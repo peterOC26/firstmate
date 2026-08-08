@@ -103,8 +103,14 @@ KIND=$(meta_value kind)
 HARNESS=$(meta_value harness)
 [ -n "$KIND" ] || KIND=ship
 
-# A torn-down (or never-created) worktree has no current state to read.
-if [ -z "$WT" ] || [ ! -d "$WT" ]; then
+# A torn-down (or never-created) worktree has no current state to read. A task
+# placed on a remote Orca host is the one case where the worktree is legitimately
+# absent from THIS machine while the task is perfectly alive, so its liveness is
+# read from the pane below instead. It drives no local no-mistakes run either,
+# which the empty CREW_BRANCH further down already accounts for.
+TASK_REMOTE=0
+[ "$(meta_value orca_remote)" != 1 ] || TASK_REMOTE=1
+if [ -z "$WT" ] || { [ "$TASK_REMOTE" != 1 ] && [ ! -d "$WT" ]; }; then
   emit unknown none "worktree gone (torn down?)"
 fi
 

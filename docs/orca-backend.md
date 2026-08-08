@@ -1,13 +1,14 @@
 # Orca runtime backend
 
-Orca is an experimental macOS backend in which the Orca app owns both the task worktree and terminal endpoint.
+Orca is an experimental backend in which the Orca app owns both the task worktree and terminal endpoint.
+Firstmate itself runs on macOS, and by default a task is placed on that same machine; a project that lives on a remote Orca host can be targeted explicitly, in which case the worktree and the agent process are on that host and only the CLI runs locally.
 The crewmate harness remains the agent process launched inside that endpoint.
 Firstmate agents load [`firstmate-orca`](../.agents/skills/firstmate-orca/SKILL.md) before operating or recovering this backend.
 
 ## Setup
 
 Pick Orca when you already use the Orca macOS app and want Orca-managed worktrees and terminals instead of Treehouse plus a session multiplexer.
-Orca is macOS-only, explicit-only, and does not support secondmate spawns.
+Firstmate runs Orca from macOS, selects it explicitly, and does not support secondmate spawns on it.
 
 Prerequisites:
 
@@ -38,10 +39,16 @@ window=fm-<id>
 terminal=<orca terminal handle>
 orca_worktree_id=<orca worktree id>
 worktree=<absolute Orca worktree path>
+orca_host=<orca host id>
+orca_project_host_setup=<project host setup id>
+orca_remote=1                       # only when the host is not local
+orca_remote_tasktmp=<path on host>  # only when the host is not local
 ```
 
 `window=` remains the caller-facing Firstmate alias.
 `terminal=` and `orca_worktree_id=` are the backend authority used by operation and cleanup paths.
+`orca_host=` and `orca_project_host_setup=` record which host the task was placed on, so recovery and cleanup read that from the task's own record instead of re-deriving it from a path.
+`orca_remote=1` is what tells every later step that the recorded paths are not on this machine.
 
 ## Current lifecycle and safety
 
@@ -64,12 +71,59 @@ It never raw-deletes an Orca worktree.
 
 ## Active limits
 
-- Orca is macOS-only and explicit-only.
+- Firstmate drives Orca from macOS and selects it explicitly.
 - The app must be running and report ready.
 - Secondmate spawns are unsupported.
 - Escape is unsupported.
 - Orca exposes no stable CLI version or protocol marker, so readiness is the compatibility gate rather than a version floor.
 - Only the verified terminal-handle and worktree result fields are accepted; speculative response shapes are rejected.
+- Remote hosts carry the further limits in "Remote Orca hosts" below.
+
+## Remote Orca hosts
+
+One Orca runtime can be federated with others, so a single local `orca` CLI addresses projects on remote hosts as well as local ones.
+Firstmate uses that to place a task where its project already lives, which is the point for a project whose source of truth is a server rather than this Mac.
+
+Target a remote project by passing an explicit selector in place of `<project-dir>`:
+
+```sh
+bin/fm-spawn.sh <id> orca:setup:<project-host-setup-id> --backend orca ...
+bin/fm-spawn.sh <id> orca:project:<project-id> --backend orca ...
+```
+
+`orca project setups` lists both ids.
+The selector is required and never inferred: a plain path that happens not to exist locally still fails as a bad path, so a typo or an unmounted disk can never be read as a request for a remote host.
+A selector requires `--backend orca`, must resolve to exactly one setup whose state is `ready`, and refuses when it matches none or several.
+A selector naming a `local` host resolves to that setup's directory and behaves exactly like passing the path.
+
+Placement is verified rather than requested.
+The worktree is created with `--project-host-setup`, then the created worktree's own host and non-primary status, and the terminal's execution host, are each checked against the requested host.
+Any mismatch removes what was created and refuses, because a task that quietly landed on this Mac would defeat the whole point of targeting the host.
+
+The isolation assertion, the dirty and unlanded-work checks, and the recorded-identity check all still run; they run on the host, through a throwaway Orca shell terminal there, and every comparison is made on that host so terminal rendering cannot flip a verdict.
+A check that cannot be obtained refuses and preserves the task: a path that is merely absent from this machine is never read as "nothing to protect".
+Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
+
+Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
+That route was chosen over Orca's own `--agent`/`--prompt` because Firstmate must keep control of the harness, model, effort, and encoded launch brief, and over SSH because it needs no transport or credentials beyond the Orca connection the backend already depends on.
+The delivered brief carries a short addendum telling the worker its status-log path is unreachable from that host and to report in its terminal instead.
+
+The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
+A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.
+An unresolvable harness refuses and reports the `PATH` the host actually had.
+
+### Remote limits
+
+- Turn-end and busy-state hooks are not installed.
+  They write into the task worktree and point at absolute paths in this firstmate home, and neither exists on another host.
+  A remote task is therefore supervised by reading its pane (`bin/fm-peek.sh`, `bin/fm-crew-state.sh`) rather than by waiting for turn-end wakes, and the spawn says so out loud.
+- For the same reason the worker cannot append to `state/<id>.status`; it reports in its terminal instead.
+- `pi`, `pi-signed`, `muse`, and `kimi` are refused: each needs an extension file, harness store, or post-launch handshake that only exists in this firstmate home.
+  `codex` re-resolves onto its verified hook-free launch form.
+- No local no-mistakes run is attributed to a remote task, and cleanup skips the local process reap, because neither has anything on this machine.
+- Secondmate spawns remain unsupported, on remote hosts as on local ones.
+- Steering delivers, but `bin/fm-send.sh` reports its delivery verdict from the Orca composer classifier, which has no verified idle pattern for `codex`; a `codex` worker receives the steer while the command still reports it unconfirmed.
+  That is a pre-existing gap in the Orca composer contract, identical for local and remote tasks.
 
 ## Regression entry points
 

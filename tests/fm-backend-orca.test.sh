@@ -75,6 +75,545 @@ SH
   chmod +x "$fb/tmux"
 }
 
+# --- remote Orca host fixtures ----------------------------------------------
+#
+# The numbered fake above cannot answer the remote-host flows: their terminal
+# reads must echo back marker lines built from a nonce the code mints at run
+# time, so a canned response can never match. This second fake instead makes the
+# "host" a local bash - `terminal send` runs the sent line, `terminal read`
+# replays what it printed - which exercises the real marker, base64, and exit
+# status protocol rather than a stub's idea of it, and lets a real local git
+# worktree stand in for the remote checkout.
+
+FM_REMOTE_HOST=ssh:test-host-1
+
+make_orca_remote_fakebin() {  # <dir> -> echoes fakebin dir
+  local fb="$1/fakebin"
+  mkdir -p "$fb"
+  cat > "$fb/orca" <<'SH'
+#!/usr/bin/env bash
+set -u
+LOG="${FM_ORCA_LOG:?}"
+FIX="${FM_ORCA_FIXTURES:?}"
+{
+  printf 'orca'
+  for a in "$@"; do printf '\x1f%s' "$a"; done
+  printf '\n'
+} >> "$LOG"
+
+ARGS=("$@")
+get_flag() {
+  local want=$1 i
+  for ((i = 0; i < ${#ARGS[@]}; i++)); do
+    if [ "${ARGS[$i]}" = "$want" ]; then printf '%s' "${ARGS[$((i + 1))]:-}"; return 0; fi
+  done
+  return 1
+}
+
+case "${1:-}" in
+  status)
+    printf '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}\n'
+    exit 0
+    ;;
+esac
+
+case "${1:-} ${2:-}" in
+  "project setups")
+    cat "$FIX/setups.json"
+    exit 0
+    ;;
+  "worktree create")
+    [ ! -f "$FIX/worktree-create.exit" ] || exit "$(cat "$FIX/worktree-create.exit")"
+    cat "$FIX/worktree-create.json"
+    exit 0
+    ;;
+  "worktree show")
+    cat "$FIX/worktree-show.json"
+    exit 0
+    ;;
+  "worktree rm")
+    printf '{"ok":true,"result":{"removed":true}}\n'
+    exit 0
+    ;;
+  "terminal create")
+    if [ -f "$FIX/terminal-create.exit" ]; then exit "$(cat "$FIX/terminal-create.exit")"; fi
+    n=$(( $(cat "$FIX/.termcount" 2>/dev/null || echo 0) + 1 ))
+    echo "$n" > "$FIX/.termcount"
+    handle="term-$n"
+    : > "$FIX/$handle.buf"
+    host=$(cat "$FIX/terminal-host" 2>/dev/null || printf '%s' "${FM_ORCA_FAKE_HOST:-}")
+    printf '{"ok":true,"result":{"terminal":{"handle":"%s","executionHostId":"%s","hostPlatform":"linux"}}}\n' \
+      "$handle" "$host"
+    exit 0
+    ;;
+  "terminal send")
+    handle=$(get_flag --terminal) || handle=
+    text=$(get_flag --text) || text=
+    # The stand-in host: run the line and keep what it printed, exactly as a
+    # real shell's scrollback would.
+    if [ -n "${FM_ORCA_FAKE_HOST_PATH:-}" ]; then
+      # A host whose PATH is deliberately narrower than the caller's, which is
+      # how a real remote host can have an agent installed but unresolvable.
+      mkdir -p "$FIX/fakehome"
+      out=$(env -i PATH="$FM_ORCA_FAKE_HOST_PATH" HOME="$FIX/fakehome" bash --noprofile --norc -c "$text" 2>&1)
+    else
+      out=$(bash -c "$text" 2>&1)
+    fi
+    [ -z "$out" ] || printf '%s\n' "$out" >> "$FIX/$handle.buf"
+    printf '{"ok":true,"result":{}}\n'
+    exit 0
+    ;;
+  "terminal read")
+    handle=$(get_flag --terminal) || handle=
+    cursor=$(get_flag --cursor) || cursor=0
+    case "$cursor" in ''|*[!0-9]*) cursor=0 ;; esac
+    total=$(wc -l < "$FIX/$handle.buf" 2>/dev/null || echo 0)
+    total=$(printf '%s' "$total" | tr -d '[:space:]')
+    tail -n +$((cursor + 1)) "$FIX/$handle.buf" 2>/dev/null \
+      | node -e '
+const fs = require("fs");
+const total = process.argv[1];
+const lines = fs.readFileSync(0, "utf8").split("\n");
+if (lines.length && lines[lines.length - 1] === "") lines.pop();
+process.stdout.write(JSON.stringify({
+  ok: true,
+  result: { terminal: { tail: lines, limited: false, oldestCursor: "0", nextCursor: total, latestCursor: total } },
+}) + "\n");
+' "$total"
+    exit 0
+    ;;
+  "terminal close")
+    printf '{"ok":true,"result":{}}\n'
+    exit 0
+    ;;
+esac
+printf '{"ok":true,"result":{}}\n'
+exit 0
+SH
+  chmod +x "$fb/orca"
+  printf '%s\n' "$fb"
+}
+
+orca_remote_case() {  # <name> -> sets CASE_DIR LOG FIX FB
+  CASE_DIR="$TMP_ROOT/$1"
+  mkdir -p "$CASE_DIR/fixtures"
+  LOG="$CASE_DIR/log"
+  FIX="$CASE_DIR/fixtures"
+  : > "$LOG"
+  FB=$(make_orca_remote_fakebin "$CASE_DIR")
+  printf '%s\n' "$FM_REMOTE_HOST" > "$FIX/terminal-host"
+}
+
+write_remote_setups() {  # <fixtures> [<extra-setup-json>]
+  local fix=$1 extra=${2:-}
+  {
+    printf '{"ok":true,"result":{"setups":['
+    printf '{"id":"setup-remote","projectId":"github:acme/app","hostId":"%s","path":"/srv/app","setupState":"ready"}' "$FM_REMOTE_HOST"
+    printf ',{"id":"setup-local","projectId":"github:acme/tools","hostId":"local","path":"/tmp","setupState":"ready"}'
+    printf ',{"id":"setup-pending","projectId":"github:acme/pending","hostId":"%s","path":"/srv/pending","setupState":"cloning"}' "$FM_REMOTE_HOST"
+    [ -z "$extra" ] || printf ',%s' "$extra"
+    printf ']}}\n'
+  } > "$fix/setups.json"
+}
+
+write_remote_worktree_fixtures() {  # <fixtures> <worktree-path> [<host-override>]
+  local fix=$1 wt=$2 host=${3:-$FM_REMOTE_HOST}
+  printf '{"ok":true,"result":{"worktree":{"id":"repo-remote::%s","path":"%s","hostId":"%s","isMainWorktree":false}}}\n' \
+    "$wt" "$wt" "$host" > "$fix/worktree-create.json"
+  printf '{"ok":true,"result":{"worktree":{"id":"repo-remote::%s","path":"%s","hostId":"%s","isMainWorktree":false}}}\n' \
+    "$wt" "$wt" "$host" > "$fix/worktree-show.json"
+}
+
+# restricted_host_path: a PATH for a host that genuinely cannot resolve the
+# caller's own tools. It shadows `bash` with a shim that refuses to read login
+# profiles, so the login-shell fallback in the harness resolution cannot quietly
+# re-import the developer machine's PATH and make this fixture machine-specific.
+# Only the coreutils the transfer protocol itself needs stay reachable.
+restricted_host_path() {  # <fixtures> -> echoes PATH
+  local bin="$1/hostbin"
+  mkdir -p "$bin"
+  cat > "$bin/bash" <<'SH'
+#!/bin/sh
+exec /bin/bash --noprofile --norc "$@"
+SH
+  chmod +x "$bin/bash"
+  printf '%s
+' "$bin:/usr/bin:/bin"
+}
+
+# A stand-in for the remote agent binary, so the PATH resolution the remote
+# launch depends on has something real to resolve.
+add_fake_remote_harness() {  # <fakebin> <name>
+  cat > "$1/$2" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "$1/$2"
+}
+
+
+# --- remote placement through fm-spawn.sh / fm-teardown.sh ------------------
+
+write_remote_setups_at() {  # <fixtures> <project-path>
+  printf '{"ok":true,"result":{"setups":[{"id":"setup-remote","projectId":"github:acme/app","hostId":"%s","path":"%s","setupState":"ready"}]}}\n' \
+    "$FM_REMOTE_HOST" "$2" > "$1/setups.json"
+}
+
+remote_spawn_case() {  # <name> <task-id> -> sets CASE_DIR LOG FIX FB PROJ WT DATA STATE CONFIG
+  orca_remote_case "$1"
+  PROJ="$CASE_DIR/proj"
+  WT="$CASE_DIR/wt"
+  DATA="$CASE_DIR/data"
+  STATE="$CASE_DIR/state"
+  CONFIG="$CASE_DIR/config"
+  fm_git_worktree "$PROJ" "$WT" "fm/$2"
+  mkdir -p "$DATA/$2" "$STATE" "$CONFIG"
+  printf 'Delivery contract: mode=local-only\n\nsmoke brief body\n' > "$DATA/$2/brief.md"
+  touch "$STATE/.last-watcher-beat"
+  write_remote_setups_at "$FIX" "$PROJ"
+  write_remote_worktree_fixtures "$FIX" "$WT"
+  add_fake_remote_harness "$FB" claude
+}
+
+run_remote_spawn() {  # <task-id> [<extra spawn args>...]
+  local id=$1
+  shift
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_HOST_PATH="${FM_ORCA_FAKE_HOST_PATH:-}" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    FM_PROJECTS_OVERRIDE="$CASE_DIR/unused-projects" FM_SPAWN_NO_GUARD=1 \
+    "$ROOT/bin/fm-spawn.sh" "$id" orca:setup:setup-remote "$@" 2>&1
+}
+
+test_spawn_places_task_on_remote_orca_host() {
+  local id out
+  id="orcaremotez1"
+  remote_spawn_case remote-spawn "$id"
+  out=$(run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  expect_code 0 $? "a remote Orca spawn should succeed"$'\n'"$out"
+  assert_grep "backend=orca" "$STATE/$id.meta" "meta missing backend=orca"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "meta must record that this task runs on a remote host"
+  assert_grep "orca_host=$FM_REMOTE_HOST" "$STATE/$id.meta" "meta must record the task's host identity"
+  assert_grep "orca_project_host_setup=setup-remote" "$STATE/$id.meta" "meta must record the project host setup"
+  assert_grep "worktree=$WT" "$STATE/$id.meta" "meta must record the remote worktree path"
+  assert_grep "project=$PROJ" "$STATE/$id.meta" "meta must record the remote project path"
+  assert_grep "orca_remote_tasktmp=/tmp/fm-$id" "$STATE/$id.meta" "meta must record the remote task temp root"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''create'$'\x1f''--project-host-setup'$'\x1f''setup-remote' \
+    "a remote spawn must pin worktree creation to the resolved host setup"
+  # The brief and its encoder must exist ON the host, and the launch line must
+  # read them from there rather than from this firstmate home.
+  [ -f "/tmp/fm-$id/brief.md" ] || fail "the brief was not delivered to the host"
+  [ -f "/tmp/fm-$id/fm-operational-input.sh" ] || fail "the operational-input encoder was not delivered to the host"
+  assert_contains "$(cat "/tmp/fm-$id/brief.md")" "smoke brief body" "delivered brief lost its body"
+  assert_contains "$(cat "/tmp/fm-$id/brief.md")" "Remote host addendum" \
+    "the delivered brief must tell the worker its status path is unreachable from that host"
+  assert_contains "$(cat "$LOG")" "/tmp/fm-$id/brief.md" "the launch line must read the brief from the host"
+  assert_contains "$(cat "$LOG")" "$FB/claude" \
+    "the launch line must name the harness's absolute path on the host, not a bare name"
+  assert_contains "$(cat "$LOG")" "export GOTMPDIR=/tmp/fm-$id/gotmp" \
+    "GOTMPDIR must point at the task temp root on the host"
+  # Local hooks would point into this firstmate home and could never fire there.
+  assert_absent "$WT/.claude/settings.local.json" "a remote task must not install a firstmate-home turn-end hook"
+  assert_contains "$out" "turn-end and busy-state hooks are not installed" \
+    "a remote spawn must say out loud that it is supervised by reading its pane"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-spawn.sh: places a task on a remote Orca host with host-pinned creation, delivered instructions, and no unreachable hooks"
+}
+
+test_spawn_refuses_orca_selector_without_orca_backend() {
+  local id out status
+  id="orcaremotez2"
+  remote_spawn_case remote-wrong-backend "$id"
+  out=$(run_remote_spawn "$id" claude --mode local-only --yolo off --backend tmux)
+  status=$?
+  [ "$status" -ne 0 ] || fail "an Orca selector on a non-Orca backend must refuse"
+  assert_contains "$out" "is an Orca project selector but this spawn resolved backend=tmux" \
+    "the refusal should name the mismatch"
+  assert_absent "$STATE/$id.meta" "a refused selector must not publish task metadata"
+  pass "fm-spawn.sh: refuses an Orca project selector unless the spawn is on the Orca backend"
+}
+
+test_spawn_refuses_remote_worktree_that_is_the_primary_checkout() {
+  local id out status
+  id="orcaremotez3"
+  remote_spawn_case remote-primary "$id"
+  # Orca answers with the project's own primary checkout instead of a new one.
+  write_remote_worktree_fixtures "$FIX" "$PROJ"
+  out=$(run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a remote worktree that is the primary checkout must refuse"
+  assert_contains "$out" "resolved to the primary checkout" "the refusal should name the tangle it prevents"
+  assert_absent "$STATE/$id.meta" "a failed isolation check must not publish task metadata"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a refused remote spawn must release the worktree it created"
+  pass "fm-spawn.sh: refuses a remote task whose worktree is the project's primary checkout"
+}
+
+test_spawn_refuses_remote_harness_the_host_cannot_resolve() {
+  local id out status
+  id="orcaremotez4"
+  remote_spawn_case remote-no-harness "$id"
+  rm -f "$FB/claude"
+  out=$(FM_ORCA_FAKE_HOST_PATH=$(restricted_host_path "$FIX") \
+    run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  status=$?
+  [ "$status" -ne 0 ] || fail "a harness the host cannot resolve must refuse before launch"
+  assert_contains "$out" "is not on PATH on Orca host" "the refusal should name the host"
+  assert_contains "$out" "PATH there:" "the refusal should report the PATH the host actually had"
+  assert_absent "$STATE/$id.meta" "an unresolvable harness must not publish task metadata"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-spawn.sh: refuses when the harness cannot be resolved on the remote host, naming that host's PATH"
+}
+
+remote_teardown_meta() {  # <state> <id> <worktree> <project>
+  fm_write_meta "$1/$2.meta" \
+    "window=fm-$2" "endpoint_task_id=$2" "terminal=term-1" "worktree=$3" "project=$4" \
+    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$3" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$2"
+}
+
+run_remote_teardown() {  # <id> [<extra args>...]
+  local id=$1 neutral
+  shift
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
+}
+
+test_remote_teardown_refuses_uncommitted_work_on_the_host() {
+  local id out status
+  id="orcaremotez5"
+  remote_spawn_case remote-td-dirty "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'work in progress\n' > "$WT/unfinished.txt"
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "cleanup must refuse while the host's worktree holds uncommitted work"
+  assert_contains "$out" "uncommitted changes present" "the refusal should name the uncommitted work"
+  assert_contains "$out" "$WT" "the refusal should name the remote worktree it protected"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a refused cleanup must not remove the worktree"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  pass "fm-teardown.sh: refuses to release a remote worktree that holds uncommitted work on its host"
+}
+
+test_remote_teardown_refuses_when_the_host_is_unreachable() {
+  local id out status
+  id="orcaremotez6"
+  remote_spawn_case remote-td-unreachable "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'work in progress\n' > "$WT/unfinished.txt"
+  # No inspection shell can be opened, so no protective check can run.
+  printf '1\n' > "$FIX/terminal-create.exit"
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unreachable host must refuse cleanup, not be read as an empty worktree"
+  assert_contains "$out" "cannot reach Orca host" "the refusal should name the unreachable host"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "an unreachable host must not lead to removing the worktree anyway"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
+}
+
+test_remote_teardown_releases_a_clean_worktree() {
+  local id out status
+  id="orcaremotez7"
+  remote_spawn_case remote-td-clean "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  mkdir -p "/tmp/fm-$id"
+  printf 'scratch\n' > "/tmp/fm-$id/scratch.txt"
+  out=$(run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a clean remote worktree should be released"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
+    "cleanup must release the recorded remote worktree through Orca"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-1' \
+    "cleanup must close the recorded remote terminal"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  assert_absent "/tmp/fm-$id" "cleanup should sweep the task temp root it created on the host"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-teardown.sh: releases a clean remote worktree through Orca and sweeps its temp root on the host"
+}
+
+test_setup_resolve_reads_one_ready_setup() {
+  local out
+  orca_remote_case setup-resolve
+  write_remote_setups "$FIX"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_setup_resolve orca:setup:setup-remote' "$ROOT" )
+  [ "$out" = "setup-remote	github:acme/app	$FM_REMOTE_HOST	/srv/app" ] \
+    || fail "setup resolve should print id/project/host/path, got '$out'"
+  pass "fm_backend_orca_setup_resolve: resolves orca:setup:<id> to its id, project, host, and path"
+}
+
+test_setup_resolve_refuses_ambiguous_project() {
+  local out status extra
+  orca_remote_case setup-ambiguous
+  extra='{"id":"setup-second","projectId":"github:acme/app","hostId":"local","path":"/tmp/app","setupState":"ready"}'
+  write_remote_setups "$FIX" "$extra"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_setup_resolve orca:project:github:acme/app' "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a project id matching two setups must refuse rather than pick a host"
+  assert_contains "$out" "matches 2 Orca project host setups" "ambiguous refusal should say how many matched"
+  assert_contains "$out" "setup-remote" "ambiguous refusal should name the candidate setups"
+  assert_contains "$out" "setup-second" "ambiguous refusal should name the candidate setups"
+  pass "fm_backend_orca_setup_resolve: refuses an ambiguous project selector instead of choosing a host"
+}
+
+test_setup_resolve_refuses_unready_and_unknown() {
+  local out status
+  orca_remote_case setup-unready
+  write_remote_setups "$FIX"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_setup_resolve orca:setup:setup-pending' "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a setup that is not ready must refuse"
+  assert_contains "$out" "is cloning, not ready" "unready refusal should name the actual state"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_setup_resolve orca:nonsense:x' "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unknown orca: selector form must refuse"
+  assert_contains "$out" "is not an Orca project selector" "unknown form should name the accepted forms"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_setup_resolve orca:setup:absent' "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unmatched setup id must refuse"
+  assert_contains "$out" "no Orca project host setup matches" "unmatched refusal should say so"
+  pass "fm_backend_orca_setup_resolve: refuses unready, unknown-form, and unmatched selectors"
+}
+
+test_worktree_create_on_setup_pins_and_verifies_host() {
+  local out status
+  orca_remote_case wt-on-setup
+  write_remote_worktree_fixtures "$FIX" /srv/app-task
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create_on_setup setup-remote fm-t1 '"$FM_REMOTE_HOST" "$ROOT" )
+  [ "$out" = "repo-remote::/srv/app-task	/srv/app-task" ] \
+    || fail "create-on-setup should print the worktree id and path, got '$out'"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''create'$'\x1f''--project-host-setup'$'\x1f''setup-remote' \
+    "create-on-setup should pin the host with --project-host-setup"
+
+  # Same call, but Orca answers with a worktree on a different host.
+  orca_remote_case wt-on-setup-wrong
+  write_remote_worktree_fixtures "$FIX" /srv/app-task local
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create_on_setup setup-remote fm-t1 '"$FM_REMOTE_HOST" "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a worktree created on the wrong host must refuse, not be used"
+  assert_contains "$out" "not an additional worktree on the required host" \
+    "wrong-host refusal should name the requirement"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a wrongly placed worktree should be removed, not left behind"
+  pass "fm_backend_orca_worktree_create_on_setup: pins the host and refuses a worktree that landed elsewhere"
+}
+
+test_terminal_create_refuses_wrong_execution_host() {
+  local out status
+  orca_remote_case term-host
+  printf 'local\n' > "$FIX/terminal-host"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_terminal_create repo-remote::/srv/app-task fm-t1 '"$FM_REMOTE_HOST" "$ROOT" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a terminal that came up on another host must refuse"
+  assert_contains "$out" "not the required host" "wrong-host refusal should name the requirement"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close' \
+    "a terminal on the wrong host should be closed, not left open"
+  pass "fm_backend_orca_terminal_create: refuses and closes a terminal whose execution host is not the required one"
+}
+
+test_exec_run_returns_remote_output_and_status() {
+  local out status
+  orca_remote_case exec-run
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "printf %s\\\\n one; printf %s\\\\n two"' "$ROOT" )
+  [ "$out" = $'one\ntwo' ] || fail "exec should return the command's own output, got '$out'"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "echo problem >&2; exit 7"' "$ROOT" )
+  status=$?
+  expect_code 7 "$status" "exec should return the remote command's own exit status"
+  [ "$out" = "problem" ] || fail "exec should return remote stderr with stdout, got '$out'"
+  pass "fm_backend_orca_exec_run: returns the remote command's combined output and exit status"
+}
+
+test_push_file_refuses_on_digest_mismatch() {
+  local out status src
+  orca_remote_case push-good
+  src="$CASE_DIR/payload.txt"
+  printf 'line one\nline two\n' > "$src"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_push_file "$h" "$1" "$2/delivered.txt" && cat "$2/delivered.txt"' "$ROOT" "$src" "$CASE_DIR" 2>&1 )
+  expect_code 0 $? "a clean push should succeed"$'\n'"$out"
+  [ "$out" = $'line one\nline two' ] || fail "pushed file should arrive byte-identical, got '$out'"
+
+  orca_remote_case push-corrupt
+  src="$CASE_DIR/payload.txt"
+  printf 'original content\n' > "$src"
+  # The host writes something other than what was sent: the digest check is the
+  # only thing standing between that and a worker launched on a half a brief.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" FM_BACKEND_ORCA_PUSH_CHUNK=4 \
+    bash -c '. "$0/bin/backends/orca.sh"
+fm_backend_orca_push_file_orig=$(declare -f fm_backend_orca_push_file)
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_local_digest() { printf "%s" deadbeef; }
+fm_backend_orca_push_file "$h" "$1" "$2/delivered.txt"' "$ROOT" "$src" "$CASE_DIR" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a digest mismatch must refuse the transfer"
+  assert_contains "$out" "did not arrive intact" "digest refusal should say the copy is not trustworthy"
+  pass "fm_backend_orca_push_file: delivers byte-identical content and refuses on a digest mismatch"
+}
+
+test_remote_which_resolves_absolute_path() {
+  local out status
+  orca_remote_case remote-which
+  add_fake_remote_harness "$FB" fmfakeagent
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" fmfakeagent' "$ROOT" )
+  [ "$out" = "$FB/fmfakeagent" ] || fail "remote which should return the absolute path, got '$out'"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" fmdefinitelymissing' "$ROOT" )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unresolvable harness must fail rather than return a bare name"
+  [ -z "$out" ] || fail "an unresolvable harness must print nothing, got '$out'"
+  pass "fm_backend_orca_remote_which: resolves an absolute path and fails when the host cannot resolve the name"
+}
+
+test_isolation_verdicts_distinguish_primary_and_subdirectory() {
+  local proj wt out
+  orca_remote_case isolation
+  proj="$CASE_DIR/proj"
+  wt="$CASE_DIR/wt"
+  fm_git_worktree "$proj" "$wt" fm/iso
+  mkdir -p "$wt/nested"
+  run_isolation() {
+    PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+      bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::x probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_worktree_isolation "$h" "$1" "$2"' "$ROOT" "$1" "$2"
+  }
+  out=$(run_isolation "$wt" "$proj")
+  [ "$out" = ISOLATED ] || fail "a real sibling worktree should read ISOLATED, got '$out'"
+  out=$(run_isolation "$proj" "$proj")
+  [ "$out" = IS-PRIMARY ] || fail "the primary checkout should read IS-PRIMARY, got '$out'"
+  out=$(run_isolation "$wt/nested" "$proj")
+  [ "$out" = TOPLEVEL-MISMATCH ] || fail "a subdirectory of a worktree should read TOPLEVEL-MISMATCH, got '$out'"
+  out=$(run_isolation "$CASE_DIR/absent" "$proj")
+  [ "$out" = NOT-A-WORKTREE ] || fail "a missing path should read NOT-A-WORKTREE, got '$out'"
+  pass "fm_backend_orca_remote_worktree_isolation: separates an isolated worktree from the primary, a subdirectory, and a missing path"
+}
+
 test_capture_reads_terminal_tail_json() {
   local out
   orca_case capture-tail
@@ -1276,6 +1815,22 @@ test_dispatcher_sources_orca_and_routes_primitives() {
   pass "fm-backend dispatcher: accepts orca and routes capture through bin/backends/orca.sh"
 }
 
+test_spawn_places_task_on_remote_orca_host
+test_spawn_refuses_orca_selector_without_orca_backend
+test_spawn_refuses_remote_worktree_that_is_the_primary_checkout
+test_spawn_refuses_remote_harness_the_host_cannot_resolve
+test_remote_teardown_refuses_uncommitted_work_on_the_host
+test_remote_teardown_refuses_when_the_host_is_unreachable
+test_remote_teardown_releases_a_clean_worktree
+test_setup_resolve_reads_one_ready_setup
+test_setup_resolve_refuses_ambiguous_project
+test_setup_resolve_refuses_unready_and_unknown
+test_worktree_create_on_setup_pins_and_verifies_host
+test_terminal_create_refuses_wrong_execution_host
+test_exec_run_returns_remote_output_and_status
+test_push_file_refuses_on_digest_mismatch
+test_remote_which_resolves_absolute_path
+test_isolation_verdicts_distinguish_primary_and_subdirectory
 test_capture_reads_terminal_tail_json
 test_capture_falls_back_to_text_fields
 test_capture_fails_on_orca_error_json
