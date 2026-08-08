@@ -1174,8 +1174,8 @@ validate_worktree_teardown_safety() {
   esac
   # A worktree that is genuinely gone has nothing left to protect; a worktree
   # this process merely cannot see does. Only the first of those may skip.
-  task_dir_exists "$WT"
-  exists_rc=$?
+  exists_rc=0
+  task_dir_exists "$WT" || exists_rc=$?
   if [ "$exists_rc" -eq 1 ]; then
     return 0
   fi
@@ -1632,8 +1632,8 @@ require_orca_worktree_path_match_if_present() {
   if [ "$TASK_REMOTE" = 1 ]; then
     # Only a definite "absent" skips. An indeterminate answer still checks, so
     # an unreachable host can never look like an already-removed worktree.
-    task_dir_exists "$inspected"
-    exists_rc=$?
+    exists_rc=0
+    task_dir_exists "$inspected" || exists_rc=$?
     [ "$exists_rc" -ne 1 ] || return 0
   else
     [ -e "$inspected" ] || return 0
@@ -2347,8 +2347,8 @@ fi
 # silent pass this gate exists to prevent. Only a definite "absent" (1) skips -
 # an indeterminate answer still enters, and validate_worktree_teardown_safety
 # refuses there rather than passing on a question it could not ask.
-task_dir_exists "$WT"
-WT_EXISTS_RC=$?
+WT_EXISTS_RC=0
+task_dir_exists "$WT" || WT_EXISTS_RC=$?
 if [ "$WT_EXISTS_RC" -ne 1 ] && [ "$FORCE" != "--force" ]; then
   if validate_worktree_teardown_safety; then
     :
