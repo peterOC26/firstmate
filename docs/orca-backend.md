@@ -39,15 +39,16 @@ window=fm-<id>
 terminal=<orca terminal handle>
 orca_worktree_id=<orca worktree id>
 worktree=<absolute Orca worktree path>
-orca_host=<orca host id>
-orca_project_host_setup=<project host setup id>
-orca_remote=1                       # only when the host is not local
-orca_remote_tasktmp=<path on host>  # only when the host is not local
+orca_host=<orca host id>                        # only for an orca: selector spawn
+orca_project_host_setup=<project host setup id> # only for an orca: selector spawn
+orca_remote=1                                   # only when the host is not local
+orca_remote_tasktmp=<path on host>              # only when the host is not local
 ```
 
 `window=` remains the caller-facing Firstmate alias.
 `terminal=` and `orca_worktree_id=` are the backend authority used by operation and cleanup paths.
 `orca_host=` and `orca_project_host_setup=` record which host the task was placed on, so recovery and cleanup read that from the task's own record instead of re-deriving it from a path.
+A spawn writes them whenever it named an `orca:` selector, a `local` host included; a spawn that named a plain project directory is on this machine by construction and records neither.
 `orca_remote=1` is what tells every later step that the recorded paths are not on this machine.
 
 ## Current lifecycle and safety
@@ -95,6 +96,9 @@ bin/fm-spawn.sh <id> orca:project:<project-id> --backend orca ...
 The selector is required and never inferred: a plain path that happens not to exist locally still fails as a bad path, so a typo or an unmounted disk can never be read as a request for a remote host.
 A selector requires `--backend orca`, must resolve to exactly one setup whose state is `ready`, and refuses when it matches none or several.
 A selector naming a `local` host resolves to that setup's directory and behaves exactly like passing the path.
+
+A remote host needs the chosen harness installed, `git` for the task's own worktree, `base64` for the reply transport below, and `sha256sum` or `shasum` for the digest-verified copies.
+The per-backend toolchain check in [`configuration.md`](configuration.md#toolchain) inspects this machine only, so a tool missing on the host shows up as a spawn refusal from that host rather than as a bootstrap warning.
 
 Placement is verified rather than requested.
 The worktree is created with `--project-host-setup`, then the created worktree's own host and non-primary status, and the terminal's execution host, are each checked against the requested host.

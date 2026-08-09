@@ -2557,8 +2557,10 @@ META_WINDOW=$T
   if [ "$BACKEND" = orca ]; then
     echo "orca_worktree_id=$ORCA_WORKTREE_ID"
     echo "terminal=$ORCA_TERMINAL"
-    # Recorded for every Orca task, local included, so recovery and cleanup read
-    # the task's host from its own record instead of re-deriving it from a path.
+    # Recorded for every selector-resolved Orca task, a local host included, so
+    # recovery and cleanup read the task's host from its own record instead of
+    # re-deriving it from a path. A plain project directory names no setup and
+    # is local by construction, so it leaves both fields absent.
     [ -z "$ORCA_HOST_ID" ] || echo "orca_host=$ORCA_HOST_ID"
     [ -z "$ORCA_SETUP_ID" ] || echo "orca_project_host_setup=$ORCA_SETUP_ID"
     if [ "$ORCA_REMOTE" = 1 ]; then
