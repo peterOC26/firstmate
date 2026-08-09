@@ -111,8 +111,10 @@ A reply that still cannot be recovered whole is reported as a transport failure,
 An empty answer is never itself the failure signal, so a check that genuinely finds nothing still succeeds.
 
 The landed-work half of the cleanup check asks the host too, so a remote task whose work has already landed can be released normally rather than only through `--force`.
-Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem; they name the repository explicitly - forge host included, so an enterprise origin works the same as a github.com one - instead of inferring it from a working directory the caller does not have.
+Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem.
+For a REMOTE task they name the repository explicitly - forge host included, so an enterprise origin works the same as a github.com one - because there is no worktree here for gh to resolve one from.
 An origin that names no resolvable forge host, such as an ssh alias that resolves through ssh config, is not guessed at: the PR lookup reports no match and cleanup falls back to the content check, exactly as it does for any other lookup failure.
+A local task is untouched by that: it still asks gh from inside its own worktree, so gh's own base-repository resolution - a fork whose pull requests live on the parent, or a `gh repo set-default` - keeps deciding which repository the lookup is about.
 Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
 
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.

@@ -849,7 +849,7 @@ fm_backend_orca_shell_quote() {  # <word>
 # and same output as `git -C <worktree>` locally, so a caller keeps ONE copy of
 # the policy that reads it and only the access path differs.
 fm_backend_orca_remote_git() {  # <handle> <worktree-path> <git-arg>...
-  local handle=$1 worktree=$2 cmd
+  local handle=$1 worktree=$2 cmd out rc
   shift 2
   cmd="git -C $(fm_backend_orca_shell_quote "$worktree")"
   while [ "$#" -gt 0 ]; do
@@ -859,7 +859,17 @@ fm_backend_orca_remote_git() {  # <handle> <worktree-path> <git-arg>...
   # git's own stderr is dropped on the host, exactly as every local `git -C`
   # call site already drops it, so the exit status stays the only signal and a
   # diagnostic can never be mistaken for command output.
-  fm_backend_orca_exec_run "$handle" "$cmd 2>/dev/null"
+  out=$(fm_backend_orca_exec_run "$handle" "$cmd 2>/dev/null")
+  rc=$?
+  # The reply crosses as exact bytes, and the transport it crosses through has
+  # no trailing newline to give back - a local `git -C` always does. Without one
+  # the last line of a reply fed to `read` is an unterminated line that `read`
+  # reports as end of input, so a caller silently loses it. Restored here, once,
+  # for every caller: non-empty output ends in exactly one newline, and empty
+  # output stays empty, because "nothing" and "one blank line" are different
+  # answers to the work-protection checks.
+  [ -z "$out" ] || printf '%s\n' "$out"
+  return "$rc"
 }
 
 # fm_backend_orca_remote_worktree_isolation: the remote equal of the local

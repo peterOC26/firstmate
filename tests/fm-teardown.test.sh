@@ -284,13 +284,30 @@ SH
   chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
 }
 
-# Override GitHub lookups so the PR is discoverable BY BRANCH NAME, and record
-# which repository each lookup named. The recording is the point: teardown has
-# no working directory to infer a repository from when the task's files are on
-# another host, so it has to name one, and naming the wrong one would answer
-# about somebody else's pull requests.
-add_gh_pr_merged_by_branch() {  # <case-dir> <head>
+# A checkout whose origin is a FORK, whose pull request lives on the parent
+# repository. Both fakes answer only when asked from inside the worktree, the
+# way gh resolves a base repository for itself; a lookup that instead named the
+# repository derived from the origin URL would be asking the fork, which has no
+# such PR. Every call records the repository it named, if any, so the test can
+# tell the two apart.
+add_gh_pr_merged_on_parent_repo() {  # <case-dir> <head>
   local case_dir=$1 head=$2
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+repo=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" != --repo ] || repo=\$a
+  prev=\$a
+done
+printf 'gh-axi %s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$case_dir/gh-calls"
+[ -z "\$repo" ] || { echo "error: no pull requests found" >&2 ; exit 1 ; }
+case "\${1:-} \${2:-}" in
+  "pr list")
+    printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,merged" ; exit 0 ;;
+esac
+exit 0
+SH
   cat > "$case_dir/fakebin/gh" <<SH
 #!/usr/bin/env bash
 repo=""
@@ -299,9 +316,9 @@ for a in "\$@"; do
   [ "\$prev" != --repo ] || repo=\$a
   prev=\$a
 done
-printf '%s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$case_dir/gh-calls"
+printf 'gh %s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$case_dir/gh-calls"
+[ -z "\$repo" ] || { echo "error: could not resolve to a PullRequest" >&2 ; exit 1 ; }
 case "\${1:-} \${2:-}" in
-  "pr list") printf '%s\n' 7 ; exit 0 ;;
   "pr view")
     case " \$* " in
       *"state,headRefOid"*) printf '%s\t%s\n' 'MERGED' '$head' ; exit 0 ;;
@@ -312,7 +329,7 @@ esac
 echo "error: pull request not found" >&2
 exit 1
 SH
-  chmod +x "$case_dir/fakebin/gh"
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
   : > "$case_dir/gh-calls"
 }
 
@@ -799,61 +816,34 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
   pass "teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded"
 }
 
-test_pr_discovery_by_branch_works_on_a_non_github_com_forge_host() {
+test_local_pr_discovery_honours_ghs_own_base_repository() {
   local case_dir rc local_head pr_head
-  case_dir=$(make_case enterprise-pr-branch-discovery)
+  case_dir=$(make_case fork-pr-branch-discovery)
   write_meta "$case_dir" no-mistakes ship
   # Same shape as the case above - work that landed only through its PR, with
-  # nothing pushed and nothing of it on the default branch - but on an
-  # enterprise forge host. Discovering that PR from the branch name is the only
-  # thing that can release this worktree, so the lookup has to carry the host
-  # from the task's own origin instead of assuming github.com.
+  # nothing pushed and nothing of it on the default branch - but the task's
+  # origin is a fork and its PR lives on the parent repository. Which repository
+  # a branch's PR is on is not a function of the origin URL: gh resolves it from
+  # the checkout, and this repository is itself a fork, so deriving it from the
+  # origin instead would ask the fork and refuse work that has landed.
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes auto-fix")
-  git -C "$case_dir/wt" remote set-url origin https://github.acme.invalid/team/app.git
-  add_gh_pr_merged_by_branch "$case_dir" "$pr_head"
+  # Unreachable on purpose: the fallback content check fetches from origin, and
+  # this case must not depend on the network to fail over.
+  git -C "$case_dir/wt" remote set-url origin https://github.fork.invalid/me/app.git
+  add_gh_pr_merged_on_parent_repo "$case_dir" "$pr_head"
 
   set +e
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
-  expect_code 0 "$rc" "enterprise-pr: teardown should release work landed through a PR on an enterprise forge host"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "enterprise-pr: teardown printed a REFUSED line"
-  grep -qx 'pr list github.acme.invalid/team/app' "$case_dir/gh-calls" \
-    || fail "enterprise-pr: the PR lookup did not name the task's own repository; calls were: $(cat "$case_dir/gh-calls" 2>/dev/null)"
-  pass "teardown discovers a merged PR by branch name on an enterprise forge host, naming the task's own repository"
-}
-
-test_pr_discovery_refuses_to_guess_a_repository_from_an_ssh_alias() {
-  local case_dir rc local_head pr_head
-  case_dir=$(make_case ssh-alias-pr-lookup)
-  write_meta "$case_dir" no-mistakes ship
-  wt_commit_file "$case_dir" feature.txt hello "add feature"
-  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
-  pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes auto-fix")
-  # An ssh alias names an ssh-config entry, not a forge host, so there is no
-  # repository this lookup can honestly name. It must stay fail-closed - asking
-  # a guessed host about someone else's repository could report work as landed
-  # that never landed - and the caller falls back to the content check, which
-  # here correctly refuses.
-  git -C "$case_dir/wt" remote set-url origin 'git@github-work:team/app.git'
-  # Keep the fallback content check hermetic: it fetches from origin, and this
-  # origin is deliberately not a reachable one.
-  git -C "$case_dir/wt" config core.sshCommand /usr/bin/false
-  add_gh_pr_merged_by_branch "$case_dir" "$pr_head"
-
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
-
-  expect_code 1 "$rc" "ssh-alias-pr: teardown should refuse rather than query a guessed repository"
-  grep -q REFUSED "$case_dir/stderr" || fail "ssh-alias-pr: no REFUSED line in stderr"
-  ! grep -q '^pr list ' "$case_dir/gh-calls" 2>/dev/null \
-    || fail "ssh-alias-pr: an unresolvable origin must not be turned into a forge lookup: $(cat "$case_dir/gh-calls")"
-  pass "teardown refuses to synthesize a forge host from an ssh alias instead of querying the wrong repository"
+  expect_code 0 "$rc" "fork-pr: teardown should release work landed through a PR on the parent repository"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "fork-pr: teardown printed a REFUSED line"
+  ! grep -q 'me/app' "$case_dir/gh-calls" \
+    || fail "fork-pr: the lookup named the fork instead of letting gh resolve the base repository: $(cat "$case_dir/gh-calls")"
+  pass "teardown lets gh resolve a local task's base repository, so a fork's PR on the parent still counts as landed"
 }
 
 test_squash_merged_pr_allows_replayed_unpushed_patch() {
@@ -2609,8 +2599,7 @@ test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
 test_squash_merged_branch_deleted_allows
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
-test_pr_discovery_by_branch_works_on_a_non_github_com_forge_host
-test_pr_discovery_refuses_to_guess_a_repository_from_an_ssh_alias
+test_local_pr_discovery_honours_ghs_own_base_repository
 test_squash_merged_pr_allows_replayed_unpushed_patch
 test_merged_pr_with_later_local_commit_refuses
 test_pr_check_does_not_refresh_stale_pr_head

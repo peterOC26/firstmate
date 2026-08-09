@@ -2138,7 +2138,8 @@ if [ "$ORCA_REMOTE" = 1 ]; then
   ORCA_REMOTE_TASK_TMP="/tmp/fm-$ID"
   ORCA_REMOTE_BRIEF="$ORCA_REMOTE_TASK_TMP/brief.md"
   ORCA_REMOTE_OPINPUT="$ORCA_REMOTE_TASK_TMP/fm-operational-input.sh"
-  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" "mkdir -p '$ORCA_REMOTE_TASK_TMP/gotmp'" >/dev/null || {
+  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
+    "mkdir -p $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
     echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP on host $ORCA_HOST_ID" >&2
     exit 1
   }
@@ -2172,7 +2173,8 @@ EOF
     echo "error: could not deliver the operational-input encoder for $ID to host $ORCA_HOST_ID" >&2
     exit 1
   }
-  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" "chmod 0755 '$ORCA_REMOTE_OPINPUT'" >/dev/null || {
+  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
+    "chmod 0755 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_OPINPUT")" >/dev/null || {
     echo "error: could not make the operational-input encoder executable on host $ORCA_HOST_ID" >&2
     exit 1
   }

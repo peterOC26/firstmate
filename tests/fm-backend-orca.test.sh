@@ -497,6 +497,127 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
 }
 
+# The forge answers for a merged PR whose head is <head>, recording the
+# repository each lookup named so a case can tell which one was asked.
+add_fake_gh_merged_pr() {  # <fakebin> <head> <call-log>
+  local fb=$1 head=$2 log=$3
+  cat > "$fb/gh" <<SH
+#!/usr/bin/env bash
+repo=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" != --repo ] || repo=\$a
+  prev=\$a
+done
+printf '%s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$log"
+case "\${1:-} \${2:-}" in
+  "pr list") printf '%s\n' 7 ; exit 0 ;;
+  "pr view") printf '%s\t%s\n' 'MERGED' '$head' ; exit 0 ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$fb/gh"
+  : > "$log"
+}
+
+test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr() {
+  local id out status pr_head equiv
+  id="orcaremotez13"
+  remote_spawn_case remote-td-replayed "$id"
+  # The last commit is the only unpushed one, its content is NOT on the default
+  # branch, and the PR landed an equivalent patch under a different sha - so the
+  # ONLY thing that can release this worktree is comparing patch ids across the
+  # PR's commit range. That range is a single commit, which is exactly where a
+  # reply whose last line is unterminated loses everything it had to say.
+  fm_git_add_origin "$PROJ" "$CASE_DIR/origin.git"
+  printf 'parent\n' > "$WT/local-parent.txt"
+  git -C "$WT" add local-parent.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "local parent"
+  git -C "$WT" push -q origin "HEAD:refs/heads/fm/$id"
+  printf 'hello\n' > "$WT/feature.txt"
+  git -C "$WT" add feature.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  equiv="$CASE_DIR/_equiv"
+  git clone -q "$CASE_DIR/origin.git" "$equiv"
+  printf 'hello\n' > "$equiv/feature.txt"
+  git -C "$equiv" add feature.txt
+  git -C "$equiv" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  git -C "$equiv" push -q origin HEAD:refs/heads/pr-head
+  git -C "$PROJ" fetch -q origin
+  pr_head=$(git -C "$PROJ" rev-parse refs/remotes/origin/pr-head)
+  add_fake_gh_merged_pr "$FB" "$pr_head" "$CASE_DIR/gh-calls"
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" \
+    "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id" \
+    "pr=https://github.com/example/repo/pull/7"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a remote task whose patch landed in the merged PR should be releasable"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
+    "a remote task whose patch has landed must be released through Orca"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  pass "fm-teardown.sh: releases a remote task whose unpushed patch is contained in the merged PR head"
+}
+
+test_remote_pr_discovery_names_the_task_s_own_forge_host() {
+  local id out status head
+  id="orcaremotez14"
+  remote_spawn_case remote-td-forge-host "$id"
+  # Nothing pushed and nothing on the default branch, and no pr= recorded, so the
+  # branch-name PR lookup is the only route. A remote task has no worktree here
+  # for gh to resolve a repository from, so the lookup must name one - carrying
+  # the host from the task's own origin rather than assuming github.com.
+  git -C "$PROJ" remote add origin https://github.acme.invalid/team/app.git
+  printf 'hello\n' > "$WT/feature.txt"
+  git -C "$WT" add feature.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  head=$(git -C "$WT" rev-parse HEAD)
+  add_fake_gh_merged_pr "$FB" "$head" "$CASE_DIR/gh-calls"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'mode=no-mistakes\n' >> "$STATE/$id.meta"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a remote task whose PR is discoverable by branch should be releasable"$'\n'"$out"
+  grep -qx 'pr list github.acme.invalid/team/app' "$CASE_DIR/gh-calls" \
+    || fail "the remote PR lookup did not name the task's own repository; calls were: $(cat "$CASE_DIR/gh-calls" 2>/dev/null)"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  pass "fm-teardown.sh: a remote task's PR lookup names its own repository, forge host included"
+}
+
+test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias() {
+  local id out status head
+  id="orcaremotez15"
+  remote_spawn_case remote-td-ssh-alias "$id"
+  # An ssh alias names an ssh-config entry, not a forge host. There is no
+  # repository this lookup can honestly name, and asking a guessed one could
+  # report work as landed that never landed - so it stays fail-closed and the
+  # content check, which here finds nothing, refuses.
+  git -C "$PROJ" remote add origin 'git@github-work:team/app.git'
+  git -C "$PROJ" config core.sshCommand /usr/bin/false
+  printf 'hello\n' > "$WT/feature.txt"
+  git -C "$WT" add feature.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  head=$(git -C "$WT" rev-parse HEAD)
+  add_fake_gh_merged_pr "$FB" "$head" "$CASE_DIR/gh-calls"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'mode=no-mistakes\n' >> "$STATE/$id.meta"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an origin that names no forge host must not be turned into a lookup that releases work"
+  assert_contains "$out" "REFUSED" "the refusal should say so out loud"
+  ! grep -q '^pr list ' "$CASE_DIR/gh-calls" \
+    || fail "an unresolvable origin must not be turned into a forge lookup: $(cat "$CASE_DIR/gh-calls")"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  pass "fm-teardown.sh: a remote PR lookup refuses to synthesize a forge host from an ssh alias"
+}
+
 test_remote_teardown_releases_work_already_landed_on_the_host() {
   local id out status
   id="orcaremotez9"
@@ -2232,6 +2353,9 @@ test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
 test_remote_teardown_releases_work_already_landed_on_the_host
+test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
+test_remote_pr_discovery_names_the_task_s_own_forge_host
+test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
 test_remote_teardown_releases_a_clean_worktree

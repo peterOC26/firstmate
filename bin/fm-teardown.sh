@@ -808,13 +808,16 @@ remove_pr_poll_artifacts() {
   fi
 }
 
-# The repository these forge lookups are about, as gh's own HOST/OWNER/REPO,
-# read from the task's own origin through task_git so it answers on whichever
-# host holds the worktree. gh infers a repository from the working directory,
-# and a remote task has no directory here to infer from; naming the repository
-# explicitly is what replaces that, and it resolves to the same repository a
-# local task would have inferred - on any forge host, not just github.com, so an
-# enterprise origin keeps its PR-based landed-work detection.
+# The repository a REMOTE task's forge lookups are about, as gh's own
+# HOST/OWNER/REPO, read from that task's own origin through task_git so it
+# answers on the host holding the worktree. gh infers a repository by resolving
+# one from the working directory, and a remote task has no directory here to
+# infer from, so naming it explicitly is what replaces that - on any forge host,
+# not just github.com, so an enterprise origin keeps its PR-based landed-work
+# detection. A local task does NOT come through here: it still asks gh from
+# inside its own worktree, which is what keeps gh's own base-repository
+# resolution (a fork's PRs living on the parent, `gh repo set-default`) working
+# exactly as it did.
 #
 # The host has to be a REAL one. In a scheme URL it is literal by definition; in
 # scp-like syntax it can just as easily be an ssh alias (git@github-work:...),
@@ -868,12 +871,23 @@ task_repo_slug() {
 # Resolve the PR number for a worktree branch. Echoes the number on a single
 # match and returns 0; returns non-zero on no match or any lookup failure, so
 # the caller treats it as "no PR found" (fail-safe).
+#
+# A local task asks gh-axi from inside its own worktree, exactly as before: the
+# repository a branch's PR lives on is not a function of the origin URL, and
+# letting gh resolve it is what keeps a fork whose PRs live on the parent - and
+# `gh repo set-default` - answering. A remote task has no worktree here for that
+# resolution to happen in, so it names its repository instead.
 pr_number_from_branch() {
   local branch=$1 out n slug
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
-  slug=$(task_repo_slug) || return 1
-  out=$(gh pr list --repo "$slug" --state all --head "$branch" --limit 1 --json number -q '.[].number' 2>/dev/null) || return 1
-  n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+  if [ "$TASK_REMOTE" != 1 ]; then
+    out=$( cd "$WT" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
+    n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
+  else
+    slug=$(task_repo_slug) || return 1
+    out=$(gh pr list --repo "$slug" --state all --head "$branch" --limit 1 --json number -q '.[].number' 2>/dev/null) || return 1
+    n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+  fi
   [ -n "$n" ] || return 1
   printf '%s' "$n"
 }
@@ -952,18 +966,23 @@ pr_is_merged() {
     target=$(pr_number_from_branch "$branch") || return 1
   fi
   [ -n "$target" ] || return 1
-  # A full PR URL identifies its own repository; a bare number needs one named.
-  # Either way this is a forge lookup, not a filesystem one, so it must not
-  # depend on this machine holding the task's worktree.
-  case "$target" in
-    http://*|https://*)
-      view=$(gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
-      ;;
-    *)
-      slug=$(task_repo_slug) || return 1
-      view=$(gh pr view "$target" --repo "$slug" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
-      ;;
-  esac
+  # A local task asks from inside its own worktree, unchanged, so gh resolves the
+  # repository the same way it always did here. For a remote task there is no
+  # such directory on this machine: a full PR URL identifies its own repository,
+  # and a bare number needs one named from the task's origin.
+  if [ "$TASK_REMOTE" != 1 ]; then
+    view=$(cd "$WT" && gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+  else
+    case "$target" in
+      http://*|https://*)
+        view=$(gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+        ;;
+      *)
+        slug=$(task_repo_slug) || return 1
+        view=$(gh pr view "$target" --repo "$slug" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+        ;;
+    esac
+  fi
   state=${view%%$'\t'*}
   head=${view#*$'\t'}
   [ "$state" != "$view" ] || return 1
