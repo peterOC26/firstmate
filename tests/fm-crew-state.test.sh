@@ -1136,6 +1136,38 @@ test_scout_skips_run_lookup() {
   pass "scout skips the run lookup"
 }
 
+# A task recorded as running on a remote Orca host must never have its branch
+# read from THIS machine. The worktree path below deliberately exists here and
+# is a real checkout on the same branch name as a live local run - the situation
+# where "the remote path happens not to exist locally" stops protecting
+# anything. Reporting that run would tell a supervisor the remote crew is at a
+# step of a validation run it is not running.
+test_remote_task_does_not_adopt_a_same_path_local_checkout() {
+  reset_fakes
+  local d out
+  d=$(new_case remote-same-path)
+  make_repo_on_branch "$d/wt" fm/feat-r
+  make_fakebin "$d" >/dev/null
+  # An unreachable Orca keeps the pane source hermetic and out of the way, so
+  # the only thing this case can be answering with is the local branch read.
+  cat > "$d/fakebin/orca" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+  chmod +x "$d/fakebin/orca"
+  fm_write_meta "$d/state/feat-r.meta" "window=fm-feat-r" "worktree=$d/wt" "kind=ship" \
+    "harness=claude" "backend=orca" "terminal=term-1" \
+    "orca_worktree_id=repo-remote::$d/wt" "orca_host=ssh:test-host-1" "orca_remote=1"
+  FM_FAKE_AXI_STATUS="$(run_running fm/feat-r)"
+  out=$(run_crew_state "$d" feat-r)
+  assert_not_contains "$out" "source: run-step" \
+    "a remote task must not adopt a local run found through a same-path local checkout"
+  assert_not_contains "$out" "validating (running)" \
+    "a remote task must not report an unrelated local run's step as its own state"
+  assert_contains "$out" "source: none" "with no readable pane a remote task reports no source"
+  pass "a remote task ignores a local checkout sitting at its recorded worktree path"
+}
+
 # (j) torn-down worktree and missing meta are graceful (unknown/none, exit 0)
 test_torn_down_worktree() {
   reset_fakes
@@ -1349,6 +1381,7 @@ test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
 test_no_timeout_uses_perl_bound
 test_scout_skips_run_lookup
+test_remote_task_does_not_adopt_a_same_path_local_checkout
 test_torn_down_worktree
 test_missing_meta
 test_provably_working_via_runs_list_fallback

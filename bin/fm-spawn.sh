@@ -643,6 +643,8 @@ ORCA_REMOTE=0
 ORCA_SETUP_ID=
 ORCA_HOST_ID=
 ORCA_EXEC_HANDLE=
+ORCA_REMOTE_TASK_TMP=
+ORCA_REMOTE_BRIEF_SRC=
 HERDR_PROJECTION_ABORT_CLEANUP=0
 HERDR_PROJECTION_ABORT_SESSION=
 HERDR_PROJECTION_ABORT_TASK_PANE=
@@ -671,6 +673,30 @@ parse_orca_worktree_result() {
   fi
 }
 
+# Remove the per-task temp root this spawn created on the Orca host, guarded by
+# the same /tmp/fm-?* shape fm-teardown.sh sweeps: the value is only ever built
+# here, but a wider pattern would make one wrong recorded path a recursive
+# removal of something else on that host. Quoted through the adapter's quoter
+# rather than by wrapping it in literal quotes.
+spawn_orca_remote_task_tmp_sweep() {
+  [ -n "${ORCA_REMOTE_TASK_TMP:-}" ] || return 0
+  # The inspection shell is the only way to reach that host, so there is nothing
+  # to sweep through once it is gone - which is why this runs before the close
+  # below, and why the spawn does not close it until the launch line is settled.
+  [ -n "${ORCA_EXEC_HANDLE:-}" ] || return 0
+  command -v fm_backend_orca_exec_run >/dev/null 2>&1 || return 0
+  case "$ORCA_REMOTE_TASK_TMP" in
+    /tmp/fm-?*)
+      fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
+        "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 || true
+      ;;
+    *)
+      echo "warning: not removing unexpected remote task temp root $ORCA_REMOTE_TASK_TMP for $ID" >&2
+      ;;
+  esac
+  return 0
+}
+
 spawn_abort_cleanup() {
   local status=$?
   if [ "$HERDR_PROJECTION_ABORT_CLEANUP" = 1 ] \
@@ -690,6 +716,17 @@ spawn_abort_cleanup() {
   if [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" = 1 ]; then
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
     fm_lock_release "$HERDR_PRESENTATION_ORDER_LOCK" || true
+  fi
+  # A remote spawn has already pushed the task's brief and encoder onto the host
+  # by the time most later refusals fire, and an abort that succeeds in removing
+  # the worktree preserves no metadata for fm-teardown.sh to sweep from later -
+  # so this is the only chance to take the task's instructions back off that
+  # host. It runs while the inspection shell is still open, because that handle
+  # is the only way to reach the host at all. Best effort throughout: an abort
+  # must still complete when the host cannot be reached.
+  if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
+    spawn_orca_remote_task_tmp_sweep
+    [ -z "${ORCA_REMOTE_BRIEF_SRC:-}" ] || rm -f "$ORCA_REMOTE_BRIEF_SRC" 2>/dev/null || true
   fi
   if [ -n "${ORCA_EXEC_HANDLE:-}" ]; then
     fm_backend_orca_exec_close "$ORCA_EXEC_HANDLE" 2>/dev/null || true

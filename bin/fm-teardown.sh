@@ -808,33 +808,66 @@ remove_pr_poll_artifacts() {
   fi
 }
 
-# Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
-# single match and returns 0; returns non-zero on no match or any lookup failure,
-# so the caller treats it as "no PR found" (fail-safe).
-# The repository these forge lookups are about, read from the task's own origin
-# through task_git so it answers on whichever host holds the worktree. gh infers
-# a repository from the working directory, and a remote task has no directory
-# here to infer from; naming the repository explicitly is what replaces that,
-# and it resolves to the same repository a local task would have inferred.
+# The repository these forge lookups are about, as gh's own HOST/OWNER/REPO,
+# read from the task's own origin through task_git so it answers on whichever
+# host holds the worktree. gh infers a repository from the working directory,
+# and a remote task has no directory here to infer from; naming the repository
+# explicitly is what replaces that, and it resolves to the same repository a
+# local task would have inferred - on any forge host, not just github.com, so an
+# enterprise origin keeps its PR-based landed-work detection.
+#
+# The host has to be a REAL one. In a scheme URL it is literal by definition; in
+# scp-like syntax it can just as easily be an ssh alias (git@github-work:...),
+# which names a config entry rather than a forge, so that form is accepted only
+# when the host is dotted. An origin whose host cannot be established returns
+# non-zero and the caller falls back exactly as it does for any other lookup
+# failure - fail-closed, rather than questioning a repository this is not about.
 task_repo_slug() {
-  local url slug
+  local url rest host path dotted=0
   url=$(task_git "$WT" remote get-url origin 2>/dev/null) || return 1
   url=$(printf '%s' "$url" | tr -d '[:space:]')
   [ -n "$url" ] || return 1
   case "$url" in
-    *github.com[:/]?*) : ;;
+    *://*)
+      rest=${url#*://}
+      case "$rest" in
+        */?*) : ;;
+        *) return 1 ;;
+      esac
+      host=${rest%%/*}
+      path=${rest#*/}
+      dotted=1
+      ;;
+    *:*)
+      host=${url%%:*}
+      path=${url#*:}
+      ;;
     *) return 1 ;;
   esac
-  slug=${url##*github.com}
-  slug=${slug#:}
-  slug=${slug#/}
-  slug=${slug%.git}
-  case "$slug" in
-    */?*) printf '%s' "$slug" ;;
+  host=${host##*@}
+  host=${host%%:*}
+  case "$host" in
+    ''|*[!A-Za-z0-9.-]*) return 1 ;;
+  esac
+  if [ "$dotted" != 1 ]; then
+    case "$host" in
+      *.*) : ;;
+      *) return 1 ;;
+    esac
+  fi
+  path=${path#/}
+  path=${path%/}
+  path=${path%.git}
+  path=${path%/}
+  case "$path" in
+    */?*) printf '%s/%s' "$host" "$path" ;;
     *) return 1 ;;
   esac
 }
 
+# Resolve the PR number for a worktree branch. Echoes the number on a single
+# match and returns 0; returns non-zero on no match or any lookup failure, so
+# the caller treats it as "no PR found" (fail-safe).
 pr_number_from_branch() {
   local branch=$1 out n slug
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1

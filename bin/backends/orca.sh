@@ -502,10 +502,12 @@ fm_backend_orca_kill() {  # <terminal-id>
 # corrupt a path, a digest, or a git status line.
 FM_BACKEND_ORCA_EXEC_POLLS=${FM_BACKEND_ORCA_EXEC_POLLS:-120}
 FM_BACKEND_ORCA_EXEC_INTERVAL=${FM_BACKEND_ORCA_EXEC_INTERVAL:-0.5}
-# Only how wide the FIRST read is, never a correctness bound: a command whose
-# output does not fit is recovered by widening the window (see
-# fm_backend_orca_exec_run), so this trades one extra round trip against read
-# size rather than deciding whether an answer can be trusted.
+# Only how wide each read is, never a correctness bound - and widening it is not
+# how a truncated reply is recovered. A reply the host stopped retaining comes
+# back through the staging mechanism instead: it is declared with its exact
+# length and fetched in bounded slices (see fm_backend_orca_exec_run), and every
+# read here is already known to be small enough for that. Raising this only
+# trades read size against round trips.
 FM_BACKEND_ORCA_EXEC_READ_LIMIT=${FM_BACKEND_ORCA_EXEC_READ_LIMIT:-2000}
 FM_BACKEND_ORCA_PUSH_CHUNK=${FM_BACKEND_ORCA_PUSH_CHUNK:-2000}
 FM_BACKEND_ORCA_EXEC_SEQ=0
@@ -758,12 +760,19 @@ fm_backend_orca_local_digest() {  # <path>
   fi
 }
 
+# Best effort, and called on every path that leaves an encoded copy behind, so a
+# failed transfer never also leaks it onto the host.
+fm_backend_orca_push_stage_discard() {  # <handle> <already-quoted-stage-path>
+  [ -n "${2:-}" ] || return 0
+  fm_backend_orca_exec_run "$1" "rm -f $2" >/dev/null 2>&1 || true
+}
+
 # fm_backend_orca_push_file: copy a local file to <remote-path> on the shell's
 # host and prove it arrived intact. The digest comparison is the point: an
 # agent's whole instruction set travels this way, and a silently truncated copy
 # would look exactly like a successful launch.
 fm_backend_orca_push_file() {  # <handle> <local-path> <remote-path>
-  local handle=$1 local_path=$2 remote_path=$3 b64 want got off=0 part dir rc
+  local handle=$1 local_path=$2 remote_path=$3 b64 want got off=0 part dir rc q_dir q_remote q_stage
   [ -f "$local_path" ] || { echo "error: cannot push missing file $local_path to an Orca host" >&2; return 1; }
   want=$(fm_backend_orca_local_digest "$local_path") || return 1
   b64=$(base64 < "$local_path" | tr -d '\n') || {
@@ -771,21 +780,35 @@ fm_backend_orca_push_file() {  # <handle> <local-path> <remote-path>
     return 1
   }
   dir=$(dirname -- "$remote_path")
-  fm_backend_orca_exec_run "$handle" "mkdir -p '$dir' && : > '$remote_path.b64'" >/dev/null || {
+  # Every path handed to the host goes through the adapter's own quoter, never
+  # literal quotes around an expansion: this helper takes an arbitrary remote
+  # path, and one containing a quote character would otherwise close the string
+  # and hand the rest of it to the remote shell as commands.
+  q_dir=$(fm_backend_orca_shell_quote "$dir")
+  q_remote=$(fm_backend_orca_shell_quote "$remote_path")
+  q_stage=$(fm_backend_orca_shell_quote "$remote_path.b64")
+  fm_backend_orca_exec_run "$handle" "mkdir -p $q_dir && : > $q_stage" >/dev/null || {
     echo "error: could not prepare $remote_path on the Orca host" >&2
+    fm_backend_orca_push_stage_discard "$handle" "$q_stage"
     return 1
   }
   while [ "$off" -lt "${#b64}" ]; do
     part=${b64:$off:$FM_BACKEND_ORCA_PUSH_CHUNK}
-    fm_backend_orca_send_text_line "$handle" "printf %s '$part' >> '$remote_path.b64'" >/dev/null || {
+    fm_backend_orca_send_text_line "$handle" \
+      "printf %s $(fm_backend_orca_shell_quote "$part") >> $q_stage" >/dev/null || {
       echo "error: transfer of $local_path to $remote_path was interrupted" >&2
+      fm_backend_orca_push_stage_discard "$handle" "$q_stage"
       return 1
     }
     off=$((off + FM_BACKEND_ORCA_PUSH_CHUNK))
   done
   got=$(fm_backend_orca_exec_run "$handle" \
-    "{ base64 -d < '$remote_path.b64' 2>/dev/null || base64 -D < '$remote_path.b64'; } > '$remote_path' && rm -f '$remote_path.b64' && { sha256sum '$remote_path' 2>/dev/null || shasum -a 256 '$remote_path'; } | cut -d' ' -f1")
+    "{ base64 -d < $q_stage 2>/dev/null || base64 -D < $q_stage; } > $q_remote && { sha256sum $q_remote 2>/dev/null || shasum -a 256 $q_remote; } | cut -d' ' -f1")
   rc=$?
+  # The encoded copy is the transfer's scratch, not its product, so it goes on
+  # every way out of here - a decode failure or a digest mismatch would
+  # otherwise leave a half-written copy of the file sitting on the host.
+  fm_backend_orca_push_stage_discard "$handle" "$q_stage"
   if [ "$rc" -ne 0 ]; then
     echo "error: could not decode $remote_path on the Orca host (exit $rc)" >&2
     return 1

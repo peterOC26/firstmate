@@ -111,12 +111,14 @@ A reply that still cannot be recovered whole is reported as a transport failure,
 An empty answer is never itself the failure signal, so a check that genuinely finds nothing still succeeds.
 
 The landed-work half of the cleanup check asks the host too, so a remote task whose work has already landed can be released normally rather than only through `--force`.
-Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem; they name the repository explicitly instead of inferring it from a working directory the caller does not have.
+Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem; they name the repository explicitly - forge host included, so an enterprise origin works the same as a github.com one - instead of inferring it from a working directory the caller does not have.
+An origin that names no resolvable forge host, such as an ssh alias that resolves through ssh config, is not guessed at: the PR lookup reports no match and cleanup falls back to the content check, exactly as it does for any other lookup failure.
 Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
 
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
 That route was chosen over Orca's own `--agent`/`--prompt` because Firstmate must keep control of the harness, model, effort, and encoded launch brief, and over SSH because it needs no transport or credentials beyond the Orca connection the backend already depends on.
 The delivered brief carries a short addendum telling the worker its status-log path is unreachable from that host and to report in its terminal instead.
+A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host while its inspection shell is still open, since a refused spawn records no metadata for cleanup to work from later.
 
 The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
 A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.

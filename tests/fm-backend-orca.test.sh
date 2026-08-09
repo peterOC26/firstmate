@@ -401,6 +401,12 @@ test_spawn_refuses_remote_harness_the_host_cannot_resolve() {
   assert_contains "$out" "is not on PATH on Orca host" "the refusal should name the host"
   assert_contains "$out" "PATH there:" "the refusal should report the PATH the host actually had"
   assert_absent "$STATE/$id.meta" "an unresolvable harness must not publish task metadata"
+  # The refusal fires after the brief and the encoder are already on the host,
+  # and it publishes no metadata, so fm-teardown.sh will never be run for this
+  # id: if the abort does not take them back off, the task's instructions stay
+  # on that host permanently.
+  assert_absent "/tmp/fm-$id" "an aborted remote spawn must sweep the task temp root it created on the host"
+  assert_absent "$STATE/$id.remote-brief.md" "an aborted remote spawn must not leave the staged brief behind"
   rm -rf "/tmp/fm-$id"
   pass "fm-spawn.sh: refuses when the harness cannot be resolved on the remote host, naming that host's PATH"
 }
@@ -849,6 +855,37 @@ fm_backend_orca_push_file "$h" "$1" "$2/delivered.txt"' "$ROOT" "$src" "$CASE_DI
   [ "$status" -ne 0 ] || fail "a digest mismatch must refuse the transfer"
   assert_contains "$out" "did not arrive intact" "digest refusal should say the copy is not trustworthy"
   pass "fm_backend_orca_push_file: delivers byte-identical content and refuses on a digest mismatch"
+}
+
+test_push_file_leaves_nothing_behind_when_a_transfer_fails() {
+  local out status src
+  orca_remote_case push-interrupted
+  src="$CASE_DIR/payload.txt"
+  printf 'a brief long enough to need several chunks on the wire\n' > "$src"
+  # A transfer that dies partway, the way a dropped connection does. The encoded
+  # copy is scratch, and a refused transfer that leaves it behind leaves a
+  # partial copy of the agent's instructions on someone else's host.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" FM_BACKEND_ORCA_PUSH_CHUNK=4 \
+    bash -c '. "$0/bin/backends/orca.sh"
+eval "fm_backend_orca_send_real() $(declare -f fm_backend_orca_send_text_line | sed 1d)"
+FM_SENT_CHUNKS=0
+fm_backend_orca_send_text_line() {
+  case "$2" in
+    "printf %s "*)
+      FM_SENT_CHUNKS=$((FM_SENT_CHUNKS + 1))
+      [ "$FM_SENT_CHUNKS" -lt 2 ] || return 1
+      ;;
+  esac
+  fm_backend_orca_send_real "$@"
+}
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_push_file "$h" "$1" "$2/delivered.txt"' "$ROOT" "$src" "$CASE_DIR" 2>&1 )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an interrupted transfer must refuse"
+  assert_contains "$out" "was interrupted" "the refusal should say the transfer did not complete"
+  assert_absent "$CASE_DIR/delivered.txt.b64" \
+    "a failed transfer must not leave its encoded copy on the host"
+  pass "fm_backend_orca_push_file: an interrupted transfer refuses and leaves no encoded copy on the host"
 }
 
 test_remote_which_resolves_absolute_path() {
@@ -2119,6 +2156,7 @@ test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply
 test_exec_run_keeps_a_genuinely_empty_result_successful
 test_remote_teardown_refuses_when_dirty_output_cannot_be_read
 test_push_file_refuses_on_digest_mismatch
+test_push_file_leaves_nothing_behind_when_a_transfer_fails
 test_remote_which_resolves_absolute_path
 test_isolation_verdicts_distinguish_primary_and_subdirectory
 test_capture_reads_terminal_tail_json
