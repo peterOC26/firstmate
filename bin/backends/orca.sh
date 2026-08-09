@@ -899,21 +899,34 @@ echo ISOLATED"
 # line that trusts the remote PATH turns "not installed here" into a terminal
 # that silently sits at a prompt.
 fm_backend_orca_remote_which() {  # <handle> <name>
-  local handle=$1 name=$2 out
+  local handle=$1 name=$2 out line last='' candidate=''
   out=$(fm_backend_orca_exec_run "$handle" \
     "command -v $(fm_backend_orca_shell_quote "$name") 2>/dev/null || bash -lc $(fm_backend_orca_shell_quote "command -v $name") 2>/dev/null") || return 1
   # Only the surrounding whitespace goes. Deleting every space would quietly
   # rewrite an installation path that legitimately contains one into a different
   # path that does not exist, and the launch would then be the silent
-  # sits-at-a-prompt failure this resolution exists to replace. An answer
-  # carrying an interior newline is more than one path, so it is refused rather
-  # than picked from.
-  out=$(printf '%s' "$out" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-  case "$out" in
-    *$'\n'*) return 1 ;;
-    /?*) printf '%s' "$out" ;;
-    *) return 1 ;;
+  # sits-at-a-prompt failure this resolution exists to replace.
+  #
+  # The login-shell fallback runs the host's profile, so a host that prints a
+  # banner answers with the banner AND the path. The answer is the resolved
+  # path the shell printed last; a banner that trails the path leaves the first
+  # absolute line as the only candidate. A reply with no absolute line at all is
+  # still "not installed here", and still refuses.
+  while IFS= read -r line; do
+    line=$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    [ -n "$line" ] || continue
+    last=$line
+    case "$line" in
+      /?*) [ -n "$candidate" ] || candidate=$line ;;
+    esac
+  done <<FMEOF
+$out
+FMEOF
+  case "$last" in
+    /?*) printf '%s' "$last"; return 0 ;;
   esac
+  [ -n "$candidate" ] || return 1
+  printf '%s' "$candidate"
 }
 
 fm_backend_orca_remote_path_env() {  # <handle>

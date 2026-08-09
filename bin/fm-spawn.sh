@@ -2138,9 +2138,13 @@ if [ "$ORCA_REMOTE" = 1 ]; then
   ORCA_REMOTE_TASK_TMP="/tmp/fm-$ID"
   ORCA_REMOTE_BRIEF="$ORCA_REMOTE_TASK_TMP/brief.md"
   ORCA_REMOTE_OPINPUT="$ORCA_REMOTE_TASK_TMP/fm-operational-input.sh"
+  # 0700 before anything is written into it: this root holds the worker's whole
+  # brief, and unlike a local spawn - whose brief stays under $DATA in the
+  # user's own home - it sits in the host's shared /tmp, where the default umask
+  # would leave the task's instructions readable by every account on that box.
   fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
-    "mkdir -p $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
-    echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP on host $ORCA_HOST_ID" >&2
+    "mkdir -p $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp") && chmod 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP") $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
+    echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP with owner-only permissions on host $ORCA_HOST_ID" >&2
     exit 1
   }
   # The worker's instructions and the encoder that frames them both travel to

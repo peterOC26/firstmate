@@ -826,7 +826,7 @@ remove_pr_poll_artifacts() {
 # non-zero and the caller falls back exactly as it does for any other lookup
 # failure - fail-closed, rather than questioning a repository this is not about.
 task_repo_slug() {
-  local url rest host path dotted=0
+  local url rest host port path dotted=0
   url=$(task_git "$WT" remote get-url origin 2>/dev/null) || return 1
   url=$(printf '%s' "$url" | tr -d '[:space:]')
   [ -n "$url" ] || return 1
@@ -848,7 +848,21 @@ task_repo_slug() {
     *) return 1 ;;
   esac
   host=${host##*@}
-  host=${host%%:*}
+  # Whatever colon survives the userinfo strip is a port, and a forge on a
+  # non-default port is a different endpoint: dropping it would name a host
+  # that does not answer. The scp-like branch above already consumed its own
+  # colon as the path separator, so only a scheme URL can still carry one.
+  port=
+  case "$host" in
+    *:*)
+      port=${host##*:}
+      host=${host%%:*}
+      case "$port" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      port=:$port
+      ;;
+  esac
   case "$host" in
     ''|*[!A-Za-z0-9.-]*) return 1 ;;
   esac
@@ -863,7 +877,7 @@ task_repo_slug() {
   path=${path%.git}
   path=${path%/}
   case "$path" in
-    */?*) printf '%s/%s' "$host" "$path" ;;
+    */?*) printf '%s%s/%s' "$host" "$port" "$path" ;;
     *) return 1 ;;
   esac
 }
@@ -1701,6 +1715,14 @@ require_orca_worktree_path_match() {
 # component cannot make two different worktrees look like one.
 require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-resolved-path>
   local worktree_id=$1 inspected=$2 resolved=$3 verdict rc host
+  # The adapter is not always already loaded here: a caller that never opened an
+  # inspection shell - a forced secondmate teardown releasing a remote child -
+  # would otherwise lose the host proof to a missing function and refuse for a
+  # reason that has nothing to do with the worktree's identity.
+  fm_backend_source orca || {
+    echo "REFUSED: the Orca adapter is unavailable, so the identity of worktree id $worktree_id cannot be verified; preserving metadata." >&2
+    return 1
+  }
   if [ -z "$TASK_REMOTE_EXEC" ] && [ "$FORCE" != "--force" ]; then
     echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to confirm that worktree id $worktree_id is the worktree inspected at ${inspected:-<missing>}; preserving metadata." >&2
     return 1
@@ -1724,7 +1746,7 @@ require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-res
       echo "REFUSED: Orca worktree id $worktree_id resolves to $resolved, not the recorded worktree ${inspected:-<missing>}; preserving metadata even under --force." >&2
       return 1
     fi
-    echo "warning: host ${ORCA_HOST_ID:-<unrecorded>} is unreachable, so the on-host path canonicalization for $worktree_id was skipped; --force proceeded on its recorded host and exact recorded path" >&2
+    echo "warning: no inspection shell is open on host ${ORCA_HOST_ID:-<unrecorded>}, so the on-host path canonicalization for $worktree_id was skipped; --force proceeded on its recorded host and exact recorded path" >&2
     return 0
   fi
   set +e
@@ -1762,6 +1784,35 @@ require_orca_worktree_path_match_if_present() {
     [ -e "$inspected" ] || return 0
   fi
   require_orca_worktree_path_match "$worktree_id" "$inspected"
+}
+
+# child_is_remote_orca: does this CHILD task's own record say its files live on
+# another host? The parent's record answers for the parent only, and a forced
+# secondmate teardown releases children the parent never described.
+child_is_remote_orca() {  # <child-meta>
+  [ "$(meta_value "$1" orca_remote)" = 1 ]
+}
+
+# require_orca_child_worktree_identity: the identity proof a forced secondmate
+# cleanup owes a REMOTE Orca child before anything of that child is released.
+# Asking this machine whether the child's worktree path exists is asking the
+# wrong machine, and a "no" there is not permission to remove what is recorded -
+# so the proof comes from Orca's own records, which answer from here: the id
+# still reports the child's recorded host, and the path Orca gives for that id
+# is exactly the child's recorded one. That is the same host-independent pair
+# the task's own --force path keeps, reached through the same code, with the
+# host and remote flag read from the CHILD's metadata.
+require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-worktree>
+  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id
+  # shellcheck disable=SC2034  # Read by require_orca_worktree_path_match below.
+  local TASK_REMOTE=1 TASK_REMOTE_EXEC='' ORCA_HOST_ID
+  child_id=$(basename "$child_meta" .meta)
+  ORCA_HOST_ID=$(meta_value "$child_meta" orca_host)
+  if [ -z "$ORCA_HOST_ID" ] || [ -z "$child_wt" ]; then
+    echo "REFUSED: child $child_id is recorded as running on a remote Orca host but names no host or worktree; preserving that child's records." >&2
+    return 1
+  fi
+  require_orca_worktree_path_match "$worktree_id" "$child_wt"
 }
 
 firstmate_home_has_treehouse_slot() {
@@ -2133,7 +2184,9 @@ validate_firstmate_home_children_removal() {
       validate_firstmate_home_children_removal "$child_home" || return 1
     elif [ "$child_backend" = orca ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
-      if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
+      if child_is_remote_orca "$child_meta"; then
+        require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+      elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
@@ -2300,7 +2353,9 @@ cleanup_firstmate_home_children() {
     fi
     if [ "$child_backend" = orca ] && [ "$child_kind" != secondmate ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
-      if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
+      if child_is_remote_orca "$child_meta"; then
+        require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+      elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
     fi

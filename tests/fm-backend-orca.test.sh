@@ -333,7 +333,7 @@ run_remote_spawn() {  # <task-id> [<extra spawn args>...]
 }
 
 test_spawn_places_task_on_remote_orca_host() {
-  local id out
+  local id out mode
   id="orcaremotez1"
   remote_spawn_case remote-spawn "$id"
   out=$(run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
@@ -354,6 +354,12 @@ test_spawn_places_task_on_remote_orca_host() {
   assert_contains "$(cat "/tmp/fm-$id/brief.md")" "smoke brief body" "delivered brief lost its body"
   assert_contains "$(cat "/tmp/fm-$id/brief.md")" "Remote host addendum" \
     "the delivered brief must tell the worker its status path is unreachable from that host"
+  # That brief is the worker's whole instruction set, and on the host it sits in
+  # a shared /tmp rather than in anyone's home. Nobody else on that box gets to
+  # read it.
+  if [ "$(uname)" = Darwin ]; then mode=$(stat -f %Lp "/tmp/fm-$id"); else mode=$(stat -c %a "/tmp/fm-$id"); fi
+  [ "$mode" = 700 ] \
+    || fail "the remote task temp root must not be reachable by other accounts on the host, got mode '$mode'"
   assert_contains "$(cat "$LOG")" "/tmp/fm-$id/brief.md" "the launch line must read the brief from the host"
   assert_contains "$(cat "$LOG")" "$FB/claude" \
     "the launch line must name the harness's absolute path on the host, not a bare name"
@@ -588,6 +594,31 @@ test_remote_pr_discovery_names_the_task_s_own_forge_host() {
     || fail "the remote PR lookup did not name the task's own repository; calls were: $(cat "$CASE_DIR/gh-calls" 2>/dev/null)"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
   pass "fm-teardown.sh: a remote task's PR lookup names its own repository, forge host included"
+}
+
+test_remote_pr_discovery_keeps_a_forge_port() {
+  local id out status head
+  id="orcaremotez17"
+  remote_spawn_case remote-td-forge-port "$id"
+  # A self-hosted forge answering on a non-default port. The port is part of the
+  # endpoint: a lookup that drops it addresses a service that is not there, and
+  # the landed-work evidence silently stops being available.
+  git -C "$PROJ" remote add origin https://git.acme.invalid:8443/team/app.git
+  printf 'hello\n' > "$WT/feature.txt"
+  git -C "$WT" add feature.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  head=$(git -C "$WT" rev-parse HEAD)
+  add_fake_gh_merged_pr "$FB" "$head" "$CASE_DIR/gh-calls"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'mode=no-mistakes\n' >> "$STATE/$id.meta"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a remote task on a ported forge should still be releasable"$'\n'"$out"
+  grep -qx 'pr list git.acme.invalid:8443/team/app' "$CASE_DIR/gh-calls" \
+    || fail "the remote PR lookup dropped the forge's port; calls were: $(cat "$CASE_DIR/gh-calls" 2>/dev/null)"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  pass "fm-teardown.sh: a remote task's PR lookup keeps the forge port its origin named"
 }
 
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias() {
@@ -967,7 +998,7 @@ fm_backend_orca_exec_run "$h" "printf %s dirty"' "$ROOT" 2>/dev/null )
 
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply() {
   local id out status i
-  id="orcaremotez12"
+  id="orcaremotez16"
   remote_spawn_case remote-td-stage-fail "$id"
   # Real uncommitted work on the host, and a branch already merged into the
   # default branch so nothing else can refuse first. The ONLY thing standing
@@ -1118,6 +1149,42 @@ fm_backend_orca_remote_which "$h" fmspacedagent' "$ROOT" )
     || fail "remote which must return the host's path unaltered, got '$out'"
   [ -x "$out" ] || fail "remote which returned a path that is not the executable the host resolved: '$out'"
   pass "fm_backend_orca_remote_which: returns an install path containing a space unaltered"
+}
+
+test_remote_which_resolves_through_a_login_banner() {
+  local out status agentdir
+  orca_remote_case remote-which-banner
+  # A host whose login profile greets every shell it starts. The harness IS
+  # installed there - it just is not on the non-interactive PATH, so the login
+  # shell is what resolves it, and its greeting arrives with the answer. A
+  # greeting is not "not installed": refusing on it would send the spawn away
+  # from a host that can run the worker.
+  agentdir="$CASE_DIR/agentbin"
+  mkdir -p "$agentdir" "$FIX/fakehome"
+  add_fake_remote_harness "$agentdir" fmbanneragent
+  cat > "$FIX/fakehome/.bash_profile" <<SH
+printf 'Welcome to example-host\n'
+printf '3 packages can be updated.\n'
+PATH="$agentdir:\$PATH"
+SH
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_HOST_PATH="/usr/bin:/bin" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" fmbanneragent' "$ROOT" )
+  status=$?
+  expect_code 0 "$status" "a harness the login shell resolves must not be reported as missing because of a banner"
+  [ "$out" = "$agentdir/fmbanneragent" ] \
+    || fail "remote which should return the path the login shell resolved, not the banner, got '$out'"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_HOST_PATH="/usr/bin:/bin" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" fmdefinitelymissing' "$ROOT" )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a banner must not turn an absent harness into a resolved one"
+  [ -z "$out" ] || fail "an unresolvable harness must print nothing even behind a banner, got '$out'"
+  pass "fm_backend_orca_remote_which: resolves through a login banner and still refuses a harness the host does not have"
 }
 
 test_isolation_verdicts_distinguish_primary_and_subdirectory() {
@@ -2335,6 +2402,99 @@ test_secondmate_force_teardown_refuses_partial_orca_child() {
   pass "fm-teardown.sh --force: refuses partial Orca secondmate children before runtime dispatch"
 }
 
+# The numbered fake answers in call order, and a remote child's identity proof
+# asks `orca worktree show` twice (once for the path, once for the host) in each
+# of the validation and cleanup passes. Every one of those calls must get the
+# same answer, so the case describes the worktree once.
+write_orca_worktree_show_responses() {  # <responses> <count> <worktree-id> <path> <host>
+  local resp=$1 count=$2 id=$3 path=$4 host=$5 i
+  for i in $(seq 1 "$count"); do
+    printf '{"ok":true,"result":{"worktree":{"id":"%s","path":"%s","hostId":"%s","isMainWorktree":false}}}\n' \
+      "$id" "$path" "$host" > "$resp/$i.out"
+  done
+}
+
+# <state> <id> <worktree> - a crew child of a secondmate home whose files live
+# on another Orca host, so nothing of it is on this filesystem.
+remote_child_meta() {
+  fm_write_meta "$1/$2.meta" \
+    "window=fm-$2" "endpoint_task_id=$2" "terminal=term-$2" \
+    "worktree=$3" "project=/srv/app" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$3" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$2"
+}
+
+# <parent-home> <secondmate-home> - the parent record a forced secondmate
+# teardown starts from.
+remote_child_parent_home() {
+  mkdir -p "$1/state" "$1/data" "$2/state" "$2/projects"
+  printf 'domain\n' > "$2/.fm-secondmate-home"
+  fm_write_meta "$1/state/domain.meta" \
+    "window=firstmate:fm-domain" "worktree=$2" "project=$2" \
+    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "home=$2" "projects=alpha"
+  printf '%s\n' "- domain - remote Orca child cleanup (home: $2; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
+    > "$1/data/secondmates.md"
+}
+
+test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
+  local home subhome child_id childwt neutral out rc
+
+  # A child whose worktree is on another host. Asking THIS machine whether that
+  # path exists asks the wrong machine, and "absent here" is not permission to
+  # release what Orca still holds there - so the identity proof runs from Orca's
+  # own records, and a worktree Orca reports at a different path is refused.
+  child_id="orcaremotechildz1"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-mismatch-parent"
+  subhome="$TMP_ROOT/orca-remote-child-mismatch-secondmate"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  orca_case secondmate-remote-child-mismatch
+  write_orca_worktree_show_responses "$RESP" 6 "repo-remote::$childwt" "/srv/somewhere-else" "$FM_REMOTE_HOST"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "forced secondmate teardown released a remote Orca child whose recorded identity does not match Orca's"$'\n'"$out"
+  assert_contains "$out" "not the recorded worktree" \
+    "the refusal should name the remote child's identity mismatch"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "an unproven remote child worktree must not be removed"
+  assert_present "$subhome/state/$child_id.meta" \
+    "a refused remote child cleanup must preserve that child's record"
+  assert_present "$home/state/domain.meta" \
+    "a refused remote child cleanup must preserve the parent record"
+
+  # The same child, with Orca reporting exactly what the child recorded: proven,
+  # and released.
+  child_id="orcaremotechildz2"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-match-parent"
+  subhome="$TMP_ROOT/orca-remote-child-match-secondmate"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  orca_case secondmate-remote-child-match
+  write_orca_worktree_show_responses "$RESP" 4 "repo-remote::$childwt" "$childwt" "$FM_REMOTE_HOST"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "a remote Orca child whose identity Orca confirms should still be released"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$childwt" \
+    "a proven remote child worktree must be released through Orca"
+  assert_absent "$subhome/state/$child_id.meta" "a completed remote child cleanup should remove that child's record"
+  assert_absent "$home/state/domain.meta" "a completed forced teardown should remove the parent record"
+  pass "fm-teardown.sh --force: proves a remote Orca child's recorded identity from Orca's records before releasing it"
+}
+
 test_dispatcher_sources_orca_and_routes_primitives() {
   local out
   orca_case dispatch
@@ -2355,6 +2515,7 @@ test_remote_teardown_refuses_when_the_host_is_unreachable
 test_remote_teardown_releases_work_already_landed_on_the_host
 test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
 test_remote_pr_discovery_names_the_task_s_own_forge_host
+test_remote_pr_discovery_keeps_a_forge_port
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
@@ -2378,6 +2539,7 @@ test_push_file_refuses_on_digest_mismatch
 test_push_file_leaves_nothing_behind_when_a_transfer_fails
 test_remote_which_resolves_absolute_path
 test_remote_which_keeps_a_path_containing_a_space
+test_remote_which_resolves_through_a_login_banner
 test_isolation_verdicts_distinguish_primary_and_subdirectory
 test_capture_reads_terminal_tail_json
 test_capture_falls_back_to_text_fields
@@ -2429,3 +2591,4 @@ test_teardown_refuses_orca_worktree_without_terminal_handle
 test_secondmate_force_teardown_removes_orca_child_via_orca
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child
+test_secondmate_force_teardown_verifies_remote_orca_child_identity

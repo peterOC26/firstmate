@@ -116,8 +116,10 @@ For a REMOTE task they name the repository explicitly - forge host included, so 
 An origin that names no resolvable forge host, such as an ssh alias that resolves through ssh config, is not guessed at: the PR lookup reports no match and cleanup falls back to the content check, exactly as it does for any other lookup failure.
 A local task is untouched by that: it still asks gh from inside its own worktree, so gh's own base-repository resolution - a fork whose pull requests live on the parent, or a `gh repo set-default` - keeps deciding which repository the lookup is about.
 Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
+A forced secondmate teardown proves the same thing for each remote crew child it releases, reading the host and the recorded path from that child's own metadata: this machine cannot see a path that belongs to another host, so "absent here" is never taken as permission to remove it.
 
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
+That directory is created `0700` before anything is written into it: unlike a local spawn, whose brief stays under the firstmate home, it sits in the host's shared `/tmp`, and the brief is the task's whole instruction set.
 That route was chosen over Orca's own `--agent`/`--prompt` because Firstmate must keep control of the harness, model, effort, and encoded launch brief, and over SSH because it needs no transport or credentials beyond the Orca connection the backend already depends on.
 The delivered brief carries a short addendum telling the worker its status-log path is unreachable from that host and to report in its terminal instead.
 A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host, reopening an inspection shell when it has already closed its own, since a refused spawn records no metadata for cleanup to work from later.
@@ -126,6 +128,7 @@ That sweep is best effort: a host that cannot be reached is named on stderr with
 The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
 A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.
 An unresolvable harness refuses and reports the `PATH` the host actually had.
+Resolution asks the task's own shell first and then a login shell; a host whose login profile prints a banner answers with that banner alongside the path, so the resolved path is taken from the reply rather than the whole reply being read as "not installed".
 
 ### Remote limits
 
