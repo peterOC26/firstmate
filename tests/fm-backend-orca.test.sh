@@ -336,6 +336,14 @@ remote_spawn_case() {  # <name> <task-id> -> sets CASE_DIR LOG FIX FB PROJ WT DA
   STATE="$CASE_DIR/state"
   CONFIG="$CASE_DIR/config"
   fm_git_worktree "$PROJ" "$WT" "fm/$2"
+  # The stand-in host shares this machine's /tmp, and the task temp root is a
+  # FIXED path derived from the task id - it is not under the per-case temp root
+  # the suite reaps on exit. A run interrupted between the spawn and the case's
+  # own cleanup therefore leaves /tmp/fm-<id> behind, and the next run's
+  # `mkdir -m 700` correctly refuses to adopt it, so the spawn aborts. Its abort
+  # sweep then removes the leftover, which makes the failure disappear on the
+  # re-run and read as a flake. Start every remote case from a clean host root.
+  rm -rf "/tmp/fm-$2"
   mkdir -p "$DATA/$2" "$STATE" "$CONFIG"
   printf 'Delivery contract: mode=local-only\n\nsmoke brief body\n' > "$DATA/$2/brief.md"
   touch "$STATE/.last-watcher-beat"
