@@ -154,6 +154,7 @@ A line beginning with `/` only nominates a candidate: each one is proven on the 
   Verdict checks use `FM_BACKEND_ORCA_EXEC_POLLS` (120) x `FM_BACKEND_ORCA_EXEC_INTERVAL` (0.5s), which is also how quickly a genuinely dead host is noticed, so it is deliberately short.
   Network-bound git commands (`fetch`, `pull`, `push`, `clone`, `ls-remote`) get their own budget instead, `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` (1200 polls, about 10 minutes), because they are bounded by the host's link to its forge rather than by the host being alive.
   Raise `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` when a slow host fetch makes cleanup refuse a task whose work has landed; raising `FM_BACKEND_ORCA_EXEC_POLLS` is not the knob for that and only slows dead-host detection.
+  The best-effort sweep that takes a staged reply back off the host keeps its own short bound, `FM_BACKEND_ORCA_EXEC_SWEEP_POLLS` (20), rather than the budget of the call it is cleaning up after: it runs only once that call has already given up, so waiting a network-sized budget again would just delay the refusal that is already decided.
 - `--force` on a host that is genuinely gone still completes: Orca's own records answer from here, so the recorded host and the exact recorded path are still proven, and only the on-host path canonicalization is skipped, with a line saying so.
   A worktree Orca reports at a different path than the task recorded is still refused, `--force` or not.
 

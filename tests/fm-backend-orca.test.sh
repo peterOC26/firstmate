@@ -1179,31 +1179,19 @@ fm_backend_orca_exec_run "$h" "printf %s dirty"' "$ROOT" 2>/dev/null )
   pass "fm_backend_orca_exec_run: refuses a staged write that silently produced nothing, rather than reading it as an empty answer"
 }
 
-# A host whose temp root is somewhere the case can watch, which is all TMPDIR
-# means on a POSIX host (BSD mktemp reads its own configured directory instead,
-# so pointing at it through the environment would not be portable here).
-add_watchable_host_temp_root() {  # <bindir> <temp-root>
-  mkdir -p "$1" "$2"
-  cat > "$1/mktemp" <<SH
-#!/bin/sh
-if [ "\$1" = -d ] && [ "\$#" = 1 ]; then
-  exec /usr/bin/mktemp -d "$2/tmp.XXXXXX"
-fi
-exec /usr/bin/mktemp "\$@"
-SH
-  chmod +x "$1/mktemp"
-}
-
 test_exec_run_sweeps_the_host_stage_when_the_staging_reply_never_arrives() {
-  local out status hosttmp before after left
+  local out status staged mode
   orca_remote_case exec-stage-leak
-  hosttmp="$CASE_DIR/hosttmp"
-  add_watchable_host_temp_root "$CASE_DIR/hostbin" "$hosttmp"
+  # The host records every directory it is asked to create, so the case can name
+  # the stage staging ACTUALLY made rather than a path it assumed. Without that,
+  # "nothing is left behind" would also hold for an implementation that staged
+  # nothing at all.
+  add_mode_recording_host_mkdir "$CASE_DIR/hostbin" "$CASE_DIR/host-mkdirs"
+  : > "$CASE_DIR/host-mkdirs"
   # The reply is staged and then never becomes readable: the host holds the full
   # answer in a directory whose name only that reply could have carried back.
   # A stage that outlives its own transport failure is the task's data left on
   # someone else's machine, once per failed call.
-  before=$(find /tmp -maxdepth 1 -name 'fm-orca-stage-*' 2>/dev/null | wc -l | tr -d '[:space:]')
   out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
     FM_ORCA_FAKE_HOST_PATH="$CASE_DIR/hostbin:/usr/bin:/bin" \
     FM_ORCA_FAKE_SLOW_MATCH=FMSLOWMARK FM_ORCA_FAKE_SLOW_READS=200 \
@@ -1215,13 +1203,42 @@ fm_backend_orca_exec_run "$h" "printf %s FMSLOWMARK-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
   status=$?
   expect_code 125 "$status" "a reply that never arrives must report a transport failure"
   [ -z "$out" ] || fail "an unreadable reply must print nothing, got '$out'"
-  left=$(find "$hosttmp" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d '[:space:]')
-  [ "$left" = 0 ] \
-    || fail "the host still holds $left staged item(s) under its temp root after the transport failure"
-  after=$(find /tmp -maxdepth 1 -name 'fm-orca-stage-*' 2>/dev/null | wc -l | tr -d '[:space:]')
-  [ "$after" = "$before" ] \
-    || fail "the host's stage directory outlived the transport failure that lost its reply"
+  staged=$(awk '$2 ~ "^/tmp/fm-orca-stage-" { print $2; exit }' "$CASE_DIR/host-mkdirs")
+  [ -n "$staged" ] \
+    || fail "the host was never asked to create a stage directory, so a sweep of it proves nothing"
+  mode=$(awk -v d="$staged" '$2 == d { print $1; exit }' "$CASE_DIR/host-mkdirs")
+  [ "$mode" = 700 ] \
+    || fail "the stage the host created held the reply at mode '$mode', not owner-only"
+  [ ! -e "$staged" ] \
+    || fail "the host's stage directory $staged outlived the transport failure that lost its reply"
   pass "fm_backend_orca_exec_run: sweeps the host's stage even when the staging reply itself never arrives"
+}
+
+test_stage_sweep_keeps_its_own_budget_after_a_fetch_times_out() {
+  local status reads
+  orca_remote_case exec-sweep-budget
+  # Nothing this call sends ever answers, so both the fetch and the sweep that
+  # follows it run to the end of whatever budget bounds them. The read count is
+  # therefore the observable difference between a sweep bounded by the network
+  # budget of the call it is cleaning up after and one bounded by its own: the
+  # host has already stopped answering, so waiting the long budget again only
+  # delays a refusal that is already decided.
+  status=0
+  ( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_SLOW_MATCH=fm-orca-stage FM_ORCA_FAKE_SLOW_READS=500 \
+    FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.01 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=25 FM_BACKEND_ORCA_EXEC_SWEEP_POLLS=2 \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_git "$h" /srv/app-task fetch --quiet origin main' "$ROOT" ) >/dev/null 2>&1 \
+    || status=$?
+  expect_code 125 "$status" "a fetch whose reply never arrives must report a transport failure"
+  reads=$(grep -c $'orca\x1fterminal\x1fread' "$LOG" || true)
+  [ "$reads" -ge 20 ] \
+    || fail "the fetch gave up after only $reads reads; it must still get the wider fetch budget"
+  [ "$reads" -le 40 ] \
+    || fail "the sweep after the fetch waited out the fetch budget again ($reads reads); it must keep its own short bound"
+  pass "fm_backend_orca_exec_stage_discard: sweeps under its own short budget instead of the timed-out fetch's"
 }
 
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply() {
@@ -2854,6 +2871,7 @@ test_exec_run_marks_every_invocation_apart
 test_exec_run_refuses_when_the_host_cannot_encode_the_reply
 test_exec_run_refuses_when_staging_writes_an_empty_file
 test_exec_run_sweeps_the_host_stage_when_the_staging_reply_never_arrives
+test_stage_sweep_keeps_its_own_budget_after_a_fetch_times_out
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply
 test_exec_run_keeps_a_genuinely_empty_result_successful
 test_remote_teardown_refuses_when_dirty_output_cannot_be_read

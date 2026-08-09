@@ -648,7 +648,17 @@ fm_backend_orca_exec_marked() {  # <handle> <command>
 
 # Best effort, and called on every path that leaves a staged reply behind, so a
 # transport failure never also leaks the host's stage directory.
+#
+# It carries its own short budget rather than the one the failing call was
+# running under. The sweep is reached exactly when that call has already given
+# up - often with the host's shell still blocked on the command that timed out,
+# so no answer is coming - and inheriting a network-sized budget there would
+# make an already-failing teardown wait a second full budget per sweep before
+# saying anything. A short bound cannot lose data: this is cleanup, not a
+# verdict, and it stays best effort either way.
+FM_BACKEND_ORCA_EXEC_SWEEP_POLLS=${FM_BACKEND_ORCA_EXEC_SWEEP_POLLS:-20}
 fm_backend_orca_exec_stage_discard() {  # <handle> <already-quoted-dir-or-empty>
+  local FM_BACKEND_ORCA_EXEC_POLL_BUDGET=$FM_BACKEND_ORCA_EXEC_SWEEP_POLLS
   [ -n "${2:-}" ] || return 0
   fm_backend_orca_exec_marked "$1" "rm -rf $2; printf ''" >/dev/null 2>&1 || true
 }

@@ -2153,6 +2153,7 @@ if [ "$ORCA_REMOTE" = 1 ]; then
   fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
     "mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP") && mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
     echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP with owner-only permissions on host $ORCA_HOST_ID" >&2
+    echo "The usual cause is a leftover $ORCA_REMOTE_TASK_TMP from an earlier run of this task id, which a teardown that could not reach that host (or ran under --force) leaves behind; remove it on $ORCA_HOST_ID and spawn again, or spawn under a different task id." >&2
     exit 1
   }
   # The worker's instructions and the encoder that frames them both travel to
