@@ -720,6 +720,12 @@ spawn_abort_cleanup() {
             [ -z "${ORCA_TERMINAL:-}" ] || echo "terminal=$ORCA_TERMINAL"
             [ -z "${ORCA_HOST_ID:-}" ] || echo "orca_host=$ORCA_HOST_ID"
             [ -z "${ORCA_SETUP_ID:-}" ] || echo "orca_project_host_setup=$ORCA_SETUP_ID"
+            # Without this the preserved record would read as a local task, and
+            # every remote-aware safety check would then ask this machine about
+            # files it does not have.
+            [ "${ORCA_REMOTE:-0}" != 1 ] || echo "orca_remote=1"
+            [ "${ORCA_REMOTE:-0}" != 1 ] || [ -z "${ORCA_REMOTE_TASK_TMP:-}" ] \
+              || echo "orca_remote_tasktmp=$ORCA_REMOTE_TASK_TMP"
           } > "$STATE/$ID.meta" 2>/dev/null || true
         fi
       fi
@@ -928,7 +934,8 @@ LAUNCH_FROM_TEMPLATE=1
 # whose token is not the expected harness fails rather than being rewritten by
 # guess, so an unrecognized shape refuses instead of launching something else.
 launch_pin_harness_path() {  # <launch> <harness-token> <absolute-path>
-  local rest=$1 token=$2 abs=$3 prefix= head
+  local rest=$1 token=$2 abs=$3 head
+  local prefix=''
   while :; do
     head=${rest%% *}
     [ "$head" != "$rest" ] || break

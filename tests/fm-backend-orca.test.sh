@@ -151,6 +151,13 @@ case "${1:-} ${2:-}" in
     text=$(get_flag --text) || text=
     # The stand-in host: run the line and keep what it printed, exactly as a
     # real shell's scrollback would.
+    if [ -n "${FM_ORCA_FAKE_HOST_PREFIX:-}" ]; then
+      # The host's own paths, which do not exist on the caller's filesystem.
+      # Without this the fake host shares a filesystem with the caller and a
+      # local `git -C "$WT"` accidentally succeeds, hiding exactly the bugs
+      # these cases exist to catch.
+      text=$(printf '%s' "$text" | sed "s|${FM_ORCA_FAKE_HOST_PREFIX}|${FM_ORCA_FAKE_HOST_REAL}|g")
+    fi
     if [ -n "${FM_ORCA_FAKE_HOST_PATH:-}" ]; then
       # A host whose PATH is deliberately narrower than the caller's, which is
       # how a real remote host can have an agent installed but unresolvable.
@@ -166,20 +173,53 @@ case "${1:-} ${2:-}" in
   "terminal read")
     handle=$(get_flag --terminal) || handle=
     cursor=$(get_flag --cursor) || cursor=0
+    limit=$(get_flag --limit) || limit=0
     case "$cursor" in ''|*[!0-9]*) cursor=0 ;; esac
-    total=$(wc -l < "$FIX/$handle.buf" 2>/dev/null || echo 0)
-    total=$(printf '%s' "$total" | tr -d '[:space:]')
-    tail -n +$((cursor + 1)) "$FIX/$handle.buf" 2>/dev/null \
-      | node -e '
+    case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
+    # Model the contract `orca terminal read --help` states: output is terminal
+    # ROWS, --limit returns the NEWEST n of them, older rows are dropped, and
+    # oldestCursor reports that a drop happened. Retention is finite, so a
+    # bigger --limit recovers more rows but never rows the host already forgot.
+    node -e '
 const fs = require("fs");
-const total = process.argv[1];
-const lines = fs.readFileSync(0, "utf8").split("\n");
+const [file, cursorArg, limitArg, colsArg, retainArg] = process.argv.slice(1);
+const cols = Number(colsArg) > 0 ? Number(colsArg) : 120;
+const retain = Number(retainArg) > 0 ? Number(retainArg) : Infinity;
+let raw = "";
+try { raw = fs.readFileSync(file, "utf8"); } catch (e) { raw = ""; }
+const lines = raw.split("\n");
 if (lines.length && lines[lines.length - 1] === "") lines.pop();
+// A long logical line occupies several rows on a real terminal grid.
+const rows = [];
+for (const line of lines) {
+  if (line.length <= cols) { rows.push(line); continue; }
+  for (let i = 0; i < line.length; i += cols) rows.push(line.slice(i, i + cols));
+}
+const total = rows.length;
+const retainedFrom = Math.max(0, total - retain);
+const cursor = Math.max(Number(cursorArg) || 0, retainedFrom);
+let window = rows.slice(cursor);
+let limited = cursor > (Number(cursorArg) || 0);
+let oldest = cursor;
+const limit = Number(limitArg) || 0;
+if (limit > 0 && window.length > limit) {
+  oldest = cursor + (window.length - limit);
+  window = window.slice(-limit);
+  limited = true;
+}
 process.stdout.write(JSON.stringify({
   ok: true,
-  result: { terminal: { tail: lines, limited: false, oldestCursor: "0", nextCursor: total, latestCursor: total } },
+  result: {
+    terminal: {
+      tail: window,
+      limited,
+      oldestCursor: String(oldest),
+      nextCursor: String(total),
+      latestCursor: String(total),
+    },
+  },
 }) + "\n");
-' "$total"
+' "$FIX/$handle.buf" "$cursor" "$limit" "${FM_ORCA_FAKE_COLS:-120}" "${FM_ORCA_FAKE_RETAINED_ROWS:-0}"
     exit 0
     ;;
   "terminal close")
@@ -378,6 +418,8 @@ run_remote_teardown() {  # <id> [<extra args>...]
   shift
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_HOST_PREFIX="${FM_ORCA_FAKE_HOST_PREFIX:-}" FM_ORCA_FAKE_HOST_REAL="${FM_ORCA_FAKE_HOST_REAL:-}" \
+    FM_ORCA_FAKE_RETAINED_ROWS="${FM_ORCA_FAKE_RETAINED_ROWS:-0}" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
 }
@@ -415,6 +457,80 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
     "an unreachable host must not lead to removing the worktree anyway"
   assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
+}
+
+test_remote_teardown_releases_work_already_landed_on_the_host() {
+  local id out status
+  id="orcaremotez9"
+  remote_spawn_case remote-td-landed "$id"
+  # The host's paths are genuinely not on this filesystem, so anything that asks
+  # THIS machine about them fails. That is the whole point: with the landed-work
+  # chain still local, a remote task whose work HAS landed could never be
+  # cleaned up, and the only exit offered was --force.
+  FM_ORCA_FAKE_HOST_PREFIX=/fm-hostonly
+  FM_ORCA_FAKE_HOST_REAL=$CASE_DIR
+  write_remote_worktree_fixtures "$FIX" /fm-hostonly/wt
+  printf 'landed work\n' > "$WT/landed.txt"
+  git -C "$WT" add landed.txt
+  git -C "$WT" -c user.email=t@example.com -c user.name=t commit -qm "landed change"
+  # Fast-forwarded into the project's default branch, with no remote configured -
+  # so the commit is still listed by HEAD --not --remotes and only the
+  # landed-work check can tell that it is safe to release.
+  git -C "$PROJ" merge --ff-only -q "fm/$id"
+  [ ! -d /fm-hostonly ] || fail "the host prefix must not exist on the caller's filesystem"
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" \
+    "worktree=/fm-hostonly/wt" "project=/fm-hostonly/proj" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::/fm-hostonly/wt" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id"
+  out=$(run_remote_teardown "$id")
+  status=$?
+  unset FM_ORCA_FAKE_HOST_PREFIX FM_ORCA_FAKE_HOST_REAL
+  expect_code 0 "$status" "work already landed on the host should be releasable"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::/fm-hostonly/wt' \
+    "a remote task whose work has landed must be released through Orca"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  pass "fm-teardown.sh: releases a remote task whose work already landed, asking the host rather than this machine"
+}
+
+test_remote_force_teardown_completes_when_the_host_is_unreachable() {
+  local id out status
+  id="orcaremotez10"
+  remote_spawn_case remote-td-force "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'work in progress\n' > "$WT/unfinished.txt"
+  # No inspection shell is available, which is the state --force exists for: a
+  # host that is genuinely gone. Orca's own records still answer from here, so
+  # the recorded host and the exact recorded path are still proven; only the
+  # on-host canonicalization is skipped.
+  printf '1\n' > "$FIX/terminal-create.exit"
+  out=$(run_remote_teardown "$id" --force)
+  status=$?
+  expect_code 0 "$status" "--force must finish cleanup when the host is unreachable"$'\n'"$out"
+  assert_contains "$out" "canonicalization for" "--force should say which proof it had to skip"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
+    "--force must release the recorded worktree once its identity is proven from Orca's records"
+  assert_absent "$STATE/$id.meta" "--force must not leave the task record stuck"
+  pass "fm-teardown.sh --force: completes cleanup for an unreachable host instead of dead-ending on it"
+}
+
+test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one() {
+  local id out status
+  id="orcaremotez11"
+  remote_spawn_case remote-td-force-mismatch "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  # Orca reports a different path than the one recorded. --force relaxes only
+  # the on-host canonicalization, never the identity of what gets removed.
+  write_remote_worktree_fixtures "$FIX" "$PROJ"
+  printf '1\n' > "$FIX/terminal-create.exit"
+  out=$(run_remote_teardown "$id" --force)
+  status=$?
+  [ "$status" -ne 0 ] || fail "--force must still refuse to remove a worktree that is not the recorded one"
+  assert_contains "$out" "not the recorded worktree" "the refusal should name the identity mismatch"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a mismatched identity must not be removed even under --force"
+  pass "fm-teardown.sh --force: still refuses when Orca's recorded worktree is not the one in the task record"
 }
 
 test_remote_teardown_releases_a_clean_worktree() {
@@ -540,6 +656,77 @@ fm_backend_orca_exec_run "$h" "echo problem >&2; exit 7"' "$ROOT" )
   expect_code 7 "$status" "exec should return the remote command's own exit status"
   [ "$out" = "problem" ] || fail "exec should return remote stderr with stdout, got '$out'"
   pass "fm_backend_orca_exec_run: returns the remote command's combined output and exit status"
+}
+
+test_exec_run_recovers_output_larger_than_one_reply() {
+  local out status expected
+  orca_remote_case exec-overflow
+  # More output than one reply can carry, on a host that retains only a little
+  # scrollback: it has to come back in pieces, and it has to come back whole.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_RETAINED_ROWS=60 \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "seq 1 600"' "$ROOT" )
+  status=$?
+  expect_code 0 "$status" "a reply fetched in pieces should still report the command's own status"
+  expected=$(seq 1 600)
+  [ "$out" = "$expected" ] || fail "a sliced reply must be reassembled whole, got ${#out} bytes"
+  pass "fm_backend_orca_exec_run: reassembles a reply too large for one read, whole"
+}
+
+test_exec_run_never_reports_an_unreadable_reply_as_empty_success() {
+  local out status
+  orca_remote_case exec-unreadable
+  # The exact shape of the defect this guards: the command itself exits 0 and
+  # its trailing status survives, but its output cannot be read back. Reporting
+  # that as "succeeded, printed nothing" is what tells the work-protection
+  # checks there is nothing to protect.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_RETAINED_ROWS=2 \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "seq 1 600"' "$ROOT" 2>/dev/null )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unreadable reply must never be reported as the command's success"
+  expect_code 125 "$status" "an unreadable reply must report a transport failure, not a command result"
+  [ -z "$out" ] || fail "an unreadable reply must print nothing, got '$out'"
+  pass "fm_backend_orca_exec_run: an unreadable reply is a transport failure, never an empty success"
+}
+
+test_exec_run_keeps_a_genuinely_empty_result_successful() {
+  local out status
+  orca_remote_case exec-empty
+  # Emptiness must stay a legitimate answer: the failure signal is a missing
+  # begin marker and a length mismatch, never an empty payload on its own.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "true"' "$ROOT" )
+  status=$?
+  expect_code 0 "$status" "a command that really printed nothing must still succeed"
+  [ -z "$out" ] || fail "a genuinely empty result should print nothing, got '$out'"
+  pass "fm_backend_orca_exec_run: a command that genuinely produced no output still succeeds"
+}
+
+test_remote_teardown_refuses_when_dirty_output_cannot_be_read() {
+  local id out status i name
+  id="orcaremotez8"
+  remote_spawn_case remote-td-truncated "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  # Real uncommitted work, and enough of it that `git status --porcelain` no
+  # longer fits in the host's retained rows. The worktree is holding the
+  # captain's work; the only safe answer is to refuse.
+  name=$(printf 'f%.0s' $(seq 1 200))
+  for i in $(seq 1 150); do : > "$WT/$name-$i.txt"; done
+  out=$(FM_ORCA_FAKE_RETAINED_ROWS=10 run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "cleanup must refuse when it cannot read the host's uncommitted-work answer"
+  assert_contains "$out" "REFUSED" "an unreadable work check must refuse out loud"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a worktree holding unreadable work must not be released"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  pass "fm-teardown.sh: refuses a remote worktree whose uncommitted-work answer could not be read, instead of releasing it"
 }
 
 test_push_file_refuses_on_digest_mismatch() {
@@ -1821,6 +2008,9 @@ test_spawn_refuses_remote_worktree_that_is_the_primary_checkout
 test_spawn_refuses_remote_harness_the_host_cannot_resolve
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
+test_remote_teardown_releases_work_already_landed_on_the_host
+test_remote_force_teardown_completes_when_the_host_is_unreachable
+test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
 test_remote_teardown_releases_a_clean_worktree
 test_setup_resolve_reads_one_ready_setup
 test_setup_resolve_refuses_ambiguous_project
@@ -1828,6 +2018,10 @@ test_setup_resolve_refuses_unready_and_unknown
 test_worktree_create_on_setup_pins_and_verifies_host
 test_terminal_create_refuses_wrong_execution_host
 test_exec_run_returns_remote_output_and_status
+test_exec_run_recovers_output_larger_than_one_reply
+test_exec_run_never_reports_an_unreadable_reply_as_empty_success
+test_exec_run_keeps_a_genuinely_empty_result_successful
+test_remote_teardown_refuses_when_dirty_output_cannot_be_read
 test_push_file_refuses_on_digest_mismatch
 test_remote_which_resolves_absolute_path
 test_isolation_verdicts_distinguish_primary_and_subdirectory

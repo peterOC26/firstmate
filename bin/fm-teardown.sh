@@ -606,6 +606,25 @@ task_git() {  # <dir> <git-arg>...
   fm_backend_orca_remote_git "$TASK_REMOTE_EXEC" "$dir" "$@"
 }
 
+teardown_shell_quote() {  # <word>
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# task_shell_at: run one shell command with <dir> as the working directory, on
+# whichever host holds it. For a pipeline whose stages must see each other's
+# exact bytes, splitting the stages across hosts would not be the same
+# computation, so the whole thing runs on one side.
+task_shell_at() {  # <dir> <shell-command>
+  local dir=$1 cmd=$2
+  if [ "$TASK_REMOTE" != 1 ]; then
+    ( cd "$dir" 2>/dev/null && eval "$cmd" ) 2>/dev/null
+    return
+  fi
+  [ -n "$TASK_REMOTE_EXEC" ] || return 1
+  fm_backend_orca_exec_run "$TASK_REMOTE_EXEC" \
+    "cd $(fm_backend_orca_shell_quote "$dir") && { $cmd ; } 2>/dev/null"
+}
+
 # task_dir_exists: `[ -d <dir> ]` for this task, wherever its files are. An
 # indeterminate remote answer returns 2 so a caller can refuse instead of
 # treating "cannot tell" as "gone".
@@ -792,11 +811,36 @@ remove_pr_poll_artifacts() {
 # Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
 # single match and returns 0; returns non-zero on no match or any lookup failure,
 # so the caller treats it as "no PR found" (fail-safe).
+# The repository these forge lookups are about, read from the task's own origin
+# through task_git so it answers on whichever host holds the worktree. gh infers
+# a repository from the working directory, and a remote task has no directory
+# here to infer from; naming the repository explicitly is what replaces that,
+# and it resolves to the same repository a local task would have inferred.
+task_repo_slug() {
+  local url slug
+  url=$(task_git "$WT" remote get-url origin 2>/dev/null) || return 1
+  url=$(printf '%s' "$url" | tr -d '[:space:]')
+  [ -n "$url" ] || return 1
+  case "$url" in
+    *github.com[:/]?*) : ;;
+    *) return 1 ;;
+  esac
+  slug=${url##*github.com}
+  slug=${slug#:}
+  slug=${slug#/}
+  slug=${slug%.git}
+  case "$slug" in
+    */?*) printf '%s' "$slug" ;;
+    *) return 1 ;;
+  esac
+}
+
 pr_number_from_branch() {
-  local branch=$1 out n
+  local branch=$1 out n slug
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
-  out=$( cd "$WT" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
-  n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
+  slug=$(task_repo_slug) || return 1
+  out=$(gh pr list --repo "$slug" --state all --head "$branch" --limit 1 --json number -q '.[].number' 2>/dev/null) || return 1
+  n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
   [ -n "$n" ] || return 1
   printf '%s' "$n"
 }
@@ -820,26 +864,29 @@ pr_number_from_target() {
 
 ensure_commit_object() {
   local target=$1 commit=$2 n
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
+  task_git "$WT" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
   n=$(pr_number_from_target "$target") || return 1
-  git -C "$WT" remote get-url origin >/dev/null 2>&1 || return 1
-  git -C "$WT" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null
+  task_git "$WT" remote get-url origin >/dev/null 2>&1 || return 1
+  task_git "$WT" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
+  task_git "$WT" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
+# The whole pipeline runs wherever the repository is, in one invocation. Split
+# across hosts it would not be the same computation: the diff would have to
+# survive a transport round trip before reaching git patch-id, and any change to
+# its trailing bytes changes the id.
 patch_id_for_commit() {
   local commit=$1
-  git -C "$WT" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
-    | git patch-id --stable 2>/dev/null \
+  task_shell_at "$WT" "git show --pretty=medium --no-ext-diff $(teardown_shell_quote "$commit") | git patch-id --stable" \
     | awk 'NR == 1 { print $1 }'
 }
 
 unpushed_patches_are_in_pr_head() {
   local pr_head=$1 current base pr_patch_ids commit patch_id unpushed
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  base=$(git -C "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
+  current=$(task_git "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  base=$(task_git "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
   pr_patch_ids=$(
-    git -C "$WT" log --format=%H "$base..$pr_head" -- 2>/dev/null \
+    task_git "$WT" log --format=%H "$base..$pr_head" -- 2>/dev/null \
       | while IFS= read -r commit; do
           patch_id_for_commit "$commit"
         done \
@@ -847,7 +894,7 @@ unpushed_patches_are_in_pr_head() {
       | sort -u
   ) || return 1
   [ -n "$pr_patch_ids" ] || return 1
-  unpushed=$(git -C "$WT" log --format=%H HEAD --not --remotes -- 2>/dev/null) || return 1
+  unpushed=$(task_git "$WT" log --format=%H HEAD --not --remotes -- 2>/dev/null) || return 1
   [ -n "$unpushed" ] || return 1
   while IFS= read -r commit; do
     [ -n "$commit" ] || continue
@@ -865,14 +912,25 @@ EOF
 # current work is not contained in the PR head, no PR is found, or any gh error
 # occurs - the caller then falls back to the content check.
 pr_is_merged() {
-  local branch=$1 target view state head current
+  local branch=$1 target view state head current slug
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
   else
     target=$(pr_number_from_branch "$branch") || return 1
   fi
   [ -n "$target" ] || return 1
-  view=$(cd "$WT" && gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+  # A full PR URL identifies its own repository; a bare number needs one named.
+  # Either way this is a forge lookup, not a filesystem one, so it must not
+  # depend on this machine holding the task's worktree.
+  case "$target" in
+    http://*|https://*)
+      view=$(gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+      ;;
+    *)
+      slug=$(task_repo_slug) || return 1
+      view=$(gh pr view "$target" --repo "$slug" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+      ;;
+  esac
   state=${view%%$'\t'*}
   head=${view#*$'\t'}
   [ "$state" != "$view" ] || return 1
@@ -882,8 +940,8 @@ pr_is_merged() {
   esac
   [ -n "$head" ] || return 1
   ensure_commit_object "$target" "$head" || return 1
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  git -C "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null && return 0
+  current=$(task_git "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  task_git "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null && return 0
   unpushed_patches_are_in_pr_head "$head"
 }
 
@@ -897,17 +955,17 @@ pr_is_merged() {
 content_in_default() {
   local name ref default_tree merged_tree
   name=$(default_branch) || return 1
-  if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
-    git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
+  if task_git "$WT" remote get-url origin >/dev/null 2>&1; then
+    task_git "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
     ref="refs/remotes/origin/$name"
-  elif git -C "$WT" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
+  elif task_git "$WT" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
     ref="refs/heads/$name"
   else
     return 1
   fi
-  default_tree=$(git -C "$WT" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
+  default_tree=$(task_git "$WT" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$WT" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
+  merged_tree=$(task_git "$WT" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
   merged_tree=$(printf '%s\n' "$merged_tree" | head -1)
   [ "$merged_tree" = "$default_tree" ]
 }
@@ -1591,7 +1649,7 @@ require_orca_worktree_path_match() {
 # component cannot make two different worktrees look like one.
 require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-resolved-path>
   local worktree_id=$1 inspected=$2 resolved=$3 verdict rc host
-  if [ -z "$TASK_REMOTE_EXEC" ]; then
+  if [ -z "$TASK_REMOTE_EXEC" ] && [ "$FORCE" != "--force" ]; then
     echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to confirm that worktree id $worktree_id is the worktree inspected at ${inspected:-<missing>}; preserving metadata." >&2
     return 1
   fi
@@ -1603,6 +1661,19 @@ require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-res
     echo "REFUSED: Orca worktree id $worktree_id now reports host $host, not the recorded host $ORCA_HOST_ID." >&2
     echo "Cannot verify dirty or unlanded work for the worktree Orca would remove; preserving metadata." >&2
     return 1
+  fi
+  if [ -z "$TASK_REMOTE_EXEC" ]; then
+    # --force with no shell on the host. Orca's own records still answer from
+    # here, so the two proofs that do not need the host are kept: the worktree
+    # still reports the recorded host (checked above), and the path Orca would
+    # remove is literally the recorded one. Only the on-host canonicalization is
+    # unavailable, and that is said out loud rather than passed over.
+    if [ "$resolved" != "$inspected" ]; then
+      echo "REFUSED: Orca worktree id $worktree_id resolves to $resolved, not the recorded worktree ${inspected:-<missing>}; preserving metadata even under --force." >&2
+      return 1
+    fi
+    echo "warning: host ${ORCA_HOST_ID:-<unrecorded>} is unreachable, so the on-host path canonicalization for $worktree_id was skipped; --force proceeded on its recorded host and exact recorded path" >&2
+    return 0
   fi
   set +e
   verdict=$(fm_backend_orca_remote_paths_same "$TASK_REMOTE_EXEC" "$inspected" "$resolved")
@@ -2421,7 +2492,12 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
       if [ -n "$TASK_REMOTE_EXEC" ] && [ -n "$ORCA_REMOTE_TASK_TMP" ]; then
         case "$ORCA_REMOTE_TASK_TMP" in
           /tmp/fm-?*)
-            fm_backend_orca_exec_run "$TASK_REMOTE_EXEC" "rm -rf '$ORCA_REMOTE_TASK_TMP'" >/dev/null 2>&1 || true
+            # Quoted through the adapter's own quoter, not by wrapping it in
+            # literal quotes: this value comes from a metadata file, and one
+            # containing a quote character would otherwise close the string and
+            # hand the rest to the remote shell as commands.
+            fm_backend_orca_exec_run "$TASK_REMOTE_EXEC" \
+              "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 || true
             ;;
           *)
             echo "warning: not removing unexpected remote task temp root $ORCA_REMOTE_TASK_TMP for $ID" >&2

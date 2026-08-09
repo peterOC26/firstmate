@@ -190,6 +190,7 @@ fm_backend_orca_setup_resolve() {  # <selector>
     echo "error: 'orca project setups --json' failed; cannot resolve $selector" >&2
     return 1
   }
+  # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to the Node snippet.
   printf '%s' "$out" | node -e '
 const fs = require("fs");
 const kind = process.argv[1];
@@ -501,7 +502,11 @@ fm_backend_orca_kill() {  # <terminal-id>
 # corrupt a path, a digest, or a git status line.
 FM_BACKEND_ORCA_EXEC_POLLS=${FM_BACKEND_ORCA_EXEC_POLLS:-120}
 FM_BACKEND_ORCA_EXEC_INTERVAL=${FM_BACKEND_ORCA_EXEC_INTERVAL:-0.5}
-FM_BACKEND_ORCA_EXEC_READ_LIMIT=${FM_BACKEND_ORCA_EXEC_READ_LIMIT:-400}
+# Only how wide the FIRST read is, never a correctness bound: a command whose
+# output does not fit is recovered by widening the window (see
+# fm_backend_orca_exec_run), so this trades one extra round trip against read
+# size rather than deciding whether an answer can be trusted.
+FM_BACKEND_ORCA_EXEC_READ_LIMIT=${FM_BACKEND_ORCA_EXEC_READ_LIMIT:-2000}
 FM_BACKEND_ORCA_PUSH_CHUNK=${FM_BACKEND_ORCA_PUSH_CHUNK:-2000}
 FM_BACKEND_ORCA_EXEC_SEQ=0
 
@@ -527,17 +532,40 @@ fm_backend_orca_exec_cursor() {  # <handle>
   fm_backend_orca_json_field latestCursor "$out" 2>/dev/null || printf '0'
 }
 
-# fm_backend_orca_exec_run: run <command> in the open shell. Prints the command's
-# combined output and returns its exit status. A transport failure (unreadable
-# terminal, no marked completion within the poll budget) returns 125 so a caller
-# can tell "the check could not run" apart from "the check ran and said no".
+# A terminal is a bounded scrollback, not a pipe. Verified against a live remote
+# host: `orca terminal read` returned only about 6 KB of a 145 KB reply, with
+# limited=false and oldestCursor=0, and raising --limit to 8,192,000 recovered no
+# more. So the window is NOT the constraint and the truncation flags are not
+# reliable - the host simply stops retaining. A reply therefore cannot be
+# streamed through the terminal and hoped for; it has to be moved in pieces each
+# small enough to be read back whole.
+#
+# That matters because of which way the failure falls. A too-long reply loses its
+# START while its trailing exit status survives, so a naive reader sees a clean
+# rc and no output - and for the two callers that matter (the uncommitted-work
+# and unlanded-work checks in teardown) no output means "nothing to protect", so
+# a worktree holding real work gets released. Every reply is therefore
+# length-declared and length-verified: the command's output is staged in a file
+# on the host, its exact base64 length comes back with the exit status, and short
+# replies ride inline while longer ones are fetched in bounded slices and
+# reassembled. A reply that still cannot be recovered whole is a transport
+# failure, which refuses. Emptiness is never itself the failure signal, so a
+# check that genuinely finds nothing still succeeds.
 FM_BACKEND_ORCA_EXEC_TRANSPORT_RC=125
-fm_backend_orca_exec_run() {  # <handle> <command>
-  local handle=$1 command=$2 nonce start wrapped out text payload rc i=0
-  fm_backend_orca_tool_check || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+# Kept well under the observed retention so a slice is always recoverable.
+FM_BACKEND_ORCA_EXEC_SLICE=${FM_BACKEND_ORCA_EXEC_SLICE:-2000}
+FM_BACKEND_ORCA_EXEC_MAX_SLICES=${FM_BACKEND_ORCA_EXEC_MAX_SLICES:-4096}
+
+# fm_backend_orca_exec_marked: send one command and read back its marked reply.
+# Used only for replies already known to be small - the staging command and each
+# slice - so that this layer never has to solve the retention problem itself.
+# Prints "<rc> <declared-len> <payload>"; returns non-zero only on transport
+# failure, so a caller can tell "could not ask" from "asked, and the answer was".
+fm_backend_orca_exec_marked() {  # <handle> <command>
+  local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0
   nonce=$(fm_backend_orca_exec_nonce)
   start=$(fm_backend_orca_exec_cursor "$handle")
-  wrapped="__fmo=\$( { $command ; } 2>&1 ); __fmr=\$?; printf 'FMORCAB_%s\\n' '$nonce'; printf '%s' \"\$__fmo\" | base64 | tr -d '\\n'; printf '\\n'; printf 'FMORCAE_%s_rc=%s\\n' '$nonce' \"\$__fmr\""
+  wrapped="__fmb=\$( { $command ; } ); __fmr=\$?; printf 'FMORCAB_%s\\n' '$nonce'; printf '%s\\n' \"\$__fmb\"; printf 'FMORCAE_%s_rc=%s_len=%s\\n' '$nonce' \"\$__fmr\" \"\${#__fmb}\""
   fm_backend_orca_send_text_line "$handle" "$wrapped" >/dev/null || {
     echo "error: could not send an inspection command to Orca terminal $handle" >&2
     return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
@@ -557,14 +585,95 @@ fm_backend_orca_exec_run() {  # <handle> <command>
     fi
     sleep "$FM_BACKEND_ORCA_EXEC_INTERVAL"
   done
-  rc=$(printf '%s\n' "$text" | sed -n "s/.*FMORCAE_${nonce}_rc=\([0-9][0-9]*\).*/\1/p" | tail -1)
-  case "$rc" in ''|*[!0-9]*) rc=$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC ;; esac
-  payload=$(printf '%s\n' "$text" | awk -v bm="FMORCAB_$nonce" -v em="FMORCAE_${nonce}_rc=" '
-    !cap && index($0, bm) { cap = 1; next }
-    cap && index($0, em) { exit }
-    cap { printf "%s", $0 }
-  ')
-  [ -z "$payload" ] || printf '%s' "$payload" | fm_backend_orca_b64_decode
+  rc=$(printf '%s\n' "$text" | sed -n "s/.*FMORCAE_${nonce}_rc=\([0-9][0-9]*\)_len=[0-9][0-9]*.*/\1/p" | tail -1 || true)
+  declared=$(printf '%s\n' "$text" | sed -n "s/.*FMORCAE_${nonce}_rc=[0-9][0-9]*_len=\([0-9][0-9]*\).*/\1/p" | tail -1 || true)
+  payload=
+  case "$text" in
+    *"FMORCAB_$nonce"*)
+      payload=$(printf '%s\n' "$text" | awk -v bm="FMORCAB_$nonce" -v em="FMORCAE_${nonce}_rc=" '
+        !cap && index($0, bm) { cap = 1; next }
+        cap && index($0, em) { exit }
+        cap { printf "%s", $0 }
+      ' | tr -d '[:space:]' || true)
+      ;;
+    *)
+      echo "error: the reply to an Orca inspection command on terminal $handle lost its start marker; the host did not retain it" >&2
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+      ;;
+  esac
+  if [ -z "$rc" ] || [ -z "$declared" ] || [ "${#payload}" -ne "$declared" ]; then
+    echo "error: an Orca inspection reply on terminal $handle was not recovered whole (declared ${declared:-unknown}, recovered ${#payload})" >&2
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  fi
+  printf '%s %s %s' "$rc" "$declared" "$payload"
+}
+
+fm_backend_orca_exec_run() {  # <handle> <command>
+  local handle=$1 command=$2 nonce stage reply rc declared inline payload slice off i q_file
+  fm_backend_orca_tool_check || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  nonce=$(fm_backend_orca_exec_nonce)
+  q_file="/tmp/.fm-orca-exec-$nonce"
+  # Stage the reply on the host, and carry back only its exit status, its exact
+  # length, and - when it is short enough to be safe - the reply itself. A short
+  # reply is the common case (a verdict token, a branch name, an empty status),
+  # so it still costs exactly one round trip and leaves nothing behind.
+  # The staging command reports through a marked reply of its own: rc/len/inline
+  # are printed on stdout, which fm_backend_orca_exec_marked length-verifies.
+  stage="__fmo=\$( { $command ; } 2>&1 ); __fmr=\$?; printf '%s' \"\$__fmo\" | base64 | tr -d '\\n' > '$q_file'; __fml=\$(wc -c < '$q_file' | tr -d '[:space:]'); printf '%s:%s:' \"\$__fmr\" \"\$__fml\"; if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then cat '$q_file'; rm -f '$q_file'; fi"
+  reply=$(fm_backend_orca_exec_marked "$handle" "$stage") || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  reply=${reply#* }
+  reply=${reply#* }
+  rc=${reply%%:*}
+  reply=${reply#*:}
+  declared=${reply%%:*}
+  inline=${reply#*:}
+  case "$rc" in ''|*[!0-9]*) rc= ;; esac
+  case "$declared" in ''|*[!0-9]*) declared= ;; esac
+  if [ -z "$rc" ] || [ -z "$declared" ]; then
+    echo "error: an Orca inspection command on terminal $handle returned no usable status or length" >&2
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  fi
+  if [ "$declared" -le "$FM_BACKEND_ORCA_EXEC_SLICE" ]; then
+    if [ "${#inline}" -ne "$declared" ]; then
+      echo "error: a short Orca inspection reply on terminal $handle did not arrive whole (declared $declared, got ${#inline})" >&2
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+    fi
+    [ -z "$inline" ] || printf '%s' "$inline" | fm_backend_orca_b64_decode
+    return "$rc"
+  fi
+  # Longer than one slice: fetch it a slice at a time, each small enough that the
+  # host is certain to still be holding it when it is read.
+  payload=
+  off=0
+  i=0
+  while [ "$off" -lt "$declared" ]; do
+    i=$((i + 1))
+    if [ "$i" -gt "$FM_BACKEND_ORCA_EXEC_MAX_SLICES" ]; then
+      echo "error: an Orca inspection reply on terminal $handle exceeded the slice budget (${declared} base64 bytes)" >&2
+      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+    fi
+    slice=$(fm_backend_orca_exec_marked "$handle" \
+      "tail -c +$((off + 1)) '$q_file' | head -c $FM_BACKEND_ORCA_EXEC_SLICE") || {
+      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+    }
+    slice=${slice#* }
+    slice=${slice#* }
+    [ -n "$slice" ] || {
+      echo "error: an Orca inspection reply on terminal $handle stopped short at $off of $declared base64 bytes" >&2
+      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+    }
+    payload="$payload$slice"
+    off=$((off + ${#slice}))
+  done
+  fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+  if [ "${#payload}" -ne "$declared" ]; then
+    echo "error: an Orca inspection reply on terminal $handle reassembled to ${#payload} of $declared base64 bytes; refusing rather than reporting a partial result" >&2
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  fi
+  printf '%s' "$payload" | fm_backend_orca_b64_decode
   return "$rc"
 }
 
@@ -686,6 +795,7 @@ fm_backend_orca_remote_which() {  # <handle> <name>
 }
 
 fm_backend_orca_remote_path_env() {  # <handle>
+  # shellcheck disable=SC2016  # Single quotes are deliberate: $PATH expands on the remote host.
   fm_backend_orca_exec_run "$1" 'printf %s "$PATH"' 2>/dev/null || true
 }
 

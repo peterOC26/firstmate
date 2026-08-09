@@ -102,6 +102,16 @@ Any mismatch removes what was created and refuses, because a task that quietly l
 
 The isolation assertion, the dirty and unlanded-work checks, and the recorded-identity check all still run; they run on the host, through a throwaway Orca shell terminal there, and every comparison is made on that host so terminal rendering cannot flip a verdict.
 A check that cannot be obtained refuses and preserves the task: a path that is merely absent from this machine is never read as "nothing to protect".
+
+That last guarantee extends to how a remote answer is read back.
+A terminal is a bounded scrollback, not a pipe: a reply longer than the host retains loses its start while its trailing exit status survives, which would otherwise read as "succeeded, printed nothing" - and to the work-protection checks, as "nothing to protect".
+Raising the read limit does not fix that, because the limit is not the constraint; measured against a live host, an 8,192,000-row request still returned only about 6 KB of a 145 KB reply, with no truncation flag set.
+Every reply is therefore length-declared and length-verified: the command's output is staged in a file on the host, its exact length returns with the exit status, short replies ride inline, and longer ones are fetched in bounded slices and reassembled.
+A reply that still cannot be recovered whole is reported as a transport failure, which refuses.
+An empty answer is never itself the failure signal, so a check that genuinely finds nothing still succeeds.
+
+The landed-work half of the cleanup check asks the host too, so a remote task whose work has already landed can be released normally rather than only through `--force`.
+Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem; they name the repository explicitly instead of inferring it from a working directory the caller does not have.
 Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
 
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
@@ -124,6 +134,8 @@ An unresolvable harness refuses and reports the `PATH` the host actually had.
 - Secondmate spawns remain unsupported, on remote hosts as on local ones.
 - Steering delivers, but `bin/fm-send.sh` reports its delivery verdict from the Orca composer classifier, which has no verified idle pattern for `codex`; a `codex` worker receives the steer while the command still reports it unconfirmed.
   That is a pre-existing gap in the Orca composer contract, identical for local and remote tasks.
+- `--force` on a host that is genuinely gone still completes: Orca's own records answer from here, so the recorded host and the exact recorded path are still proven, and only the on-host path canonicalization is skipped, with a line saying so.
+  A worktree Orca reports at a different path than the task recorded is still refused, `--force` or not.
 
 ## Regression entry points
 

@@ -622,6 +622,12 @@ Do not assume an Orca terminal's `PATH` matches any SSH shell's on the same host
 
 The live lifecycle smoke proved selector resolution, host-pinned worktree creation, host-verified terminal creation, the on-host isolation assertion, digest-verified brief and encoder delivery, a real `codex` agent launching in the remote worktree and answering its brief, `bin/fm-peek.sh`, a steer delivered by `bin/fm-send.sh`, `bin/fm-crew-state.sh` reading pane state instead of reporting the worktree gone, cleanup refusing on remote uncommitted work, cleanup refusing on a tampered recorded worktree identity, and a clean release through `orca worktree rm`.
 
+`orca terminal read --help` states that `--limit` bounds the rows returned and that `oldestCursor` reports when older lines were dropped, so a long reply loses its start rather than its end.
+Measured against the live host, the read limit is not the binding constraint and the truncation flags are not reliable: a 145,192-byte reply returned only 5,901 bytes with `limited=false` and `oldestCursor=0`, and `--limit 8192000` recovered no more.
+The remote transport therefore stages each reply on the host, returns its exact length with the exit status, and fetches anything longer than one reply in bounded slices, refusing whatever it cannot reassemble to the declared length.
+Verified on the live host after that change: `seq 1 20000` (108,893 bytes) and a real `git status --porcelain` listing 900 entries both returned complete and correct, and a genuinely empty reply still succeeded.
+`tests/fm-backend-orca.test.sh` models bounded host retention and pins the recovery, the refusal, and the empty-but-successful case.
+
 Two gaps were observed rather than fixed, both pre-existing and identical for local Orca tasks:
 `bin/fm-send.sh` delivers to a `codex` worker but reports the delivery unconfirmed, because the Orca composer classifier has no verified idle pattern for `codex`;
 and `bin/fm-crew-state.sh` reports `unknown (codex-unverified)` for the same reason.
