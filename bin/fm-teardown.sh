@@ -1186,8 +1186,15 @@ worktree_git_lock_path() {
 # Teardown passes the worktree dir as the companion directory and its own
 # STALE_WORKTREE_LOCK_AGE_SECS threshold.
 
+# Both lock helpers below answer from THIS machine's filesystem, so neither may
+# run for a task whose worktree lives on another host. A directory that happens
+# to sit at the same absolute path here belongs to something else entirely, and
+# "recovering" a remote task's unreadable answer by deleting an unrelated local
+# repository's index.lock is a destructive act on the wrong machine. A remote
+# task's unreadable answer is simply a refusal.
 worktree_safety_blocked_by_lock() {
   local reason=$1 lock
+  [ "$TASK_REMOTE" != 1 ] || return 1
   lock=$(worktree_git_lock_path "$WT") || lock=""
   [ -n "$lock" ] && [ -e "$lock" ] || return 1
   echo "teardown: cannot inspect worktree $WT for $reason while git lock $lock is present; checking whether the lock is stale" >&2
@@ -1196,6 +1203,7 @@ worktree_safety_blocked_by_lock() {
 
 cleanup_stale_lock_for_safety_check() {
   local dir=$1 lock
+  [ "$TASK_REMOTE" != 1 ] || return 0
   lock=$(worktree_git_lock_path "$dir") || lock=""
   [ -n "$lock" ] && [ -e "$lock" ] || return 0
 

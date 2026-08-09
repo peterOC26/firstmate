@@ -502,6 +502,17 @@ fm_backend_orca_kill() {  # <terminal-id>
 # corrupt a path, a digest, or a git status line.
 FM_BACKEND_ORCA_EXEC_POLLS=${FM_BACKEND_ORCA_EXEC_POLLS:-120}
 FM_BACKEND_ORCA_EXEC_INTERVAL=${FM_BACKEND_ORCA_EXEC_INTERVAL:-0.5}
+# Almost every remote command here is a near-instant verdict check, so the budget
+# above doubles as how fast a genuinely dead host is noticed and must stay short.
+# A network-bound `git fetch` is the exception: it is bounded by the host's link
+# to its forge, not by the host being alive, and timing one out reports "could
+# not ask" to the landed-work chain, which then refuses a worktree whose work has
+# in fact landed. Fetch-class commands therefore get their own, larger budget
+# (raise this when a slow host fetch causes a refusal). Exceeding even this stays
+# a transport failure that refuses - never a silent pass.
+FM_BACKEND_ORCA_EXEC_FETCH_POLLS=${FM_BACKEND_ORCA_EXEC_FETCH_POLLS:-1200}
+# Set for the duration of one fetch-class call; empty means the ordinary budget.
+FM_BACKEND_ORCA_EXEC_POLL_BUDGET=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-}
 # Only how wide each read is, never a correctness bound - and widening it is not
 # how a truncated reply is recovered. A reply the host stopped retaining comes
 # back through the staging mechanism instead: it is declared with its exact
@@ -582,7 +593,11 @@ FM_BACKEND_ORCA_EXEC_MAX_SLICES=${FM_BACKEND_ORCA_EXEC_MAX_SLICES:-4096}
 # Prints "<rc> <declared-len> <payload>"; returns non-zero only on transport
 # failure, so a caller can tell "could not ask" from "asked, and the answer was".
 fm_backend_orca_exec_marked() {  # <handle> <command>
-  local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0
+  local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0 budget
+  budget=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-$FM_BACKEND_ORCA_EXEC_POLLS}
+  case "$budget" in
+    ''|*[!0-9]*) budget=$FM_BACKEND_ORCA_EXEC_POLLS ;;
+  esac
   nonce=$(fm_backend_orca_exec_nonce)
   start=$(fm_backend_orca_exec_cursor "$handle") || {
     echo "error: could not read the current cursor of Orca terminal $handle; refusing to read a reply from an unknown point in its scrollback" >&2
@@ -602,7 +617,7 @@ fm_backend_orca_exec_marked() {  # <handle> <command>
       esac
     fi
     i=$((i + 1))
-    if [ "$i" -ge "$FM_BACKEND_ORCA_EXEC_POLLS" ]; then
+    if [ "$i" -ge "$budget" ]; then
       echo "error: Orca inspection command did not complete on terminal $handle within the poll budget" >&2
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
     fi
@@ -639,7 +654,7 @@ fm_backend_orca_exec_stage_discard() {  # <handle> <already-quoted-dir-or-empty>
 }
 
 fm_backend_orca_exec_run() {  # <handle> <command>
-  local handle=$1 command=$2 stage reply rc declared mode rest inline payload slice off i q_dir q_file
+  local handle=$1 command=$2 stage reply rc declared mode rest inline payload slice off i dir q_dir q_file
   fm_backend_orca_tool_check || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
   # Stage the reply on the host, then carry back its exit status, its exact
   # length, and - when it is short enough to be safe - the reply itself. A short
@@ -657,17 +672,28 @@ fm_backend_orca_exec_run() {  # <handle> <command>
   # failures - never the command's own exit status, which is what would let a
   # damaged reply read as a successful empty answer.
   #
-  # The stage path comes from mktemp rather than a predictable name, so a stale
-  # or hostile file at a guessable path can neither be adopted nor written into.
+  # The stage path is derived HERE, from this invocation's own nonce, and created
+  # on the host with an atomic fail-if-exists `mkdir -m 700`. Two properties come
+  # from that, and only from that: a stale or hostile directory at the path is
+  # never adopted (mkdir fails and staging refuses), and the caller knows the
+  # path WITHOUT having to read it back - so a reply that never arrives can still
+  # be swept. A path learned only from the reply is unrecoverable in exactly the
+  # case where it matters, which is how a failed transport left the host holding
+  # a full `git status` listing indefinitely. The nonce carries real entropy, so
+  # the name is not guessable, and the mode is right from the instant the
+  # directory exists rather than one command later.
   #
   # No `case` here, deliberately: a case pattern's unbalanced `)` is a parse
   # error inside `$( )` on bash 3.2, and this whole command is sent into a
   # command substitution on a host whose shell version is not ours to choose.
   # The guards below are the same tests written without one.
+  dir="/tmp/fm-orca-stage-$(fm_backend_orca_exec_nonce)"
+  q_dir=$(fm_backend_orca_shell_quote "$dir")
+  q_file=$(fm_backend_orca_shell_quote "$dir/final")
   stage="__fmo=\$( { $command ; } 2>&1 ); __fmr=\$?; \
 command -v base64 >/dev/null 2>&1 || { printf 'E:no-base64'; exit 0; }; \
-__fmd=\$(mktemp -d 2>/dev/null) || { printf 'E:no-stage-dir'; exit 0; }; \
-{ [ -n \"\$__fmd\" ] && [ -z \"\$(printf '%s' \"\$__fmd\" | tr -d -- '-A-Za-z0-9./_')\" ]; } || { printf 'E:unsafe-stage-path'; rm -rf \"\$__fmd\" 2>/dev/null; exit 0; }; \
+__fmd=$q_dir; \
+mkdir -m 700 \"\$__fmd\" 2>/dev/null || { printf 'E:no-stage-dir'; exit 0; }; \
 printf '%s' \"\$__fmo\" > \"\$__fmd/raw\" || { printf 'E:stage-write'; rm -rf \"\$__fmd\"; exit 0; }; \
 __fmn=\$(wc -c < \"\$__fmd/raw\" | tr -d '[:space:]'); \
 { [ -n \"\$__fmn\" ] && [ -z \"\$(printf '%s' \"\$__fmn\" | tr -d '0-9')\" ]; } || { printf 'E:stage-measure'; rm -rf \"\$__fmd\"; exit 0; }; \
@@ -677,18 +703,29 @@ tr -d '\\n' < \"\$__fmd/b64\" > \"\$__fmd/final\" || { printf 'E:stage-normalize
 __fml=\$(wc -c < \"\$__fmd/final\" | tr -d '[:space:]'); \
 { [ -n \"\$__fml\" ] && [ -z \"\$(printf '%s' \"\$__fml\" | tr -d '0-9')\" ]; } || { printf 'E:stage-measure'; rm -rf \"\$__fmd\"; exit 0; }; \
 [ \"\$__fml\" -eq \$(( 4 * ( (__fmn + 2) / 3 ) )) ] || { printf 'E:stage-size'; rm -rf \"\$__fmd\"; exit 0; }; \
-if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\$__fmr\" \"\$__fml\"; cat \"\$__fmd/final\"; rm -rf \"\$__fmd\"; else printf 'S:%s:%s:F:%s' \"\$__fmr\" \"\$__fml\" \"\$__fmd\"; fi"
-  reply=$(fm_backend_orca_exec_marked "$handle" "$stage") || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\$__fmr\" \"\$__fml\"; cat \"\$__fmd/final\"; rm -rf \"\$__fmd\"; else printf 'S:%s:%s:F:' \"\$__fmr\" \"\$__fml\"; fi"
+  # A reply that never arrives is exactly when the stage cannot be named by the
+  # reply, so the sweep uses the path this call already chose.
+  reply=$(fm_backend_orca_exec_marked "$handle" "$stage") || {
+    fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  }
   reply=${reply#* }
   reply=${reply#* }
   case "$reply" in
     E:*)
       echo "error: could not stage the reply to an Orca inspection command on terminal $handle (${reply#E:}); refusing rather than reporting the command's own status" >&2
+      # Every staging guard past the mkdir removes its own stage, and a mkdir
+      # that failed means the directory is not this call's to remove: refusing
+      # to adopt a hostile or stale directory would be pointless if the refusal
+      # then deleted it. Anything else is swept.
+      [ "$reply" = E:no-stage-dir ] || fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
       ;;
     S:*) reply=${reply#S:} ;;
     *)
       echo "error: an Orca inspection command on terminal $handle returned an unrecognized staging reply" >&2
+      fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
       ;;
   esac
@@ -697,13 +734,7 @@ if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\
   declared=${reply%%:*}
   reply=${reply#*:}
   mode=${reply%%:*}
-  # Everything after the mode is one field, so a path containing a colon stays
-  # intact. Only one of inline payload / stage directory is ever present.
   rest=${reply#*:}
-  # Established before the first failure return below, so no transport failure
-  # can leave the host's stage behind.
-  q_dir=
-  [ "$mode" != F ] || [ -z "$rest" ] || q_dir=$(fm_backend_orca_shell_quote "$rest")
   case "$rc" in ''|*[!0-9]*) rc= ;; esac
   case "$declared" in ''|*[!0-9]*) declared= ;; esac
   if [ -z "$rc" ] || [ -z "$declared" ]; then
@@ -712,6 +743,8 @@ if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\
     return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
   fi
   if [ "$mode" = I ]; then
+    # The host removed the stage before printing an inline reply, so there is
+    # nothing left to sweep on either outcome here.
     inline=$rest
     if [ "${#inline}" -ne "$declared" ]; then
       echo "error: a short Orca inspection reply on terminal $handle did not arrive whole (declared $declared, got ${#inline})" >&2
@@ -720,11 +753,11 @@ if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\
     [ -z "$inline" ] || printf '%s' "$inline" | fm_backend_orca_b64_decode
     return "$rc"
   fi
-  if [ "$mode" != F ] || [ -z "$rest" ]; then
+  if [ "$mode" != F ]; then
     echo "error: an Orca inspection reply on terminal $handle named no stage to read it from" >&2
+    fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
     return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
   fi
-  q_file=$(fm_backend_orca_shell_quote "$rest/final")
   # Longer than one slice: fetch it a slice at a time, each small enough that the
   # host is certain to still be holding it when it is read.
   payload=
@@ -849,9 +882,31 @@ fm_backend_orca_shell_quote() {  # <word>
 # and same output as `git -C <worktree>` locally, so a caller keeps ONE copy of
 # the policy that reads it and only the access path differs.
 fm_backend_orca_remote_git() {  # <handle> <worktree-path> <git-arg>...
-  local handle=$1 worktree=$2 cmd out rc
+  local handle=$1 worktree=$2 cmd out rc arg verb='' wants_value=0
+  local FM_BACKEND_ORCA_EXEC_POLL_BUDGET=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-}
   shift 2
   cmd="git -C $(fm_backend_orca_shell_quote "$worktree")"
+  # The verb is the first argument that is neither an option nor an option's
+  # value, so `-c key=val` and `-C dir` in front of it do not stand in for one.
+  for arg in "$@"; do
+    if [ "$wants_value" = 1 ]; then
+      wants_value=0
+      continue
+    fi
+    case "$arg" in
+      -c|-C|--git-dir|--work-tree|--namespace) wants_value=1 ;;
+      -*) : ;;
+      *) verb=$arg; break ;;
+    esac
+  done
+  # Whether this command talks to the network is a property of the git verb, not
+  # of the call site, so the wider budget is granted here rather than left for
+  # each caller to remember. A fetch bounded by the verdict-check budget reports
+  # "could not ask" to the landed-work chain, which then refuses work that has
+  # in fact landed.
+  case "$verb" in
+    fetch|pull|push|clone|ls-remote) FM_BACKEND_ORCA_EXEC_POLL_BUDGET=$FM_BACKEND_ORCA_EXEC_FETCH_POLLS ;;
+  esac
   while [ "$#" -gt 0 ]; do
     cmd="$cmd $(fm_backend_orca_shell_quote "$1")"
     shift

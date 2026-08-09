@@ -113,6 +113,7 @@ Raising the read limit does not fix that, because the limit is not the constrain
 Every reply is therefore length-declared and length-verified: the command's output is staged in a file on the host, its exact length returns with the exit status, short replies ride inline, and longer ones are fetched in bounded slices and reassembled.
 A reply that still cannot be recovered whole is reported as a transport failure, which refuses.
 An empty answer is never itself the failure signal, so a check that genuinely finds nothing still succeeds.
+The stage directory is named from the caller's own per-invocation nonce and created on the host with an atomic fail-if-exists `mkdir -m 700`, so a stale or hostile directory at that path is refused rather than adopted, and every transport failure - including one where the reply itself never arrives to name it - can still sweep the stage back off the host.
 
 The landed-work half of the cleanup check asks the host too, so a remote task whose work has already landed can be released normally rather than only through `--force`.
 Its two forge lookups stay on this machine, since they query GitHub rather than a filesystem.
@@ -149,6 +150,10 @@ A line beginning with `/` only nominates a candidate: each one is proven on the 
 - Secondmate spawns remain unsupported, on remote hosts as on local ones.
 - Steering delivers, but `bin/fm-send.sh` reports its delivery verdict from the Orca composer classifier, which has no verified idle pattern for `codex`; a `codex` worker receives the steer while the command still reports it unconfirmed.
   That is a pre-existing gap in the Orca composer contract, identical for local and remote tasks.
+- Every remote command is bounded by a poll budget, and exceeding it is a transport failure that refuses rather than a silent pass.
+  Verdict checks use `FM_BACKEND_ORCA_EXEC_POLLS` (120) x `FM_BACKEND_ORCA_EXEC_INTERVAL` (0.5s), which is also how quickly a genuinely dead host is noticed, so it is deliberately short.
+  Network-bound git commands (`fetch`, `pull`, `push`, `clone`, `ls-remote`) get their own budget instead, `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` (1200 polls, about 10 minutes), because they are bounded by the host's link to its forge rather than by the host being alive.
+  Raise `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` when a slow host fetch makes cleanup refuse a task whose work has landed; raising `FM_BACKEND_ORCA_EXEC_POLLS` is not the knob for that and only slows dead-host detection.
 - `--force` on a host that is genuinely gone still completes: Orca's own records answer from here, so the recorded host and the exact recorded path are still proven, and only the on-host path canonicalization is skipped, with a line saying so.
   A worktree Orca reports at a different path than the task recorded is still refused, `--force` or not.
 

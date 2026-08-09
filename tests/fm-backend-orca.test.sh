@@ -166,6 +166,17 @@ case "${1:-} ${2:-}" in
     else
       out=$(bash -c "$text" 2>&1)
     fi
+    # A command whose ANSWER takes a while to show up, which is the only thing a
+    # poll budget actually measures. Held back for a fixed number of reads
+    # instead of a wall-clock delay so the case is deterministic: the reply
+    # becomes visible on the Nth read, and a budget smaller than that times out.
+    if [ -n "${FM_ORCA_FAKE_SLOW_MATCH:-}" ] && [ "${FM_ORCA_FAKE_SLOW_READS:-0}" -gt 0 ] \
+       && [ "${text#*"$FM_ORCA_FAKE_SLOW_MATCH"}" != "$text" ]; then
+      printf '%s' "$out" > "$FIX/$handle.pending"
+      printf '%s\n' "$FM_ORCA_FAKE_SLOW_READS" > "$FIX/$handle.delay"
+      printf '{"ok":true,"result":{}}\n'
+      exit 0
+    fi
     [ -z "$out" ] || printf '%s\n' "$out" >> "$FIX/$handle.buf"
     printf '{"ok":true,"result":{}}\n'
     exit 0
@@ -183,6 +194,17 @@ case "${1:-} ${2:-}" in
     fi
     case "$cursor" in ''|*[!0-9]*) cursor=0 ;; esac
     case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
+    # A held-back reply lands in the scrollback once it has been waited for.
+    if [ -f "$FIX/$handle.delay" ]; then
+      left=$(( $(cat "$FIX/$handle.delay") - 1 ))
+      if [ "$left" -le 0 ]; then
+        [ ! -s "$FIX/$handle.pending" ] || cat "$FIX/$handle.pending" >> "$FIX/$handle.buf"
+        [ ! -s "$FIX/$handle.pending" ] || printf '\n' >> "$FIX/$handle.buf"
+        rm -f "$FIX/$handle.delay" "$FIX/$handle.pending"
+      else
+        printf '%s\n' "$left" > "$FIX/$handle.delay"
+      fi
+    fi
     # Model the contract `orca terminal read --help` states: output is terminal
     # ROWS, --limit returns the NEWEST n of them, older rows are dropped, and
     # oldestCursor reports that a drop happened. Retention is finite, so a
@@ -373,6 +395,54 @@ test_spawn_places_task_on_remote_orca_host() {
   pass "fm-spawn.sh: places a task on a remote Orca host with host-pinned creation, delivered instructions, and no unreachable hooks"
 }
 
+# A host `mkdir` that records the mode each directory ACTUALLY had the moment it
+# came into existence. That instant is the whole question: a mkdir-then-chmod
+# leaves the directory at the host's default umask until the chmod lands, and
+# the final mode says nothing about whether that window existed.
+add_mode_recording_host_mkdir() {  # <bindir> <log>
+  mkdir -p "$1"
+  cat > "$1/mkdir" <<SH
+#!/bin/sh
+/bin/mkdir "\$@" || exit \$?
+skip=0
+for a in "\$@"; do
+  if [ "\$skip" = 1 ]; then skip=0; continue; fi
+  case "\$a" in
+    -m|--mode) skip=1; continue ;;
+    -*) continue ;;
+  esac
+  mode=\$(stat -f '%Lp' "\$a" 2>/dev/null || stat -c '%a' "\$a" 2>/dev/null)
+  printf '%s %s\n' "\$mode" "\$a" >> "$2"
+done
+exit 0
+SH
+  chmod +x "$1/mkdir"
+}
+
+test_spawn_creates_the_remote_task_temp_root_at_owner_only_mode() {
+  local id out modes bad
+  id="orcaremotez19"
+  remote_spawn_case remote-tmp-mode "$id"
+  rm -rf "/tmp/fm-$id"
+  add_mode_recording_host_mkdir "$CASE_DIR/hostbin" "$CASE_DIR/mkdir-modes"
+  : > "$CASE_DIR/mkdir-modes"
+  out=$(FM_ORCA_FAKE_HOST_PATH="$CASE_DIR/hostbin:$FB:$PATH" \
+    run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  expect_code 0 $? "a remote Orca spawn should succeed"$'\n'"$out"
+  modes=$(cat "$CASE_DIR/mkdir-modes")
+  assert_contains "$modes" "700 /tmp/fm-$id" \
+    "the remote task temp root must exist at mode 700 from the instant it is created"
+  assert_contains "$modes" "700 /tmp/fm-$id/gotmp" \
+    "the nested temp directory must be created at mode 700 too"
+  # Nothing this spawn creates on the host may ever be observable at a mode
+  # another account could write into: that window is what lets a pre-created
+  # symlink at brief.md capture the task's whole instruction set.
+  bad=$(printf '%s\n' "$modes" | grep -v '^700 ' || true)
+  [ -z "$bad" ] || fail "a directory on the host was observable at a permissive mode: $bad"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-spawn.sh: creates every remote task directory at mode 700 atomically, leaving no window at the host's default umask"
+}
+
 test_spawn_refuses_orca_selector_without_orca_backend() {
   local id out status
   id="orcaremotez2"
@@ -464,6 +534,10 @@ run_remote_teardown() {  # <id> [<extra args>...]
   PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
     FM_ORCA_FAKE_HOST_PREFIX="${FM_ORCA_FAKE_HOST_PREFIX:-}" FM_ORCA_FAKE_HOST_REAL="${FM_ORCA_FAKE_HOST_REAL:-}" \
     FM_ORCA_FAKE_RETAINED_ROWS="${FM_ORCA_FAKE_RETAINED_ROWS:-0}" \
+    FM_ORCA_FAKE_SLOW_MATCH="${FM_ORCA_FAKE_SLOW_MATCH:-}" FM_ORCA_FAKE_SLOW_READS="${FM_ORCA_FAKE_SLOW_READS:-0}" \
+    FM_BACKEND_ORCA_EXEC_POLLS="${FM_BACKEND_ORCA_EXEC_POLLS:-}" \
+    FM_BACKEND_ORCA_EXEC_INTERVAL="${FM_BACKEND_ORCA_EXEC_INTERVAL:-}" \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS="${FM_BACKEND_ORCA_EXEC_FETCH_POLLS:-}" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
 }
@@ -708,6 +782,89 @@ test_remote_teardown_releases_work_already_landed_on_the_host() {
     "a remote task whose work has landed must be released through Orca"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
   pass "fm-teardown.sh: releases a remote task whose work already landed, asking the host rather than this machine"
+}
+
+# A forge that knows about no PR at all, so the landed-work verdict can only
+# come from the content check - and therefore from the fetch that feeds it.
+add_fake_gh_without_any_pr() {  # <fakebin>
+  cat > "$1/gh" <<'SH'
+#!/usr/bin/env bash
+echo "error: no pull requests found" >&2
+exit 1
+SH
+  chmod +x "$1/gh"
+}
+
+test_remote_teardown_survives_a_slow_host_fetch() {
+  local id out status default
+  id="orcaremotez17"
+  # No path in this case may contain the slow-command marker below, or every
+  # command naming the worktree would be held back instead of just the fetch.
+  remote_spawn_case remote-td-slow-network "$id"
+  add_fake_gh_without_any_pr "$FB"
+  # The work HAS landed: it is in the project's default branch and in origin.
+  # Only the content check can see that, and only after fetching the default
+  # branch from the forge - the one remote command bounded by the network rather
+  # than by the host being alive.
+  printf 'landed through the forge\n' > "$WT/landed.txt"
+  git -C "$WT" add landed.txt
+  git -C "$WT" -c user.email=t@example.com -c user.name=t commit -qm "landed change"
+  git -C "$PROJ" merge --ff-only -q "fm/$id"
+  fm_git_add_origin "$PROJ" "$CASE_DIR/origin.git"
+  default=$(git -C "$PROJ" rev-parse --abbrev-ref HEAD)
+  # No remote-tracking ref here yet, so the commit still counts as unpushed and
+  # the landed-work chain is what has to release the worktree.
+  git -C "$PROJ" update-ref -d "refs/remotes/origin/$default" 2>/dev/null || true
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" \
+    "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id"
+  # The fetch answers only after more polls than an ordinary verdict check is
+  # allowed; every other command still answers at once.
+  out=$(FM_ORCA_FAKE_SLOW_MATCH="fetch" FM_ORCA_FAKE_SLOW_READS=6 \
+    FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.05 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=60 \
+    run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a slow host fetch must not be mistaken for a dead host"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
+    "a remote task whose work landed must be released even when the host's fetch is slow"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-teardown.sh: releases a remote task whose landed-work fetch takes longer than an ordinary verdict check"
+}
+
+test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone() {
+  local id out status lock i name
+  id="orcaremotez18"
+  remote_spawn_case remote-td-local-lock "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  # Enough uncommitted work that the host's answer cannot be read back, which is
+  # the failure that used to fall through to THIS machine's git lock.
+  name=$(printf 'f%.0s' $(seq 1 200))
+  for i in $(seq 1 150); do : > "$WT/$name-$i.txt"; done
+  # A git lock at the recorded absolute path, on this machine. For a remote task
+  # that lock belongs to whatever local checkout happens to sit there, never to
+  # the task - so nothing here may read it as the task's own, and nothing here
+  # may remove it. Old enough and unheld, so the stale-lock cleanup would take
+  # it if it ever ran.
+  lock=$(git -C "$WT" rev-parse --git-path index.lock)
+  case "$lock" in /*) : ;; *) lock="$WT/$lock" ;; esac
+  : > "$lock"
+  touch -t 202001010000 "$lock"
+  out=$(FM_ORCA_FAKE_RETAINED_ROWS=10 run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unreadable remote work check must refuse"
+  assert_contains "$out" "REFUSED" "an unreadable remote work check must refuse out loud"
+  [ -f "$lock" ] \
+    || fail "teardown removed the local git lock $lock while cleaning up a task whose worktree is on another host"
+  assert_not_contains "$out" "removed provably-stale git lock" \
+    "a remote task's unreadable answer must not be 'recovered' by touching this machine's locks"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  rm -f "$lock"
+  pass "fm-teardown.sh: refuses a remote task's unreadable work check without consulting or deleting this machine's git lock"
 }
 
 test_remote_force_teardown_completes_when_the_host_is_unreachable() {
@@ -1020,6 +1177,51 @@ fm_backend_orca_exec_run "$h" "printf %s dirty"' "$ROOT" 2>/dev/null )
   expect_code 125 "$status" "a silently empty staged file must report a transport failure"
   [ -z "$out" ] || fail "a silently empty staged file must print nothing, got '$out'"
   pass "fm_backend_orca_exec_run: refuses a staged write that silently produced nothing, rather than reading it as an empty answer"
+}
+
+# A host whose temp root is somewhere the case can watch, which is all TMPDIR
+# means on a POSIX host (BSD mktemp reads its own configured directory instead,
+# so pointing at it through the environment would not be portable here).
+add_watchable_host_temp_root() {  # <bindir> <temp-root>
+  mkdir -p "$1" "$2"
+  cat > "$1/mktemp" <<SH
+#!/bin/sh
+if [ "\$1" = -d ] && [ "\$#" = 1 ]; then
+  exec /usr/bin/mktemp -d "$2/tmp.XXXXXX"
+fi
+exec /usr/bin/mktemp "\$@"
+SH
+  chmod +x "$1/mktemp"
+}
+
+test_exec_run_sweeps_the_host_stage_when_the_staging_reply_never_arrives() {
+  local out status hosttmp before after left
+  orca_remote_case exec-stage-leak
+  hosttmp="$CASE_DIR/hosttmp"
+  add_watchable_host_temp_root "$CASE_DIR/hostbin" "$hosttmp"
+  # The reply is staged and then never becomes readable: the host holds the full
+  # answer in a directory whose name only that reply could have carried back.
+  # A stage that outlives its own transport failure is the task's data left on
+  # someone else's machine, once per failed call.
+  before=$(find /tmp -maxdepth 1 -name 'fm-orca-stage-*' 2>/dev/null | wc -l | tr -d '[:space:]')
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_HOST_PATH="$CASE_DIR/hostbin:/usr/bin:/bin" \
+    FM_ORCA_FAKE_SLOW_MATCH=FMSLOWMARK FM_ORCA_FAKE_SLOW_READS=200 \
+    FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.01 \
+    FM_BACKEND_ORCA_EXEC_SLICE=8 \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "printf %s FMSLOWMARK-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$ROOT" 2>/dev/null )
+  status=$?
+  expect_code 125 "$status" "a reply that never arrives must report a transport failure"
+  [ -z "$out" ] || fail "an unreadable reply must print nothing, got '$out'"
+  left=$(find "$hosttmp" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d '[:space:]')
+  [ "$left" = 0 ] \
+    || fail "the host still holds $left staged item(s) under its temp root after the transport failure"
+  after=$(find /tmp -maxdepth 1 -name 'fm-orca-stage-*' 2>/dev/null | wc -l | tr -d '[:space:]')
+  [ "$after" = "$before" ] \
+    || fail "the host's stage directory outlived the transport failure that lost its reply"
+  pass "fm_backend_orca_exec_run: sweeps the host's stage even when the staging reply itself never arrives"
 }
 
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply() {
@@ -2621,6 +2823,7 @@ test_dispatcher_sources_orca_and_routes_primitives() {
 }
 
 test_spawn_places_task_on_remote_orca_host
+test_spawn_creates_the_remote_task_temp_root_at_owner_only_mode
 test_spawn_refuses_orca_selector_without_orca_backend
 test_spawn_refuses_remote_worktree_that_is_the_primary_checkout
 test_spawn_refuses_remote_harness_the_host_cannot_resolve
@@ -2633,6 +2836,8 @@ test_remote_pr_discovery_names_the_task_s_own_forge_host
 test_remote_pr_discovery_keeps_a_forge_port
 test_remote_pr_discovery_drops_an_ssh_transport_port
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
+test_remote_teardown_survives_a_slow_host_fetch
+test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
 test_remote_teardown_releases_a_clean_worktree
@@ -2648,6 +2853,7 @@ test_exec_run_refuses_when_the_cursor_cannot_be_read
 test_exec_run_marks_every_invocation_apart
 test_exec_run_refuses_when_the_host_cannot_encode_the_reply
 test_exec_run_refuses_when_staging_writes_an_empty_file
+test_exec_run_sweeps_the_host_stage_when_the_staging_reply_never_arrives
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply
 test_exec_run_keeps_a_genuinely_empty_result_successful
 test_remote_teardown_refuses_when_dirty_output_cannot_be_read

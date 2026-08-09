@@ -2127,7 +2127,10 @@ fi
 # later, and teardown cleans one deterministic path. GOTMPDIR (not TMPDIR) is the
 # targeted knob: TMPDIR is too broad (affects every program's temp, not just Go's).
 TASK_TMP="/tmp/fm-$ID"
-mkdir -p "$TASK_TMP/gotmp"
+# A remote task's processes never run here, so this machine gets no root: the
+# one that matters is created on the host below, and creating a same-named one
+# here would only be a directory on the wrong machine.
+[ "$ORCA_REMOTE" = 1 ] || mkdir -p "$TASK_TMP/gotmp"
 # A remote task needs the same root where its processes actually run. Same path
 # shape so an operator reads one convention, recorded separately in the metadata
 # so cleanup never has to derive it.
@@ -2138,12 +2141,17 @@ if [ "$ORCA_REMOTE" = 1 ]; then
   ORCA_REMOTE_TASK_TMP="/tmp/fm-$ID"
   ORCA_REMOTE_BRIEF="$ORCA_REMOTE_TASK_TMP/brief.md"
   ORCA_REMOTE_OPINPUT="$ORCA_REMOTE_TASK_TMP/fm-operational-input.sh"
-  # 0700 before anything is written into it: this root holds the worker's whole
-  # brief, and unlike a local spawn - whose brief stays under $DATA in the
-  # user's own home - it sits in the host's shared /tmp, where the default umask
-  # would leave the task's instructions readable by every account on that box.
+  # 0700 from the instant the directory exists, not one command later: this root
+  # holds the worker's whole brief, and unlike a local spawn - whose brief stays
+  # under $DATA in the user's own home - it sits in the host's shared /tmp. A
+  # mkdir-then-chmod leaves a window at the host's default umask, and another
+  # account that wins it can pre-create brief.md as a symlink; the copy then
+  # follows it, and the digest read-back follows it too, so the task's whole
+  # instruction set lands at a path of that account's choosing and still
+  # verifies. `mkdir -m 700` closes the window, and its fail-if-exists also
+  # keeps a directory this spawn did not create from being adopted.
   fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
-    "mkdir -p $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp") && chmod 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP") $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
+    "mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP") && mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
     echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP with owner-only permissions on host $ORCA_HOST_ID" >&2
     exit 1
   }
