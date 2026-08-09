@@ -765,7 +765,11 @@ spawn_abort_cleanup() {
             echo "kind=$KIND"
             [ -z "${MODE:-}" ] || echo "mode=$MODE"
             [ -z "${YOLO:-}" ] || echo "yolo=$YOLO"
-            echo "tasktmp=${TASK_TMP:-}"
+            if [ "${ORCA_REMOTE:-0}" = 1 ]; then
+              echo "tasktmp="
+            else
+              echo "tasktmp=${TASK_TMP:-}"
+            fi
             echo "model=${MODEL:-default}"
             echo "effort=${EFFORT:-default}"
             echo "backend=orca"
@@ -2543,7 +2547,15 @@ META_WINDOW=$T
   echo "kind=$KIND"
   [ -z "$MODE" ] || echo "mode=$MODE"
   [ -z "$YOLO" ] || echo "yolo=$YOLO"
-  echo "tasktmp=$TASK_TMP"
+  # tasktmp= is the root on THIS machine, and a remote task has none here - it
+  # records the one it really created as orca_remote_tasktmp= instead. Naming a
+  # local path this task never created would point cleanup at whatever else
+  # happens to sit there.
+  if [ "$ORCA_REMOTE" = 1 ]; then
+    echo "tasktmp="
+  else
+    echo "tasktmp=$TASK_TMP"
+  fi
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"

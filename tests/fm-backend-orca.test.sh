@@ -367,6 +367,8 @@ test_spawn_places_task_on_remote_orca_host() {
   assert_grep "worktree=$WT" "$STATE/$id.meta" "meta must record the remote worktree path"
   assert_grep "project=$PROJ" "$STATE/$id.meta" "meta must record the remote project path"
   assert_grep "orca_remote_tasktmp=/tmp/fm-$id" "$STATE/$id.meta" "meta must record the remote task temp root"
+  grep -q '^tasktmp=$' "$STATE/$id.meta" \
+    || fail "meta must not name a local task temp root for a task whose processes run on another host, got '$(grep '^tasktmp=' "$STATE/$id.meta")'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''create'$'\x1f''--project-host-setup'$'\x1f''setup-remote' \
     "a remote spawn must pin worktree creation to the resolved host setup"
   # The brief and its encoder must exist ON the host, and the launch line must
@@ -886,6 +888,38 @@ test_remote_force_teardown_completes_when_the_host_is_unreachable() {
     "--force must release the recorded worktree once its identity is proven from Orca's records"
   assert_absent "$STATE/$id.meta" "--force must not leave the task record stuck"
   pass "fm-teardown.sh --force: completes cleanup for an unreachable host instead of dead-ending on it"
+}
+
+test_remote_force_teardown_names_the_task_temp_root_it_could_not_sweep() {
+  local id out status
+  id="orcaremotez20"
+  remote_spawn_case remote-td-force-tmp "$id"
+  # A record from before tasktmp= stopped naming a local root for remote tasks:
+  # the authoritative root is the remote one, and the local path is a path this
+  # machine never created for this task.
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" "backend=orca" \
+    "tasktmp=/tmp/fm-$id" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id"
+  mkdir -p "/tmp/fm-$id"
+  printf 'not this machine s to delete\n' > "/tmp/fm-$id/marker.txt"
+  # The host is gone, so the worker's brief is certainly still sitting in its
+  # /tmp there, and the record that names the path is about to be deleted.
+  printf '1\n' > "$FIX/terminal-create.exit"
+  out=$(run_remote_teardown "$id" --force)
+  status=$?
+  expect_code 0 "$status" "--force must finish cleanup when the host is unreachable"$'\n'"$out"
+  assert_contains "$out" "/tmp/fm-$id" \
+    "an unreachable host must leave the task temp root named, since the record about to be deleted is the only thing that knows it"
+  assert_contains "$out" "remove it on that host by hand" \
+    "the warning should say what an operator has to do with it"
+  [ -f "/tmp/fm-$id/marker.txt" ] \
+    || fail "teardown deleted /tmp/fm-$id on THIS machine while cleaning up a task whose files are on another host"
+  assert_absent "$STATE/$id.meta" "--force must not leave the task record stuck"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-teardown.sh --force: names the remote task temp root it could not sweep, and never deletes that path locally"
 }
 
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one() {
@@ -2856,6 +2890,7 @@ test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_teardown_survives_a_slow_host_fetch
 test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone
 test_remote_force_teardown_completes_when_the_host_is_unreachable
+test_remote_force_teardown_names_the_task_temp_root_it_could_not_sweep
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
 test_remote_teardown_releases_a_clean_worktree
 test_setup_resolve_reads_one_ready_setup

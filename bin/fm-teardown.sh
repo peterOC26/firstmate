@@ -1828,31 +1828,27 @@ require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-wo
   require_orca_worktree_path_match "$worktree_id" "$child_wt"
 }
 
-# sweep_orca_child_remote_task_tmp: remove the per-task temp root a REMOTE Orca
-# child recorded, while that child's metadata still names it - the record is the
-# only thing that knows the path, so once it is deleted the directory holding
-# the worker's brief can never be found again. Best effort in every direction,
-# exactly like the ordinary task's own sweep: a host that cannot be reached is
-# one warning naming the path to remove by hand, never a failed cleanup.
-sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
-  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
-  tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
+# sweep_remote_task_tmp: remove the per-task temp root a REMOTE Orca task
+# recorded, on the host that actually holds it. The temp root is /tmp/fm-<id>
+# THERE and has nothing to do with the worktree, so what it depends on is the
+# recorded path and an inspection shell - never whether the worktree is still
+# present. Every outcome is best effort: an unreachable host is one warning
+# naming the path to remove by hand, never a failed cleanup, because the record
+# that knows the path is deleted moments later and the warning is then the only
+# thing that can lead an operator (or the next spawn's refusal) back to it.
+sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label>
+  local handle=$1 tasktmp=$2 host=$3 label=$4
   [ -n "$tasktmp" ] || return 0
+  [ -n "$host" ] || host='<unrecorded>'
   case "$tasktmp" in
     /tmp/fm-?*) : ;;
     *)
-      echo "warning: not removing unexpected remote task temp root $tasktmp for child $child_id" >&2
+      echo "warning: not removing unexpected remote task temp root $tasktmp for $label" >&2
       return 0
       ;;
   esac
-  host=$(meta_value "$child_meta" orca_host)
-  if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
-    echo "warning: child $child_id records $tasktmp on a remote Orca host but nothing here can reach it; remove it on that host by hand" >&2
-    return 0
-  fi
-  handle=$(fm_backend_orca_exec_open "$worktree_id" "fm-$child_id-sweep" "$host" 2>/dev/null) || handle=
   if [ -z "$handle" ]; then
-    echo "warning: could not reach Orca host $host to remove $tasktmp for child $child_id; remove it on that host by hand" >&2
+    echo "warning: could not reach Orca host $host to remove $tasktmp for $label; remove it on that host by hand" >&2
     return 0
   fi
   # Quoted through the adapter's own quoter: this value comes from a metadata
@@ -1860,8 +1856,24 @@ sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
   # and hand the rest to the remote shell as commands.
   fm_backend_orca_exec_run "$handle" \
     "rm -rf $(fm_backend_orca_shell_quote "$tasktmp")" >/dev/null 2>&1 \
-    || echo "warning: could not remove $tasktmp on Orca host $host for child $child_id; remove it on that host by hand" >&2
-  fm_backend_orca_exec_close "$handle" 2>/dev/null || true
+    || echo "warning: could not remove $tasktmp on Orca host $host for $label; remove it on that host by hand" >&2
+  return 0
+}
+
+# sweep_orca_child_remote_task_tmp: the same sweep for a REMOTE Orca child,
+# which has no inspection shell open yet and so opens (and releases) its own.
+sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
+  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
+  tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
+  [ -n "$tasktmp" ] || return 0
+  host=$(meta_value "$child_meta" orca_host)
+  if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
+    sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id"
+    return 0
+  fi
+  handle=$(fm_backend_orca_exec_open "$worktree_id" "fm-$child_id-sweep" "$host" 2>/dev/null) || handle=
+  sweep_remote_task_tmp "$handle" "$tasktmp" "$host" "child $child_id"
+  [ -z "$handle" ] || fm_backend_orca_exec_close "$handle" 2>/dev/null || true
   return 0
 }
 
@@ -2644,32 +2656,22 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
         task_git "$WT" branch -D "$branch" >/dev/null 2>&1 || true
       fi
     fi
-    # A remote task installs none of these hook files (fm-spawn.sh refuses the
-    # harnesses that would need them there), so only the per-task temp root it
-    # really did create on that host has to be swept. Best effort, exactly like
-    # the local file removal it replaces.
-    if [ "$TASK_REMOTE" = 1 ]; then
-      if [ -n "$TASK_REMOTE_EXEC" ] && [ -n "$ORCA_REMOTE_TASK_TMP" ]; then
-        case "$ORCA_REMOTE_TASK_TMP" in
-          /tmp/fm-?*)
-            # Quoted through the adapter's own quoter, not by wrapping it in
-            # literal quotes: this value comes from a metadata file, and one
-            # containing a quote character would otherwise close the string and
-            # hand the rest to the remote shell as commands.
-            fm_backend_orca_exec_run "$TASK_REMOTE_EXEC" \
-              "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 || true
-            ;;
-          *)
-            echo "warning: not removing unexpected remote task temp root $ORCA_REMOTE_TASK_TMP for $ID" >&2
-            ;;
-        esac
-      fi
-    else
+    # A remote task installs none of these hook files: fm-spawn.sh refuses the
+    # harnesses that would need them there, and the rest are written into the
+    # worktree by hooks a remote task never gets.
+    if [ "$TASK_REMOTE" != 1 ]; then
       rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \
         "$WT/.opencode/plugins/fm-busy-state.js" \
         "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
     fi
   fi
+  # Deliberately outside that test: the temp root sits in the host's /tmp, not in
+  # the worktree, so a worktree already gone from the host - and an unreachable
+  # host under --force, where its existence cannot even be determined - are the
+  # two cases where the brief is most likely still sitting there. Both used to
+  # skip this entirely and then delete the record naming it.
+  [ "$TASK_REMOTE" != 1 ] \
+    || sweep_remote_task_tmp "$TASK_REMOTE_EXEC" "$ORCA_REMOTE_TASK_TMP" "$ORCA_HOST_ID" "$ID"
   # The inspection shell is itself a terminal in this worktree, so it is released
   # before Orca is asked to remove the worktree, not after.
   task_remote_exec_release
@@ -2783,7 +2785,11 @@ remove_kimi_turnend_auth "$STATE" "$ID"
 fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # Remove the per-task temp root (/tmp/fm-<id>/, incl. its gotmp/) recorded by spawn.
 # Read before the state-file rm below; empty (pre-fix tasks without tasktmp=) is a no-op.
-[ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
+# Never for a remote task: its root is on the host and was swept there, so the
+# only thing this path could delete here is whatever else happens to occupy that
+# absolute path on THIS machine - a task recorded before tasktmp= stopped naming
+# a local root for remote tasks still reaches this line.
+[ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 rm -f "$STATE/$ID.status" "$STATE/$ID.turn-ended" "$STATE/$ID.meta" \
