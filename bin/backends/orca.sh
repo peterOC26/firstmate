@@ -608,32 +608,88 @@ fm_backend_orca_exec_marked() {  # <handle> <command>
   printf '%s %s %s' "$rc" "$declared" "$payload"
 }
 
+# Best effort, and called on every path that leaves a staged reply behind, so a
+# transport failure never also leaks the host's stage directory.
+fm_backend_orca_exec_stage_discard() {  # <handle> <already-quoted-dir-or-empty>
+  [ -n "${2:-}" ] || return 0
+  fm_backend_orca_exec_marked "$1" "rm -rf $2; printf ''" >/dev/null 2>&1 || true
+}
+
 fm_backend_orca_exec_run() {  # <handle> <command>
-  local handle=$1 command=$2 nonce stage reply rc declared inline payload slice off i q_file
+  local handle=$1 command=$2 stage reply rc declared mode rest inline payload slice off i q_dir q_file
   fm_backend_orca_tool_check || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
-  nonce=$(fm_backend_orca_exec_nonce)
-  q_file="/tmp/.fm-orca-exec-$nonce"
-  # Stage the reply on the host, and carry back only its exit status, its exact
+  # Stage the reply on the host, then carry back its exit status, its exact
   # length, and - when it is short enough to be safe - the reply itself. A short
   # reply is the common case (a verdict token, a branch name, an empty status),
   # so it still costs exactly one round trip and leaves nothing behind.
-  # The staging command reports through a marked reply of its own: rc/len/inline
-  # are printed on stdout, which fm_backend_orca_exec_marked length-verifies.
-  stage="__fmo=\$( { $command ; } 2>&1 ); __fmr=\$?; printf '%s' \"\$__fmo\" | base64 | tr -d '\\n' > '$q_file'; __fml=\$(wc -c < '$q_file' | tr -d '[:space:]'); printf '%s:%s:' \"\$__fmr\" \"\$__fml\"; if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then cat '$q_file'; rm -f '$q_file'; fi"
+  #
+  # Every step of that staging is checked BEFORE any length is declared. An
+  # unchecked encode is the same hazard as an unread reply: if base64 is missing,
+  # the disk is full, or the stage path is unwritable, the file is empty or
+  # partial, and a length measured from it describes the damage and then agrees
+  # with itself forever after. The declared length is therefore cross-checked
+  # against the length base64 must produce for the raw byte count, so a short
+  # write cannot be self-consistent, and the raw output never passes through an
+  # unchecked pipeline. Staging failures report their own step and are transport
+  # failures - never the command's own exit status, which is what would let a
+  # damaged reply read as a successful empty answer.
+  #
+  # The stage path comes from mktemp rather than a predictable name, so a stale
+  # or hostile file at a guessable path can neither be adopted nor written into.
+  #
+  # No `case` here, deliberately: a case pattern's unbalanced `)` is a parse
+  # error inside `$( )` on bash 3.2, and this whole command is sent into a
+  # command substitution on a host whose shell version is not ours to choose.
+  # The guards below are the same tests written without one.
+  stage="__fmo=\$( { $command ; } 2>&1 ); __fmr=\$?; \
+command -v base64 >/dev/null 2>&1 || { printf 'E:no-base64'; exit 0; }; \
+__fmd=\$(mktemp -d 2>/dev/null) || { printf 'E:no-stage-dir'; exit 0; }; \
+{ [ -n \"\$__fmd\" ] && [ -z \"\$(printf '%s' \"\$__fmd\" | tr -d -- '-A-Za-z0-9./_')\" ]; } || { printf 'E:unsafe-stage-path'; rm -rf \"\$__fmd\" 2>/dev/null; exit 0; }; \
+printf '%s' \"\$__fmo\" > \"\$__fmd/raw\" || { printf 'E:stage-write'; rm -rf \"\$__fmd\"; exit 0; }; \
+__fmn=\$(wc -c < \"\$__fmd/raw\" | tr -d '[:space:]'); \
+{ [ -n \"\$__fmn\" ] && [ -z \"\$(printf '%s' \"\$__fmn\" | tr -d '0-9')\" ]; } || { printf 'E:stage-measure'; rm -rf \"\$__fmd\"; exit 0; }; \
+base64 < \"\$__fmd/raw\" > \"\$__fmd/b64\" || { printf 'E:stage-encode'; rm -rf \"\$__fmd\"; exit 0; }; \
+tr -d '\\n' < \"\$__fmd/b64\" > \"\$__fmd/final\" || { printf 'E:stage-normalize'; rm -rf \"\$__fmd\"; exit 0; }; \
+{ [ -f \"\$__fmd/final\" ] && [ -r \"\$__fmd/final\" ]; } || { printf 'E:stage-missing'; rm -rf \"\$__fmd\"; exit 0; }; \
+__fml=\$(wc -c < \"\$__fmd/final\" | tr -d '[:space:]'); \
+{ [ -n \"\$__fml\" ] && [ -z \"\$(printf '%s' \"\$__fml\" | tr -d '0-9')\" ]; } || { printf 'E:stage-measure'; rm -rf \"\$__fmd\"; exit 0; }; \
+[ \"\$__fml\" -eq \$(( 4 * ( (__fmn + 2) / 3 ) )) ] || { printf 'E:stage-size'; rm -rf \"\$__fmd\"; exit 0; }; \
+if [ \"\$__fml\" -le $FM_BACKEND_ORCA_EXEC_SLICE ]; then printf 'S:%s:%s:I:' \"\$__fmr\" \"\$__fml\"; cat \"\$__fmd/final\"; rm -rf \"\$__fmd\"; else printf 'S:%s:%s:F:%s' \"\$__fmr\" \"\$__fml\" \"\$__fmd\"; fi"
   reply=$(fm_backend_orca_exec_marked "$handle" "$stage") || return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
   reply=${reply#* }
   reply=${reply#* }
+  case "$reply" in
+    E:*)
+      echo "error: could not stage the reply to an Orca inspection command on terminal $handle (${reply#E:}); refusing rather than reporting the command's own status" >&2
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+      ;;
+    S:*) reply=${reply#S:} ;;
+    *)
+      echo "error: an Orca inspection command on terminal $handle returned an unrecognized staging reply" >&2
+      return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+      ;;
+  esac
   rc=${reply%%:*}
   reply=${reply#*:}
   declared=${reply%%:*}
-  inline=${reply#*:}
+  reply=${reply#*:}
+  mode=${reply%%:*}
+  # Everything after the mode is one field, so a path containing a colon stays
+  # intact. Only one of inline payload / stage directory is ever present.
+  rest=${reply#*:}
+  # Established before the first failure return below, so no transport failure
+  # can leave the host's stage behind.
+  q_dir=
+  [ "$mode" != F ] || [ -z "$rest" ] || q_dir=$(fm_backend_orca_shell_quote "$rest")
   case "$rc" in ''|*[!0-9]*) rc= ;; esac
   case "$declared" in ''|*[!0-9]*) declared= ;; esac
   if [ -z "$rc" ] || [ -z "$declared" ]; then
     echo "error: an Orca inspection command on terminal $handle returned no usable status or length" >&2
+    fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
     return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
   fi
-  if [ "$declared" -le "$FM_BACKEND_ORCA_EXEC_SLICE" ]; then
+  if [ "$mode" = I ]; then
+    inline=$rest
     if [ "${#inline}" -ne "$declared" ]; then
       echo "error: a short Orca inspection reply on terminal $handle did not arrive whole (declared $declared, got ${#inline})" >&2
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
@@ -641,6 +697,11 @@ fm_backend_orca_exec_run() {  # <handle> <command>
     [ -z "$inline" ] || printf '%s' "$inline" | fm_backend_orca_b64_decode
     return "$rc"
   fi
+  if [ "$mode" != F ] || [ -z "$rest" ]; then
+    echo "error: an Orca inspection reply on terminal $handle named no stage to read it from" >&2
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  fi
+  q_file=$(fm_backend_orca_shell_quote "$rest/final")
   # Longer than one slice: fetch it a slice at a time, each small enough that the
   # host is certain to still be holding it when it is read.
   payload=
@@ -650,25 +711,25 @@ fm_backend_orca_exec_run() {  # <handle> <command>
     i=$((i + 1))
     if [ "$i" -gt "$FM_BACKEND_ORCA_EXEC_MAX_SLICES" ]; then
       echo "error: an Orca inspection reply on terminal $handle exceeded the slice budget (${declared} base64 bytes)" >&2
-      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
     fi
     slice=$(fm_backend_orca_exec_marked "$handle" \
-      "tail -c +$((off + 1)) '$q_file' | head -c $FM_BACKEND_ORCA_EXEC_SLICE") || {
-      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      "tail -c +$((off + 1)) $q_file | head -c $FM_BACKEND_ORCA_EXEC_SLICE") || {
+      fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
     }
     slice=${slice#* }
     slice=${slice#* }
     [ -n "$slice" ] || {
       echo "error: an Orca inspection reply on terminal $handle stopped short at $off of $declared base64 bytes" >&2
-      fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+      fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
     }
     payload="$payload$slice"
     off=$((off + ${#slice}))
   done
-  fm_backend_orca_exec_marked "$handle" "rm -f '$q_file'; printf ''" >/dev/null 2>&1 || true
+  fm_backend_orca_exec_stage_discard "$handle" "$q_dir"
   if [ "${#payload}" -ne "$declared" ]; then
     echo "error: an Orca inspection reply on terminal $handle reassembled to ${#payload} of $declared base64 bytes; refusing rather than reporting a partial result" >&2
     return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"

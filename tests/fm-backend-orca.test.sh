@@ -694,6 +694,99 @@ fm_backend_orca_exec_run "$h" "seq 1 600"' "$ROOT" 2>/dev/null )
   pass "fm_backend_orca_exec_run: an unreadable reply is a transport failure, never an empty success"
 }
 
+# Break the HOST's base64 the two ways staging can fail without any single
+# command reporting an error: outright failure, and a clean exit that writes
+# nothing. The second is the harder one - every step "succeeds" and the staged
+# file is simply empty, which is byte-for-byte what a command that genuinely
+# printed nothing produces.
+# A host that stages small replies fine and silently produces nothing for a
+# large one - a filling disk, a quota, a partial write. This is the shape that
+# actually loses data: every short verdict check still answers, so cleanup gets
+# all the way to the uncommitted-work question before the reply goes missing.
+add_size_limited_remote_base64() {  # <fakebin> <max-bytes>
+  cat > "$1/base64" <<SH
+#!/usr/bin/env bash
+__t=\$(mktemp) || exit 1
+cat > "\$__t"
+__n=\$(wc -c < "\$__t" | tr -d '[:space:]')
+if [ "\$__n" -le $2 ]; then /usr/bin/base64 < "\$__t"; fi
+rm -f "\$__t"
+exit 0
+SH
+  chmod +x "$1/base64"
+}
+
+add_broken_remote_base64() {  # <fakebin> <fail|empty>
+  if [ "$2" = fail ]; then
+    cat > "$1/base64" <<'SH'
+#!/usr/bin/env bash
+echo "base64: cannot encode" >&2
+exit 1
+SH
+  else
+    cat > "$1/base64" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  fi
+  chmod +x "$1/base64"
+}
+
+test_exec_run_refuses_when_the_host_cannot_encode_the_reply() {
+  local out status
+  orca_remote_case exec-stage-encode-fail
+  add_broken_remote_base64 "$FB" fail
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "printf %s dirty"' "$ROOT" 2>/dev/null )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a failed encode must not be reported as the command's own success"
+  expect_code 125 "$status" "a failed encode must report a transport failure"
+  [ -z "$out" ] || fail "a failed encode must print nothing, got '$out'"
+  pass "fm_backend_orca_exec_run: refuses when the host cannot encode the reply, instead of returning the command's status with no output"
+}
+
+test_exec_run_refuses_when_staging_writes_an_empty_file() {
+  local out status
+  orca_remote_case exec-stage-empty-write
+  # Every step exits 0 and the staged file is empty. Only proving the write
+  # against the size the encoding must produce can tell this apart from a
+  # command that legitimately printed nothing.
+  add_broken_remote_base64 "$FB" empty
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "printf %s dirty"' "$ROOT" 2>/dev/null )
+  status=$?
+  [ "$status" -ne 0 ] || fail "a silently empty staged file must not be reported as the command's success"
+  expect_code 125 "$status" "a silently empty staged file must report a transport failure"
+  [ -z "$out" ] || fail "a silently empty staged file must print nothing, got '$out'"
+  pass "fm_backend_orca_exec_run: refuses a staged write that silently produced nothing, rather than reading it as an empty answer"
+}
+
+test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply() {
+  local id out status i
+  id="orcaremotez12"
+  remote_spawn_case remote-td-stage-fail "$id"
+  # Real uncommitted work on the host, and a branch already merged into the
+  # default branch so nothing else can refuse first. The ONLY thing standing
+  # between this worktree and release is the uncommitted-work answer - and the
+  # host cannot stage a reply that large.
+  for i in $(seq 1 60); do : > "$WT/untracked-work-file-number-$i.txt"; done
+  git -C "$PROJ" merge --ff-only -q "fm/$id" 2>/dev/null || true
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  add_size_limited_remote_base64 "$FB" 200
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "cleanup must refuse when the host cannot stage the answer to the uncommitted-work check"
+  assert_contains "$out" "REFUSED" "an unstageable work check must refuse out loud"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "a worktree holding uncommitted work must not be released because its answer went missing"
+  assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  pass "fm-teardown.sh: refuses to release a remote worktree holding uncommitted work when the host cannot stage that answer"
+}
+
 test_exec_run_keeps_a_genuinely_empty_result_successful() {
   local out status
   orca_remote_case exec-empty
@@ -2020,6 +2113,9 @@ test_terminal_create_refuses_wrong_execution_host
 test_exec_run_returns_remote_output_and_status
 test_exec_run_recovers_output_larger_than_one_reply
 test_exec_run_never_reports_an_unreadable_reply_as_empty_success
+test_exec_run_refuses_when_the_host_cannot_encode_the_reply
+test_exec_run_refuses_when_staging_writes_an_empty_file
+test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply
 test_exec_run_keeps_a_genuinely_empty_result_successful
 test_remote_teardown_refuses_when_dirty_output_cannot_be_read
 test_push_file_refuses_on_digest_mismatch
