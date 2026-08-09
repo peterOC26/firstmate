@@ -50,6 +50,7 @@ orca_remote_tasktmp=<path on host>              # only when the host is not loca
 `orca_host=` and `orca_project_host_setup=` record which host the task was placed on, so recovery and cleanup read that from the task's own record instead of re-deriving it from a path.
 A spawn writes them whenever it named an `orca:` selector, a `local` host included; a spawn that named a plain project directory is on this machine by construction and records neither.
 `orca_remote=1` is what tells every later step that the recorded paths are not on this machine.
+A remote task's per-task temp root exists only on that host, so it records an empty shared `tasktmp=` - which names a root on this machine - and `orca_remote_tasktmp=` names the real one instead.
 
 ## Current lifecycle and safety
 
@@ -131,6 +132,9 @@ That route was chosen over Orca's own `--agent`/`--prompt` because Firstmate mus
 The delivered brief carries a short addendum telling the worker its status-log path is unreachable from that host and to report in its terminal instead.
 A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host, reopening an inspection shell when it has already closed its own, since a refused spawn records no metadata for cleanup to work from later.
 That sweep is best effort: a host that cannot be reached is named on stderr with the path to remove by hand, and the abort still completes.
+Cleanup sweeps the same directory on the host before it deletes the record naming it, and does so independently of the worktree: a worktree already gone from the host, and an unreachable host under `--force` where its presence cannot even be determined, are exactly the cases where the brief is most likely still sitting there.
+It is best effort in the same way, so an unreachable host is one warning naming the path rather than a failed teardown.
+A leftover `/tmp/fm-<id>` is never adopted: the next spawn under that same task id refuses to create the root and names the leftover as the likely cause.
 
 The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
 A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.
@@ -164,6 +168,7 @@ A line beginning with `/` only nominates a candidate: each one is proven on the 
 tests/fm-backend-orca.test.sh
 tests/fm-backend.test.sh
 tests/fm-bootstrap.test.sh
+tests/fm-crew-state.test.sh
 ```
 
 [`verification/runtime-backends.md`](verification/runtime-backends.md#orca) records the real readiness and response-shape smoke.
