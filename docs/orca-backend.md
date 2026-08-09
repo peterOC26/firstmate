@@ -117,6 +117,8 @@ An origin that names no resolvable forge host, such as an ssh alias that resolve
 A local task is untouched by that: it still asks gh from inside its own worktree, so gh's own base-repository resolution - a fork whose pull requests live on the parent, or a `gh repo set-default` - keeps deciding which repository the lookup is about.
 Cleanup additionally proves the worktree Orca would remove still sits on the recorded host.
 A forced secondmate teardown proves the same thing for each remote crew child it releases, reading the host and the recorded path from that child's own metadata: this machine cannot see a path that belongs to another host, so "absent here" is never taken as permission to remove it.
+It also sweeps that child's own `/tmp/fm-<child-id>` on the host before deleting the record, since that record is the only thing that knows the path.
+For an http or https origin the repository named in the PR lookup keeps the port, which is the forge's own endpoint; under `ssh://`, `git://`, or the scp-like form the colon carries a transport port or the path separator and is dropped.
 
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
 That directory is created `0700` before anything is written into it: unlike a local spawn, whose brief stays under the firstmate home, it sits in the host's shared `/tmp`, and the brief is the task's whole instruction set.
@@ -129,6 +131,7 @@ The harness is resolved to an absolute path on the host and launched by that pat
 A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.
 An unresolvable harness refuses and reports the `PATH` the host actually had.
 Resolution asks the task's own shell first and then a login shell; a host whose login profile prints a banner answers with that banner alongside the path, so the resolved path is taken from the reply rather than the whole reply being read as "not installed".
+A line beginning with `/` only nominates a candidate: each one is proven on the host to be an executable that is not a directory before it is accepted, so a profile that prints a path-shaped line can never stand in for an agent the host does not have.
 
 ### Remote limits
 

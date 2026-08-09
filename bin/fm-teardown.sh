@@ -826,12 +826,13 @@ remove_pr_poll_artifacts() {
 # non-zero and the caller falls back exactly as it does for any other lookup
 # failure - fail-closed, rather than questioning a repository this is not about.
 task_repo_slug() {
-  local url rest host port path dotted=0
+  local url scheme='' rest host port path dotted=0
   url=$(task_git "$WT" remote get-url origin 2>/dev/null) || return 1
   url=$(printf '%s' "$url" | tr -d '[:space:]')
   [ -n "$url" ] || return 1
   case "$url" in
     *://*)
+      scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
       rest=${url#*://}
       case "$rest" in
         */?*) : ;;
@@ -848,20 +849,24 @@ task_repo_slug() {
     *) return 1 ;;
   esac
   host=${host##*@}
-  # Whatever colon survives the userinfo strip is a port, and a forge on a
-  # non-default port is a different endpoint: dropping it would name a host
-  # that does not answer. The scp-like branch above already consumed its own
-  # colon as the path separator, so only a scheme URL can still carry one.
+  # A colon surviving the userinfo strip is a port, and only http/https put the
+  # forge's own endpoint there - so only those keep it, since a forge answering
+  # on a non-default port is a different endpoint and dropping it names one that
+  # does not answer. Under ssh:// or git:// the same colon is a TRANSPORT port
+  # that the forge's API does not live behind, so it goes, as it always has. The
+  # scp-like branch has no scheme and already consumed its colon as the path
+  # separator.
   port=
   case "$host" in
     *:*)
       port=${host##*:}
       host=${host%%:*}
-      case "$port" in
-        ''|*[!0-9]*) return 1 ;;
-      esac
-      port=:$port
       ;;
+  esac
+  case "$scheme:$port" in
+    http:*[!0-9]*|https:*[!0-9]*|http:|https:) port= ;;
+    http:*|https:*) port=:$port ;;
+    *) port= ;;
   esac
   case "$host" in
     ''|*[!A-Za-z0-9.-]*) return 1 ;;
@@ -1815,6 +1820,43 @@ require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-wo
   require_orca_worktree_path_match "$worktree_id" "$child_wt"
 }
 
+# sweep_orca_child_remote_task_tmp: remove the per-task temp root a REMOTE Orca
+# child recorded, while that child's metadata still names it - the record is the
+# only thing that knows the path, so once it is deleted the directory holding
+# the worker's brief can never be found again. Best effort in every direction,
+# exactly like the ordinary task's own sweep: a host that cannot be reached is
+# one warning naming the path to remove by hand, never a failed cleanup.
+sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
+  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
+  tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
+  [ -n "$tasktmp" ] || return 0
+  case "$tasktmp" in
+    /tmp/fm-?*) : ;;
+    *)
+      echo "warning: not removing unexpected remote task temp root $tasktmp for child $child_id" >&2
+      return 0
+      ;;
+  esac
+  host=$(meta_value "$child_meta" orca_host)
+  if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
+    echo "warning: child $child_id records $tasktmp on a remote Orca host but nothing here can reach it; remove it on that host by hand" >&2
+    return 0
+  fi
+  handle=$(fm_backend_orca_exec_open "$worktree_id" "fm-$child_id-sweep" "$host" 2>/dev/null) || handle=
+  if [ -z "$handle" ]; then
+    echo "warning: could not reach Orca host $host to remove $tasktmp for child $child_id; remove it on that host by hand" >&2
+    return 0
+  fi
+  # Quoted through the adapter's own quoter: this value comes from a metadata
+  # file, and one carrying a quote character would otherwise close the string
+  # and hand the rest to the remote shell as commands.
+  fm_backend_orca_exec_run "$handle" \
+    "rm -rf $(fm_backend_orca_shell_quote "$tasktmp")" >/dev/null 2>&1 \
+    || echo "warning: could not remove $tasktmp on Orca host $host for child $child_id; remove it on that host by hand" >&2
+  fm_backend_orca_exec_close "$handle" 2>/dev/null || true
+  return 0
+}
+
 firstmate_home_has_treehouse_slot() {
   local home=$1
   worktree_registered_for_project "$FM_ROOT" "$home"
@@ -2391,6 +2433,9 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+      fi
+      if child_is_remote_orca "$child_meta"; then
+        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id"
       fi
       fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then

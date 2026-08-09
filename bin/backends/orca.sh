@@ -899,7 +899,7 @@ echo ISOLATED"
 # line that trusts the remote PATH turns "not installed here" into a terminal
 # that silently sits at a prompt.
 fm_backend_orca_remote_which() {  # <handle> <name>
-  local handle=$1 name=$2 out line last='' candidate=''
+  local handle=$1 name=$2 out line last='' candidate='' probe probed='' verdict q
   out=$(fm_backend_orca_exec_run "$handle" \
     "command -v $(fm_backend_orca_shell_quote "$name") 2>/dev/null || bash -lc $(fm_backend_orca_shell_quote "command -v $name") 2>/dev/null") || return 1
   # Only the surrounding whitespace goes. Deleting every space would quietly
@@ -908,10 +908,14 @@ fm_backend_orca_remote_which() {  # <handle> <name>
   # sits-at-a-prompt failure this resolution exists to replace.
   #
   # The login-shell fallback runs the host's profile, so a host that prints a
-  # banner answers with the banner AND the path. The answer is the resolved
-  # path the shell printed last; a banner that trails the path leaves the first
-  # absolute line as the only candidate. A reply with no absolute line at all is
-  # still "not installed here", and still refuses.
+  # banner answers with the banner AND the path: the resolved path is usually
+  # the last line, and a banner that TRAILS it leaves the first absolute line as
+  # the other candidate. Shape is only how a candidate is nominated, never how
+  # it is accepted - a profile can print any absolute-looking line, and
+  # returning one would hand the launch a path that is not the agent. Each
+  # candidate is therefore proven on the host to be an executable non-directory
+  # before it is returned, and a reply with no such line resolves nothing, which
+  # is the loud missing-executable refusal the caller reports.
   while IFS= read -r line; do
     line=$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
     [ -n "$line" ] || continue
@@ -922,11 +926,23 @@ fm_backend_orca_remote_which() {  # <handle> <name>
   done <<FMEOF
 $out
 FMEOF
-  case "$last" in
-    /?*) printf '%s' "$last"; return 0 ;;
-  esac
-  [ -n "$candidate" ] || return 1
-  printf '%s' "$candidate"
+  for probe in "$last" "$candidate"; do
+    [ -n "$probe" ] || continue
+    [ "$probe" != "$probed" ] || continue
+    case "$probe" in
+      /?*) : ;;
+      *) continue ;;
+    esac
+    probed=$probe
+    q=$(fm_backend_orca_shell_quote "$probe")
+    verdict=$(fm_backend_orca_exec_run "$handle" \
+      "if [ -x $q ] && [ ! -d $q ]; then echo FM-EXECUTABLE; else echo FM-NOT-EXECUTABLE; fi") || continue
+    verdict=$(printf '%s' "$verdict" | tr -d '[:space:]')
+    [ "$verdict" = FM-EXECUTABLE ] || continue
+    printf '%s' "$probe"
+    return 0
+  done
+  return 1
 }
 
 fm_backend_orca_remote_path_env() {  # <handle>

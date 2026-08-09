@@ -621,6 +621,32 @@ test_remote_pr_discovery_keeps_a_forge_port() {
   pass "fm-teardown.sh: a remote task's PR lookup keeps the forge port its origin named"
 }
 
+test_remote_pr_discovery_drops_an_ssh_transport_port() {
+  local id out status head
+  id="orcaremotez18"
+  remote_spawn_case remote-td-ssh-port "$id"
+  # The same forge, reached over ssh on a non-standard port. That port is the
+  # sshd the clone travels through, not the endpoint the forge's API answers on,
+  # so carrying it into the lookup would address a service that does not exist -
+  # and the PR evidence a landed remote task needs would silently vanish.
+  git -C "$PROJ" remote add origin ssh://git@git.acme.invalid:2222/team/app.git
+  printf 'hello\n' > "$WT/feature.txt"
+  git -C "$WT" add feature.txt
+  git -C "$WT" -c user.email=t@t -c user.name=t commit -qm "add feature"
+  head=$(git -C "$WT" rev-parse HEAD)
+  add_fake_gh_merged_pr "$FB" "$head" "$CASE_DIR/gh-calls"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'mode=no-mistakes\n' >> "$STATE/$id.meta"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  expect_code 0 "$status" "a remote task cloned over ssh on a non-standard port should still be releasable"$'\n'"$out"
+  grep -qx 'pr list git.acme.invalid/team/app' "$CASE_DIR/gh-calls" \
+    || fail "the remote PR lookup carried an ssh transport port into the forge repository; calls were: $(cat "$CASE_DIR/gh-calls" 2>/dev/null)"
+  assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  pass "fm-teardown.sh: a remote task's PR lookup drops an ssh transport port rather than addressing a service that is not there"
+}
+
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias() {
   local id out status head
   id="orcaremotez15"
@@ -1185,6 +1211,63 @@ fm_backend_orca_remote_which "$h" fmdefinitelymissing' "$ROOT" )
   [ "$status" -ne 0 ] || fail "a banner must not turn an absent harness into a resolved one"
   [ -z "$out" ] || fail "an unresolvable harness must print nothing even behind a banner, got '$out'"
   pass "fm_backend_orca_remote_which: resolves through a login banner and still refuses a harness the host does not have"
+}
+
+test_remote_which_refuses_an_absolute_looking_line_that_is_not_the_agent() {
+  local out status agentdir notice notesdir
+  orca_remote_case remote-which-lookalike
+  # A host whose login profile leaves an exit hook - an ordinary way for a
+  # profile to say something on the way out. The harness IS installed and the
+  # login shell resolves it, so the reply carries the real path AND a trailing
+  # line that has nothing but a path's SHAPE. Shape is not proof: returning that
+  # line pins the launch to something that is not the agent, and the worker
+  # terminal then fails on it instead of the spawn refusing out loud.
+  agentdir="$CASE_DIR/agentbin"
+  notice="$CASE_DIR/release-notes.txt"
+  notesdir="$CASE_DIR/agent-notes"
+  mkdir -p "$agentdir" "$notesdir" "$FIX/fakehome"
+  printf 'read me first\n' > "$notice"
+  chmod 644 "$notice"
+  add_fake_remote_harness "$agentdir" fmtrapagent
+  remote_which_under_profile() {  # <harness-name>
+    PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+      FM_ORCA_FAKE_HOST_PATH="/usr/bin:/bin" \
+      bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" "$1"' "$ROOT" "$1"
+  }
+
+  # Trailing line names a real file that is not executable.
+  cat > "$FIX/fakehome/.bash_profile" <<SH
+PATH="$agentdir:\$PATH"
+trap 'printf "%s\n" "$notice"' EXIT
+SH
+  out=$(remote_which_under_profile fmtrapagent)
+  status=$?
+  expect_code 0 "$status" "the harness the host really has must still resolve behind a trailing profile line"
+  [ "$out" = "$agentdir/fmtrapagent" ] \
+    || fail "remote which returned a line that merely looks like a path instead of the executable the host has, got '$out'"
+
+  # Trailing line names a real directory - which IS executable to `[ -x ]`, so
+  # only rejecting directories keeps this from resolving.
+  cat > "$FIX/fakehome/.bash_profile" <<SH
+PATH="$agentdir:\$PATH"
+trap 'printf "%s\n" "$notesdir"' EXIT
+SH
+  out=$(remote_which_under_profile fmtrapagent)
+  status=$?
+  expect_code 0 "$status" "a trailing directory line must not stop the real harness from resolving"
+  [ "$out" = "$agentdir/fmtrapagent" ] \
+    || fail "remote which returned a directory instead of the executable the host has, got '$out'"
+
+  # And a harness the host genuinely does not have still resolves nothing, which
+  # is what makes the spawn refuse with its concrete missing-executable message.
+  out=$(remote_which_under_profile fmdefinitelymissing)
+  status=$?
+  [ "$status" -ne 0 ] || fail "an absent harness must not be resolved by a line the login profile printed"
+  [ -z "$out" ] || fail "an absent harness must print nothing, got '$out'"
+  unset -f remote_which_under_profile
+  pass "fm_backend_orca_remote_which: proves its candidate is an executable on the host instead of trusting a line's shape"
 }
 
 test_isolation_verdicts_distinguish_primary_and_subdirectory() {
@@ -2495,6 +2578,38 @@ test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
   pass "fm-teardown.sh --force: proves a remote Orca child's recorded identity from Orca's records before releasing it"
 }
 
+test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp() {
+  local home subhome child_id childwt neutral out rc
+  child_id="orcaremotechildz3"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-sweep-parent"
+  subhome="$TMP_ROOT/orca-remote-child-sweep-secondmate"
+  # The child's record is the only thing that knows where its temp root is, and
+  # that root holds the worker's whole brief. Cleanup deletes the record, so a
+  # sweep that does not happen here can never happen at all.
+  orca_remote_case secondmate-remote-child-sweep
+  write_remote_worktree_fixtures "$FIX" "$childwt"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  mkdir -p "/tmp/fm-$child_id"
+  printf 'the whole task brief\n' > "/tmp/fm-$child_id/brief.md"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "a forced secondmate teardown should release its remote Orca child"$'\n'"$out"
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$childwt" \
+    "the remote child's worktree must still be released through Orca"
+  assert_absent "/tmp/fm-$child_id" \
+    "forced cleanup must sweep the remote child's task temp root before its record is deleted"
+  assert_absent "$subhome/state/$child_id.meta" "a completed remote child cleanup should remove that child's record"
+  rm -rf "/tmp/fm-$child_id"
+  pass "fm-teardown.sh --force: sweeps a remote Orca child's task temp root on the host before deleting the record that names it"
+}
+
 test_dispatcher_sources_orca_and_routes_primitives() {
   local out
   orca_case dispatch
@@ -2516,6 +2631,7 @@ test_remote_teardown_releases_work_already_landed_on_the_host
 test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
 test_remote_pr_discovery_names_the_task_s_own_forge_host
 test_remote_pr_discovery_keeps_a_forge_port
+test_remote_pr_discovery_drops_an_ssh_transport_port
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_still_refuses_a_worktree_that_is_not_the_recorded_one
@@ -2540,6 +2656,7 @@ test_push_file_leaves_nothing_behind_when_a_transfer_fails
 test_remote_which_resolves_absolute_path
 test_remote_which_keeps_a_path_containing_a_space
 test_remote_which_resolves_through_a_login_banner
+test_remote_which_refuses_an_absolute_looking_line_that_is_not_the_agent
 test_isolation_verdicts_distinguish_primary_and_subdirectory
 test_capture_reads_terminal_tail_json
 test_capture_falls_back_to_text_fields
@@ -2592,3 +2709,4 @@ test_secondmate_force_teardown_removes_orca_child_via_orca
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child
 test_secondmate_force_teardown_verifies_remote_orca_child_identity
+test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp
