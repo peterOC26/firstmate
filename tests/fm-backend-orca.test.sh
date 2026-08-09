@@ -174,6 +174,13 @@ case "${1:-} ${2:-}" in
     handle=$(get_flag --terminal) || handle=
     cursor=$(get_flag --cursor) || cursor=0
     limit=$(get_flag --limit) || limit=0
+    # A host that cannot answer where the scrollback currently ends. The probe
+    # for that is the only read taken without a cursor, so failing exactly it
+    # models a transient position read failing while the terminal itself is
+    # otherwise fine.
+    if [ -f "$FIX/cursor-read.exit" ] && ! get_flag --cursor >/dev/null 2>&1; then
+      exit "$(cat "$FIX/cursor-read.exit")"
+    fi
     case "$cursor" in ''|*[!0-9]*) cursor=0 ;; esac
     case "$limit" in ''|*[!0-9]*) limit=0 ;; esac
     # Model the contract `orca terminal read --help` states: output is terminal
@@ -409,6 +416,31 @@ test_spawn_refuses_remote_harness_the_host_cannot_resolve() {
   assert_absent "$STATE/$id.remote-brief.md" "an aborted remote spawn must not leave the staged brief behind"
   rm -rf "/tmp/fm-$id"
   pass "fm-spawn.sh: refuses when the harness cannot be resolved on the remote host, naming that host's PATH"
+}
+
+test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space() {
+  local id out status spaced
+  id="orcaremotez12"
+  remote_spawn_case remote-spaced-harness "$id"
+  # The host has the harness, just at a path with a space in it. The launch line
+  # is a command line for that host's shell, so the only proof that survives a
+  # rewrite or a missing quote is whether the agent actually started.
+  rm -f "$FB/claude"
+  spaced="$CASE_DIR/agent tools"
+  mkdir -p "$spaced"
+  cat > "$spaced/claude" <<SH
+#!/usr/bin/env bash
+printf 'launched\n' >> "$CASE_DIR/harness-ran"
+exit 0
+SH
+  chmod +x "$spaced/claude"
+  out=$(PATH="$spaced:$PATH" run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  status=$?
+  expect_code 0 "$status" "a harness installed at a path with a space should still spawn"$'\n'"$out"
+  [ -f "$CASE_DIR/harness-ran" ] \
+    || fail "the host never launched the harness at '$spaced/claude'; the launch line did not survive its own path"
+  rm -rf "/tmp/fm-$id"
+  pass "fm-spawn.sh: launches a remote harness whose install path contains a space"
 }
 
 remote_teardown_meta() {  # <state> <id> <worktree> <project>
@@ -700,6 +732,47 @@ fm_backend_orca_exec_run "$h" "seq 1 600"' "$ROOT" 2>/dev/null )
   pass "fm_backend_orca_exec_run: an unreadable reply is a transport failure, never an empty success"
 }
 
+test_exec_run_refuses_when_the_cursor_cannot_be_read() {
+  local out status
+  orca_remote_case exec-cursor-unreadable
+  # Where this reply's window starts is what keeps an OLDER reply of the same
+  # terminal out of it. An unreadable position is not a position, and treating
+  # it as the start of the scrollback would answer with whatever is sitting
+  # there - so it has to refuse instead of returning a result.
+  printf '1\n' > "$FIX/cursor-read.exit"
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_exec_run "$h" "printf %s ready"' "$ROOT" 2>/dev/null )
+  status=$?
+  [ "$status" -ne 0 ] || fail "an unreadable cursor must never be reported as the command's own result"
+  expect_code 125 "$status" "an unreadable cursor must report a transport failure"
+  [ -z "$out" ] || fail "a transport failure must print nothing, got '$out'"
+  pass "fm_backend_orca_exec_run: an unreadable scrollback position is a transport failure, not an answer"
+}
+
+test_exec_run_marks_every_invocation_apart() {
+  local out markers
+  orca_remote_case exec-nonce
+  # Both calls run inside command substitutions, exactly as every real caller
+  # does, so a marker built from shell state a subshell discards would come out
+  # identical for both - and then a reply still sitting in the scrollback could
+  # answer for a later command.
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+a=$(fm_backend_orca_exec_run "$h" "printf %s one") || exit 8
+b=$(fm_backend_orca_exec_run "$h" "printf %s two") || exit 8
+printf "%s/%s" "$a" "$b"' "$ROOT" )
+  expect_code 0 $? "two successive inspection commands should both answer"$'\n'"$out"
+  [ "$out" = "one/two" ] || fail "each command must return its own output, got '$out'"
+  # The host's own scrollback is where the markers actually land.
+  markers=$(grep -ho 'FMORCAB_[A-Za-z0-9]*' "$FIX"/term-*.buf 2>/dev/null | sort -u | wc -l | tr -d '[:space:]')
+  [ "${markers:-0}" -ge 2 ] \
+    || fail "two inspection commands must not share one marker (distinct markers seen: ${markers:-0})"
+  pass "fm_backend_orca_exec_run: successive commands mark their replies apart, even from subshells"
+}
+
 # Break the HOST's base64 the two ways staging can fail without any single
 # command reporting an error: outright failure, and a clean exit that writes
 # nothing. The second is the harder one - every step "succeeds" and the staged
@@ -905,6 +978,25 @@ fm_backend_orca_remote_which "$h" fmdefinitelymissing' "$ROOT" )
   [ "$status" -ne 0 ] || fail "an unresolvable harness must fail rather than return a bare name"
   [ -z "$out" ] || fail "an unresolvable harness must print nothing, got '$out'"
   pass "fm_backend_orca_remote_which: resolves an absolute path and fails when the host cannot resolve the name"
+}
+
+test_remote_which_keeps_a_path_containing_a_space() {
+  local out spaced
+  orca_remote_case remote-which-spaced
+  # A perfectly ordinary install location on someone else's machine. Rewriting
+  # it into a shorter path that does not exist is worse than failing: the guard
+  # still sees an absolute path, so the spawn proceeds and launches nothing.
+  spaced="$CASE_DIR/agent tools"
+  mkdir -p "$spaced"
+  add_fake_remote_harness "$spaced" fmspacedagent
+  out=$( PATH="$FB:$spaced:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    bash -c '. "$0/bin/backends/orca.sh"
+h=$(fm_backend_orca_exec_open repo-remote::/srv/app-task probe '"$FM_REMOTE_HOST"') || exit 9
+fm_backend_orca_remote_which "$h" fmspacedagent' "$ROOT" )
+  [ "$out" = "$spaced/fmspacedagent" ] \
+    || fail "remote which must return the host's path unaltered, got '$out'"
+  [ -x "$out" ] || fail "remote which returned a path that is not the executable the host resolved: '$out'"
+  pass "fm_backend_orca_remote_which: returns an install path containing a space unaltered"
 }
 
 test_isolation_verdicts_distinguish_primary_and_subdirectory() {
@@ -2136,6 +2228,7 @@ test_spawn_places_task_on_remote_orca_host
 test_spawn_refuses_orca_selector_without_orca_backend
 test_spawn_refuses_remote_worktree_that_is_the_primary_checkout
 test_spawn_refuses_remote_harness_the_host_cannot_resolve
+test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
 test_remote_teardown_releases_work_already_landed_on_the_host
@@ -2150,6 +2243,8 @@ test_terminal_create_refuses_wrong_execution_host
 test_exec_run_returns_remote_output_and_status
 test_exec_run_recovers_output_larger_than_one_reply
 test_exec_run_never_reports_an_unreadable_reply_as_empty_success
+test_exec_run_refuses_when_the_cursor_cannot_be_read
+test_exec_run_marks_every_invocation_apart
 test_exec_run_refuses_when_the_host_cannot_encode_the_reply
 test_exec_run_refuses_when_staging_writes_an_empty_file
 test_remote_teardown_refuses_when_the_host_cannot_stage_a_reply
@@ -2158,6 +2253,7 @@ test_remote_teardown_refuses_when_dirty_output_cannot_be_read
 test_push_file_refuses_on_digest_mismatch
 test_push_file_leaves_nothing_behind_when_a_transfer_fails
 test_remote_which_resolves_absolute_path
+test_remote_which_keeps_a_path_containing_a_space
 test_isolation_verdicts_distinguish_primary_and_subdirectory
 test_capture_reads_terminal_tail_json
 test_capture_falls_back_to_text_fields

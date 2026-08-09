@@ -118,7 +118,8 @@ Cleanup additionally proves the worktree Orca would remove still sits on the rec
 Instructions reach the worker by copying the brief and the operational-input encoder to `/tmp/fm-<id>/` on the host and verifying both by digest, after which the ordinary launch line reads them from there.
 That route was chosen over Orca's own `--agent`/`--prompt` because Firstmate must keep control of the harness, model, effort, and encoded launch brief, and over SSH because it needs no transport or credentials beyond the Orca connection the backend already depends on.
 The delivered brief carries a short addendum telling the worker its status-log path is unreachable from that host and to report in its terminal instead.
-A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host while its inspection shell is still open, since a refused spawn records no metadata for cleanup to work from later.
+A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host, reopening an inspection shell when it has already closed its own, since a refused spawn records no metadata for cleanup to work from later.
+That sweep is best effort: a host that cannot be reached is named on stderr with the path to remove by hand, and the abort still completes.
 
 The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
 A remote host can have an agent installed somewhere its shells leave off `PATH`, and a launch line that trusted `PATH` would leave a terminal sitting at a prompt looking like a worker that has not started yet.

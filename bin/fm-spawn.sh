@@ -679,21 +679,37 @@ parse_orca_worktree_result() {
 # removal of something else on that host. Quoted through the adapter's quoter
 # rather than by wrapping it in literal quotes.
 spawn_orca_remote_task_tmp_sweep() {
+  local handle=${ORCA_EXEC_HANDLE:-} opened=0
   [ -n "${ORCA_REMOTE_TASK_TMP:-}" ] || return 0
-  # The inspection shell is the only way to reach that host, so there is nothing
-  # to sweep through once it is gone - which is why this runs before the close
-  # below, and why the spawn does not close it until the launch line is settled.
-  [ -n "${ORCA_EXEC_HANDLE:-}" ] || return 0
   command -v fm_backend_orca_exec_run >/dev/null 2>&1 || return 0
   case "$ORCA_REMOTE_TASK_TMP" in
-    /tmp/fm-?*)
-      fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
-        "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 || true
-      ;;
+    /tmp/fm-?*) : ;;
     *)
       echo "warning: not removing unexpected remote task temp root $ORCA_REMOTE_TASK_TMP for $ID" >&2
+      return 0
       ;;
   esac
+  # A shell on that host is the only way to reach these files, and the spawn
+  # closes its own as soon as the launch line is settled - so an abort after
+  # that point opens one more rather than leaving the task's instructions
+  # behind. The worktree is still there to open it on; this cleanup removes it
+  # further down. A host that cannot be reached says so and the abort continues.
+  if [ -z "$handle" ]; then
+    if [ -n "${ORCA_WORKTREE_ID:-}" ] && [ -n "${ORCA_HOST_ID:-}" ]; then
+      handle=$(fm_backend_orca_exec_open "$ORCA_WORKTREE_ID" "fm-$ID-sweep" "$ORCA_HOST_ID" 2>/dev/null) || handle=
+    fi
+    if [ -z "$handle" ]; then
+      echo "warning: could not reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to remove $ORCA_REMOTE_TASK_TMP for $ID; remove it on that host by hand" >&2
+      return 0
+    fi
+    opened=1
+  fi
+  fm_backend_orca_exec_run "$handle" \
+    "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 \
+    || echo "warning: could not remove $ORCA_REMOTE_TASK_TMP on Orca host ${ORCA_HOST_ID:-<unrecorded>} for $ID; remove it on that host by hand" >&2
+  if [ "$opened" = 1 ]; then
+    fm_backend_orca_exec_close "$handle" 2>/dev/null || true
+  fi
   return 0
 }
 
@@ -970,6 +986,9 @@ LAUNCH_FROM_TEMPLATE=1
 # the same rule that derives HARNESS from a raw launch command above. A line
 # whose token is not the expected harness fails rather than being rewritten by
 # guess, so an unrecognized shape refuses instead of launching something else.
+# The path is quoted on the way in: the result is a command line for a shell,
+# and an install path containing a space would otherwise be read as a command
+# plus an argument.
 launch_pin_harness_path() {  # <launch> <harness-token> <absolute-path>
   local rest=$1 token=$2 abs=$3 head
   local prefix=''
@@ -983,7 +1002,7 @@ launch_pin_harness_path() {  # <launch> <harness-token> <absolute-path>
   done
   head=${rest%% *}
   [ "$head" = "$token" ] || return 1
-  printf '%s%s%s' "$prefix" "$abs" "${rest#"$token"}"
+  printf '%s%s%s' "$prefix" "$(shell_quote "$abs")" "${rest#"$token"}"
 }
 
 case "$ARG3" in

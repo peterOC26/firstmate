@@ -512,9 +512,19 @@ FM_BACKEND_ORCA_EXEC_READ_LIMIT=${FM_BACKEND_ORCA_EXEC_READ_LIMIT:-2000}
 FM_BACKEND_ORCA_PUSH_CHUNK=${FM_BACKEND_ORCA_PUSH_CHUNK:-2000}
 FM_BACKEND_ORCA_EXEC_SEQ=0
 
+# The markers are what tell this reply apart from every other reply the same
+# terminal is still holding, so the nonce has to be unique per INVOCATION. The
+# pid and the counter cannot carry that alone: nearly every caller runs a check
+# inside a command substitution, and the counter's increment dies with that
+# subshell, so a parent hands out the same counter value again and again. Fresh
+# entropy is read per call and kept alongside them, so two calls from the same
+# shell - or from two sibling subshells of it - can never mint the same marker.
 fm_backend_orca_exec_nonce() {
+  local rand
   FM_BACKEND_ORCA_EXEC_SEQ=$((FM_BACKEND_ORCA_EXEC_SEQ + 1))
-  printf 'x%sx%s' "$$" "$FM_BACKEND_ORCA_EXEC_SEQ"
+  rand=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -dc 'a-f0-9' || true)
+  [ -n "$rand" ] || rand=$(printf '%s%s%s' "$RANDOM" "$RANDOM" "$RANDOM" | tr -dc '0-9')
+  printf 'x%sx%sx%s' "$$" "$FM_BACKEND_ORCA_EXEC_SEQ" "$rand"
 }
 
 # fm_backend_orca_exec_open: open an inspection shell on <worktree-id>'s host.
@@ -528,10 +538,18 @@ fm_backend_orca_exec_close() {  # <handle>
   [ -z "${1:-}" ] || fm_backend_orca_kill "$1"
 }
 
+# Where in the scrollback this reply's window starts. An unreadable answer is
+# NOT a position: reporting 0 would silently mean "read from the very beginning
+# of the scrollback", where an older reply of this same terminal is sitting, so
+# it fails instead and the caller treats it as the transport failure it is.
 fm_backend_orca_exec_cursor() {  # <handle>
-  local out
-  out=$(orca terminal read --terminal "$1" --limit 1 --json 2>/dev/null) || { printf '0'; return 0; }
-  fm_backend_orca_json_field latestCursor "$out" 2>/dev/null || printf '0'
+  local out cursor
+  out=$(orca terminal read --terminal "$1" --limit 1 --json 2>/dev/null) || return 1
+  cursor=$(fm_backend_orca_json_field latestCursor "$out" 2>/dev/null) || return 1
+  case "$cursor" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s' "$cursor"
 }
 
 # A terminal is a bounded scrollback, not a pipe. Verified against a live remote
@@ -566,7 +584,10 @@ FM_BACKEND_ORCA_EXEC_MAX_SLICES=${FM_BACKEND_ORCA_EXEC_MAX_SLICES:-4096}
 fm_backend_orca_exec_marked() {  # <handle> <command>
   local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0
   nonce=$(fm_backend_orca_exec_nonce)
-  start=$(fm_backend_orca_exec_cursor "$handle")
+  start=$(fm_backend_orca_exec_cursor "$handle") || {
+    echo "error: could not read the current cursor of Orca terminal $handle; refusing to read a reply from an unknown point in its scrollback" >&2
+    return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
+  }
   wrapped="__fmb=\$( { $command ; } ); __fmr=\$?; printf 'FMORCAB_%s\\n' '$nonce'; printf '%s\\n' \"\$__fmb\"; printf 'FMORCAE_%s_rc=%s_len=%s\\n' '$nonce' \"\$__fmr\" \"\${#__fmb}\""
   fm_backend_orca_send_text_line "$handle" "$wrapped" >/dev/null || {
     echo "error: could not send an inspection command to Orca terminal $handle" >&2
@@ -871,8 +892,15 @@ fm_backend_orca_remote_which() {  # <handle> <name>
   local handle=$1 name=$2 out
   out=$(fm_backend_orca_exec_run "$handle" \
     "command -v $(fm_backend_orca_shell_quote "$name") 2>/dev/null || bash -lc $(fm_backend_orca_shell_quote "command -v $name") 2>/dev/null") || return 1
-  out=$(printf '%s' "$out" | tr -d '[:space:]')
+  # Only the surrounding whitespace goes. Deleting every space would quietly
+  # rewrite an installation path that legitimately contains one into a different
+  # path that does not exist, and the launch would then be the silent
+  # sits-at-a-prompt failure this resolution exists to replace. An answer
+  # carrying an interior newline is more than one path, so it is refused rather
+  # than picked from.
+  out=$(printf '%s' "$out" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   case "$out" in
+    *$'\n'*) return 1 ;;
     /?*) printf '%s' "$out" ;;
     *) return 1 ;;
   esac
