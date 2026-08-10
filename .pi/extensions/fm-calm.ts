@@ -7,11 +7,11 @@
 // disposable component factory, and setHiddenThinkingLabel().
 // ./lib/fm-calm-working-ship.ts owns the animated working presentation this file
 // installs. The focused tests pin those assumptions but never reject a
-// newer Pi solely for its version. The collapsed-thinking and operational-user
-// presentation adapters probe the exact API they patch and degrade independently with a
-// diagnostic (see installCalmPresentationAdapter below) if a future Pi removes it; Pi
-// still exposes no global transcript filter or tool-registration seam that can safely
-// wrap arbitrary foreign tool definitions.
+// newer Pi solely for its version. The collapsed-thinking, tool-row, and
+// operational-user presentation adapters probe the exact API they patch and degrade
+// independently with a diagnostic (see installCalmPresentationAdapter below) if a
+// future Pi removes it; Pi still exposes no global transcript filter or
+// tool-registration seam that can safely wrap arbitrary foreign tool definitions.
 // docs/configuration.md owns the home-local Calm preference contract.
 //
 // Pi has one first-registration-wins ToolDefinition per tool name, with no merge or
@@ -19,7 +19,7 @@
 // registration synchronous because restored rows capture the registry before
 // session_start; and collision-check only the later first-activation path, when
 // getAllTools() is reliable. docs/calm-mode-feasibility.md owns the Pi-source evidence
-// and docs/calm.md owns the user-facing behavior and non-retroactive first-toggle bound.
+// and docs/calm.md owns the user-facing behavior and the contested-name bound.
 import { randomUUID } from "node:crypto";
 import {
   mkdirSync,
@@ -341,8 +341,9 @@ export default function (pi: ExtensionAPI) {
 
   // The first time Calm turns on in a session that started off, claim every
   // uncontested built-in and leave each contested tool and its owning extension
-  // untouched. Tell the user which built-in Calm could not take over, since Calm's
-  // presentation does not apply to it.
+  // untouched. Tell the user which built-in Calm could not take over: the transcript
+  // row still collapses through the tool-row adapter, but Calm does not own the
+  // renderer Pi hands to /export and /share.
   function activateBuiltInsIfNeeded(ui: ExtensionUIContext): void {
     if (builtInsRegistered) return;
     const contested = contestedBuiltIns();
@@ -355,7 +356,7 @@ export default function (pi: ExtensionAPI) {
     const names = contested.map((tool) => `"${tool.name}"`).join(", ");
     const plural = contested.length > 1;
     ui.notify(
-      `Firstmate Calm: the ${names} built-in tool${plural ? "s are" : " is"} already provided by another extension, so Calm may not fully function for ${plural ? "them" : "it"} this session.`,
+      `Firstmate Calm: the ${names} built-in tool${plural ? "s are" : " is"} already provided by another extension, so Calm left ${plural ? "them" : "it"} alone this session. Calm still collapses ${plural ? "those rows" : "that row"}, while /export and /share use the other extension's renderer.`,
       "warning",
     );
     for (const tool of contested) {
@@ -383,7 +384,7 @@ export default function (pi: ExtensionAPI) {
       const owner = registered.find((info) => info.name === tool.name)?.sourceInfo;
       if (owner && owner.source !== "builtin" && realpathOrSelf(owner.path) !== extensionRealFile) {
         console.error(
-          `Firstmate Calm: another extension (${owner.path}) also claimed the built-in "${tool.name}" tool and won; Calm's presentation for it is unavailable this session.`,
+          `Firstmate Calm: another extension (${owner.path}) also claimed the built-in "${tool.name}" tool and won; Calm still collapses its transcript row, while /export and /share use that extension's renderer this session.`,
         );
       }
     }
@@ -422,6 +423,10 @@ export default function (pi: ExtensionAPI) {
         exportRendering = false;
         setCalmStockExportRendering(false);
         publishPresentationState();
+        // Pi already repainted the stock-rendered transcript during the export window,
+        // so Calm needs one repaint after it closes. Clearing an unset footer status
+        // requests that render without touching Pi's own export completion status.
+        ctx.ui.setStatus("firstmate-calm", undefined);
       }, 0);
     });
   });

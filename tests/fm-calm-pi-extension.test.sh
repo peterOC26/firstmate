@@ -382,6 +382,84 @@ JS
   pass "missing Pi presentation class exports reach the independent adapter degradation path"
 }
 
+test_tool_row_image_state_probe() {
+  local fixture out status
+  if ! command -v node >/dev/null 2>&1; then
+    echo "skip: node not found for Pi calm tool-row image-state test"
+    return 0
+  fi
+
+  fixture="$TMP_ROOT/tool-row-image-state"
+  mkdir -p \
+    "$fixture/project/.pi/extensions/lib" \
+    "$fixture/project/node_modules/@earendil-works/pi-coding-agent"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
+  cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
+  printf '%s\n' '{"type":"module"}' >"$fixture/project/package.json"
+  printf '%s\n' \
+    '{"name":"@earendil-works/pi-coding-agent","type":"module","exports":"./index.js"}' \
+    >"$fixture/project/node_modules/@earendil-works/pi-coding-agent/package.json"
+  cat >"$fixture/project/node_modules/@earendil-works/pi-coding-agent/index.js" <<'MODULE'
+export function getMarkdownTheme() { return {}; }
+export class UserMessageComponent {}
+class ToolRowWithoutImageState {
+  render() { return ["ROW_TEXT"]; }
+}
+class ToolRowWithImageState {
+  imageComponents = [];
+  imageSpacers = [];
+  render() { return ["ROW_TEXT"]; }
+}
+export let ToolExecutionComponent = ToolRowWithoutImageState;
+export function useToolRowWithImageState() {
+  ToolExecutionComponent = ToolRowWithImageState;
+}
+MODULE
+
+  out=$(cd "$fixture/project" && node --input-type=module 2>&1 <<'JS'
+const pi = await import("@earendil-works/pi-coding-agent");
+const { installCalmToolRowLayout } = await import("./.pi/extensions/lib/fm-calm-tool-row-layout.ts");
+const { setCalmPresentation } = await import("./.pi/extensions/lib/fm-calm-visibility.ts");
+
+// A Pi that renames the image children must fail the whole adapter closed at install
+// rather than hide rows and silently drop every tool image at render time.
+const stockRender = pi.ToolExecutionComponent.prototype.render;
+let reason;
+try {
+  installCalmToolRowLayout();
+} catch (error) {
+  reason = error instanceof Error ? error.message : String(error);
+}
+if (!reason?.includes("image")) {
+  throw new Error(`the adapter installed over an unavailable image seam instead of failing closed: ${String(reason)}`);
+}
+if (pi.ToolExecutionComponent.prototype.render !== stockRender) {
+  throw new Error("the adapter patched render despite reporting the image seam unavailable");
+}
+setCalmPresentation(true);
+const skippedRow = new pi.ToolExecutionComponent();
+if (JSON.stringify(skippedRow.render(100)) !== JSON.stringify(["ROW_TEXT"])) {
+  throw new Error("a skipped tool-row adapter still changed Pi's own row rendering");
+}
+
+pi.useToolRowWithImageState();
+installCalmToolRowLayout();
+const row = new pi.ToolExecutionComponent();
+if (row.render(100).length !== 0) {
+  throw new Error("the installed tool-row adapter did not hide an image-free row while Calm was active");
+}
+setCalmPresentation(false);
+if (JSON.stringify(row.render(100)) !== JSON.stringify(["ROW_TEXT"])) {
+  throw new Error("Calm off did not restore the stock tool-row rendering");
+}
+JS
+)
+  status=$?
+  [ "$status" -eq 0 ] || fail "Pi calm tool-row image-state probe failed: $out"
+  [ -z "$out" ] || fail "Pi calm tool-row image-state test printed output: $out"
+  pass "an unavailable ToolExecutionComponent image seam skips the whole tool-row adapter at install instead of dropping images mid-render"
+}
+
 test_builtin_gate_load_time() {
   local fixture out output_file status
   if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
@@ -1218,6 +1296,11 @@ let terminalInputHandler;
 let workingVisible;
 let hiddenThinkingLabel = "unset";
 const statuses = new Map();
+// Pi repaints only when an extension asks it to. setStatus is the redraw request Calm
+// is allowed to make around an export, since it never overwrites Pi's own status row;
+// setToolsExpanded also repaints but clobbers the export completion status.
+const statusCalls = [];
+const toolsExpandedCalls = [];
 const sessionEntries = [{ type: "message", message: { role: "toolResult", content: "kept" } }];
 const entriesBefore = JSON.stringify(sessionEntries);
 const commandContext = {
@@ -1239,8 +1322,10 @@ const commandContext = {
     },
     setStatus(key, value) {
       statuses.set(key, value);
+      statusCalls.push({ key, value });
     },
     setToolsExpanded(value) {
+      toolsExpandedCalls.push(value);
       expanded = value;
       for (const row of rows) row.actual.setExpanded(value);
       watchActual.setExpanded(value);
@@ -1362,6 +1447,8 @@ for (const { name, actual } of rows) {
 }
 async function assertStockHtmlRendering(command, submitData) {
   editorText = command;
+  const statusCallsBefore = statusCalls.length;
+  const toolsExpandedCallsBefore = toolsExpandedCalls.length;
   terminalInputHandler(submitData);
   const getToolDefinition = (name) =>
     tools.find((tool) => tool.name === name) ||
@@ -1397,6 +1484,15 @@ async function assertStockHtmlRendering(command, submitData) {
   }
   editorText = "";
   await new Promise((resolve) => setTimeout(resolve, 0));
+  // Pi paints the stock-rendered transcript during the export window, so closing that
+  // window has to ask Pi for one more paint or the unhidden rows stay on screen.
+  const repaints = statusCalls.slice(statusCallsBefore);
+  if (!repaints.some((call) => call.key === "firstmate-calm" && call.value === undefined)) {
+    throw new Error(`${command} left the stock-rendered transcript painted without requesting a Calm repaint`);
+  }
+  if (toolsExpandedCalls.length !== toolsExpandedCallsBefore) {
+    throw new Error(`${command} repainted through tool expansion, which overwrites Pi's own export status row`);
+  }
 }
 
 await assertStockHtmlRendering("/export calm.html", "\r");
@@ -3851,6 +3947,7 @@ test_home_resolution
 test_pi_compat_no_upper_bound
 test_pi_compat_degraded_adapter
 test_pi_compat_missing_adapter_exports
+test_tool_row_image_state_probe
 test_builtin_gate_load_time
 test_calm_activation_collision_and_regression_bound
 test_rendering_and_session_lifecycle

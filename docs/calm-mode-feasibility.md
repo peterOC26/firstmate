@@ -28,7 +28,7 @@ The losing definition's execution and render functions are both discarded, so un
 Pi's `getAllTools()` exposes tool metadata and source identity but not the executable or rendering functions needed to wrap another extension's full definition.
 It is also usable for reliable collision detection only after extension binding, which makes it suitable for the first same-session `/calm` activation but not for synchronous extension loading.
 Deferring registration to `session_start` is not an equivalent path: Pi constructs restored tool rows from an earlier tool-registry snapshot during reload, new-session, fork, and session switching, so those rows retain the definition captured before `session_start`.
-`tests/fm-calm-pi-extension.test.sh` covers the resulting split contract: no load-time claims while Calm is off, synchronous claims while it is already on, collision-checked first activation with a warning, preservation of a contested tool's execution, and the non-retroactive bound for rows rendered before first activation.
+`tests/fm-calm-pi-extension.test.sh` covers the resulting split contract: no load-time claims while Calm is off, synchronous claims while it is already on, collision-checked first activation with a warning, preservation of a contested tool's execution, and collapse plus Calm-off restoration of rows that were already rendered before first activation.
 
 ## Pi 0.81.1 end-to-end reproduction
 
@@ -230,7 +230,9 @@ General component replacement, ANSI cursor erasure, provider-context mutation, a
 ## 2026-08-10 SuperCalm Pi 0.84.1 verification
 
 The SuperCalm revision was verified against the installed Pi 0.84.1 CLI.
-The revision adds the `ToolExecutionComponent.render` adapter, preserves image output, forwards Pi 0.84.x widened component arguments in the existing adapters, and removes the old post-export expansion redraw because it overwrote Pi's `/export` completion status after the synchronous export had completed.
+The revision adds the `ToolExecutionComponent.render` adapter, preserves image output, and forwards Pi 0.84.x widened component arguments in the existing adapters.
+The adapter probes the row's image children at install and skips itself entirely if that seam is renamed, because a hidden row whose images are silently dropped loses the parity this change exists to keep, and a render-time diagnostic would write to the screen Pi's TUI owns.
+It also replaces the old post-export expansion redraw, which repainted correctly but overwrote Pi's `/export` completion status, with a cleared extension footer status: `setExtensionStatus` requests the render Calm needs after Pi has already painted the stock-rendered transcript, and touches only footer data.
 
 ```text
 $ pi --version
@@ -241,6 +243,7 @@ ok - Pi calm resolves its persistent home independently of Pi's launch directory
 ok - Pi calm compatibility evidence never rejects a Pi version for being newer than 0.82.0, and still fails closed on a missing or malformed version
 ok - a missing collapsed-thinking presentation API degrades only that Calm adapter with a clear skip reason, while the rest of Calm still registers
 ok - missing Pi presentation class exports reach the independent adapter degradation path
+ok - an unavailable ToolExecutionComponent image seam skips the whole tool-row adapter at install instead of dropping images mid-render
 ok - Calm registers none of its 7 built-in tool wrappers at load while config/calm is off, and all 7 synchronously at load while config/calm is on
 ok - Calm's first same-session /calm activation claims every uncontested built-in, leaves a foreign bash tool fully intact and callable, warns prominently and logs the contested name, and SuperCalm collapses and restores pre-activation rows
 ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts

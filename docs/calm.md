@@ -31,13 +31,14 @@ These are supported-API boundaries rather than hidden-content failures.
 ## Pi compatibility
 
 Calm has no numeric Pi version minimum or maximum and never refuses Pi solely because its version is newer than a previously verified version.
-The collapsed-thinking, tool-row, and operational-user-row presentation adapters probe the exact Pi API seam they patch when Calm loads.
-If Pi removes one of those seams, Calm logs a diagnostic naming the unavailable adapter and skips only that adapter; `/calm`, the other adapter, and unrelated Pi extensions remain available.
+The collapsed-thinking, tool-row, and operational-user-row presentation adapters probe the exact Pi API seam they patch when Calm loads, including the tool row's image children.
+If Pi removes one of those seams, Calm logs a diagnostic naming the unavailable adapter and skips only that adapter, leaving Pi's own rendering for it untouched; `/calm`, the other adapters, and unrelated Pi extensions remain available.
 
 Calm's built-in tool presentation (`bash`, `read`, `edit`, `write`, `grep`, `find`, `ls`) shares Pi's single, unmerged override slot per name with any other extension that overrides the same tool.
 While the persisted Calm preference is off, Calm registers none of those overrides and therefore contests no built-in tool name.
 The first time Calm turns on in a session that started off, it claims every built-in name no other extension already owns, leaves every contested tool intact and callable, and displays a prominent warning naming the tools it skipped.
-Tool-call rows already on screen before that first toggle do not retroactively collapse; later rows for the names Calm claimed use Calm presentation.
+A contested tool's transcript rows still collapse, including rows already on screen before that first toggle, because the tool-row adapter works on Pi's row layout rather than on tool registration.
+What a contested name loses is renderer ownership: `/export` and `/share` HTML use the other extension's renderer instead of Pi's stock one.
 When a session starts or reloads with Calm already on, Calm must instead register all seven overrides synchronously so Pi can render restored rows with them.
 Pi provides no ownership check early enough for that load-time path, and the first registrant wins the complete tool definition.
 If the other extension wins, a session-start console diagnostic names the tool and winning extension; if Calm wins, Pi does not expose the losing registration, so the other extension's override is unavailable and cannot be named.
