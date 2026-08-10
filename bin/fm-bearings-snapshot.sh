@@ -461,7 +461,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     ] + [
       $candidate_prs[]
       | select(.review == "APPROVED" and .mergeable == "MERGEABLE" and .checks == "passing")
-      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:((.title // "-") | trunc(70)),artifact:.url}
+      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:.title,artifact:.url}
     ] + [
       $landed[]
       | {column:"Done",id,summary:.what,owner,detail:"recent completion",artifact}

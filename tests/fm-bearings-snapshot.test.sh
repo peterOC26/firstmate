@@ -918,7 +918,8 @@ test_board_columns_are_complete_and_classified() {
       and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
   ' >/dev/null || fail "Kanban board columns were incomplete or misclassified: $json"
   assert_contains "$toon" 'board_columns[6]' "TOON must always declare every board column"
-  assert_contains "$toon" 'board_items' "TOON must expose board items from the snapshot path"
+  assert_contains "$toon" "board_items[$(printf '%s' "$json" | jq '.board_items | length')]{" \
+    "TOON must expose every projected board item as counted tabular rows"
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
