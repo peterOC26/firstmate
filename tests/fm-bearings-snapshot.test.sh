@@ -896,11 +896,11 @@ test_default_is_bounded_and_local_only() {
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
 
-test_board_columns_are_complete_and_read_only() {
+test_board_columns_are_complete_and_classified() {
   local home fakebin json toon
   home=$(make_home board); write_fixture "$home"
   perl -0pi -e 's/## Queued\n/## Queued\n- [ ] ready-work - Dispatchable queued work (repo: firstmate) (kind: ship)\n- [ ] held-work - Wait for scheduled rollout (repo: firstmate) (kind: scout) (hold: after release window) (hold-kind: external)\n/' "$home/data/backlog.md"
-  fakebin=$(make_fakebin "$home"); : > "$home/net.log"
+  fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --include-prs --json)
   toon=$(run "$home" "$fakebin" --include-prs)
   printf '%s' "$json" | jq -e '
@@ -1929,7 +1929,7 @@ test_nonprogressing_child_states_are_explicit
 test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
-test_board_columns_are_complete_and_read_only
+test_board_columns_are_complete_and_classified
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes
