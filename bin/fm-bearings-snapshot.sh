@@ -317,8 +317,11 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     else ((.hold_reason // .blocked_reason // "-") | trunc(40)) end;
   def pr_captain_action:
     ((.review // "none") | if . == "" then "none" else . end) as $review
-    | if $review == "APPROVED" and .mergeable == "MERGEABLE" and .checks == "passing"
-        then "ready to merge"
+    | if $review == "APPROVED" and .mergeable == "MERGEABLE" then
+        (if .checks == "passing" then "ready to merge"
+         elif .checks == "pending" then "approved, checks still running"
+         elif .checks == "none" then "approved, no checks reported"
+         else "-" end)
       elif ($review == "none" or $review == "REVIEW_REQUIRED") and .checks != "failing"
         then "waiting for your review"
       else "-" end;
@@ -496,7 +499,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     ] + [
       $candidate_prs[]
       | select(pr_captain_action != "-")
-      | {column:"Waiting on you",id:("pr-" + .num),
+      | {column:"Waiting on you",id:(.repo + "#" + .num),
          summary:((.repo + " PR " + .num + ": " + .title) | trunc(90)),
          owner:.repo,detail:pr_captain_action,artifact:.url}
     ] + [

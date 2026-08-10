@@ -928,7 +928,7 @@ test_board_columns_are_complete_and_classified() {
         | any(. == "ship" or . == "scout" or . == "secondmate") | not)
       and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"
         and .detail == "your decision needed"))
-      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and .detail == "ready to merge"
+      and (.board_items | any(.column == "Waiting on you" and .id == "kunchenguid/firstmate#9" and .detail == "ready to merge"
         and (.summary | contains("Ship the thing")) and (.artifact | test("/pull/9"))))
       and (.board_items | any(.column == "Done" and .id == "done-a"))
       and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
@@ -1021,25 +1021,64 @@ cat <<'JSON'
  {"number":12,"title":"Red CI","url":"https://github.com/kunchenguid/firstmate/pull/12","headRefName":"fm/twelve","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"FAILURE","status":"COMPLETED"}]},
  {"number":13,"title":"Author must act","url":"https://github.com/kunchenguid/firstmate/pull/13","headRefName":"fm/thirteen","reviewDecision":"CHANGES_REQUESTED","mergeable":"MERGEABLE","statusCheckRollup":[]},
  {"number":14,"title":"Approved but no checks reported","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]},
- {"number":15,"title":"Green and approved","url":"https://github.com/kunchenguid/firstmate/pull/15","headRefName":"fm/fifteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+ {"number":15,"title":"Green and approved","url":"https://github.com/kunchenguid/firstmate/pull/15","headRefName":"fm/fifteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]},
+ {"number":16,"title":"Approved while CI runs","url":"https://github.com/kunchenguid/firstmate/pull/16","headRefName":"fm/sixteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"status":"IN_PROGRESS"}]},
+ {"number":17,"title":"Approved but conflicting","url":"https://github.com/kunchenguid/firstmate/pull/17","headRefName":"fm/seventeen","reviewDecision":"APPROVED","mergeable":"CONFLICTING","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
 JSON
 SH
   chmod +x "$fakebin/gh"
   json=$(run "$home" "$fakebin" --include-prs --json)
   printf '%s' "$json" | jq -e '
-    ([.board_items[] | select(.id == "pr-11") | .column] == ["Waiting on you"])
-      and (.board_items | any(.id == "pr-11" and .detail == "waiting for your review"
+    ([.board_items[] | select(.id == "kunchenguid/firstmate#11") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "kunchenguid/firstmate#11" and .detail == "waiting for your review"
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/11")))
-      and ([.board_items[] | select(.id == "pr-15") | .column] == ["Waiting on you"])
-      and (.board_items | any(.id == "pr-15" and .detail == "ready to merge"
+      and (.board_items | any(.id == "kunchenguid/firstmate#15" and .detail == "ready to merge"
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/15")))
-      and (.board_items | any(.id == "pr-12") | not)
-      and (.board_items | any(.id == "pr-13") | not)
-      and (.board_items | any(.id == "pr-14") | not)
-      and (.candidate_prs | any(.num == "14" and .checks == "none"))
-      and (.candidate_prs | any(.num == "12") and any(.num == "13"))
+      and (.board_items | any(.id == "kunchenguid/firstmate#14"
+        and .detail == "approved, no checks reported"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/14")))
+      and (.board_items | any(.id == "kunchenguid/firstmate#16"
+        and .detail == "approved, checks still running"))
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 4
+      and (.board_items | any(.id | test("#12$")) | not)
+      and (.board_items | any(.id | test("#13$")) | not)
+      and (.board_items | any(.id | test("#17$")) | not)
+      and (.candidate_prs | any(.num == "12") and any(.num == "13") and any(.num == "17"))
   ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
-  pass "PRs awaiting review or a green merge board under Waiting on you, unreported checks do not"
+  pass "PRs awaiting review or merge board with an honest check state, author-owned ones do not"
+}
+
+test_board_pr_ids_stay_unique_across_repositories() {
+  local home fakebin json
+  home=$(make_home pr-ids); write_fixture "$home"
+  fm_write_meta "$home/state/other-task.meta" \
+    "window=firstmate:fm-other-task" "worktree=$home/projects/ship-wt" "project=other" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" \
+    "pr=https://github.com/kunchenguid/other/pull/3"
+  record_claude_state "$home/state" other-task busy
+  printf 'working: building the other thing\n' > "$home/state/other-task.status"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+slug=""
+while [ $# -gt 0 ]; do case "$1" in --repo) slug=$2; shift 2 ;; *) shift ;; esac; done
+cat <<JSON
+[{"number":3,"title":"Third PR in $slug","url":"https://github.com/$slug/pull/3","headRefName":"fm/three","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+JSON
+SH
+  chmod +x "$fakebin/gh"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  printf '%s' "$json" | jq -e '
+    ([.candidate_prs[] | select(.num == "3")] | length) == 2
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#3$")))] | length) == 2
+      and ([.board_items[].id] | length) == ([.board_items[].id] | unique | length)
+      and (.board_items | any(.id == "kunchenguid/firstmate#3"
+        and .artifact == "https://github.com/kunchenguid/firstmate/pull/3"))
+      and (.board_items | any(.id == "kunchenguid/other#3"
+        and .artifact == "https://github.com/kunchenguid/other/pull/3"))
+  ' >/dev/null || fail "board PR ids collided across repositories: $json"
+  pass "board item ids stay unique when two repositories share a PR number"
 }
 
 test_toon_json_parity() {
@@ -2055,6 +2094,7 @@ test_board_columns_are_complete_and_classified
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
 test_open_prs_needing_the_captain_reach_waiting_on_you
+test_board_pr_ids_stay_unique_across_repositories
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes
