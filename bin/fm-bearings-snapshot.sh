@@ -312,6 +312,16 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     if (((.unresolved_blocker_ids // []) | length) > 0) then "blocked"
     elif (.hold_reason != null) then "hold"
     else "-" end;
+  def gate_reason:
+    if gate_class == "-" then "-"
+    else ((.hold_reason // .blocked_reason // "-") | trunc(40)) end;
+  def pr_captain_action:
+    ((.review // "none") | if . == "" then "none" else . end) as $review
+    | if $review == "APPROVED" and .mergeable == "MERGEABLE"
+         and (.checks == "passing" or .checks == "none") then "ready to merge"
+      elif ($review == "none" or $review == "REVIEW_REQUIRED") and .checks != "failing"
+        then "waiting for your review"
+      else "-" end;
   def round_robin_landed($n):
     . as $groups
     | [range(0; (($groups | map(length) | max) // 0)) as $i
@@ -416,7 +426,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                   or (((.body_excerpt // "") | test("SUPERSEDED|NOT REQUIRED|NOT-REQUIRED|DEFERRED"; "i")) | not))
          | {id, title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
-            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:"(main)",
+            reason:gate_reason,owner:"(main)",
             gate:gate_class} ]
      + [ (.secondmate_current.records // [])[] as $m
          | select($m.provenance.selected == "structured-home")
@@ -424,7 +434,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | select(.captain_actionable != true)
          | {id,title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
-            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:$m.id,
+            reason:gate_reason,owner:$m.id,
             gate:gate_class} ]) as $gates_all
   | ([ .scout_reports[]
        | . as $r
@@ -436,7 +446,11 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | (if $all_decisions == 1 then $decisions_all else $decisions_all[:$decisions_n] end) as $decisions
   | ($done | map({id, what:(.title | trunc(70)),
                   artifact:(.pr_url // .report_path // .local_note // "-"),owner:.home_id})) as $landed
-  | (if $all_queued == 1 then $gates_all else $gates_all[:$gates_n] end) as $gates
+  | ([ $gates_all[] | select(.gate == "-") ]) as $gates_ready_all
+  | ([ $gates_all[] | select(.gate == "hold") ]) as $gates_held_all
+  | ([ $gates_all[] | select(.gate == "blocked") ]) as $gates_blocked_all
+  | (if $all_queued == 1 then $gates_all
+     else ($gates_ready_all[:$gates_n] + $gates_held_all[:$gates_n] + $gates_blocked_all[:$gates_n]) end) as $gates
   | (if $all_reports == 1 then $reports_all else $reports_all[:$reports_n] end) as $reports
   | (if $all_recorded_prs == 1 then $recorded_prs_all else $recorded_prs_all[:$recorded_prs_n] end) as $recorded_prs
   | ([
@@ -464,11 +478,13 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       | {column:"Under way",id,summary:.doing,owner:(.kind // "-"),detail:.state,artifact:"-"}
     ] + [
       $decisions[]
-      | {column:"Waiting on you",id,summary,owner,detail:.verb,artifact:"-"}
+      | {column:"Waiting on you",id,summary,owner,detail:"your decision needed",artifact:"-"}
     ] + [
       $candidate_prs[]
-      | select(.review == "APPROVED" and .mergeable == "MERGEABLE" and .checks == "passing")
-      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:.title,artifact:.url}
+      | select(pr_captain_action != "-")
+      | {column:"Waiting on you",id:("pr-" + .num),
+         summary:((.repo + " PR " + .num + ": " + .title) | trunc(90)),
+         owner:.repo,detail:pr_captain_action,artifact:.url}
     ] + [
       $landed[]
       | {column:"Done",id,summary:.what,owner,detail:"recent completion",artifact}
@@ -521,7 +537,10 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.input_truncated == true or .parent_event.activity_scan.retained_truncated == true)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence truncated for \($n) record(s)"), reveal:"raise FM_SNAPSHOT_PARENT_ACTIVITY_LINES, FM_SNAPSHOT_PARENT_ACTIVITY_BYTES, or FM_SNAPSHOT_PARENT_ACTIVITIES"} else empty end),
         (([($snap.secondmate_current.records // [])[] | select(.parent_event.activity_scan.available == false)] | length) as $n | if $n > 0 then {surface:("secondmate parent activity evidence unavailable for \($n) record(s)"), reveal:"inspect the parent status logs"} else empty end),
         (if $all_decisions == 0 and ($decisions_all | length) > $decisions_n then {surface:("decisions_open showing \($decisions_n) of \($decisions_all | length)"), reveal:"--all-decisions"} else empty end),
-        (if $all_queued == 0 and ($gates_all | length) > $gates_n then {surface:("gates showing \($gates_n) of \($gates_all | length)"), reveal:"--all-queued"} else empty end),
+        (if $all_queued == 0 and ($gates_all | length) > ($gates | length) then {surface:("gates showing \($gates | length) of \($gates_all | length)"), reveal:"--all-queued"} else empty end),
+        (if $all_queued == 0 and ($gates_ready_all | length) > $gates_n then {surface:("board Ready showing \($gates_n) of \($gates_ready_all | length)"), reveal:"--all-queued"} else empty end),
+        (if $all_queued == 0 and ($gates_held_all | length) > $gates_n then {surface:("board Held showing \($gates_n) of \($gates_held_all | length)"), reveal:"--all-queued"} else empty end),
+        (if $all_queued == 0 and ($gates_blocked_all | length) > $gates_n then {surface:("board Blocked showing \($gates_n) of \($gates_blocked_all | length)"), reveal:"--all-queued"} else empty end),
         (if $all_reports == 0 and ($reports_all | length) > $reports_n then {surface:("reports showing \($reports_n) of \($reports_all | length)"), reveal:"--all-reports"} else empty end),
         (if $all_recorded_prs == 0 and ($recorded_prs_all | length) > $recorded_prs_n then {surface:("recorded_prs showing \($recorded_prs_n) of \($recorded_prs_all | length)"), reveal:"--all-recorded-prs"} else empty end),
         (if $all_unhealthy == 0 and ($unhealthy_all | length) > $unhealthy_n then {surface:("unhealthy_endpoints showing \($unhealthy_n) of \($unhealthy_all | length)"), reveal:"--all-unhealthy"} else empty end),

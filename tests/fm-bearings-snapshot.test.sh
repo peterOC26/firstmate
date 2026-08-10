@@ -912,10 +912,13 @@ test_board_columns_are_complete_and_classified() {
       and (.board_items | any(.column == "Held" and .id == "held-work" and .detail == "after release window"))
       and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
       and (.board_items | any(.column == "Under way" and .id == "ship-task"))
-      and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"))
-      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and .detail == "Ship the thing" and (.artifact | test("/pull/9"))))
+      and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"
+        and .detail == "your decision needed"))
+      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and .detail == "ready to merge"
+        and (.summary | contains("Ship the thing")) and (.artifact | test("/pull/9"))))
       and (.board_items | any(.column == "Done" and .id == "done-a"))
       and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
+      and (.board_items | all((.detail | test("captain-hold|needs-decision|^blocked$")) | not))
   ' >/dev/null || fail "Kanban board columns were incomplete or misclassified: $json"
   assert_contains "$toon" 'board_columns[6]' "TOON must always declare every board column"
   assert_contains "$toon" "board_items[$(printf '%s' "$json" | jq '.board_items | length')]{" \
@@ -945,8 +948,80 @@ EOF
       and (.board_items | any(.id == "task-c" and (.detail | contains("task-z"))))
       and ([.board_items[] | select(.id == "task-d") | .column] == ["Held"])
       and (.board_items | any(.id == "task-d" and .detail == "after release window"))
+      and (.gates | any(.id == "task-b" and .reason == "-"))
+      and (.gates | any(.id == "task-c" and .reason == "waiting on task-z"))
+      and (.gates | any(.id == "task-d" and .reason == "after release window"))
   ' >/dev/null || fail "queued work whose blocker landed must board as Ready, not Held: $json"
   pass "queued work becomes Ready once its blocker lands, and real holds stay Held"
+}
+
+test_gate_columns_keep_their_share_of_the_bound() {
+  local home fakebin json
+  home=$(make_home gate-share); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] blk-1 - Blocked one blocked-by: missing-1 (repo: firstmate) (kind: ship)
+- [ ] blk-2 - Blocked two blocked-by: missing-2 (repo: firstmate) (kind: ship)
+- [ ] blk-3 - Blocked three blocked-by: missing-3 (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-2 - Held two (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-3 - Held three (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] ready-2 - Ready two (repo: firstmate) (kind: ship)
+
+## Done
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] == ["ready-1","ready-2"])
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 2
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 2
+      and (.gates | length) == 6
+      and ([.omitted[].surface] | index("gates showing 6 of 8") != null)
+      and ([.omitted[].surface] | index("board Held showing 2 of 3") != null)
+      and ([.omitted[].surface] | index("board Blocked showing 2 of 3") != null)
+      and ([.omitted[].surface] | any(startswith("board Ready showing")) | not)
+  ' >/dev/null || fail "a shared gate bound starved a board column: $json"
+  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json --all-queued)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] | length) == 2
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 3
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 3
+      and ([.omitted[].surface] | any(startswith("board ")) | not)
+  ' >/dev/null || fail "--all-queued must lift every gate column bound: $json"
+  pass "Ready, Held, and Blocked each keep their share of the gate bound"
+}
+
+test_open_prs_needing_the_captain_reach_waiting_on_you() {
+  local home fakebin json
+  home=$(make_home pr-columns); write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+cat <<'JSON'
+[{"number":11,"title":"Needs a look","url":"https://github.com/kunchenguid/firstmate/pull/11","headRefName":"fm/eleven","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":12,"title":"Red CI","url":"https://github.com/kunchenguid/firstmate/pull/12","headRefName":"fm/twelve","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"FAILURE","status":"COMPLETED"}]},
+ {"number":13,"title":"Author must act","url":"https://github.com/kunchenguid/firstmate/pull/13","headRefName":"fm/thirteen","reviewDecision":"CHANGES_REQUESTED","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":14,"title":"No CI configured","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]}]
+JSON
+SH
+  chmod +x "$fakebin/gh"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "pr-11") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "pr-11" and .detail == "waiting for your review"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/11")))
+      and ([.board_items[] | select(.id == "pr-14") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "pr-14" and .detail == "ready to merge"))
+      and (.board_items | any(.id == "pr-12") | not)
+      and (.board_items | any(.id == "pr-13") | not)
+      and (.candidate_prs | any(.num == "12") and any(.num == "13"))
+  ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
+  pass "PRs awaiting the captain's review or merge board under Waiting on you"
 }
 
 test_toon_json_parity() {
@@ -1960,6 +2035,8 @@ test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
 test_landed_blocker_frees_queued_work_to_ready
+test_gate_columns_keep_their_share_of_the_bound
+test_open_prs_needing_the_captain_reach_waiting_on_you
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes
