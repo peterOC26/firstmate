@@ -83,6 +83,15 @@ export function calmPresentationHides(itemClass: CalmTranscriptClass): boolean {
   return calm && !stockExportRendering && !calmTranscriptClassIsVisible(itemClass);
 }
 
+// The stock-export escape hatch exists for the renderers Pi actually calls while it
+// builds /export and /share output. Pi builds that output from tool definitions and
+// entry renderers, never from an on-screen row component, so a row-layout adapter that
+// honored the hatch would only unhide rows for the frame Pi paints inside the export
+// window. Screen-only adapters ask this instead.
+export function calmScreenPresentationHides(itemClass: CalmTranscriptClass): boolean {
+  return calm && !calmTranscriptClassIsVisible(itemClass);
+}
+
 export function registerFirstmateSyntheticPresentation(pi: ExtensionAPI): void {
   pi.registerEntryRenderer<FirstmateSyntheticPresentation>(
     FIRSTMATE_SYNTHETIC_PRESENTATION_TYPE,

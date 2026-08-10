@@ -233,6 +233,8 @@ The SuperCalm revision was verified against the installed Pi 0.84.1 CLI.
 The revision adds the `ToolExecutionComponent.render` adapter, preserves image output, and forwards Pi 0.84.x widened component arguments in the existing adapters.
 The adapter probes the row's image children at install and skips itself entirely if that seam is renamed, because a hidden row whose images are silently dropped loses the parity this change exists to keep, and a render-time diagnostic would write to the screen Pi's TUI owns.
 It also replaces the old post-export expansion redraw, which repainted correctly but overwrote Pi's `/export` completion status, with a cleared extension footer status: `setExtensionStatus` requests the render Calm needs after Pi has already painted the stock-rendered transcript, and touches only footer data.
+The row adapter reads the Calm policy without the stock-export escape hatch, because Pi builds `/export` and `/share` output from tool definitions and entry renderers rather than from on-screen rows: honoring the hatch there would only unhide every tool row for the single frame Pi paints inside the export window.
+The tool-definition wrappers and the synthetic entry renderer still honor it, so exported and shared artifacts keep their complete content.
 
 ```text
 $ pi --version

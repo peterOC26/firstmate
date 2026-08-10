@@ -5,8 +5,11 @@
 // that and skips only this adapter with a diagnostic instead of blocking Calm or Pi.
 // Failing closed at install keeps a renamed image seam from silently dropping image
 // output row by row, and keeps every diagnostic off Pi's render path.
+// This adapter is screen-only: Pi builds /export and /share output from tool
+// definitions rather than from these rows, so it reads the Calm policy without the
+// stock-export escape hatch the definition wrappers need.
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
-import { calmPresentationHides } from "./fm-calm-visibility.ts";
+import { calmScreenPresentationHides } from "./fm-calm-visibility.ts";
 
 type ToolExecutionComponentConstructor = typeof PiCodingAgent.ToolExecutionComponent;
 type ToolExecutionComponentInstance = InstanceType<ToolExecutionComponentConstructor>;
@@ -83,8 +86,8 @@ export function installCalmToolRowLayout(): void {
     [key: symbol]: CalmToolRowLayoutPatch | undefined;
   };
   const hidesToolRow = (): boolean =>
-    calmPresentationHides("assistant-tool-call") &&
-    calmPresentationHides("tool-result");
+    calmScreenPresentationHides("assistant-tool-call") &&
+    calmScreenPresentationHides("tool-result");
   const installed = registry[CALM_TOOL_ROW_LAYOUT_PATCH];
   if (installed) {
     installed.hidesToolRow = hidesToolRow;

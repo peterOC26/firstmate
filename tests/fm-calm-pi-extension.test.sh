@@ -1450,6 +1450,28 @@ async function assertStockHtmlRendering(command, submitData) {
   const statusCallsBefore = statusCalls.length;
   const toolsExpandedCallsBefore = toolsExpandedCalls.length;
   terminalInputHandler(submitData);
+  // Pi paints one frame inside the open export window, so a tool row that unhides for
+  // the stock-export pass flashes to full height and collapses again.
+  const windowRows = [
+    ...rows.map(({ name, actual }) => ({ name, row: actual })),
+    { name: "fm_watch_arm_pi", row: watchActual },
+    { name: "foreign self-shell custom tool", row: customRow },
+    { name: "foreign default-shell custom tool", row: defaultShellRow },
+    { name: "foreign-owned built-in", row: contestedBashRow },
+    { name: "unregistered provider tool", row: unregisteredRow },
+  ];
+  for (const { name, row } of windowRows) {
+    const rendered = row.render(100);
+    if (rendered.length !== 0) {
+      throw new Error(`${name} flashed to full height inside the ${command} window: ${JSON.stringify(rendered)}`);
+    }
+  }
+  for (const [name, row] of [["built-in read", imageRow], ["foreign", foreignImageRow]]) {
+    const rendered = row.render(100).join("\n");
+    if (!rendered.includes("\x1b]1337;File=")) {
+      throw new Error(`the ${command} window dropped the disclosed ${name} tool image`);
+    }
+  }
   const getToolDefinition = (name) =>
     tools.find((tool) => tool.name === name) ||
     (name === customDefinition.name ? customDefinition : undefined) ||
