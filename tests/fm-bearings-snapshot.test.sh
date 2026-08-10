@@ -210,7 +210,7 @@ EOF
 }
 
 # This is the Domain Alpha failure shape exactly: the structured home says Phase 7 is Done
-# and no child is active, so the stale parent event must never become Underway.
+# and no child is active, so the stale parent event must never become Under way.
 test_domain_alpha_stale_parent_event_does_not_become_current_work() {
   local home mate fakebin json canonical
   home=$(make_home domain-alpha-parent)
@@ -394,7 +394,7 @@ EOF
         and .key == "phase8-decision-release" and .verb == "captain-hold"))
       and (.in_flight | any(.[]; .id == "domain-alpha") | not)
   ' >/dev/null || fail "structured child captain hold did not reach Captain Call: $json"
-  pass "a structured child captain hold reaches Captain's Call"
+  pass "a structured child captain hold reaches Waiting on you"
 }
 
 make_valid_secondmate_home() {  # <id> <home>
@@ -896,6 +896,32 @@ test_default_is_bounded_and_local_only() {
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
 
+test_board_columns_are_complete_and_read_only() {
+  local home fakebin json toon
+  home=$(make_home board); write_fixture "$home"
+  perl -0pi -e 's/## Queued\n/## Queued\n- [ ] ready-work - Dispatchable queued work (repo: firstmate) (kind: ship)\n- [ ] held-work - Wait for scheduled rollout (repo: firstmate) (kind: scout) (hold: after release window) (hold-kind: external)\n/' "$home/data/backlog.md"
+  fakebin=$(make_fakebin "$home"); : > "$home/net.log"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  toon=$(run "$home" "$fakebin" --include-prs)
+  printf '%s' "$json" | jq -e '
+    . as $root
+    |
+    ([.board_columns[].column] == ["Ready","Held","Blocked","Under way","Waiting on you","Done"])
+      and (.board_columns | all(has("empty") and (.empty | length > 0)))
+      and (.board_items | any(.column == "Ready" and .id == "ready-work"))
+      and (.board_items | any(.column == "Held" and .id == "held-work" and .detail == "after release window"))
+      and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
+      and (.board_items | any(.column == "Under way" and .id == "ship-task"))
+      and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"))
+      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and (.artifact | test("/pull/9"))))
+      and (.board_items | any(.column == "Done" and .id == "done-a"))
+      and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
+  ' >/dev/null || fail "Kanban board columns were incomplete or misclassified: $json"
+  assert_contains "$toon" 'board_columns[6]' "TOON must always declare every board column"
+  assert_contains "$toon" 'board_items' "TOON must expose board items from the snapshot path"
+  pass "Kanban board columns are complete and projected from the bounded snapshot"
+}
+
 test_toon_json_parity() {
   local home fakebin toon json keys k
   home=$(make_home parity); write_fixture "$home"
@@ -1395,13 +1421,13 @@ test_live_blocker_is_not_charted_queue_work() {
       and (.decisions_open | any(.[]; .id == "ship-task") | not)
       and (.gates | any(.[]; .id == "ship-task") | not)
   ' >/dev/null || fail "live blocked work was projected as queued/deferred work: $json"
-  pass "Bearings keeps a live blocker in structured live state and never converts it to Charted Next queue work"
+  pass "Bearings keeps a live blocker in structured live state and never converts it to queued board work"
 }
 
-# Captain's Call is populated only from the durable keyed open-decision set. The
+# Waiting on you is populated only from the durable keyed open-decision set. The
 # anti-leak guard: action-free highlights - a working task, a completed scout,
 # queued/gated items, landed work - must never surface as an open decision, so they
-# cannot leak into Captain's Call. The standard fixture has exactly one genuine open
+# cannot leak into Waiting on you. The standard fixture has exactly one genuine open
 # decision (the secondmate's structured captain hold).
 test_captains_call_anti_leak() {
   local home fakebin json canonical
@@ -1421,13 +1447,13 @@ test_captains_call_anti_leak() {
       and ([$bearings.decisions_open[].id] | index("mate-landed") | not)
       and ([$bearings.decisions_open[].id] | index("live-gate") | not)
       and ([$bearings.decisions_open[].id] | index("dead-gate") | not)
-  ' >/dev/null || fail "only genuine open decisions may feed Captain's Call: $json"
-  pass "action-free items (working/done/queued/landed) do not leak into Captain's Call"
+  ' >/dev/null || fail "only genuine open decisions may feed Waiting on you: $json"
+  pass "action-free items (working/done/queued/landed) do not leak into Waiting on you"
 }
 
 # R1: main-home orphan in-flight and unstructured current rows must not vanish
 # silently. Meta remains the sole live-work inventory; disclosure is via
-# main_inventory + omitted[] + a Charted Next gate line, never fake Underway.
+# main_inventory + omitted[] + a Blocked board item, never fake Under way.
 test_main_orphan_in_flight_is_disclosed_not_invented() {
   local home fakebin json canonical
   home=$(make_home main-orphan)
@@ -1459,7 +1485,7 @@ EOF
         and (.title | contains("in-flight backlog item has no child metadata"))))
       and (.omitted | any(.surface == "main in-flight backlog item(s) have no child metadata: 1"))
   ' >/dev/null || fail "orphan in-flight was invented or not disclosed: $json"
-  pass "main orphan in-flight stays out of Underway and is disclosed in omitted/gates"
+  pass "main orphan in-flight stays out of Under way and is disclosed in omitted/gates"
 }
 
 test_main_unstructured_current_is_disclosed_with_structured_sibling() {
@@ -1903,6 +1929,7 @@ test_nonprogressing_child_states_are_explicit
 test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
+test_board_columns_are_complete_and_read_only
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes

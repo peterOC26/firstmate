@@ -25,9 +25,9 @@
 #
 # Main-home inventory validity comes from the canonical snapshot's main_inventory
 # object (orphan structured in-flight without meta, unstructured current rows).
-# Bearings never invents Underway rows from backlog-only ids; it discloses those
-# gaps in omitted[] and, when invalid, a Charted Next gate line so the four-section
-# chat cannot claim an empty fleet while main current state is broken.
+# Bearings never invents Under way rows from backlog-only ids; it discloses those
+# gaps in omitted[] and, when invalid, a Blocked board item so the six-column chat
+# cannot claim an empty fleet while main current state is broken.
 #
 # The landed section merges this home's Done with the canonical snapshot's
 # secondmate_landed roll-up (fm-fleet-snapshot.sh), so merges a secondmate managed -
@@ -56,6 +56,9 @@
 #   -h,--help        usage
 #
 # Output contract: `fm-bearings.v1`. Read-only; no locks, no mutation, no reports.
+# The board_columns + board_items surfaces are the Kanban renderer source: every
+# column is declared every run, and each item is projected from the same bounded
+# arrays that already feed the legacy digest surfaces.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -105,7 +108,8 @@ usage: fm-bearings-snapshot.sh [--json] [--include-prs] [--fields <list>]
 Compact bearings projection over fm-fleet-snapshot.sh. TOON by default.
 Default is LOCAL-ONLY (no network); --include-prs is the only path that fetches.
 
-Default fields: schema, home, generated, prs, in_flight{id,kind,state,doing},
+Default fields: schema, home, generated, prs, board_columns{column,empty},
+  board_items{column,id,summary,owner,detail,artifact}, in_flight{id,kind,state,doing},
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
   decisions_open{id,key,verb,summary,owner}, landed{id,what,artifact,owner},
   gates{id,title,blocked_by,reason,owner}, reports{id,path}, recorded_prs{id,url},
@@ -417,20 +421,63 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        | select(($all_reports == 1) or (($rel_ids | index($r.id)) != null))
        | {id, path} ]) as $reports_all
   | ([ .tasks[] | select(.kind != "secondmate" and .pr.url != null and .pr.source == "meta") | {id, url:.pr.url} ]) as $recorded_prs_all
+  | (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end) as $in_flight
+  | (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end) as $secondmates
+  | (if $all_decisions == 1 then $decisions_all else $decisions_all[:$decisions_n] end) as $decisions
+  | ($done | map({id, what:(.title | trunc(70)),
+                  artifact:(.pr_url // .report_path // .local_note // "-"),owner:.home_id})) as $landed
+  | (if $all_queued == 1 then $gates_all else $gates_all[:$gates_n] end) as $gates
+  | (if $all_reports == 1 then $reports_all else $reports_all[:$reports_n] end) as $reports
+  | (if $all_recorded_prs == 1 then $recorded_prs_all else $recorded_prs_all[:$recorded_prs_n] end) as $recorded_prs
+  | ([
+      {column:"Ready",empty:"No dispatchable queued work."},
+      {column:"Held",empty:"No captain- or time-gated work."},
+      {column:"Blocked",empty:"No queued work is waiting on another item."},
+      {column:"Under way",empty:"No live workers are under way."},
+      {column:"Waiting on you",empty:"Nothing needs your action right now, captain."},
+      {column:"Done",empty:"No recent completions are in the current baseline."}
+    ]) as $board_columns
+  | ([
+      $gates[]
+      | select(.id != "(main-inventory)" and .blocked_by == "-" and .reason == "-")
+      | {column:"Ready",id,summary:.title,owner,detail:"dispatchable queued",artifact:"-"}
+    ] + [
+      $gates[]
+      | select(.id != "(main-inventory)" and .blocked_by == "-" and .reason != "-")
+      | {column:"Held",id,summary:.title,owner,detail:.reason,artifact:"-"}
+    ] + [
+      $gates[]
+      | select(.id == "(main-inventory)" or .blocked_by != "-")
+      | {column:"Blocked",id,summary:.title,owner,detail:(if .blocked_by == "-" then .reason else ("blocked by " + .blocked_by) end),artifact:"-"}
+    ] + [
+      $in_flight[]
+      | {column:"Under way",id,summary:.doing,owner:(.kind // "-"),detail:.state,artifact:"-"}
+    ] + [
+      $decisions[]
+      | {column:"Waiting on you",id,summary,owner,detail:.verb,artifact:"-"}
+    ] + [
+      $candidate_prs[]
+      | select(.review == "APPROVED" and .mergeable == "MERGEABLE" and .checks == "passing")
+      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:(.title // "-"),artifact:.url}
+    ] + [
+      $landed[]
+      | {column:"Done",id,summary:.what,owner,detail:"recent completion",artifact}
+    ]) as $board_items
   | . as $snap
   | {
       schema: "fm-bearings.v1",
       home: $home,
       generated: $now,
       prs: $prs,
-      in_flight: (if $all_in_flight == 1 then $in_flight_all else $in_flight_all[:$in_flight_n] end),
-      secondmates: (if $all_secondmates == 1 then $secondmates_all else $secondmates_all[:$secondmates_n] end),
-      decisions_open: (if $all_decisions == 1 then $decisions_all else $decisions_all[:$decisions_n] end),
-      landed: ($done | map({id, what:(.title | trunc(70)),
-                            artifact:(.pr_url // .report_path // .local_note // "-"),owner:.home_id})),
-      gates: (if $all_queued == 1 then $gates_all else $gates_all[:$gates_n] end),
-      reports: (if $all_reports == 1 then $reports_all else $reports_all[:$reports_n] end),
-      recorded_prs: (if $all_recorded_prs == 1 then $recorded_prs_all else $recorded_prs_all[:$recorded_prs_n] end)
+      board_columns: $board_columns,
+      board_items: $board_items,
+      in_flight: $in_flight,
+      secondmates: $secondmates,
+      decisions_open: $decisions,
+      landed: $landed,
+      gates: $gates,
+      reports: $reports,
+      recorded_prs: $recorded_prs
     }
   | . + (if ($unhealthy_all | length) > 0 then
            {unhealthy_endpoints:(if $all_unhealthy == 1 then $unhealthy_all else $unhealthy_all[:$unhealthy_n] end)}
