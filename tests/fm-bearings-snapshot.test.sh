@@ -1485,8 +1485,10 @@ EOF
       and (.gates | any(.id == "(main-inventory)"
         and (.title | contains("in-flight backlog item has no child metadata"))))
       and (.omitted | any(.surface == "main in-flight backlog item(s) have no child metadata: 1"))
+      and ([.board_items[] | select(.id == "(main-inventory)") | .column] == ["Blocked"])
+      and (.board_items | any(.column == "Under way") | not)
   ' >/dev/null || fail "orphan in-flight was invented or not disclosed: $json"
-  pass "main orphan in-flight stays out of Under way and is disclosed in omitted/gates"
+  pass "main orphan in-flight boards as Blocked, never Under way, and is disclosed in omitted/gates"
 }
 
 test_main_unstructured_current_is_disclosed_with_structured_sibling() {
