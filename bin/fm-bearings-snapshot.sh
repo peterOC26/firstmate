@@ -308,6 +308,10 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   --argjson candidate_prs "$CANDIDATE_PRS" '
   def trunc($n): if . == null then null else
     (tostring | gsub("\\s+"; " ") | if (length > $n) then (.[:$n] + "…") else . end) end;
+  def gate_class:
+    if (((.unresolved_blocker_ids // []) | length) > 0) then "blocked"
+    elif (.hold_reason != null) then "hold"
+    else "-" end;
   def round_robin_landed($n):
     . as $groups
     | [range(0; (($groups | map(length) | max) // 0)) as $i
@@ -399,7 +403,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
           title:((.main_inventory.reason // "main inventory invalid") | trunc(60)),
           blocked_by:"-",
           reason:"main inventory",
-          owner:"(main)"}]
+          owner:"(main)",
+          gate:"blocked"}]
       else [] end)
      + [ .backlog.records[]
          | . as $record
@@ -411,14 +416,16 @@ MODEL=$(printf '%s' "$SNAP" | jq \
                   or (((.body_excerpt // "") | test("SUPERSEDED|NOT REQUIRED|NOT-REQUIRED|DEFERRED"; "i")) | not))
          | {id, title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
-            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:"(main)"} ]
+            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:"(main)",
+            gate:gate_class} ]
      + [ (.secondmate_current.records // [])[] as $m
          | select($m.provenance.selected == "structured-home")
          | $m.queued[]?
          | select(.captain_actionable != true)
          | {id,title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
-            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:$m.id} ]) as $gates_all
+            reason:((.hold_reason // .blocked_reason // "-") | trunc(40)),owner:$m.id,
+            gate:gate_class} ]) as $gates_all
   | ([ .scout_reports[]
        | . as $r
        | select(($all_reports == 1) or (($rel_ids | index($r.id)) != null))
@@ -442,15 +449,15 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     ]) as $board_columns
   | ([
       $gates[]
-      | select(.id != "(main-inventory)" and .blocked_by == "-" and .reason == "-")
+      | select(.gate == "-")
       | {column:"Ready",id,summary:.title,owner,detail:"dispatchable queued",artifact:"-"}
     ] + [
       $gates[]
-      | select(.id != "(main-inventory)" and .blocked_by == "-" and .reason != "-")
+      | select(.gate == "hold")
       | {column:"Held",id,summary:.title,owner,detail:.reason,artifact:"-"}
     ] + [
       $gates[]
-      | select(.id == "(main-inventory)" or .blocked_by != "-")
+      | select(.gate == "blocked")
       | {column:"Blocked",id,summary:.title,owner,detail:(if .blocked_by == "-" then .reason else ("blocked by " + .blocked_by) end),artifact:"-"}
     ] + [
       $in_flight[]
@@ -478,7 +485,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       secondmates: $secondmates,
       decisions_open: $decisions,
       landed: $landed,
-      gates: $gates,
+      gates: ($gates | map(del(.gate))),
       reports: $reports,
       recorded_prs: $recorded_prs
     }

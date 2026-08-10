@@ -923,6 +923,32 @@ test_board_columns_are_complete_and_classified() {
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
+test_landed_blocker_frees_queued_work_to_ready() {
+  local home fakebin json
+  home=$(make_home resolved-blocker); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] task-b - Do it blocked-by: task-a - waiting on task-a (repo: firstmate) (kind: ship)
+- [ ] task-c - Do it later blocked-by: task-z - waiting on task-z (repo: firstmate) (kind: ship)
+- [ ] task-d - Wait for the window (repo: firstmate) (kind: ship) (hold: after release window) (hold-kind: external)
+
+## Done
+- [x] task-a - Prepare the way (repo: firstmate) (kind: ship) (done 2026-07-22)
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "task-b") | .column] == ["Ready"])
+      and ([.board_items[] | select(.id == "task-c") | .column] == ["Blocked"])
+      and (.board_items | any(.id == "task-c" and (.detail | contains("task-z"))))
+      and ([.board_items[] | select(.id == "task-d") | .column] == ["Held"])
+      and (.board_items | any(.id == "task-d" and .detail == "after release window"))
+  ' >/dev/null || fail "queued work whose blocker landed must board as Ready, not Held: $json"
+  pass "queued work becomes Ready once its blocker lands, and real holds stay Held"
+}
+
 test_toon_json_parity() {
   local home fakebin toon json keys k
   home=$(make_home parity); write_fixture "$home"
@@ -1933,6 +1959,7 @@ test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
+test_landed_blocker_frees_queued_work_to_ready
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes
