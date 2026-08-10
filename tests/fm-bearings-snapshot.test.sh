@@ -913,7 +913,7 @@ test_board_columns_are_complete_and_classified() {
       and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
       and (.board_items | any(.column == "Under way" and .id == "ship-task"))
       and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"))
-      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and (.artifact | test("/pull/9"))))
+      and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and .detail == "Ship the thing" and (.artifact | test("/pull/9"))))
       and (.board_items | any(.column == "Done" and .id == "done-a"))
       and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
   ' >/dev/null || fail "Kanban board columns were incomplete or misclassified: $json"

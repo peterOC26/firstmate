@@ -237,9 +237,12 @@ EOF
         || { nwarn=$((nwarn + 1)); continue; }
       [ -n "$out" ] || out='[]'
       repo_result=$(printf '%s' "$out" | jq --arg repo "$repo" --argjson limit "$FM_BEARINGS_PR_LIMIT" '
+        def trunc($n): if . == null then null else
+          (tostring | gsub("\\s+"; " ") | if (length > $n) then (.[:$n] + "…") else . end) end;
         [ .[] | {
           num:(.number|tostring),
           repo:$repo,
+          title:((.title // "-") | trunc(70)),
           task:(if (.headRefName // "" | startswith("fm/")) then (.headRefName | ltrimstr("fm/")) else "-" end),
           url:(.url // "-"),
           review:(.reviewDecision // "none"),
@@ -458,7 +461,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     ] + [
       $candidate_prs[]
       | select(.review == "APPROVED" and .mergeable == "MERGEABLE" and .checks == "passing")
-      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:(.title // "-"),artifact:.url}
+      | {column:"Waiting on you",id:("pr-" + .num),summary:(.repo + " PR " + .num + " ready to merge"),owner:.repo,detail:((.title // "-") | trunc(70)),artifact:.url}
     ] + [
       $landed[]
       | {column:"Done",id,summary:.what,owner,detail:"recent completion",artifact}
