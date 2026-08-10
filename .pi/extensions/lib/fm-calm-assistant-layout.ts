@@ -47,6 +47,7 @@ export function installCalmAssistantLayout(): void {
 
   AssistantMessageComponent.prototype.updateContent = function (
     message: AssistantMessage,
+    ...rest: unknown[]
   ): void {
     const state = this as unknown as AssistantMessagePresentationState;
     const hideThinking =
@@ -60,7 +61,11 @@ export function installCalmAssistantLayout(): void {
         }
       : message;
 
-    originalUpdateContent.call(this, presentationMessage);
+    (originalUpdateContent as (...args: unknown[]) => void).call(
+      this,
+      presentationMessage,
+      ...rest,
+    );
     if (presentationMessage !== message) state.lastMessage = message;
   };
 

@@ -13,7 +13,8 @@ Hidden elapsed time does not advance the animation, and a resize while hidden cl
 A fresh Pi session or new Calm extension lifetime starts at the normal initial position.
 Very narrow terminals fall back to a smaller deterministic sprite.
 While Calm is off, Pi's stock working row is left exactly as Pi renders it.
-Calm hides collapsed thinking labels, the shells for the Pi built-in tool names Calm owns, the `fm_watch_arm_pi` tool shell, and canonically classified Firstmate operational user rows.
+Calm hides collapsed thinking labels, Pi tool-call and text-result shells, and canonically classified Firstmate operational user rows.
+That includes built-in tools Calm owns, `fm_watch_arm_pi`, foreign extension tools, provider-side tool names Pi has no local definition for, and built-in names another extension owns.
 The operational inputs remain ordinary user-role messages, while Pi's transcript layout renders their complete rows at zero height.
 The session-start nudge remains on its existing non-displayed custom-message path.
 
@@ -24,13 +25,13 @@ Legacy operational custom messages remain in session data and Pi's sidebar tree,
 Toggling Calm off restores ordinary rendering, and `Ctrl+O` expansion state is preserved.
 
 Pi's supported presentation API does not expose a global transcript filter.
-Expanded reasoning and its reserved spacing, built-in tool images, user-bash rows, skill and summary rows, generic status notices, and arbitrary custom-tool or extension rows remain visible.
+Expanded reasoning and its reserved spacing, tool images, user-bash rows, skill and summary rows, generic status notices, and arbitrary non-tool custom extension rows remain visible.
 These are supported-API boundaries rather than hidden-content failures.
 
 ## Pi compatibility
 
 Calm has no numeric Pi version minimum or maximum and never refuses Pi solely because its version is newer than a previously verified version.
-The collapsed-thinking and operational-user-row presentation adapters probe the exact Pi API seam they patch when Calm loads.
+The collapsed-thinking, tool-row, and operational-user-row presentation adapters probe the exact Pi API seam they patch when Calm loads.
 If Pi removes one of those seams, Calm logs a diagnostic naming the unavailable adapter and skips only that adapter; `/calm`, the other adapter, and unrelated Pi extensions remain available.
 
 Calm's built-in tool presentation (`bash`, `read`, `edit`, `write`, `grep`, `find`, `ls`) shares Pi's single, unmerged override slot per name with any other extension that overrides the same tool.
@@ -43,7 +44,7 @@ If the other extension wins, a session-start console diagnostic names the tool a
 
 [`calm-mode-feasibility.md`](calm-mode-feasibility.md) owns the version-scoped renderer taxonomy, built-in override constraints, and empirical evidence.
 [`configuration.md`](configuration.md#pi-calm-preference-configcalm) owns the persisted preference file and resolution rules.
-`.pi/extensions/lib/fm-calm-visibility.ts` owns the visibility policy, `.pi/extensions/lib/fm-calm-operational-user-layout.ts` owns the zero-height operational-user row adapter, and `.pi/extensions/lib/fm-calm-working-ship.ts` owns the animated working presentation.
+`.pi/extensions/lib/fm-calm-visibility.ts` owns the visibility policy, `.pi/extensions/lib/fm-calm-tool-row-layout.ts` owns the generic zero-height tool-row adapter, `.pi/extensions/lib/fm-calm-operational-user-layout.ts` owns the zero-height operational-user row adapter, and `.pi/extensions/lib/fm-calm-working-ship.ts` owns the animated working presentation.
 
 Regression entry points:
 
