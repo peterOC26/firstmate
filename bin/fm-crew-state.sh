@@ -103,8 +103,14 @@ KIND=$(meta_value kind)
 HARNESS=$(meta_value harness)
 [ -n "$KIND" ] || KIND=ship
 
-# A torn-down (or never-created) worktree has no current state to read.
-if [ -z "$WT" ] || [ ! -d "$WT" ]; then
+# A torn-down (or never-created) worktree has no current state to read. A task
+# placed on a remote Orca host is the one case where the worktree is legitimately
+# absent from THIS machine while the task is perfectly alive, so its liveness is
+# read from the pane below instead. It drives no local no-mistakes run either,
+# which the CREW_BRANCH gate further down decides from this same recorded fact.
+TASK_REMOTE=0
+[ "$(meta_value orca_remote)" != 1 ] || TASK_REMOTE=1
+if [ -z "$WT" ] || { [ "$TASK_REMOTE" != 1 ] && [ ! -d "$WT" ]; }; then
   emit unknown none "worktree gone (torn down?)"
 fi
 
@@ -363,7 +369,15 @@ nm_runs_status_for_branch() {  # <branch>
 
 # CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
 # scratch worktree); with no branch there is no run to attribute to this crew.
-CREW_BRANCH=$(git -C "$WT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+# A remote task's worktree is on another host, so this machine must not be asked
+# for its branch at all: a directory that happens to sit at the same absolute
+# path here belongs to something else entirely, and taking its branch would
+# attribute an unrelated local no-mistakes run's step to this crew. The recorded
+# orca_remote=1 decides that, not whether the path resolves locally.
+CREW_BRANCH=
+if [ "$TASK_REMOTE" != 1 ]; then
+  CREW_BRANCH=$(git -C "$WT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+fi
 
 # 0 if the active axi-status run's head field matches this worktree's code
 # identity. Branch match is a precondition (caller). Rule owned by

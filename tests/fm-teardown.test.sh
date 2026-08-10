@@ -284,6 +284,55 @@ SH
   chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
 }
 
+# A checkout whose origin is a FORK, whose pull request lives on the parent
+# repository. Both fakes answer only when asked from inside the worktree, the
+# way gh resolves a base repository for itself; a lookup that instead named the
+# repository derived from the origin URL would be asking the fork, which has no
+# such PR. Every call records the repository it named, if any, so the test can
+# tell the two apart.
+add_gh_pr_merged_on_parent_repo() {  # <case-dir> <head>
+  local case_dir=$1 head=$2
+  cat > "$case_dir/fakebin/gh-axi" <<SH
+#!/usr/bin/env bash
+repo=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" != --repo ] || repo=\$a
+  prev=\$a
+done
+printf 'gh-axi %s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$case_dir/gh-calls"
+[ -z "\$repo" ] || { echo "error: no pull requests found" >&2 ; exit 1 ; }
+case "\${1:-} \${2:-}" in
+  "pr list")
+    printf '%s\n' "count: 1 (showing first 1)" "pull_requests[1]{number,state}:" "  7,merged" ; exit 0 ;;
+esac
+exit 0
+SH
+  cat > "$case_dir/fakebin/gh" <<SH
+#!/usr/bin/env bash
+repo=""
+prev=""
+for a in "\$@"; do
+  [ "\$prev" != --repo ] || repo=\$a
+  prev=\$a
+done
+printf 'gh %s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$case_dir/gh-calls"
+[ -z "\$repo" ] || { echo "error: could not resolve to a PullRequest" >&2 ; exit 1 ; }
+case "\${1:-} \${2:-}" in
+  "pr view")
+    case " \$* " in
+      *"state,headRefOid"*) printf '%s\t%s\n' 'MERGED' '$head' ; exit 0 ;;
+      *"headRefOid"*) printf '%s\n' '$head' ; exit 0 ;;
+    esac
+    ;;
+esac
+echo "error: pull request not found" >&2
+exit 1
+SH
+  chmod +x "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh"
+  : > "$case_dir/gh-calls"
+}
+
 append_pr_meta_for_current_head() {
   local case_dir=$1 head
   head=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -765,6 +814,36 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
   expect_code 0 "$rc" "no-pr-branch-discovery: teardown should succeed by discovering the merged PR from the branch name"
   ! grep -q REFUSED "$case_dir/stderr" || fail "no-pr-branch-discovery: teardown printed a REFUSED line"
   pass "teardown discovers a merged PR by branch name and tears down when no pr= was ever recorded"
+}
+
+test_local_pr_discovery_honours_ghs_own_base_repository() {
+  local case_dir rc local_head pr_head
+  case_dir=$(make_case fork-pr-branch-discovery)
+  write_meta "$case_dir" no-mistakes ship
+  # Same shape as the case above - work that landed only through its PR, with
+  # nothing pushed and nothing of it on the default branch - but the task's
+  # origin is a fork and its PR lives on the parent repository. Which repository
+  # a branch's PR is on is not a function of the origin URL: gh resolves it from
+  # the checkout, and this repository is itself a fork, so deriving it from the
+  # origin instead would ask the fork and refuse work that has landed.
+  wt_commit_file "$case_dir" feature.txt hello "add feature"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes auto-fix")
+  # Unreachable on purpose: the fallback content check fetches from origin, and
+  # this case must not depend on the network to fail over.
+  git -C "$case_dir/wt" remote set-url origin https://github.fork.invalid/me/app.git
+  add_gh_pr_merged_on_parent_repo "$case_dir" "$pr_head"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "fork-pr: teardown should release work landed through a PR on the parent repository"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "fork-pr: teardown printed a REFUSED line"
+  ! grep -q 'me/app' "$case_dir/gh-calls" \
+    || fail "fork-pr: the lookup named the fork instead of letting gh resolve the base repository: $(cat "$case_dir/gh-calls")"
+  pass "teardown lets gh resolve a local task's base repository, so a fork's PR on the parent still counts as landed"
 }
 
 test_squash_merged_pr_allows_replayed_unpushed_patch() {
@@ -2510,6 +2589,7 @@ test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
 test_herdr_flat_teardown_refuses_records_on_unparseable_presence
+test_local_pr_discovery_honours_ghs_own_base_repository
 test_herdr_flat_teardown_preflight_refuses_before_changes
 test_forced_secondmate_herdr_child_preflight_refuses_before_changes
 test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed

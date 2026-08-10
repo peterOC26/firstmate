@@ -519,6 +519,56 @@ test_backend_validate_spawn_accepts_orca() {
   pass "fm_backend_validate_spawn: all implemented lifecycle backends are spawn-supported"
 }
 
+test_orca_endpoint_accepts_real_worktree_id_shape() {
+  local state out status
+  state="$TMP_ROOT/orca-endpoint-state"
+  mkdir -p "$state"
+  # The id shape `orca worktree create --help` documents and every real Orca
+  # runtime returns: "<repo-id>::<absolute-path>".
+  fm_write_meta "$state/orcareal.meta" \
+    "window=fm-orcareal" "endpoint_task_id=orcareal" "terminal=term_9f2c1d40-aaaa-4bbb-8ccc-1234567890ab" \
+    "worktree=/srv/app-task" "project=/srv/app" "backend=orca" \
+    "orca_worktree_id=repo-1234::/srv/app-task"
+  out=$( bash -c '. "$0/bin/fm-backend.sh"; fm_backend_validate_task_endpoint "$1" orcareal && printf %s "$FM_BACKEND_VALIDATED_TARGET"' \
+    "$ROOT" "$state/orcareal.meta" 2>&1 )
+  status=$?
+  expect_code 0 "$status" "a real Orca worktree id must pass endpoint validation"$'\n'"$out"
+  [ "$out" = "term_9f2c1d40-aaaa-4bbb-8ccc-1234567890ab" ] \
+    || fail "validation should resolve the Orca terminal as the endpoint target, got '$out'"
+
+  # The historical plain-atom id stays valid, so nothing already recorded
+  # becomes uncleanable.
+  fm_write_meta "$state/orcalegacy.meta" \
+    "window=fm-orcalegacy" "endpoint_task_id=orcalegacy" "terminal=term-legacy" \
+    "worktree=/srv/app-task" "project=/srv/app" "backend=orca" \
+    "orca_worktree_id=wt-legacy"
+  bash -c '. "$0/bin/fm-backend.sh"; fm_backend_validate_task_endpoint "$1" orcalegacy' \
+    "$ROOT" "$state/orcalegacy.meta" >/dev/null 2>&1 \
+    || fail "a previously recorded plain Orca worktree id must stay valid"
+  pass "fm_backend_validate_task_endpoint: accepts real <repo-id>::<path> Orca worktree ids alongside previously recorded ones"
+}
+
+test_orca_endpoint_refuses_malformed_worktree_id() {
+  local state id out status
+  state="$TMP_ROOT/orca-endpoint-bad-state"
+  mkdir -p "$state"
+  # Each is structurally wrong in a different way: a relative path, an empty
+  # repo half, a repo half outside the endpoint character set, and a doubled
+  # separator that makes the path half ambiguous.
+  for id in "repo-1::relative/path" "::/srv/app-task" "repo 1::/srv/app-task" "repo-1::/srv::/app"; do
+    fm_write_meta "$state/orcabad.meta" \
+      "window=fm-orcabad" "endpoint_task_id=orcabad" "terminal=term-bad" \
+      "worktree=/srv/app-task" "project=/srv/app" "backend=orca" \
+      "orca_worktree_id=$id"
+    out=$( bash -c '. "$0/bin/fm-backend.sh"; fm_backend_validate_task_endpoint "$1" orcabad' \
+      "$ROOT" "$state/orcabad.meta" 2>&1 )
+    status=$?
+    [ "$status" -ne 0 ] || fail "malformed Orca worktree id '$id' must be refused"
+    assert_contains "$out" "malformed or inconsistent" "refusal for '$id' should name the malformed endpoint"
+  done
+  pass "fm_backend_validate_task_endpoint: refuses Orca worktree ids that are not <repo-id>::<absolute-path>"
+}
+
 test_meta_get_and_backend_of_meta() {
   local meta=$TMP_ROOT/meta-get.meta
   fm_write_meta "$meta" "window=firstmate:fm-x1" "harness=claude"
@@ -1132,6 +1182,8 @@ test_backend_name_explicit_beats_detection
 test_backend_validate_refuses_unknown
 test_backend_source_shell_portable
 test_backend_validate_spawn_accepts_orca
+test_orca_endpoint_accepts_real_worktree_id_shape
+test_orca_endpoint_refuses_malformed_worktree_id
 test_meta_get_and_backend_of_meta
 test_resolve_selector_three_forms
 test_backend_of_selector_matches_explicit_target_meta

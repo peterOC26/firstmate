@@ -383,6 +383,38 @@ fm_backend_endpoint_atom_valid() {  # <value>
   esac
 }
 
+# fm_backend_orca_worktree_id_valid: `orca worktree create --help` states that a
+# worktree id is the full "<repo-id>::<path>" value, and every real Orca id
+# carries both the "::" separator and an absolute path's slashes. The generic
+# atom set above admits neither, so a genuine Orca id could never pass it and
+# real Orca tasks were refused at cleanup. This accepts that documented shape
+# IN ADDITION to the plain atom the previous check allowed, so nothing already
+# recorded stops being cleanable, and it stays a structural test rather than a
+# looser charset: it pins the separator count, the repo half's character set,
+# and an absolute path, and still rejects the control characters that would
+# corrupt a metadata line.
+fm_backend_orca_worktree_id_valid() {  # <value>
+  local value=$1 repo path
+  fm_backend_endpoint_atom_valid "$value" && return 0
+  case "$value" in
+    *::*) : ;;
+    *) return 1 ;;
+  esac
+  repo=${value%%::*}
+  path=${value#*::}
+  case "$path" in
+    *::*) return 1 ;;
+  esac
+  fm_backend_endpoint_atom_valid "$repo" || return 1
+  case "$path" in
+    /?*) : ;;
+    *) return 1 ;;
+  esac
+  case "$path" in
+    *[[:cntrl:]]*) return 1 ;;
+  esac
+}
+
 fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
   local meta=$1 id=$2 backend_count backend window worktree project binding_count binding
   local session pane recorded_session workspace tab terminal worktree_id surface
@@ -503,7 +535,7 @@ fm_backend_validate_task_endpoint() {  # <meta-file> <task-id>
       }
       if [ "$window" != "fm-$id" ] \
         || ! fm_backend_endpoint_atom_valid "$terminal" \
-        || ! fm_backend_endpoint_atom_valid "$worktree_id"; then
+        || ! fm_backend_orca_worktree_id_valid "$worktree_id"; then
         echo "REFUSED: Orca endpoint metadata for task $id is malformed or inconsistent; preserving task state." >&2
         return 1
       fi

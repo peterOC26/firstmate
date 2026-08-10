@@ -37,6 +37,13 @@
 # Orca tasks use the same safety checks, then close the recorded terminal and
 # remove the recorded worktree through `orca worktree rm`; teardown never guesses
 # an Orca target from ambient CLI state.
+# A task recorded with orca_remote=1 lives on the host in its orca_host= record,
+# so its files cannot be reached with a local path test. It runs the SAME dirty,
+# unlanded, isolation, and recorded-identity checks through one inspection shell
+# on that host (bin/backends/orca.sh), and additionally proves the worktree Orca
+# would remove still sits on the recorded host. A remote check that cannot be
+# obtained refuses and preserves the task: a path that is merely absent from
+# this machine must never be read as "nothing to protect".
 # A Herdr presentation journal never authorizes cleanup. Teardown still closes
 # only the exact task pane from ordinary endpoint metadata and never calls
 # `workspace close`. It retires the non-authoritative journal only when a
@@ -405,6 +412,11 @@ if [ -z "$BUSY_GEN" ]; then
 fi
 ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
 ORCA_PATH_MATCH_VERIFIED=0
+ORCA_HOST_ID=$(fm_meta_get "$META" orca_host)
+ORCA_REMOTE_TASK_TMP=$(fm_meta_get "$META" orca_remote_tasktmp)
+TASK_REMOTE=0
+[ "$(fm_meta_get "$META" orca_remote)" != 1 ] || TASK_REMOTE=1
+TASK_REMOTE_EXEC=
 
 KIND=$(grep '^kind=' "$META" | cut -d= -f2- || true)
 [ -n "$KIND" ] || KIND=ship
@@ -550,15 +562,92 @@ elif [ "$FORCE" != "--force" ] && fm_pf_relay_active "$FM_HOME"; then
   PUBLIC_FOLLOWUP_RELAY_ACTIVE=1
 fi
 
+# --- task filesystem access -------------------------------------------------
+#
+# A remote Orca task's worktree and project live on another host, so `[ -d ... ]`
+# and `git -C ...` answer about the wrong machine - and both would answer
+# "nothing here", turning every protective check into a silent pass. These two
+# shims route the SAME questions to the host that owns the files, so the safety
+# policy below stays one copy and only its access path changes.
+#
+# The inspection shell is opened ONCE, in the main shell, before any check runs.
+# It cannot be opened on demand: nearly every caller below reads its result
+# through a command substitution, and a handle created inside a subshell would
+# be lost, silently reopening a terminal per question. Opening is itself a host
+# check - it refuses if Orca brings the shell up anywhere but the recorded host.
+task_remote_exec_open() {
+  [ -z "$TASK_REMOTE_EXEC" ] || return 0
+  if [ -z "$ORCA_WORKTREE_ID" ] || [ -z "$ORCA_HOST_ID" ]; then
+    echo "task $ID is recorded as running on a remote Orca host but its metadata has no worktree id or host" >&2
+    return 1
+  fi
+  fm_backend_source orca || return 1
+  TASK_REMOTE_EXEC=$(fm_backend_orca_exec_open "$ORCA_WORKTREE_ID" "fm-$ID-teardown" "$ORCA_HOST_ID") || return 1
+  return 0
+}
+
+task_remote_exec_release() {
+  [ -n "$TASK_REMOTE_EXEC" ] || return 0
+  fm_backend_orca_exec_close "$TASK_REMOTE_EXEC" 2>/dev/null || true
+  TASK_REMOTE_EXEC=
+}
+
+# task_git: `git -C <dir>` for this task, wherever its files are. Remote git
+# stderr is discarded exactly as every local call site already discards it, so
+# the exit status stays the only signal either path reports.
+task_git() {  # <dir> <git-arg>...
+  local dir=$1
+  shift
+  if [ "$TASK_REMOTE" != 1 ]; then
+    git -C "$dir" "$@"
+    return
+  fi
+  [ -n "$TASK_REMOTE_EXEC" ] || return 1
+  fm_backend_orca_remote_git "$TASK_REMOTE_EXEC" "$dir" "$@"
+}
+
+teardown_shell_quote() {  # <word>
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# task_shell_at: run one shell command with <dir> as the working directory, on
+# whichever host holds it. For a pipeline whose stages must see each other's
+# exact bytes, splitting the stages across hosts would not be the same
+# computation, so the whole thing runs on one side.
+task_shell_at() {  # <dir> <shell-command>
+  local dir=$1 cmd=$2
+  if [ "$TASK_REMOTE" != 1 ]; then
+    ( cd "$dir" 2>/dev/null && eval "$cmd" ) 2>/dev/null
+    return
+  fi
+  [ -n "$TASK_REMOTE_EXEC" ] || return 1
+  fm_backend_orca_exec_run "$TASK_REMOTE_EXEC" \
+    "cd $(fm_backend_orca_shell_quote "$dir") && { $cmd ; } 2>/dev/null"
+}
+
+# task_dir_exists: `[ -d <dir> ]` for this task, wherever its files are. An
+# indeterminate remote answer returns 2 so a caller can refuse instead of
+# treating "cannot tell" as "gone".
+task_dir_exists() {  # <dir>
+  local dir=$1
+  [ -n "$dir" ] || return 1
+  if [ "$TASK_REMOTE" != 1 ]; then
+    [ -d "$dir" ]
+    return
+  fi
+  [ -n "$TASK_REMOTE_EXEC" ] || return 2
+  fm_backend_orca_remote_dir_exists "$TASK_REMOTE_EXEC" "$dir"
+}
+
 default_branch() {
   local ref branch
-  ref=$(git -C "$PROJ" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  ref=$(task_git "$PROJ" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
   if [ -n "$ref" ]; then
     echo "${ref#origin/}"
     return 0
   fi
   for branch in main master; do
-    if git -C "$PROJ" show-ref --verify --quiet "refs/heads/$branch"; then
+    if task_git "$PROJ" show-ref --verify --quiet "refs/heads/$branch"; then
       echo "$branch"
       return 0
     fi
@@ -595,6 +684,22 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   ORCA_WORKTREE_ID=$(require_orca_worktree_id "$META") || exit 1
   T_ORCA=$(meta_value "$META" terminal)
   [ -z "$T_ORCA" ] || T=$T_ORCA
+fi
+
+# One inspection shell for the whole teardown of a remote task, opened before
+# the first check and released on every exit. Without it none of the protective
+# checks below can see the task's files at all, so a normal teardown refuses
+# here; --force is the approved discard path and continues without them.
+if [ "$TASK_REMOTE" = 1 ]; then
+  trap 'task_remote_exec_release' EXIT INT TERM
+  if ! task_remote_exec_open; then
+    if [ "$FORCE" != "--force" ]; then
+      echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to inspect $ID for uncommitted or unlanded work; preserving task state." >&2
+      echo "Restore access to that host, or get the captain's explicit OK to discard, then --force." >&2
+      exit 1
+    fi
+    echo "warning: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} for $ID; --force is discarding without inspecting its worktree there" >&2
+  fi
 fi
 
 remove_grok_turnend_auth() {
@@ -703,14 +808,105 @@ remove_pr_poll_artifacts() {
   fi
 }
 
-# Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
-# single match and returns 0; returns non-zero on no match or any lookup failure,
-# so the caller treats it as "no PR found" (fail-safe).
+# The repository a REMOTE task's forge lookups are about, as gh's own
+# HOST/OWNER/REPO, read from that task's own origin through task_git so it
+# answers on the host holding the worktree. gh infers a repository by resolving
+# one from the working directory, and a remote task has no directory here to
+# infer from, so naming it explicitly is what replaces that - on any forge host,
+# not just github.com, so an enterprise origin keeps its PR-based landed-work
+# detection. A local task does NOT come through here: it still asks gh from
+# inside its own worktree, which is what keeps gh's own base-repository
+# resolution (a fork's PRs living on the parent, `gh repo set-default`) working
+# exactly as it did.
+#
+# The host has to be a REAL one. In a scheme URL it is literal by definition; in
+# scp-like syntax it can just as easily be an ssh alias (git@github-work:...),
+# which names a config entry rather than a forge, so that form is accepted only
+# when the host is dotted. An origin whose host cannot be established returns
+# non-zero and the caller falls back exactly as it does for any other lookup
+# failure - fail-closed, rather than questioning a repository this is not about.
+task_repo_slug() {
+  local url scheme='' rest host port path dotted=0
+  url=$(task_git "$WT" remote get-url origin 2>/dev/null) || return 1
+  url=$(printf '%s' "$url" | tr -d '[:space:]')
+  [ -n "$url" ] || return 1
+  case "$url" in
+    *://*)
+      scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
+      rest=${url#*://}
+      case "$rest" in
+        */?*) : ;;
+        *) return 1 ;;
+      esac
+      host=${rest%%/*}
+      path=${rest#*/}
+      dotted=1
+      ;;
+    *:*)
+      host=${url%%:*}
+      path=${url#*:}
+      ;;
+    *) return 1 ;;
+  esac
+  host=${host##*@}
+  # A colon surviving the userinfo strip is a port, and only http/https put the
+  # forge's own endpoint there - so only those keep it, since a forge answering
+  # on a non-default port is a different endpoint and dropping it names one that
+  # does not answer. Under ssh:// or git:// the same colon is a TRANSPORT port
+  # that the forge's API does not live behind, so it goes, as it always has. The
+  # scp-like branch has no scheme and already consumed its colon as the path
+  # separator.
+  port=
+  case "$host" in
+    *:*)
+      port=${host##*:}
+      host=${host%%:*}
+      ;;
+  esac
+  case "$scheme:$port" in
+    http:*[!0-9]*|https:*[!0-9]*|http:|https:) port= ;;
+    http:*|https:*) port=:$port ;;
+    *) port= ;;
+  esac
+  case "$host" in
+    ''|*[!A-Za-z0-9.-]*) return 1 ;;
+  esac
+  if [ "$dotted" != 1 ]; then
+    case "$host" in
+      *.*) : ;;
+      *) return 1 ;;
+    esac
+  fi
+  path=${path#/}
+  path=${path%/}
+  path=${path%.git}
+  path=${path%/}
+  case "$path" in
+    */?*) printf '%s%s/%s' "$host" "$port" "$path" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Resolve the PR number for a worktree branch. Echoes the number on a single
+# match and returns 0; returns non-zero on no match or any lookup failure, so
+# the caller treats it as "no PR found" (fail-safe).
+#
+# A local task asks gh-axi from inside its own worktree, exactly as before: the
+# repository a branch's PR lives on is not a function of the origin URL, and
+# letting gh resolve it is what keeps a fork whose PRs live on the parent - and
+# `gh repo set-default` - answering. A remote task has no worktree here for that
+# resolution to happen in, so it names its repository instead.
 pr_number_from_branch() {
-  local branch=$1 out n
+  local branch=$1 out n slug
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
-  out=$( cd "$WT" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
-  n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
+  if [ "$TASK_REMOTE" != 1 ]; then
+    out=$( cd "$WT" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
+    n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
+  else
+    slug=$(task_repo_slug) || return 1
+    out=$(gh pr list --repo "$slug" --state all --head "$branch" --limit 1 --json number -q '.[].number' 2>/dev/null) || return 1
+    n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+  fi
   [ -n "$n" ] || return 1
   printf '%s' "$n"
 }
@@ -734,26 +930,29 @@ pr_number_from_target() {
 
 ensure_commit_object() {
   local target=$1 commit=$2 n
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
+  task_git "$WT" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
   n=$(pr_number_from_target "$target") || return 1
-  git -C "$WT" remote get-url origin >/dev/null 2>&1 || return 1
-  git -C "$WT" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null
+  task_git "$WT" remote get-url origin >/dev/null 2>&1 || return 1
+  task_git "$WT" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
+  task_git "$WT" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
+# The whole pipeline runs wherever the repository is, in one invocation. Split
+# across hosts it would not be the same computation: the diff would have to
+# survive a transport round trip before reaching git patch-id, and any change to
+# its trailing bytes changes the id.
 patch_id_for_commit() {
   local commit=$1
-  git -C "$WT" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
-    | git patch-id --stable 2>/dev/null \
+  task_shell_at "$WT" "git show --pretty=medium --no-ext-diff $(teardown_shell_quote "$commit") | git patch-id --stable" \
     | awk 'NR == 1 { print $1 }'
 }
 
 unpushed_patches_are_in_pr_head() {
   local pr_head=$1 current base pr_patch_ids commit patch_id unpushed
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  base=$(git -C "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
+  current=$(task_git "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  base=$(task_git "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
   pr_patch_ids=$(
-    git -C "$WT" log --format=%H "$base..$pr_head" -- 2>/dev/null \
+    task_git "$WT" log --format=%H "$base..$pr_head" -- 2>/dev/null \
       | while IFS= read -r commit; do
           patch_id_for_commit "$commit"
         done \
@@ -761,7 +960,7 @@ unpushed_patches_are_in_pr_head() {
       | sort -u
   ) || return 1
   [ -n "$pr_patch_ids" ] || return 1
-  unpushed=$(git -C "$WT" log --format=%H HEAD --not --remotes -- 2>/dev/null) || return 1
+  unpushed=$(task_git "$WT" log --format=%H HEAD --not --remotes -- 2>/dev/null) || return 1
   [ -n "$unpushed" ] || return 1
   while IFS= read -r commit; do
     [ -n "$commit" ] || continue
@@ -779,14 +978,30 @@ EOF
 # current work is not contained in the PR head, no PR is found, or any gh error
 # occurs - the caller then falls back to the content check.
 pr_is_merged() {
-  local branch=$1 target view state head current
+  local branch=$1 target view state head current slug
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
   else
     target=$(pr_number_from_branch "$branch") || return 1
   fi
   [ -n "$target" ] || return 1
-  view=$(cd "$WT" && gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+  # A local task asks from inside its own worktree, unchanged, so gh resolves the
+  # repository the same way it always did here. For a remote task there is no
+  # such directory on this machine: a full PR URL identifies its own repository,
+  # and a bare number needs one named from the task's origin.
+  if [ "$TASK_REMOTE" != 1 ]; then
+    view=$(cd "$WT" && gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+  else
+    case "$target" in
+      http://*|https://*)
+        view=$(gh pr view "$target" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+        ;;
+      *)
+        slug=$(task_repo_slug) || return 1
+        view=$(gh pr view "$target" --repo "$slug" --json state,headRefOid -q '.state + "\t" + .headRefOid' 2>/dev/null) || return 1
+        ;;
+    esac
+  fi
   state=${view%%$'\t'*}
   head=${view#*$'\t'}
   [ "$state" != "$view" ] || return 1
@@ -796,8 +1011,8 @@ pr_is_merged() {
   esac
   [ -n "$head" ] || return 1
   ensure_commit_object "$target" "$head" || return 1
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  git -C "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null && return 0
+  current=$(task_git "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  task_git "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null && return 0
   unpushed_patches_are_in_pr_head "$head"
 }
 
@@ -811,17 +1026,17 @@ pr_is_merged() {
 content_in_default() {
   local name ref default_tree merged_tree
   name=$(default_branch) || return 1
-  if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
-    git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
+  if task_git "$WT" remote get-url origin >/dev/null 2>&1; then
+    task_git "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
     ref="refs/remotes/origin/$name"
-  elif git -C "$WT" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
+  elif task_git "$WT" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
     ref="refs/heads/$name"
   else
     return 1
   fi
-  default_tree=$(git -C "$WT" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
+  default_tree=$(task_git "$WT" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$WT" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
+  merged_tree=$(task_git "$WT" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
   merged_tree=$(printf '%s\n' "$merged_tree" | head -1)
   [ "$merged_tree" = "$default_tree" ]
 }
@@ -908,11 +1123,12 @@ EOF
 inspectable_git_worktree() {
   local target=$1 top
   [ -n "$target" ] || return 1
-  [ -d "$target" ] || return 1
-  top=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null) || return 1
+  task_dir_exists "$target" || return 1
+  top=$(task_git "$target" rev-parse --show-toplevel 2>/dev/null) || return 1
+  top=$(printf '%s' "$top" | tr -d '\r')
   [ -n "$top" ] || return 1
-  [ -d "$top" ] || return 1
-  git -C "$top" rev-parse --git-dir >/dev/null 2>&1
+  task_dir_exists "$top" || return 1
+  task_git "$top" rev-parse --git-dir >/dev/null 2>&1
 }
 
 canonical_existing_dir() {
@@ -970,8 +1186,15 @@ worktree_git_lock_path() {
 # Teardown passes the worktree dir as the companion directory and its own
 # STALE_WORKTREE_LOCK_AGE_SECS threshold.
 
+# Both lock helpers below answer from THIS machine's filesystem, so neither may
+# run for a task whose worktree lives on another host. A directory that happens
+# to sit at the same absolute path here belongs to something else entirely, and
+# "recovering" a remote task's unreadable answer by deleting an unrelated local
+# repository's index.lock is a destructive act on the wrong machine. A remote
+# task's unreadable answer is simply a refusal.
 worktree_safety_blocked_by_lock() {
   local reason=$1 lock
+  [ "$TASK_REMOTE" != 1 ] || return 1
   lock=$(worktree_git_lock_path "$WT") || lock=""
   [ -n "$lock" ] && [ -e "$lock" ] || return 1
   echo "teardown: cannot inspect worktree $WT for $reason while git lock $lock is present; checking whether the lock is stale" >&2
@@ -980,6 +1203,7 @@ worktree_safety_blocked_by_lock() {
 
 cleanup_stale_lock_for_safety_check() {
   local dir=$1 lock
+  [ "$TASK_REMOTE" != 1 ] || return 0
   lock=$(worktree_git_lock_path "$dir") || lock=""
   [ -n "$lock" ] && [ -e "$lock" ] || return 0
 
@@ -1080,14 +1304,25 @@ teardown_treehouse_return() {
 }
 
 validate_worktree_teardown_safety() {
-  local dirty_raw dirty unpushed_raw unpushed DEFAULT unmerged_raw unmerged branch
-  [ -d "$WT" ] || return 0
+  local dirty_raw dirty unpushed_raw unpushed DEFAULT unmerged_raw unmerged branch exists_rc
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
   esac
+  # A worktree that is genuinely gone has nothing left to protect; a worktree
+  # this process merely cannot see does. Only the first of those may skip.
+  exists_rc=0
+  task_dir_exists "$WT" || exists_rc=$?
+  if [ "$exists_rc" -eq 1 ]; then
+    return 0
+  fi
+  if [ "$exists_rc" -ne 0 ]; then
+    echo "REFUSED: cannot determine whether worktree $WT still exists on Orca host ${ORCA_HOST_ID:-<unrecorded>}." >&2
+    echo "Cannot verify dirty or unlanded work; restore access to that host, or get the captain's explicit OK to discard, then --force." >&2
+    return 1
+  fi
 
-  if ! dirty_raw=$(git -C "$WT" status --porcelain 2>/dev/null); then
+  if ! dirty_raw=$(task_git "$WT" status --porcelain 2>/dev/null); then
     if worktree_safety_blocked_by_lock "uncommitted changes"; then
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
@@ -1097,7 +1332,7 @@ validate_worktree_teardown_safety() {
   fi
   dirty=$(printf '%s\n' "$dirty_raw" | grep -vE '^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)' | head -1 || true)
 
-  if ! unpushed_raw=$(git -C "$WT" log --oneline HEAD --not --remotes -- 2>/dev/null); then
+  if ! unpushed_raw=$(task_git "$WT" log --oneline HEAD --not --remotes -- 2>/dev/null); then
     if worktree_safety_blocked_by_lock "commits not on a remote"; then
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
@@ -1109,7 +1344,7 @@ validate_worktree_teardown_safety() {
 
   if [ -n "$unpushed" ] && [ "$MODE" = local-only ]; then
     DEFAULT=$(default_branch) || { echo "REFUSED: cannot determine default branch for $PROJ; expected origin/HEAD, main, or master." >&2; return 1; }
-    if ! unmerged_raw=$(git -C "$WT" log --oneline HEAD --not "$DEFAULT" -- 2>/dev/null); then
+    if ! unmerged_raw=$(task_git "$WT" log --oneline HEAD --not "$DEFAULT" -- 2>/dev/null); then
       if worktree_safety_blocked_by_lock "commits not on $DEFAULT"; then
         return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
       fi
@@ -1133,7 +1368,8 @@ validate_worktree_teardown_safety() {
   elif [ -n "$unpushed" ]; then
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
     if [ -z "$branch" ]; then
-      branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      branch=$(task_git "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      branch=$(printf '%s' "$branch" | tr -d '\r')
       TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY=$branch
     fi
     if ! work_is_landed "$branch"; then
@@ -1465,6 +1701,10 @@ require_orca_worktree_path_match() {
     echo "REFUSED: cannot resolve Orca worktree id $worktree_id to a path; preserving metadata." >&2
     return 1
   }
+  if [ "$TASK_REMOTE" = 1 ]; then
+    require_orca_remote_worktree_identity "$worktree_id" "$inspected" "$resolved"
+    return
+  fi
   inspected_abs=$(canonical_existing_dir "$inspected") || {
     echo "REFUSED: cannot canonicalize inspected worktree ${inspected:-<missing>}; preserving metadata." >&2
     return 1
@@ -1480,10 +1720,161 @@ require_orca_worktree_path_match() {
   fi
 }
 
+# require_orca_remote_worktree_identity: the remote equal of the local
+# canonicalize-and-compare identity check. It answers the same question - is the
+# worktree Orca is about to remove the one whose work was just inspected? - and
+# adds the check the local form never had to make: that it still sits on the
+# recorded host. Canonicalization happens on that host, so a symlinked path
+# component cannot make two different worktrees look like one.
+require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-resolved-path>
+  local worktree_id=$1 inspected=$2 resolved=$3 verdict rc host
+  # The adapter is not always already loaded here: a caller that never opened an
+  # inspection shell - a forced secondmate teardown releasing a remote child -
+  # would otherwise lose the host proof to a missing function and refuse for a
+  # reason that has nothing to do with the worktree's identity.
+  fm_backend_source orca || {
+    echo "REFUSED: the Orca adapter is unavailable, so the identity of worktree id $worktree_id cannot be verified; preserving metadata." >&2
+    return 1
+  }
+  if [ -z "$TASK_REMOTE_EXEC" ] && [ "$FORCE" != "--force" ]; then
+    echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to confirm that worktree id $worktree_id is the worktree inspected at ${inspected:-<missing>}; preserving metadata." >&2
+    return 1
+  fi
+  host=$(fm_backend_orca_worktree_host "$worktree_id") || {
+    echo "REFUSED: cannot read the host of Orca worktree id $worktree_id; preserving metadata." >&2
+    return 1
+  }
+  if [ "$host" != "$ORCA_HOST_ID" ]; then
+    echo "REFUSED: Orca worktree id $worktree_id now reports host $host, not the recorded host $ORCA_HOST_ID." >&2
+    echo "Cannot verify dirty or unlanded work for the worktree Orca would remove; preserving metadata." >&2
+    return 1
+  fi
+  if [ -z "$TASK_REMOTE_EXEC" ]; then
+    # --force with no shell on the host. Orca's own records still answer from
+    # here, so the two proofs that do not need the host are kept: the worktree
+    # still reports the recorded host (checked above), and the path Orca would
+    # remove is literally the recorded one. Only the on-host canonicalization is
+    # unavailable, and that is said out loud rather than passed over.
+    if [ "$resolved" != "$inspected" ]; then
+      echo "REFUSED: Orca worktree id $worktree_id resolves to $resolved, not the recorded worktree ${inspected:-<missing>}; preserving metadata even under --force." >&2
+      return 1
+    fi
+    echo "warning: no inspection shell is open on host ${ORCA_HOST_ID:-<unrecorded>}, so the on-host path canonicalization for $worktree_id was skipped; --force proceeded on its recorded host and exact recorded path" >&2
+    return 0
+  fi
+  set +e
+  verdict=$(fm_backend_orca_remote_paths_same "$TASK_REMOTE_EXEC" "$inspected" "$resolved")
+  rc=$?
+  set -e
+  verdict=$(printf '%s' "$verdict" | tr -d '[:space:]')
+  if [ "$rc" -ne 0 ] || [ -z "$verdict" ]; then
+    echo "REFUSED: could not compare Orca worktree id $worktree_id (path $resolved) with the inspected worktree ${inspected:-<missing>} on host $ORCA_HOST_ID; preserving metadata." >&2
+    return 1
+  fi
+  case "$verdict" in
+    SAME) return 0 ;;
+    MISSING)
+      echo "REFUSED: Orca worktree id $worktree_id or the inspected worktree ${inspected:-<missing>} is not present on host $ORCA_HOST_ID; preserving metadata." >&2
+      ;;
+    *)
+      echo "REFUSED: Orca worktree id $worktree_id resolves to $resolved, not inspected worktree ${inspected:-<missing>}, on host $ORCA_HOST_ID." >&2
+      echo "Cannot verify dirty or unlanded work for the worktree Orca would remove; preserving metadata." >&2
+      ;;
+  esac
+  return 1
+}
+
 require_orca_worktree_path_match_if_present() {
-  local worktree_id=$1 inspected=$2
-  [ -n "$inspected" ] && [ -e "$inspected" ] || return 0
+  local worktree_id=$1 inspected=$2 exists_rc
+  [ -n "$inspected" ] || return 0
+  if [ "$TASK_REMOTE" = 1 ]; then
+    # Only a definite "absent" skips. An indeterminate answer still checks, so
+    # an unreachable host can never look like an already-removed worktree.
+    exists_rc=0
+    task_dir_exists "$inspected" || exists_rc=$?
+    [ "$exists_rc" -ne 1 ] || return 0
+  else
+    [ -e "$inspected" ] || return 0
+  fi
   require_orca_worktree_path_match "$worktree_id" "$inspected"
+}
+
+# child_is_remote_orca: does this CHILD task's own record say its files live on
+# another host? The parent's record answers for the parent only, and a forced
+# secondmate teardown releases children the parent never described.
+child_is_remote_orca() {  # <child-meta>
+  [ "$(meta_value "$1" orca_remote)" = 1 ]
+}
+
+# require_orca_child_worktree_identity: the identity proof a forced secondmate
+# cleanup owes a REMOTE Orca child before anything of that child is released.
+# Asking this machine whether the child's worktree path exists is asking the
+# wrong machine, and a "no" there is not permission to remove what is recorded -
+# so the proof comes from Orca's own records, which answer from here: the id
+# still reports the child's recorded host, and the path Orca gives for that id
+# is exactly the child's recorded one. That is the same host-independent pair
+# the task's own --force path keeps, reached through the same code, with the
+# host and remote flag read from the CHILD's metadata.
+require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-worktree>
+  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id
+  # shellcheck disable=SC2034  # Read by require_orca_worktree_path_match below.
+  local TASK_REMOTE=1 TASK_REMOTE_EXEC='' ORCA_HOST_ID
+  child_id=$(basename "$child_meta" .meta)
+  ORCA_HOST_ID=$(meta_value "$child_meta" orca_host)
+  if [ -z "$ORCA_HOST_ID" ] || [ -z "$child_wt" ]; then
+    echo "REFUSED: child $child_id is recorded as running on a remote Orca host but names no host or worktree; preserving that child's records." >&2
+    return 1
+  fi
+  require_orca_worktree_path_match "$worktree_id" "$child_wt"
+}
+
+# sweep_remote_task_tmp: remove the per-task temp root a REMOTE Orca task
+# recorded, on the host that actually holds it. The temp root is /tmp/fm-<id>
+# THERE and has nothing to do with the worktree, so what it depends on is the
+# recorded path and an inspection shell - never whether the worktree is still
+# present. Every outcome is best effort: an unreachable host is one warning
+# naming the path to remove by hand, never a failed cleanup, because the record
+# that knows the path is deleted moments later and the warning is then the only
+# thing that can lead an operator (or the next spawn's refusal) back to it.
+sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label>
+  local handle=$1 tasktmp=$2 host=$3 label=$4
+  [ -n "$tasktmp" ] || return 0
+  [ -n "$host" ] || host='<unrecorded>'
+  case "$tasktmp" in
+    /tmp/fm-?*) : ;;
+    *)
+      echo "warning: not removing unexpected remote task temp root $tasktmp for $label" >&2
+      return 0
+      ;;
+  esac
+  if [ -z "$handle" ]; then
+    echo "warning: could not reach Orca host $host to remove $tasktmp for $label; remove it on that host by hand" >&2
+    return 0
+  fi
+  # Quoted through the adapter's own quoter: this value comes from a metadata
+  # file, and one carrying a quote character would otherwise close the string
+  # and hand the rest to the remote shell as commands.
+  fm_backend_orca_exec_run "$handle" \
+    "rm -rf $(fm_backend_orca_shell_quote "$tasktmp")" >/dev/null 2>&1 \
+    || echo "warning: could not remove $tasktmp on Orca host $host for $label; remove it on that host by hand" >&2
+  return 0
+}
+
+# sweep_orca_child_remote_task_tmp: the same sweep for a REMOTE Orca child,
+# which has no inspection shell open yet and so opens (and releases) its own.
+sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
+  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
+  tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
+  [ -n "$tasktmp" ] || return 0
+  host=$(meta_value "$child_meta" orca_host)
+  if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
+    sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id"
+    return 0
+  fi
+  handle=$(fm_backend_orca_exec_open "$worktree_id" "fm-$child_id-sweep" "$host" 2>/dev/null) || handle=
+  sweep_remote_task_tmp "$handle" "$tasktmp" "$host" "child $child_id"
+  [ -z "$handle" ] || fm_backend_orca_exec_close "$handle" 2>/dev/null || true
+  return 0
 }
 
 firstmate_home_has_treehouse_slot() {
@@ -1855,7 +2246,9 @@ validate_firstmate_home_children_removal() {
       validate_firstmate_home_children_removal "$child_home" || return 1
     elif [ "$child_backend" = orca ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
-      if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
+      if child_is_remote_orca "$child_meta"; then
+        require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+      elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
@@ -2022,7 +2415,9 @@ cleanup_firstmate_home_children() {
     fi
     if [ "$child_backend" = orca ] && [ "$child_kind" != secondmate ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
-      if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
+      if child_is_remote_orca "$child_meta"; then
+        require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+      elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
     fi
@@ -2058,6 +2453,9 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
+      fi
+      if child_is_remote_orca "$child_meta"; then
+        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id"
       fi
       fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
@@ -2187,7 +2585,14 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] &&
   ORCA_PATH_MATCH_VERIFIED=1
 fi
 
-if [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
+# task_dir_exists, not [ -d ]: for a remote task the worktree is never on this
+# machine, and skipping the safety check because of that would be exactly the
+# silent pass this gate exists to prevent. Only a definite "absent" (1) skips -
+# an indeterminate answer still enters, and validate_worktree_teardown_safety
+# refuses there rather than passing on a question it could not ask.
+WT_EXISTS_RC=0
+task_dir_exists "$WT" || WT_EXISTS_RC=$?
+if [ "$WT_EXISTS_RC" -ne 1 ] && [ "$FORCE" != "--force" ]; then
   if validate_worktree_teardown_safety; then
     :
   else
@@ -2208,7 +2613,11 @@ fi
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
-if [ "$KIND" != secondmate ]; then
+# Both steps act on THIS machine: the no-mistakes daemon that could own a parked
+# run is local, and the processes a leak would strand are local. A remote task
+# has neither here - its agent lives in the Orca terminal closed below - so
+# running them would only ask local tools about a path that is not local.
+if [ "$KIND" != secondmate ] && [ "$TASK_REMOTE" != 1 ]; then
   conclude_task_no_mistakes_run "$WT"
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 fi
@@ -2239,17 +2648,33 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
     require_orca_worktree_path_match_if_present "$ORCA_WORKTREE_ID" "$WT" || exit 1
     ORCA_PATH_MATCH_VERIFIED=1
   fi
-  if [ -d "$WT" ]; then
-    branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-    if [ "$branch" != "HEAD" ]; then
-      if git -C "$WT" checkout --detach -q 2>/dev/null; then
-        git -C "$WT" branch -D "$branch" >/dev/null 2>&1 || true
+  if task_dir_exists "$WT"; then
+    branch=$(task_git "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+    branch=$(printf '%s' "$branch" | tr -d '[:space:]')
+    if [ "$branch" != HEAD ] && [ -n "$branch" ]; then
+      if task_git "$WT" checkout --detach -q 2>/dev/null; then
+        task_git "$WT" branch -D "$branch" >/dev/null 2>&1 || true
       fi
     fi
-    rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \
-      "$WT/.opencode/plugins/fm-busy-state.js" \
-      "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
+    # A remote task installs none of these hook files: fm-spawn.sh refuses the
+    # harnesses that would need them there, and the rest are written into the
+    # worktree by hooks a remote task never gets.
+    if [ "$TASK_REMOTE" != 1 ]; then
+      rm -f "$WT/.claude/settings.local.json" "$WT/.opencode/plugins/fm-turn-end.js" \
+        "$WT/.opencode/plugins/fm-busy-state.js" \
+        "$WT/.fm-grok-turnend" "$WT/.fm-kimi-turnend"
+    fi
   fi
+  # Deliberately outside that test: the temp root sits in the host's /tmp, not in
+  # the worktree, so a worktree already gone from the host - and an unreachable
+  # host under --force, where its existence cannot even be determined - are the
+  # two cases where the brief is most likely still sitting there. Both used to
+  # skip this entirely and then delete the record naming it.
+  [ "$TASK_REMOTE" != 1 ] \
+    || sweep_remote_task_tmp "$TASK_REMOTE_EXEC" "$ORCA_REMOTE_TASK_TMP" "$ORCA_HOST_ID" "$ID"
+  # The inspection shell is itself a terminal in this worktree, so it is released
+  # before Orca is asked to remove the worktree, not after.
+  task_remote_exec_release
   [ -z "$T_ORCA" ] || fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" 2>/dev/null || true
   fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
@@ -2360,13 +2785,18 @@ remove_kimi_turnend_auth "$STATE" "$ID"
 fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # Remove the per-task temp root (/tmp/fm-<id>/, incl. its gotmp/) recorded by spawn.
 # Read before the state-file rm below; empty (pre-fix tasks without tasktmp=) is a no-op.
-[ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
+# Never for a remote task: its root is on the host and was swept there, so the
+# only thing this path could delete here is whatever else happens to occupy that
+# absolute path on THIS machine - a task recorded before tasktmp= stopped naming
+# a local root for remote tasks still reaches this line.
+[ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 rm -f "$STATE/$ID.status" "$STATE/$ID.turn-ended" "$STATE/$ID.meta" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
   "$STATE/$ID.muse-session-current" \
+  "$STATE/$ID.remote-brief.md" \
   "$STATE/.$ID.open-decisions-cursor"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ]; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true

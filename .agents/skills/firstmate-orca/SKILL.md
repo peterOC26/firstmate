@@ -46,6 +46,13 @@ After spawn, check the task with firstmate helpers:
 - `bin/fm-crew-state.sh <id>` when the current run state matters.
 - `bin/fm-watch.sh` whenever there are tasks in flight and this session owns supervision.
 
+To place a task on a project that lives on a remote Orca host, pass an `orca:setup:<id>` or `orca:project:<id>` selector instead of a project directory, with `--backend orca`.
+`orca project setups` lists both ids.
+The selector is required; a project path that merely does not exist locally is still a bad path.
+A remote task additionally records `orca_host=`, `orca_project_host_setup=`, `orca_remote=1`, and `orca_remote_tasktmp=`.
+It installs no turn-end or busy-state hooks, so supervise it by reading its pane rather than waiting for turn-end wakes, and expect its worker to report in the terminal instead of the status log.
+`docs/orca-backend.md` "Remote Orca hosts" owns the selector rules, the placement and safety guarantees, and the remote limits.
+
 Do not manually create the Orca worktree or terminal for a normal firstmate task.
 Do not manually patch metadata to make an externally-created Orca terminal look like a firstmate task.
 

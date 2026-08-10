@@ -33,7 +33,24 @@
 #   Spawn-capable backends are the reference tmux adapter and experimental
 #   herdr, zellij, orca, and cmux. Orca owns both the task worktree and
 #   terminal, so ship/scout Orca spawns do not run treehouse get; cmux is a
-#   session provider only, exactly like herdr/zellij, so it does. An
+#   session provider only, exactly like herdr/zellij, so it does.
+#   <project-dir> may instead be an Orca project selector - orca:setup:<id> or
+#   orca:project:<id> - which resolves through Orca's project host setups rather
+#   than this filesystem and is the only way to place a task on a project that
+#   lives on a REMOTE Orca host. It requires --backend orca, must resolve to
+#   exactly one ready setup, and is never inferred: a plain path that happens
+#   not to exist locally still fails as a bad path. A selector naming a local
+#   host resolves to that setup's directory and behaves exactly like passing the
+#   path. For a remote host the worktree is created with --project-host-setup,
+#   and the created worktree's own host, its non-primary status, and the
+#   terminal's execution host are all checked against the requested host before
+#   the worker exists; the isolation assertion then runs ON that host. The brief
+#   and the operational-input encoder are copied there and digest-verified, and
+#   the launch line reads them from the host. Turn-end and busy-state hooks are
+#   NOT installed for a remote task (they point at this home's paths), so it is
+#   supervised by reading its pane; harnesses whose launch line needs a
+#   firstmate-home path, and kimi, are refused up front. See
+#   docs/orca-backend.md "Remote Orca hosts". An
 #   auto-detected herdr or cmux spawn prints a loud stderr notice;
 #   auto-detected tmux stays silent; zellij and orca are never auto-detected.
 #   codex-app is not a known backend yet; docs/codex-app-backend.md owns that
@@ -620,6 +637,14 @@ fi
 ORCA_ABORT_CLEANUP=0
 ORCA_WORKTREE_ID=
 ORCA_TERMINAL=
+# Remote-Orca placement. ORCA_REMOTE stays 0 for every local spawn, so the whole
+# local path below is reached with these unset exactly as before.
+ORCA_REMOTE=0
+ORCA_SETUP_ID=
+ORCA_HOST_ID=
+ORCA_EXEC_HANDLE=
+ORCA_REMOTE_TASK_TMP=
+ORCA_REMOTE_BRIEF_SRC=
 HERDR_PROJECTION_ABORT_CLEANUP=0
 HERDR_PROJECTION_ABORT_SESSION=
 HERDR_PROJECTION_ABORT_TASK_PANE=
@@ -648,6 +673,46 @@ parse_orca_worktree_result() {
   fi
 }
 
+# Remove the per-task temp root this spawn created on the Orca host, guarded by
+# the same /tmp/fm-?* shape fm-teardown.sh sweeps: the value is only ever built
+# here, but a wider pattern would make one wrong recorded path a recursive
+# removal of something else on that host. Quoted through the adapter's quoter
+# rather than by wrapping it in literal quotes.
+spawn_orca_remote_task_tmp_sweep() {
+  local handle=${ORCA_EXEC_HANDLE:-} opened=0
+  [ -n "${ORCA_REMOTE_TASK_TMP:-}" ] || return 0
+  command -v fm_backend_orca_exec_run >/dev/null 2>&1 || return 0
+  case "$ORCA_REMOTE_TASK_TMP" in
+    /tmp/fm-?*) : ;;
+    *)
+      echo "warning: not removing unexpected remote task temp root $ORCA_REMOTE_TASK_TMP for $ID" >&2
+      return 0
+      ;;
+  esac
+  # A shell on that host is the only way to reach these files, and the spawn
+  # closes its own as soon as the launch line is settled - so an abort after
+  # that point opens one more rather than leaving the task's instructions
+  # behind. The worktree is still there to open it on; this cleanup removes it
+  # further down. A host that cannot be reached says so and the abort continues.
+  if [ -z "$handle" ]; then
+    if [ -n "${ORCA_WORKTREE_ID:-}" ] && [ -n "${ORCA_HOST_ID:-}" ]; then
+      handle=$(fm_backend_orca_exec_open "$ORCA_WORKTREE_ID" "fm-$ID-sweep" "$ORCA_HOST_ID" 2>/dev/null) || handle=
+    fi
+    if [ -z "$handle" ]; then
+      echo "warning: could not reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to remove $ORCA_REMOTE_TASK_TMP for $ID; remove it on that host by hand" >&2
+      return 0
+    fi
+    opened=1
+  fi
+  fm_backend_orca_exec_run "$handle" \
+    "rm -rf $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP")" >/dev/null 2>&1 \
+    || echo "warning: could not remove $ORCA_REMOTE_TASK_TMP on Orca host ${ORCA_HOST_ID:-<unrecorded>} for $ID; remove it on that host by hand" >&2
+  if [ "$opened" = 1 ]; then
+    fm_backend_orca_exec_close "$handle" 2>/dev/null || true
+  fi
+  return 0
+}
+
 spawn_abort_cleanup() {
   local status=$?
   if [ "$HERDR_PROJECTION_ABORT_CLEANUP" = 1 ] \
@@ -668,6 +733,21 @@ spawn_abort_cleanup() {
     HERDR_PRESENTATION_ORDER_LOCK_HELD=0
     fm_lock_release "$HERDR_PRESENTATION_ORDER_LOCK" || true
   fi
+  # A remote spawn has already pushed the task's brief and encoder onto the host
+  # by the time most later refusals fire, and an abort that succeeds in removing
+  # the worktree preserves no metadata for fm-teardown.sh to sweep from later -
+  # so this is the only chance to take the task's instructions back off that
+  # host. It runs while the inspection shell is still open, because that handle
+  # is the only way to reach the host at all. Best effort throughout: an abort
+  # must still complete when the host cannot be reached.
+  if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
+    spawn_orca_remote_task_tmp_sweep
+    [ -z "${ORCA_REMOTE_BRIEF_SRC:-}" ] || rm -f "$ORCA_REMOTE_BRIEF_SRC" 2>/dev/null || true
+  fi
+  if [ -n "${ORCA_EXEC_HANDLE:-}" ]; then
+    fm_backend_orca_exec_close "$ORCA_EXEC_HANDLE" 2>/dev/null || true
+    ORCA_EXEC_HANDLE=
+  fi
   if [ "$ORCA_ABORT_CLEANUP" = 1 ]; then
     ORCA_ABORT_CLEANUP=0
     if [ -n "${ORCA_TERMINAL:-}" ]; then
@@ -685,12 +765,24 @@ spawn_abort_cleanup() {
             echo "kind=$KIND"
             [ -z "${MODE:-}" ] || echo "mode=$MODE"
             [ -z "${YOLO:-}" ] || echo "yolo=$YOLO"
-            echo "tasktmp=${TASK_TMP:-}"
+            if [ "${ORCA_REMOTE:-0}" = 1 ]; then
+              echo "tasktmp="
+            else
+              echo "tasktmp=${TASK_TMP:-}"
+            fi
             echo "model=${MODEL:-default}"
             echo "effort=${EFFORT:-default}"
             echo "backend=orca"
             echo "orca_worktree_id=$ORCA_WORKTREE_ID"
             [ -z "${ORCA_TERMINAL:-}" ] || echo "terminal=$ORCA_TERMINAL"
+            [ -z "${ORCA_HOST_ID:-}" ] || echo "orca_host=$ORCA_HOST_ID"
+            [ -z "${ORCA_SETUP_ID:-}" ] || echo "orca_project_host_setup=$ORCA_SETUP_ID"
+            # Without this the preserved record would read as a local task, and
+            # every remote-aware safety check would then ask this machine about
+            # files it does not have.
+            [ "${ORCA_REMOTE:-0}" != 1 ] || echo "orca_remote=1"
+            [ "${ORCA_REMOTE:-0}" != 1 ] || [ -z "${ORCA_REMOTE_TASK_TMP:-}" ] \
+              || echo "orca_remote_tasktmp=$ORCA_REMOTE_TASK_TMP"
           } > "$STATE/$ID.meta" 2>/dev/null || true
         fi
       fi
@@ -813,8 +905,13 @@ fi
 
 # The verified launch command per adapter. The knowledge half of each adapter
 # (busy-state source, exit command, dialogs, quirks) lives in the harness-adapters skill.
+# <turnend> selects whether the launch line may carry a turn-end hook that
+# points into THIS firstmate home. It is "local" everywhere except a task placed
+# on another Orca host, where no such path exists and a launch line naming one
+# would wire the agent to a file it can never touch. Only adapters whose
+# hook rides the launch line itself need to read it.
 launch_template() {
-  local harness=$1 kind=${2:-ship}
+  local harness=$1 kind=${2:-ship} turnend=${3:-local}
   # shellcheck disable=SC2016  # single quotes are deliberate: $(cat ...) expands in the crewmate pane, not here
   case "$harness" in
     # CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false disables claude's interactive
@@ -828,7 +925,7 @@ launch_template() {
     # the defense-in-depth backstop for any pane this flag cannot reach.
     claude) printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
     codex)
-      if [ "$kind" = secondmate ]; then
+      if [ "$kind" = secondmate ] || [ "$turnend" = none ]; then
         printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
       else
         printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox -c "notify=[\"bash\",\"-c\",\"touch __TURNEND__\"]" "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
@@ -881,9 +978,41 @@ launch_template() {
   esac
 }
 
+# Cleared below when the launch line is a caller-supplied raw command rather than
+# an adapter template, so a remote spawn knows whether re-resolving it is even
+# meaningful: a raw command is the operator's own escape hatch and is theirs to
+# make host-correct.
+LAUNCH_FROM_TEMPLATE=1
+
+# launch_pin_harness_path: replace the harness token in a launch line with an
+# absolute path, leaving its leading NAME=VALUE env prefixes and every argument
+# untouched. "The harness token" is the first word that is not an assignment -
+# the same rule that derives HARNESS from a raw launch command above. A line
+# whose token is not the expected harness fails rather than being rewritten by
+# guess, so an unrecognized shape refuses instead of launching something else.
+# The path is quoted on the way in: the result is a command line for a shell,
+# and an install path containing a space would otherwise be read as a command
+# plus an argument.
+launch_pin_harness_path() {  # <launch> <harness-token> <absolute-path>
+  local rest=$1 token=$2 abs=$3 head
+  local prefix=''
+  while :; do
+    head=${rest%% *}
+    [ "$head" != "$rest" ] || break
+    case "$head" in
+      [A-Za-z_]*=*) prefix="$prefix$head "; rest=${rest#* } ;;
+      *) break ;;
+    esac
+  done
+  head=${rest%% *}
+  [ "$head" = "$token" ] || return 1
+  printf '%s%s%s' "$prefix" "$(shell_quote "$abs")" "${rest#"$token"}"
+}
+
 case "$ARG3" in
   *' '*)  # raw launch command (unverified-adapter escape hatch)
     LAUNCH=$ARG3
+    LAUNCH_FROM_TEMPLATE=0
     HARNESS=""
     for word in $LAUNCH; do
       case "$word" in [A-Za-z_]*=*) continue ;; *) HARNESS=$(basename "$word"); break ;; esac
@@ -1161,6 +1290,16 @@ resolve_project_dir_arg() {
   esac
 }
 
+# The reserved orca: namespace routes a project argument to Orca's own project
+# resolution instead of this machine's filesystem. Only the prefix is decided
+# here; bin/backends/orca.sh owns the accepted forms and their refusals.
+project_arg_is_orca_selector() {  # <project-arg>
+  case "${1:-}" in
+    orca:?*) return 0 ;;
+  esac
+  return 1
+}
+
 path_is_ancestor_of() {
   local ancestor=$1 path=$2
   [ -n "$ancestor" ] || return 1
@@ -1322,6 +1461,33 @@ if [ "$KIND" = secondmate ]; then
   else
     BRIEF="$DATA/$ID/brief.md"
   fi
+elif project_arg_is_orca_selector "$PROJ"; then
+  # An explicit selector in the reserved orca: namespace, resolved through Orca
+  # rather than the filesystem. Deliberately keyed on the SELECTOR, never on
+  # "this path is missing locally": a mistyped or unmounted project path must
+  # still fail as a bad path instead of being promoted to a remote target.
+  # bin/backends/orca.sh owns which orca: forms are valid and rejects the rest.
+  if [ "$BACKEND" != orca ]; then
+    echo "error: '$PROJ' is an Orca project selector but this spawn resolved backend=$BACKEND; pass --backend orca to place work on an Orca host" >&2
+    exit 1
+  fi
+  ORCA_SETUP_RAW=$(fm_backend_orca_setup_resolve "$PROJ") || exit 1
+  ORCA_SETUP_ID=$(printf '%s' "$ORCA_SETUP_RAW" | cut -f1)
+  ORCA_HOST_ID=$(printf '%s' "$ORCA_SETUP_RAW" | cut -f3)
+  PROJ_ABS=$(printf '%s' "$ORCA_SETUP_RAW" | cut -f4)
+  if [ -z "$ORCA_SETUP_ID" ] || [ -z "$ORCA_HOST_ID" ] || [ -z "$PROJ_ABS" ]; then
+    echo "error: Orca returned an incomplete project host setup for $PROJ; refusing to place work on an unidentified host" >&2
+    exit 1
+  fi
+  if fm_backend_orca_host_is_local "$ORCA_HOST_ID"; then
+    # A local setup names a real directory on this machine, so it rejoins the
+    # ordinary local path with nothing else changed.
+    PROJ_ABS="$(cd "$PROJ_ABS" && pwd)"
+  else
+    ORCA_REMOTE=1
+  fi
+  WT=""
+  BRIEF="$DATA/$ID/brief.md"
 else
   PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
   WT=""
@@ -1378,6 +1544,42 @@ BRIEF_REAL="$BRIEF_DIR_REAL/$(basename "$BRIEF")"
 # (docs/herdr-backend.md "Known gaps").
 PROJ_ABS_REAL=$(cd "$PROJ_ABS" 2>/dev/null && pwd -P) || PROJ_ABS_REAL="$PROJ_ABS"
 
+# A remote task's launch line runs on another machine, so every path baked into
+# it has to exist there. The brief and the operational-input encoder are copied
+# across below, which covers every adapter whose launch line needs nothing else.
+# The rest split two ways: codex carries its turn-end hook IN the launch line and
+# already has a verified hook-free form, so it re-resolves onto that; pi and muse
+# name an extension file or a harness store that only exists in this firstmate
+# home, and no copy makes those meaningful. kimi is refused separately because
+# its brief handshake reads a locally readable path after launch.
+if [ "$ORCA_REMOTE" = 1 ]; then
+  case "$HARNESS" in
+    kimi)
+      echo "error: harness 'kimi' delivers its brief through a locally readable path and a local turn-end registry, neither of which reaches Orca host $ORCA_HOST_ID; pick another harness" >&2
+      exit 1
+      ;;
+    pi|pi-signed|muse)
+      echo "error: harness '$HARNESS' launches with firstmate-home paths (its turn-end extension or harness store) that do not exist on Orca host $ORCA_HOST_ID; pick a harness whose launch line needs only the brief (docs/orca-backend.md 'Remote Orca hosts')" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$LAUNCH_FROM_TEMPLATE" = 1 ]; then
+    LAUNCH=$(launch_template "$HARNESS" "$KIND" none) || {
+      echo "error: no hook-free launch template for harness '$HARNESS'; it cannot run on Orca host $ORCA_HOST_ID" >&2
+      exit 1
+    }
+  fi
+  # Backstop, not the primary gate: if any future template grows a new
+  # firstmate-home placeholder, a remote spawn refuses here instead of launching
+  # an agent wired to a path it can never reach.
+  case "$LAUNCH" in
+    *__TURNEND__*|*__PIEXT__*|*__PITURNEND__*|*__PIWATCH__*|*__MUSECONFIG__*|*__MUSEDATA__*|*__MUSEBIN__*)
+      echo "error: the launch line for harness '$HARNESS' still names a firstmate-home path that does not exist on Orca host $ORCA_HOST_ID; refusing to launch" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 real_path_or_raw() {  # <path>
   local path=$1 real
   if real=$(cd "$path" 2>/dev/null && pwd -P); then
@@ -1411,6 +1613,41 @@ validate_spawn_worktree() {  # <source> <inspect-target>
     echo "error: $source did not yield an isolated worktree (resolved '$WT'; worktree root '${wt_top:-none}'; primary '$PROJ_ABS'); refusing to launch to avoid tangling the primary checkout. Inspect target $inspect_target" >&2
     exit 1
   fi
+}
+
+# validate_spawn_worktree_remote: the same assertion for a task placed on
+# another host. It proves exactly what the local one proves - the path resolves,
+# it IS a git worktree root rather than a subdirectory of one, and it is not the
+# project's primary checkout - except that every comparison runs on the host
+# that owns those files. A verdict that cannot be obtained is a refusal, never a
+# pass: a check this one replaces must not become weaker by moving hosts.
+validate_spawn_worktree_remote() {  # <source> <inspect-target>
+  local source=$1 inspect_target=$2 verdict rc
+  set +e
+  verdict=$(fm_backend_orca_remote_worktree_isolation "$ORCA_EXEC_HANDLE" "$WT" "$PROJ_ABS")
+  rc=$?
+  set -e
+  verdict=$(printf '%s' "$verdict" | tr -d '[:space:]')
+  if [ "$rc" -ne 0 ] || [ -z "$verdict" ]; then
+    echo "error: could not verify on host $ORCA_HOST_ID that $source yielded an isolated worktree at '$WT'; refusing to launch without that proof. Inspect target $inspect_target" >&2
+    exit 1
+  fi
+  case "$verdict" in
+    ISOLATED) return 0 ;;
+    IS-PRIMARY)
+      echo "error: $source resolved to the primary checkout '$WT' on host $ORCA_HOST_ID; refusing to launch to avoid tangling it. Inspect target $inspect_target" >&2
+      ;;
+    TOPLEVEL-MISMATCH)
+      echo "error: $source resolved to '$WT' on host $ORCA_HOST_ID, which is inside a git worktree rather than being its root; refusing to launch. Inspect target $inspect_target" >&2
+      ;;
+    NOT-A-WORKTREE)
+      echo "error: $source resolved to '$WT' on host $ORCA_HOST_ID, which is not an inspectable git worktree; refusing to launch. Inspect target $inspect_target" >&2
+      ;;
+    *)
+      echo "error: the isolation check for '$WT' on host $ORCA_HOST_ID returned an unrecognized verdict '$verdict'; refusing to launch. Inspect target $inspect_target" >&2
+      ;;
+  esac
+  exit 1
 }
 
 herdr_projection_meta_field_exact() {  # <meta> <key>
@@ -1696,7 +1933,11 @@ EOF
     ;;
   orca)
     set +e
-    ORCA_WT_RAW=$(fm_backend_orca_worktree_create "$PROJ_ABS" "$W")
+    if [ "$ORCA_REMOTE" = 1 ]; then
+      ORCA_WT_RAW=$(fm_backend_orca_worktree_create_on_setup "$ORCA_SETUP_ID" "$W" "$ORCA_HOST_ID")
+    else
+      ORCA_WT_RAW=$(fm_backend_orca_worktree_create "$PROJ_ABS" "$W")
+    fi
     ORCA_WT_STATUS=$?
     set -e
     if [ "$ORCA_WT_STATUS" -ne 0 ]; then
@@ -1713,9 +1954,25 @@ EOF
       echo "error: orca did not return a worktree id/path for $W" >&2
       exit 1
     fi
-    validate_spawn_worktree "orca worktree create" "$W"
-    if [ -z "$ORCA_TERMINAL" ]; then
-      ORCA_TERMINAL=$(fm_backend_orca_terminal_create "$ORCA_WORKTREE_ID" "$W") || exit 1
+    if [ "$ORCA_REMOTE" = 1 ]; then
+      # An implicit terminal from worktree creation carries no proof of which
+      # host it came up on, so a remote task discards it and opens only
+      # host-checked terminals of its own.
+      if [ -n "$ORCA_TERMINAL" ]; then
+        fm_backend_kill orca "$ORCA_TERMINAL" 2>/dev/null || true
+        ORCA_TERMINAL=
+      fi
+      # The inspection shell proves isolation and later carries the brief across.
+      # It runs every check before the worker's own endpoint exists, so a remote
+      # target that cannot be proven isolated never gets an agent.
+      ORCA_EXEC_HANDLE=$(fm_backend_orca_exec_open "$ORCA_WORKTREE_ID" "fm-$ID-setup" "$ORCA_HOST_ID") || exit 1
+      validate_spawn_worktree_remote "orca worktree create" "$W"
+      ORCA_TERMINAL=$(fm_backend_orca_terminal_create "$ORCA_WORKTREE_ID" "$W" "$ORCA_HOST_ID") || exit 1
+    else
+      validate_spawn_worktree "orca worktree create" "$W"
+      if [ -z "$ORCA_TERMINAL" ]; then
+        ORCA_TERMINAL=$(fm_backend_orca_terminal_create "$ORCA_WORKTREE_ID" "$W") || exit 1
+      fi
     fi
     T="$ORCA_TERMINAL"
     ;;
@@ -1874,7 +2131,93 @@ fi
 # later, and teardown cleans one deterministic path. GOTMPDIR (not TMPDIR) is the
 # targeted knob: TMPDIR is too broad (affects every program's temp, not just Go's).
 TASK_TMP="/tmp/fm-$ID"
-mkdir -p "$TASK_TMP/gotmp"
+# A remote task's processes never run here, so this machine gets no root: the
+# one that matters is created on the host below, and creating a same-named one
+# here would only be a directory on the wrong machine.
+[ "$ORCA_REMOTE" = 1 ] || mkdir -p "$TASK_TMP/gotmp"
+# A remote task needs the same root where its processes actually run. Same path
+# shape so an operator reads one convention, recorded separately in the metadata
+# so cleanup never has to derive it.
+ORCA_REMOTE_TASK_TMP=
+ORCA_REMOTE_BRIEF=
+ORCA_REMOTE_OPINPUT=
+if [ "$ORCA_REMOTE" = 1 ]; then
+  ORCA_REMOTE_TASK_TMP="/tmp/fm-$ID"
+  ORCA_REMOTE_BRIEF="$ORCA_REMOTE_TASK_TMP/brief.md"
+  ORCA_REMOTE_OPINPUT="$ORCA_REMOTE_TASK_TMP/fm-operational-input.sh"
+  # 0700 from the instant the directory exists, not one command later: this root
+  # holds the worker's whole brief, and unlike a local spawn - whose brief stays
+  # under $DATA in the user's own home - it sits in the host's shared /tmp. A
+  # mkdir-then-chmod leaves a window at the host's default umask, and another
+  # account that wins it can pre-create brief.md as a symlink; the copy then
+  # follows it, and the digest read-back follows it too, so the task's whole
+  # instruction set lands at a path of that account's choosing and still
+  # verifies. `mkdir -m 700` closes the window, and its fail-if-exists also
+  # keeps a directory this spawn did not create from being adopted.
+  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
+    "mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP") && mkdir -m 700 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_TASK_TMP/gotmp")" >/dev/null || {
+    echo "error: could not create the task temp root $ORCA_REMOTE_TASK_TMP with owner-only permissions on host $ORCA_HOST_ID" >&2
+    echo "The usual cause is a leftover $ORCA_REMOTE_TASK_TMP from an earlier run of this task id, which a teardown that could not reach that host (or ran under --force) leaves behind; remove it on $ORCA_HOST_ID and spawn again, or spawn under a different task id." >&2
+    exit 1
+  }
+  # The worker's instructions and the encoder that frames them both travel to
+  # the host, so the launch line stays the one every harness already uses and
+  # the encoded form is produced by the same authoritative encoder as a local
+  # spawn. Both copies are digest-verified: a truncated brief would otherwise
+  # launch an agent that is confidently working from half a task.
+  ORCA_REMOTE_BRIEF_SRC="$STATE/$ID.remote-brief.md"
+  {
+    cat "$BRIEF"
+    cat <<EOF
+
+## Remote host addendum (added by firstmate at dispatch)
+
+You are running on Orca host $ORCA_HOST_ID, not on the machine firstmate runs on.
+The status file path named above is on firstmate's machine and is unreachable from here, so do not try to write it.
+Report by leaving your state in this terminal: firstmate reads this pane directly and steers you through it.
+When you would have appended a status line, print that same one-line "state: summary" to the terminal instead, then continue or stop exactly as the line means.
+Everything else in this brief applies unchanged.
+EOF
+  } > "$ORCA_REMOTE_BRIEF_SRC" || {
+    echo "error: could not stage the remote brief for $ID" >&2
+    exit 1
+  }
+  fm_backend_orca_push_file "$ORCA_EXEC_HANDLE" "$ORCA_REMOTE_BRIEF_SRC" "$ORCA_REMOTE_BRIEF" || {
+    echo "error: could not deliver the brief for $ID to host $ORCA_HOST_ID; refusing to launch a worker with no instructions" >&2
+    exit 1
+  }
+  fm_backend_orca_push_file "$ORCA_EXEC_HANDLE" "$FM_ROOT/bin/fm-operational-input.sh" "$ORCA_REMOTE_OPINPUT" || {
+    echo "error: could not deliver the operational-input encoder for $ID to host $ORCA_HOST_ID" >&2
+    exit 1
+  }
+  fm_backend_orca_exec_run "$ORCA_EXEC_HANDLE" \
+    "chmod 0755 $(fm_backend_orca_shell_quote "$ORCA_REMOTE_OPINPUT")" >/dev/null || {
+    echo "error: could not make the operational-input encoder executable on host $ORCA_HOST_ID" >&2
+    exit 1
+  }
+  # An absent harness on the far side would otherwise show up as a pane that
+  # simply never becomes an agent. A raw launch command is exempt: its first
+  # word is the caller's own escape hatch, not a known adapter.
+  # Resolve the harness to an ABSOLUTE path on the host and launch that, never
+  # the bare name. A remote host can have an agent installed somewhere its
+  # non-interactive and login shells both leave off PATH, and a launch line that
+  # trusts PATH turns that into a terminal that quietly sits at a prompt looking
+  # like a worker that has not started yet. A raw launch command is exempt: the
+  # caller supplied the exact command line and owns making it host-correct.
+  if [ "$LAUNCH_FROM_TEMPLATE" = 1 ]; then
+    if ! ORCA_REMOTE_HARNESS_ABS=$(fm_backend_orca_remote_which "$ORCA_EXEC_HANDLE" "$HARNESS"); then
+      ORCA_REMOTE_PATH_ENV=$(fm_backend_orca_remote_path_env "$ORCA_EXEC_HANDLE")
+      echo "error: harness '$HARNESS' is not on PATH on Orca host $ORCA_HOST_ID (PATH there: ${ORCA_REMOTE_PATH_ENV:-unreadable}); install it on that PATH, pick a harness that is, or pass a raw launch command naming its absolute path on that host" >&2
+      exit 1
+    fi
+    LAUNCH=$(launch_pin_harness_path "$LAUNCH" "$HARNESS" "$ORCA_REMOTE_HARNESS_ABS") || {
+      echo "error: could not pin harness '$HARNESS' to its resolved path $ORCA_REMOTE_HARNESS_ABS on Orca host $ORCA_HOST_ID; refusing to launch on an unresolved command name" >&2
+      exit 1
+    }
+  fi
+  fm_backend_orca_exec_close "$ORCA_EXEC_HANDLE"
+  ORCA_EXEC_HANDLE=
+fi
 
 # Per-harness turn-end hook where enabled: a file that touches
 # state/<id>.turn-ended when the agent finishes a turn. Worktree-resident hooks
@@ -1890,7 +2233,17 @@ exclude_path() {
   mkdir -p "$(dirname "$EXCL")"
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >> "$EXCL"
 }
-if [ "$KIND" != secondmate ]; then
+BUSY_GEN=
+# Every turn-end and busy-state hook below writes a file into the task worktree
+# and points it at absolute paths in THIS firstmate home. Neither exists on
+# another host, so a remote task deliberately installs none rather than writing
+# a hook that could never fire. The consequence is stated out loud, because a
+# silently unhooked worker looks identical to a healthy one right up until a
+# supervisor waits for a wake that is never coming.
+if [ "$ORCA_REMOTE" = 1 ]; then
+  echo "notice: $ID runs on Orca host $ORCA_HOST_ID, so its turn-end and busy-state hooks are not installed; supervise it by reading its pane (bin/fm-peek.sh, bin/fm-crew-state.sh) rather than waiting for turn-end wakes, and expect no status-log lines from the worker (docs/orca-backend.md 'Remote Orca hosts')" >&2
+fi
+if [ "$KIND" != secondmate ] && [ "$ORCA_REMOTE" != 1 ]; then
   # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
   # adapter with a verified semantic source. The launch brief sent below IS a
   # submitted turn, so the seed record is busy/fm-spawn. The minted gen is
@@ -2194,7 +2547,15 @@ META_WINDOW=$T
   echo "kind=$KIND"
   [ -z "$MODE" ] || echo "mode=$MODE"
   [ -z "$YOLO" ] || echo "yolo=$YOLO"
-  echo "tasktmp=$TASK_TMP"
+  # tasktmp= is the root on THIS machine, and a remote task has none here - it
+  # records the one it really created as orca_remote_tasktmp= instead. Naming a
+  # local path this task never created would point cleanup at whatever else
+  # happens to sit there.
+  if [ "$ORCA_REMOTE" = 1 ]; then
+    echo "tasktmp="
+  else
+    echo "tasktmp=$TASK_TMP"
+  fi
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
@@ -2217,6 +2578,16 @@ META_WINDOW=$T
   if [ "$BACKEND" = orca ]; then
     echo "orca_worktree_id=$ORCA_WORKTREE_ID"
     echo "terminal=$ORCA_TERMINAL"
+    # Recorded for every selector-resolved Orca task, a local host included, so
+    # recovery and cleanup read the task's host from its own record instead of
+    # re-deriving it from a path. A plain project directory names no setup and
+    # is local by construction, so it leaves both fields absent.
+    [ -z "$ORCA_HOST_ID" ] || echo "orca_host=$ORCA_HOST_ID"
+    [ -z "$ORCA_SETUP_ID" ] || echo "orca_project_host_setup=$ORCA_SETUP_ID"
+    if [ "$ORCA_REMOTE" = 1 ]; then
+      echo "orca_remote=1"
+      echo "orca_remote_tasktmp=$ORCA_REMOTE_TASK_TMP"
+    fi
   fi
   if [ "$BACKEND" = cmux ]; then
     echo "cmux_workspace_id=$CMUX_WORKSPACE_ID"
@@ -2230,11 +2601,18 @@ META_WINDOW=$T
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
+sq_opinput_path="$FM_ROOT/bin/fm-operational-input.sh"
+if [ "$ORCA_REMOTE" = 1 ]; then
+  # Same launch line, same encoder, same "read your brief from this file"
+  # contract - only the host the two files live on differs.
+  sq_brief=$(shell_quote "$ORCA_REMOTE_BRIEF")
+  sq_opinput_path=$ORCA_REMOTE_OPINPUT
+fi
 sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
-sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
+sq_opinput=$(shell_quote "$sq_opinput_path")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
 EFFORTFLAG=$(effort_flag_for_harness "$HARNESS" "$EFFORT")
 LAUNCH=${LAUNCH//__MODELFLAG__/$MODELFLAG}
@@ -2252,7 +2630,10 @@ LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 # Forward firstmate's own resolved store onto the claude launch so the crewmate
 # uses the same credential/config firstmate is authenticated with. Only when set;
 # an unset value is the single-store default and needs no prefix.
-if [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
+# Not for a remote task: this home's store path names a directory on THIS
+# machine, and forwarding it to another host would point the agent at a
+# credential store that does not exist there.
+if [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "$ORCA_REMOTE" != 1 ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
@@ -2274,7 +2655,7 @@ fi
 # Export GOTMPDIR into the crewmate's pane shell so the agent and every child
 # process (go build, go test, ...) inherit it. Sent before the launch command so
 # the env is set when the agent starts; the brief sleep lets the export land.
-spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
+spawn_send_text_line "$T" "export GOTMPDIR=${ORCA_REMOTE_TASK_TMP:-$TASK_TMP}/gotmp"
 # Send through the exact channel that already ships GOTMPDIR, so every backend
 # and harness - ship, scout, and secondmate - gets it before launch. Skipped
 # entirely when trace context is off.

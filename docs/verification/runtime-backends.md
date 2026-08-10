@@ -597,6 +597,41 @@ tests/fm-bootstrap.test.sh
 
 The fake-Orca suite covers readiness, registration, create response parsing, metadata routing, popup-safe submit, and path-matched release refusal.
 
+### Remote Orca hosts
+
+Verified 2026-08-09 against `/usr/local/bin/orca` from macOS, targeting a federated remote host over `ws://`, with a disposable worktree that was released through `orca worktree rm` afterwards.
+
+`orca project setups --json` returns `id`, `projectId`, `hostId`, `path`, and `setupState`; a remote setup reports `hostId` as `ssh:<connection-id>` while a local one reports `local`.
+`orca worktree create --project-host-setup <id> --json` returned `result.worktree.hostId` equal to the setup's host and `result.worktree.isMainWorktree=false`.
+`orca terminal create --worktree id:<worktree-id> --json` returned `result.terminal.executionHostId` equal to that host and `result.terminal.hostPlatform=linux`, which is the structural proof the agent process runs there.
+
+`orca exec` drives the browser, not a shell, and a terminal created with `--command` discards its scrollback the moment the shell exits (`terminal read` returned `status=exited` with an empty `tail`).
+A long-lived shell terminal plus marked `terminal send`/`terminal read` is therefore the only remote execution seam, and it retained output as expected.
+
+The remote shell reported `bash 5.3.9`, with `base64` and `sha256sum` present.
+A digest-verified transfer of an 8907-byte file in 2000-character chunks arrived byte-identical.
+
+An Orca-created terminal's `PATH` on that host was **wider than either SSH shell's**:
+
+```text
+/root/.orca-relay/bin:/usr/local/bin:/root/.hermes/node/bin:/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+```
+
+Both `codex` (`/usr/local/bin/codex`, codex-cli 0.145.0) and `claude` (`/root/.hermes/node/bin/claude`) resolved there, while a non-interactive and a login SSH shell on the same host resolved only `codex`.
+Do not assume an Orca terminal's `PATH` matches any SSH shell's on the same host; resolve the harness through the terminal itself and launch it by absolute path.
+
+The live lifecycle smoke proved selector resolution, host-pinned worktree creation, host-verified terminal creation, the on-host isolation assertion, digest-verified brief and encoder delivery, a real `codex` agent launching in the remote worktree and answering its brief, `bin/fm-peek.sh`, a steer delivered by `bin/fm-send.sh`, `bin/fm-crew-state.sh` reading pane state instead of reporting the worktree gone, cleanup refusing on remote uncommitted work, cleanup refusing on a tampered recorded worktree identity, and a clean release through `orca worktree rm`.
+
+`orca terminal read --help` states that `--limit` bounds the rows returned and that `oldestCursor` reports when older lines were dropped, so a long reply loses its start rather than its end.
+Measured against the live host, the read limit is not the binding constraint and the truncation flags are not reliable: a 145,192-byte reply returned only 5,901 bytes with `limited=false` and `oldestCursor=0`, and `--limit 8192000` recovered no more.
+The remote transport therefore stages each reply on the host, returns its exact length with the exit status, and fetches anything longer than one reply in bounded slices, refusing whatever it cannot reassemble to the declared length.
+Verified on the live host after that change: `seq 1 20000` (108,893 bytes) and a real `git status --porcelain` listing 900 entries both returned complete and correct, and a genuinely empty reply still succeeded.
+`tests/fm-backend-orca.test.sh` models bounded host retention and pins the recovery, the refusal, and the empty-but-successful case.
+
+Two gaps were observed rather than fixed, both pre-existing and identical for local Orca tasks:
+`bin/fm-send.sh` delivers to a `codex` worker but reports the delivery unconfirmed, because the Orca composer classifier has no verified idle pattern for `codex`;
+and `bin/fm-crew-state.sh` reports `unknown (codex-unverified)` for the same reason.
+
 ## cmux
 
 The current compatibility floor is cmux 0.64, and the active live evidence uses 0.64.17 build 97 on macOS aarch64.
