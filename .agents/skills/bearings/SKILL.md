@@ -72,21 +72,16 @@ This skill is the one owner of the `/bearings` chat-response format; the snapsho
 Every `/bearings` chat response renders EXACTLY these six columns, in THIS order, and nothing else structural:
 
 1. **Ready** - dispatchable queued work.
-   Empty-state: "No dispatchable queued work."
 2. **Held** - captain- or time-gated work that is not ready to dispatch.
-   Empty-state: "No captain- or time-gated work."
 3. **Blocked** - queued work waiting on another item, plus action-free inventory integrity gates.
-   Empty-state: "No queued work is waiting on another item."
 4. **Under way** - live workers, one line of current state per direct report.
-   Empty-state: "No live workers are under way."
 5. **Waiting on you** - ONLY items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
-   Empty-state: "Nothing needs your action right now."
 6. **Done** - the bounded current recent-completions baseline: merged PRs, completed scouts, and finished local-only merges across the main fleet and every registered secondmate home.
-   Empty-state: "No recent completions are in the current baseline."
 
 Rules that keep the contract unambiguous:
 
-- Every column ALWAYS renders, even when empty, with its short empty-state sentence from `board_columns`; never omit a column.
+- Every column ALWAYS renders, even when empty; never omit a column.
+- `board_columns` is the single source of the empty-state wording: render an empty column's `empty` sentence from `board_columns` verbatim, and never restate, paraphrase, or hardcode those sentences here or anywhere else.
 - Every chat digest and file-mode report is a complete current snapshot, never a delta against a prior report.
 - Done always renders the bounded current baseline, even when the same completions appeared in an earlier report.
 - The six buckets are mutually exclusive, so every board item is forced into exactly one column by `board_items`.

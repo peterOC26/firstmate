@@ -1185,7 +1185,7 @@ test_completed_scout_report_not_pending() {
   pass "a completed scout with decision-like report prose is a pointer, not pending"
 }
 
-# Recently Landed must include merges a secondmate managed. Those completion records
+# Done must include merges a secondmate managed. Those completion records
 # live in the secondmate home's OWN backlog, not the main one, so the projection must
 # roll them up. Local, deterministic, no GitHub call.
 test_landed_includes_secondmate_home_merges() {
