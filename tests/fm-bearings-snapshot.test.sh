@@ -900,6 +900,11 @@ test_board_columns_are_complete_and_classified() {
   local home fakebin json toon
   home=$(make_home board); write_fixture "$home"
   perl -0pi -e 's/## Queued\n/## Queued\n- [ ] ready-work - Dispatchable queued work (repo: firstmate) (kind: ship)\n- [ ] held-work - Wait for scheduled rollout (repo: firstmate) (kind: scout) (hold: after release window) (hold-kind: external)\n/' "$home/data/backlog.md"
+  fm_write_meta "$home/state/stalled-task.meta" \
+    "window=firstmate:fm-stalled-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" stalled-task idle
+  printf 'blocked [key=synthetic-dependency]: firstmate can refresh the token\n' > "$home/state/stalled-task.status"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --include-prs --json)
   toon=$(run "$home" "$fakebin" --include-prs)
@@ -911,7 +916,16 @@ test_board_columns_are_complete_and_classified() {
       and (.board_items | any(.column == "Ready" and .id == "ready-work"))
       and (.board_items | any(.column == "Held" and .id == "held-work" and .detail == "after release window"))
       and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
-      and (.board_items | any(.column == "Under way" and .id == "ship-task"))
+      and (.board_items | any(.column == "Under way" and .id == "ship-task"
+        and .detail == "working now" and .owner == "(main)"))
+      and (.board_items | any(.column == "Under way" and .id == "stalled-task"
+        and .detail == "stalled, needs a look" and .owner == "(main)"))
+      and ([.board_items[] | select(.column == "Under way") | .detail]
+        | any(. == "working" or . == "parked" or . == "done" or . == "blocked"
+              or . == "paused" or . == "failed" or . == "unknown"
+              or . == "active_child_work") | not)
+      and ([.board_items[] | select(.column == "Under way") | .owner]
+        | any(. == "ship" or . == "scout" or . == "secondmate") | not)
       and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"
         and .detail == "your decision needed"))
       and (.board_items | any(.column == "Waiting on you" and .id == "pr-9" and .detail == "ready to merge"
@@ -974,25 +988,25 @@ test_gate_columns_keep_their_share_of_the_bound() {
 ## Done
 EOF
   fakebin=$(make_fakebin "$home")
-  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json)
+  json=$(FM_BEARINGS_GATES=3 run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    ([.board_items[] | select(.column == "Ready") | .id] == ["ready-1","ready-2"])
-      and ([.board_items[] | select(.column == "Held") | .id] | length) == 2
-      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 2
-      and (.gates | length) == 6
-      and ([.omitted[].surface] | index("gates showing 6 of 8") != null)
-      and ([.omitted[].surface] | index("board Held showing 2 of 3") != null)
-      and ([.omitted[].surface] | index("board Blocked showing 2 of 3") != null)
-      and ([.omitted[].surface] | any(startswith("board Ready showing")) | not)
+    ([.board_items[] | select(.column == "Ready") | .id] == ["ready-1"])
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 1
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 1
+      and (.gates | length) == 3
+      and ([.omitted[].surface] | index("gates showing 3 of 8") != null)
+      and ([.omitted[].surface] | index("board Ready showing 1 of 2") != null)
+      and ([.omitted[].surface] | index("board Held showing 1 of 3") != null)
+      and ([.omitted[].surface] | index("board Blocked showing 1 of 3") != null)
   ' >/dev/null || fail "a shared gate bound starved a board column: $json"
-  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json --all-queued)
+  json=$(FM_BEARINGS_GATES=3 run "$home" "$fakebin" --json --all-queued)
   printf '%s' "$json" | jq -e '
     ([.board_items[] | select(.column == "Ready") | .id] | length) == 2
       and ([.board_items[] | select(.column == "Held") | .id] | length) == 3
       and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 3
       and ([.omitted[].surface] | any(startswith("board ")) | not)
   ' >/dev/null || fail "--all-queued must lift every gate column bound: $json"
-  pass "Ready, Held, and Blocked each keep their share of the gate bound"
+  pass "Ready, Held, and Blocked each keep their share of one gate bound"
 }
 
 test_open_prs_needing_the_captain_reach_waiting_on_you() {
@@ -1006,7 +1020,8 @@ cat <<'JSON'
 [{"number":11,"title":"Needs a look","url":"https://github.com/kunchenguid/firstmate/pull/11","headRefName":"fm/eleven","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[]},
  {"number":12,"title":"Red CI","url":"https://github.com/kunchenguid/firstmate/pull/12","headRefName":"fm/twelve","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"FAILURE","status":"COMPLETED"}]},
  {"number":13,"title":"Author must act","url":"https://github.com/kunchenguid/firstmate/pull/13","headRefName":"fm/thirteen","reviewDecision":"CHANGES_REQUESTED","mergeable":"MERGEABLE","statusCheckRollup":[]},
- {"number":14,"title":"No CI configured","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]}]
+ {"number":14,"title":"Approved but no checks reported","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":15,"title":"Green and approved","url":"https://github.com/kunchenguid/firstmate/pull/15","headRefName":"fm/fifteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
 JSON
 SH
   chmod +x "$fakebin/gh"
@@ -1015,13 +1030,16 @@ SH
     ([.board_items[] | select(.id == "pr-11") | .column] == ["Waiting on you"])
       and (.board_items | any(.id == "pr-11" and .detail == "waiting for your review"
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/11")))
-      and ([.board_items[] | select(.id == "pr-14") | .column] == ["Waiting on you"])
-      and (.board_items | any(.id == "pr-14" and .detail == "ready to merge"))
+      and ([.board_items[] | select(.id == "pr-15") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "pr-15" and .detail == "ready to merge"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/15")))
       and (.board_items | any(.id == "pr-12") | not)
       and (.board_items | any(.id == "pr-13") | not)
+      and (.board_items | any(.id == "pr-14") | not)
+      and (.candidate_prs | any(.num == "14" and .checks == "none"))
       and (.candidate_prs | any(.num == "12") and any(.num == "13"))
   ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
-  pass "PRs awaiting the captain's review or merge board under Waiting on you"
+  pass "PRs awaiting review or a green merge board under Waiting on you, unreported checks do not"
 }
 
 test_toon_json_parity() {
