@@ -1450,8 +1450,8 @@ async function assertStockHtmlRendering(command, submitData) {
   const statusCallsBefore = statusCalls.length;
   const toolsExpandedCallsBefore = toolsExpandedCalls.length;
   terminalInputHandler(submitData);
-  // Pi paints one frame inside the open export window, so a tool row that unhides for
-  // the stock-export pass flashes to full height and collapses again.
+  // Pi paints one frame inside the open export window, so any row that unhides for the
+  // stock-export pass flashes to full height and collapses again.
   const windowRows = [
     ...rows.map(({ name, actual }) => ({ name, row: actual })),
     { name: "fm_watch_arm_pi", row: watchActual },
@@ -1459,6 +1459,8 @@ async function assertStockHtmlRendering(command, submitData) {
     { name: "foreign default-shell custom tool", row: defaultShellRow },
     { name: "foreign-owned built-in", row: contestedBashRow },
     { name: "unregistered provider tool", row: unregisteredRow },
+    { name: "current operational user row", row: operationalComponent },
+    { name: "legacy operational user row", row: legacyOperationalComponent },
   ];
   for (const { name, row } of windowRows) {
     const rendered = row.render(100);
@@ -3552,7 +3554,7 @@ JS
 
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l "/export $export_file"
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" M-s
-  wait_for_text "$export_snapshot" "Session exported to: $export_file" 600 \
+  wait_for_text "$export_snapshot" "Session exported to: $export_file" \
     || fail "/export did not complete while calm mode was on"
   node - "$export_file" <<'JS' || fail "calm-mode HTML export lost tool data or persisted synthetic provenance"
 const html = require("node:fs").readFileSync(process.argv[2], "utf8");
