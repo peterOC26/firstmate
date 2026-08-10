@@ -421,7 +421,15 @@ for a in "\$@"; do
     -m|--mode) skip=1; continue ;;
     -*) continue ;;
   esac
-  mode=\$(stat -f '%Lp' "\$a" 2>/dev/null || stat -c '%a' "\$a" 2>/dev/null)
+  # Platform-detected, never the \`stat -f <fmt> || stat -c <fmt>\` fallback: on
+  # Linux \`stat -f\` is *filesystem* stat, so it writes a filesystem dump for the
+  # path to stdout and only then fails on the format string - and the fallback's
+  # substitution captures both, turning every recorded mode into that dump.
+  if [ "\$(uname)" = Darwin ]; then
+    mode=\$(stat -f '%Lp' "\$a" 2>/dev/null)
+  else
+    mode=\$(stat -c '%a' "\$a" 2>/dev/null)
+  fi
   printf '%s %s\n' "\$mode" "\$a" >> "$2"
 done
 exit 0
