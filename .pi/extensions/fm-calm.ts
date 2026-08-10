@@ -405,7 +405,9 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setStatus("firstmate-calm", undefined);
     removeTerminalInputHandler?.();
     removeTerminalInputHandler = ctx.ui.onTerminalInput((data) => {
-      if (!getKeybindings().matches(data, "tui.input.submit")) return;
+      // Pi's TerminalInputHandler reads the return value as an input override,
+      // so every path returns undefined to leave the keystroke untouched.
+      if (!getKeybindings().matches(data, "tui.input.submit")) return undefined;
 
       const input = ctx.ui.getEditorText().trim();
       if (
@@ -413,7 +415,7 @@ export default function (pi: ExtensionAPI) {
         input !== "/export" &&
         !input.startsWith("/export ")
       ) {
-        return;
+        return undefined;
       }
 
       exportRendering = true;
@@ -428,6 +430,7 @@ export default function (pi: ExtensionAPI) {
         // requests that render without touching Pi's own export completion status.
         ctx.ui.setStatus("firstmate-calm", undefined);
       }, 0);
+      return undefined;
     });
   });
 
