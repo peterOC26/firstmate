@@ -23,7 +23,15 @@ make_fakebin() {  # <dir>
   fb=$(fm_fakebin "$1")
   cat > "$fb/no-mistakes" <<'SH'
 #!/usr/bin/env bash
+# A worktree opts into an attributable run by holding a .fm-fake-run file whose
+# contents are the run status word; every other worktree gets no run at all.
 [ "${FAKE_NM_SLEEP:-0}" = 1 ] && sleep 30
+if [ "${1:-}" = axi ] && [ "${2:-}" = status ] && [ -f .fm-fake-run ]; then
+  branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0
+  head=$(git rev-parse HEAD 2>/dev/null) || exit 0
+  printf 'run:\n  id: "01FAKE"\n  branch: %s\n  status: %s\n  head: "%s"\n  pr: ""\n  findings: none\n' \
+    "$branch" "$(cat .fm-fake-run)" "$head"
+fi
 exit 0
 SH
   cat > "$fb/tmux" <<'SH'
@@ -85,6 +93,20 @@ record_claude_state() {  # <state-dir> <id> <busy|idle>
   gen=$("$ROOT/bin/fm-busy-event.sh" arm "$state" "$id")
   "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" "$semantic_state" --gen "$gen" \
     --source claude-hook --event "$event"
+}
+
+# A ship worktree on its own branch with an attributable no-mistakes run, so this
+# crew's current state comes from the run-step source instead of its status log.
+write_run_step_task() {  # <home> <id> <run-status>
+  local home=$1 id=$2 run_status=$3 wt
+  wt="$home/projects/$id-wt"
+  fm_git_init_commit "$wt"
+  git -C "$wt" checkout -q -b "fm/$id"
+  printf '%s\n' "$run_status" > "$wt/.fm-fake-run"
+  fm_write_meta "$home/state/$id.meta" \
+    "window=firstmate:fm-$id" "worktree=$wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" "$id" idle
 }
 
 fixture_mate_home() {  # <parent-home>
@@ -905,11 +927,7 @@ test_board_columns_are_complete_and_classified() {
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$home/state" stalled-task idle
   printf 'blocked [key=synthetic-dependency]: firstmate can refresh the token\n' > "$home/state/stalled-task.status"
-  fm_write_meta "$home/state/cancelled-task.meta" \
-    "window=firstmate:fm-cancelled-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
-    "harness=claude" "kind=ship" "mode=no-mistakes"
-  record_claude_state "$home/state" cancelled-task idle
-  printf 'failed: run cancelled\n' > "$home/state/cancelled-task.status"
+  write_run_step_task "$home" cancelled-task cancelled
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --include-prs --json)
   toon=$(run "$home" "$fakebin" --include-prs)
@@ -955,9 +973,10 @@ test_board_columns_are_complete_and_classified() {
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
-# A validation-run stop is a deliberate park and reads calmly; a crew that reported
-# its OWN failure is a real wreck and must keep the needs-a-look cue in both the
-# summary and the detail, or the captain reads a lost worktree as an orderly park.
+# Only a no-mistakes run-step stop is the deliberate park that reads calmly. A crew
+# that reported its OWN failure is a real wreck and keeps the needs-a-look cue in
+# both summary and detail - including when its free-form `failed: {why}` prose
+# happens to mention a failed run, which must never buy it the calm wording.
 test_real_worker_failure_is_not_dressed_as_a_deliberate_park() {
   local home fakebin json
   home=$(make_home failure-honesty); write_fixture "$home"
@@ -966,17 +985,22 @@ test_real_worker_failure_is_not_dressed_as_a_deliberate_park() {
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$home/state" wrecked-task idle
   printf 'failed: worktree gone, work lost\n' > "$home/state/wrecked-task.status"
-  fm_write_meta "$home/state/parked-task.meta" \
-    "window=firstmate:fm-parked-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+  fm_write_meta "$home/state/masquerading-task.meta" \
+    "window=firstmate:fm-masquerading-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
-  record_claude_state "$home/state" parked-task idle
-  printf 'failed: run failed\n' > "$home/state/parked-task.status"
+  record_claude_state "$home/state" masquerading-task idle
+  printf 'failed: the validation run failed and the worktree is gone\n' \
+    > "$home/state/masquerading-task.status"
+  write_run_step_task "$home" parked-task failed
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.board_items | any(.column == "Under way" and .id == "wrecked-task"
       and .summary == "worktree gone, work lost"
       and .detail == "failed, needs a look"))
+      and (.board_items | any(.column == "Under way" and .id == "masquerading-task"
+        and .summary == "the validation run failed and the worktree is gone"
+        and .detail == "failed, needs a look"))
       and (.board_items | any(.column == "Under way" and .id == "parked-task"
         and .summary == "parked after validation stop"
         and .detail == "parked after validation stop"))

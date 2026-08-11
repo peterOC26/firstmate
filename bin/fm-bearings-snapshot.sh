@@ -334,8 +334,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       elif .checks == "none" then "PR open - no checks reported"
       else "PR open" end;
   def validation_park:
-    (.state == "failed" or .state == "cancelled")
-    and ((.doing // "") | test("run (failed|cancelled)"; "i"));
+    (.state == "failed" or .state == "cancelled") and .source == "run-step";
   def under_way_detail:
     .state as $state
     | if $state == "working" then "working now"
@@ -422,13 +421,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         state: .current_state.state,
         doing: ((.current_state.detail // "") as $d
                 | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90)),
+        source: (.current_state.source // "-"),
         pr: (if (.pr.url != null and .pr.source == "meta") then .pr.url else "-" end)
       } ]
      + [ $secondmate_views[]
          | select(.bearings_state == "active_child_work")
          | {id,kind:"secondmate",state:.bearings_state,
             doing:([.active_children[] | .id + ": " + (.doing // .state)] | join("; ") | trunc(90)),
-            pr:"-"} ]) as $in_flight_all
+            source:"-",pr:"-"} ]) as $in_flight_all
   | ([ .backlog.records[]
          | select(.structured and .captain_actionable == true)
          | {id,key:.id,verb:"captain-hold",
@@ -537,7 +537,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       prs: $prs,
       board_columns: $board_columns,
       board_items: $board_items,
-      in_flight: ($in_flight | map(del(.pr))),
+      in_flight: ($in_flight | map(del(.source, .pr))),
       secondmates: $secondmates,
       decisions_open: $decisions,
       landed: $landed,
