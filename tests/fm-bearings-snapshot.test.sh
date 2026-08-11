@@ -905,6 +905,11 @@ test_board_columns_are_complete_and_classified() {
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$home/state" stalled-task idle
   printf 'blocked [key=synthetic-dependency]: firstmate can refresh the token\n' > "$home/state/stalled-task.status"
+  fm_write_meta "$home/state/cancelled-task.meta" \
+    "window=firstmate:fm-cancelled-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" cancelled-task idle
+  printf 'failed: run cancelled\n' > "$home/state/cancelled-task.status"
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --include-prs --json)
   toon=$(run "$home" "$fakebin" --include-prs)
@@ -920,10 +925,15 @@ test_board_columns_are_complete_and_classified() {
         and .detail == "working now" and .owner == "(main)"))
       and (.board_items | any(.column == "Under way" and .id == "stalled-task"
         and .detail == "stalled, needs a look" and .owner == "(main)"))
+      and (.board_items | any(.column == "Under way" and .id == "cancelled-task"
+        and .summary == "parked after validation stop"
+        and .detail == "parked after validation stop"))
       and ([.board_items[] | select(.column == "Under way") | .detail]
         | any(. == "working" or . == "parked" or . == "done" or . == "blocked"
-              or . == "paused" or . == "failed" or . == "unknown"
+              or . == "paused" or . == "failed" or . == "cancelled" or . == "unknown"
               or . == "active_child_work") | not)
+      and ([.board_items[] | select(.column == "Under way") | .summary]
+        | any(. == "run cancelled" or . == "run failed") | not)
       and ([.board_items[] | select(.column == "Under way") | .owner]
         | any(. == "ship" or . == "scout" or . == "secondmate") | not)
       and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"
@@ -1034,18 +1044,22 @@ SH
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/11")))
       and (.board_items | any(.id == "kunchenguid/firstmate#15" and .detail == "ready to merge"
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/15")))
-      and (.board_items | any(.id == "kunchenguid/firstmate#14"
-        and .detail == "approved, no checks reported"
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#12"
+        and .detail == "PR open - CI failing"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/12")))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#13"
+        and .detail == "PR open - changes requested"))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#14"
+        and .detail == "PR open - no checks reported"
         and (.artifact == "https://github.com/kunchenguid/firstmate/pull/14")))
-      and (.board_items | any(.id == "kunchenguid/firstmate#16"
-        and .detail == "approved, checks still running"))
-      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 4
-      and (.board_items | any(.id | test("#12$")) | not)
-      and (.board_items | any(.id | test("#13$")) | not)
-      and (.board_items | any(.id | test("#17$")) | not)
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#16"
+        and .detail == "PR open - checks still running"))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#17"
+        and .detail == "PR open - needs author update"))
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 2
       and (.candidate_prs | any(.num == "12") and any(.num == "13") and any(.num == "17"))
   ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
-  pass "PRs awaiting review or merge board with an honest check state, author-owned ones do not"
+  pass "PRs awaiting captain action wait on the captain, and other open PRs stay visible under way"
 }
 
 test_board_pr_ids_stay_unique_across_repositories() {

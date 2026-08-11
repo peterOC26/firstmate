@@ -318,22 +318,34 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   def pr_captain_action:
     ((.review // "none") | if . == "" then "none" else . end) as $review
     | if $review == "APPROVED" and .mergeable == "MERGEABLE" then
-        (if .checks == "passing" then "ready to merge"
-         elif .checks == "pending" then "approved, checks still running"
-         elif .checks == "none" then "approved, no checks reported"
-         else "-" end)
+        (if .checks == "passing" then "ready to merge" else "-" end)
       elif ($review == "none" or $review == "REVIEW_REQUIRED") and .checks != "failing"
         then "waiting for your review"
       else "-" end;
+  def pr_under_way_detail:
+    ((.review // "none") | if . == "" then "none" else . end) as $review
+    | if pr_captain_action != "-" then "-"
+      elif $review == "CHANGES_REQUESTED" then "PR open - changes requested"
+      elif .mergeable == "CONFLICTING" then "PR open - needs author update"
+      elif .checks == "failing" then "PR open - CI failing"
+      elif .checks == "pending" then "PR open - checks still running"
+      elif .checks == "none" then "PR open - no checks reported"
+      else "PR open" end;
   def under_way_detail:
     if . == "working" then "working now"
     elif . == "active_child_work" then "child work under way"
-    elif . == "paused" then "paused on a declared external wait"
+    elif . == "paused" then "paused for walk"
     elif . == "blocked" then "stalled, needs a look"
-    elif . == "failed" then "failed, needs a look"
+    elif . == "failed" then "parked after validation stop"
+    elif . == "cancelled" then "parked after validation stop"
     elif . == "parked" then "parked between steps"
     elif . == "done" then "finished, awaiting pickup"
     else "current state unclear" end;
+  def under_way_summary:
+    if (.state == "failed" or .state == "cancelled")
+       and ((.doing // "") | test("run (failed|cancelled)"; "i")) then
+      "parked after validation stop"
+    else .doing end;
   def round_robin($n):
     . as $groups
     | [range(0; (($groups | map(length) | max) // 0)) as $i
@@ -490,9 +502,15 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       | {column:"Blocked",id,summary:.title,owner,detail:(if .blocked_by == "-" then .reason else ("blocked by " + .blocked_by) end),artifact:"-"}
     ] + [
       $in_flight[]
-      | {column:"Under way",id,summary:.doing,
+      | {column:"Under way",id,summary:under_way_summary,
          owner:(if .kind == "secondmate" then .id else "(main)" end),
          detail:(.state | under_way_detail),artifact:"-"}
+    ] + [
+      $candidate_prs[]
+      | select(pr_under_way_detail != "-")
+      | {column:"Under way",id:(.repo + "#" + .num),
+         summary:((.repo + " PR " + .num + ": " + .title) | trunc(90)),
+         owner:.repo,detail:pr_under_way_detail,artifact:.url}
     ] + [
       $decisions[]
       | {column:"Waiting on you",id,summary,owner,detail:"your decision needed",artifact:"-"}
