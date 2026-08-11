@@ -86,8 +86,8 @@ Rules that keep the contract unambiguous:
 - Done always renders the bounded current baseline, even when the same completions appeared in an earlier report.
 - The six buckets are mutually exclusive, so every board item is forced into exactly one column by `board_items`.
 - The strict boundary keeps action-free items OUT of Waiting on you: a working or validating task, a queued item blocked on another task or a date, landed work, a completed scout's report pointer, a declared `paused:` external wait, and a bare recorded PR with no merge-ready signal each belong to one of the other columns, never Waiting on you.
-- A secondmate's own row appears Under way only for `active_child_work`; held structured-home state is represented through the board's queued or held items unless its reason requires the captain's action.
-- A secondmate home whose own state is unavailable boards under Blocked as an unavailable-state gate, so an unreachable home is never silently absent from every column even when its queues, holds, and decisions are all empty.
+- A secondmate's own row appears Under way only for `active_child_work`, and a home awaiting the captain reaches Waiting on you through its own decisions.
+- Every other secondmate home still lands in a column: an unavailable home boards under Blocked as an unavailable-state gate, and a home held on its own work boards under Held whenever its queued items do not already represent it. An unreachable or held home is never silently absent from all six columns, even when its queues, holds, and decisions are all empty.
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown`.
 - Include the required direct address to the captain inside one item or empty-state sentence.
 - Every PR appears as the full `https://...` URL; a shorthand `#number` is fine only as a back-reference after the full URL has already appeared in the same digest.

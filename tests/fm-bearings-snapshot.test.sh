@@ -1113,6 +1113,85 @@ EOF
   pass "the main-inventory integrity gate outranks queued work when the gate bound is full"
 }
 
+# A secondmate home held on its OWN child work carries no queued backlog row (the
+# child-state hold branch requires the absence of hold metadata), so nothing else
+# on the board represents it. It must still occupy a column rather than vanish.
+test_externally_held_secondmate_home_stays_on_the_board() {
+  local home fakebin mate wt json canonical
+  home=$(make_home mate-held)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/mate-held-home"
+  make_valid_secondmate_home held-mate "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] mate-ship - Ship the mate thing (repo: sample) (kind: ship) (since 2026-07-13)
+
+## Queued
+
+## Done
+EOF
+  wt="$mate/projects/mate-ship"
+  fm_git_init_commit "$wt"
+  fm_write_meta "$mate/state/mate-ship.meta" \
+    "window=firstmate:fm-mate-ship" "worktree=$wt" "project=sample" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$mate/state" mate-ship idle
+  printf 'paused: waiting on the upstream vendor release\n' > "$mate/state/mate-ship.status"
+  append_secondmate_registry "$home" held-mate "$mate"
+  fakebin=$(make_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    (.secondmate_current.records[] | select(.id == "held-mate")
+      | .current.state == "externally_held"
+        and .provenance.selected == "structured-home"
+        and (.queued | length) == 0
+        and (.holds | any(.source == "child-state")))
+  ' >/dev/null || fail "fixture did not produce a child-state held secondmate home: $canonical"
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "held-mate") | .column] == ["Held"])
+      and (.board_items | any(.id == "held-mate"
+        and .detail == "secondmate home held on its own work"
+        and (.summary | contains("upstream vendor release"))))
+      and (.gates | any(.id == "held-mate"))
+  ' >/dev/null || fail "a held secondmate home vanished from every board column: $json"
+  pass "a secondmate home held on its own child work stays on the board under Held"
+}
+
+# The pinned integrity prefix must never eat the whole gate bound: many unreachable
+# homes at once still leave Ready, Held, and Blocked a share of ordinary work.
+test_many_unavailable_homes_do_not_starve_the_queued_columns() {
+  local home fakebin mate json i
+  home=$(make_home mate-flood); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] blk-1 - Blocked one blocked-by: missing-1 (repo: firstmate) (kind: ship)
+
+## Done
+EOF
+  i=1
+  while [ "$i" -le 4 ]; do
+    mate="$TMP_ROOT/mate-flood-gone-$i"
+    append_secondmate_registry "$home" "gone-$i" "$mate"
+    i=$((i + 1))
+  done
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=4 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] | length) >= 1
+      and ([.board_items[] | select(.column == "Held") | .id] | length) >= 1
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) >= 1
+      and (.gates | length) == 4
+      and ([.board_items[] | select(.column == "Blocked") | .id] | any(startswith("gone-")))
+  ' >/dev/null || fail "unavailable secondmate homes starved the queued board columns: $json"
+  pass "a flood of unavailable homes still leaves each queued column its share"
+}
+
 test_open_prs_needing_the_captain_reach_waiting_on_you() {
   local home fakebin json
   home=$(make_home pr-columns); write_fixture "$home"
@@ -2208,6 +2287,8 @@ test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
 test_integrity_gate_outranks_queued_work_at_a_full_bound
+test_externally_held_secondmate_home_stays_on_the_board
+test_many_unavailable_homes_do_not_starve_the_queued_columns
 test_open_prs_needing_the_captain_reach_waiting_on_you
 test_board_pr_ids_stay_unique_across_repositories
 test_toon_json_parity
