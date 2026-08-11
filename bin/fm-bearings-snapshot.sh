@@ -317,8 +317,10 @@ MODEL=$(printf '%s' "$SNAP" | jq \
     else ((.hold_reason // .blocked_reason // "-") | trunc(40)) end;
   def pr_captain_action:
     ((.review // "none") | if . == "" then "none" else . end) as $review
-    | if $review == "APPROVED" and .mergeable == "MERGEABLE" then
-        (if .checks == "passing" then "ready to merge" else "-" end)
+    | ((.mergeable // "UNKNOWN") | if . == "" then "UNKNOWN" else . end) as $mergeable
+    | if $review == "APPROVED" and .checks == "passing" and $mergeable != "CONFLICTING" then
+        (if $mergeable == "MERGEABLE" then "ready to merge"
+         else "ready to merge - GitHub has not reported mergeability yet" end)
       elif ($review == "none" or $review == "REVIEW_REQUIRED") and .checks != "failing"
         then "waiting for your review"
       else "-" end;
@@ -331,21 +333,22 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       elif .checks == "pending" then "PR open - checks still running"
       elif .checks == "none" then "PR open - no checks reported"
       else "PR open" end;
+  def validation_park:
+    (.state == "failed" or .state == "cancelled")
+    and ((.doing // "") | test("run (failed|cancelled)"; "i"));
   def under_way_detail:
-    if . == "working" then "working now"
-    elif . == "active_child_work" then "child work under way"
-    elif . == "paused" then "paused for walk"
-    elif . == "blocked" then "stalled, needs a look"
-    elif . == "failed" then "parked after validation stop"
-    elif . == "cancelled" then "parked after validation stop"
-    elif . == "parked" then "parked between steps"
-    elif . == "done" then "finished, awaiting pickup"
-    else "current state unclear" end;
+    .state as $state
+    | if $state == "working" then "working now"
+      elif $state == "active_child_work" then "child work under way"
+      elif $state == "paused" then "paused, waiting on something outside the fleet"
+      elif $state == "blocked" then "stalled, needs a look"
+      elif $state == "failed" or $state == "cancelled" then
+        (if validation_park then "parked after validation stop" else "failed, needs a look" end)
+      elif $state == "parked" then "parked between steps"
+      elif $state == "done" then "finished, awaiting pickup"
+      else "current state unclear" end;
   def under_way_summary:
-    if (.state == "failed" or .state == "cancelled")
-       and ((.doing // "") | test("run (failed|cancelled)"; "i")) then
-      "parked after validation stop"
-    else .doing end;
+    if validation_park then "parked after validation stop" else .doing end;
   def round_robin($n):
     . as $groups
     | [range(0; (($groups | map(length) | max) // 0)) as $i
@@ -418,12 +421,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        | {id, kind,
         state: .current_state.state,
         doing: ((.current_state.detail // "") as $d
-                | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90))
+                | (if $d != "" then $d else (.hints.last_event_text // "") end) | trunc(90)),
+        pr: (if (.pr.url != null and .pr.source == "meta") then .pr.url else "-" end)
       } ]
      + [ $secondmate_views[]
          | select(.bearings_state == "active_child_work")
          | {id,kind:"secondmate",state:.bearings_state,
-            doing:([.active_children[] | .id + ": " + (.doing // .state)] | join("; ") | trunc(90))} ]) as $in_flight_all
+            doing:([.active_children[] | .id + ": " + (.doing // .state)] | join("; ") | trunc(90)),
+            pr:"-"} ]) as $in_flight_all
   | ([ .backlog.records[]
          | select(.structured and .captain_actionable == true)
          | {id,key:.id,verb:"captain-hold",
@@ -504,7 +509,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       $in_flight[]
       | {column:"Under way",id,summary:under_way_summary,
          owner:(if .kind == "secondmate" then .id else "(main)" end),
-         detail:(.state | under_way_detail),artifact:"-"}
+         detail:under_way_detail,artifact:(.pr // "-")}
     ] + [
       $candidate_prs[]
       | select(pr_under_way_detail != "-")
@@ -532,7 +537,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       prs: $prs,
       board_columns: $board_columns,
       board_items: $board_items,
-      in_flight: $in_flight,
+      in_flight: ($in_flight | map(del(.pr))),
       secondmates: $secondmates,
       decisions_open: $decisions,
       landed: $landed,

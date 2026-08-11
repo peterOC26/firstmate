@@ -922,12 +922,17 @@ test_board_columns_are_complete_and_classified() {
       and (.board_items | any(.column == "Held" and .id == "held-work" and .detail == "after release window"))
       and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
       and (.board_items | any(.column == "Under way" and .id == "ship-task"
-        and .detail == "working now" and .owner == "(main)"))
+        and .detail == "working now" and .owner == "(main)"
+        and .artifact == "https://github.com/kunchenguid/firstmate/pull/9"))
       and (.board_items | any(.column == "Under way" and .id == "stalled-task"
-        and .detail == "stalled, needs a look" and .owner == "(main)"))
+        and .detail == "stalled, needs a look" and .owner == "(main)"
+        and .artifact == "-"))
       and (.board_items | any(.column == "Under way" and .id == "cancelled-task"
         and .summary == "parked after validation stop"
         and .detail == "parked after validation stop"))
+      and (.board_items | any(.column == "Under way" and .id == "external-wait"
+        and (.detail | test("walk") | not)
+        and (.summary | contains("upstream release"))))
       and ([.board_items[] | select(.column == "Under way") | .detail]
         | any(. == "working" or . == "parked" or . == "done" or . == "blocked"
               or . == "paused" or . == "failed" or . == "cancelled" or . == "unknown"
@@ -948,6 +953,35 @@ test_board_columns_are_complete_and_classified() {
   assert_contains "$toon" "board_items[$(printf '%s' "$json" | jq '.board_items | length')]{" \
     "TOON must expose every projected board item as counted tabular rows"
   pass "Kanban board columns are complete and projected from the bounded snapshot"
+}
+
+# A validation-run stop is a deliberate park and reads calmly; a crew that reported
+# its OWN failure is a real wreck and must keep the needs-a-look cue in both the
+# summary and the detail, or the captain reads a lost worktree as an orderly park.
+test_real_worker_failure_is_not_dressed_as_a_deliberate_park() {
+  local home fakebin json
+  home=$(make_home failure-honesty); write_fixture "$home"
+  fm_write_meta "$home/state/wrecked-task.meta" \
+    "window=firstmate:fm-wrecked-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" wrecked-task idle
+  printf 'failed: worktree gone, work lost\n' > "$home/state/wrecked-task.status"
+  fm_write_meta "$home/state/parked-task.meta" \
+    "window=firstmate:fm-parked-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" parked-task idle
+  printf 'failed: run failed\n' > "$home/state/parked-task.status"
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.board_items | any(.column == "Under way" and .id == "wrecked-task"
+      and .summary == "worktree gone, work lost"
+      and .detail == "failed, needs a look"))
+      and (.board_items | any(.column == "Under way" and .id == "parked-task"
+        and .summary == "parked after validation stop"
+        and .detail == "parked after validation stop"))
+  ' >/dev/null || fail "a real worker failure was reported as a deliberate park: $json"
+  pass "a real worker failure keeps its needs-a-look cue while validation stops stay calm"
 }
 
 test_landed_blocker_frees_queued_work_to_ready() {
@@ -1033,7 +1067,8 @@ cat <<'JSON'
  {"number":14,"title":"Approved but no checks reported","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]},
  {"number":15,"title":"Green and approved","url":"https://github.com/kunchenguid/firstmate/pull/15","headRefName":"fm/fifteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]},
  {"number":16,"title":"Approved while CI runs","url":"https://github.com/kunchenguid/firstmate/pull/16","headRefName":"fm/sixteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"status":"IN_PROGRESS"}]},
- {"number":17,"title":"Approved but conflicting","url":"https://github.com/kunchenguid/firstmate/pull/17","headRefName":"fm/seventeen","reviewDecision":"APPROVED","mergeable":"CONFLICTING","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+ {"number":17,"title":"Approved but conflicting","url":"https://github.com/kunchenguid/firstmate/pull/17","headRefName":"fm/seventeen","reviewDecision":"APPROVED","mergeable":"CONFLICTING","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]},
+ {"number":18,"title":"Green and approved, mergeability unreported","url":"https://github.com/kunchenguid/firstmate/pull/18","headRefName":"fm/eighteen","reviewDecision":"APPROVED","mergeable":"UNKNOWN","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
 JSON
 SH
   chmod +x "$fakebin/gh"
@@ -1056,7 +1091,11 @@ SH
         and .detail == "PR open - checks still running"))
       and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#17"
         and .detail == "PR open - needs author update"))
-      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 2
+      and ([.board_items[] | select(.id == "kunchenguid/firstmate#18") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "kunchenguid/firstmate#18"
+        and (.detail | startswith("ready to merge"))
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/18")))
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 3
       and (.candidate_prs | any(.num == "12") and any(.num == "13") and any(.num == "17"))
   ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
   pass "PRs awaiting captain action wait on the captain, and other open PRs stay visible under way"
@@ -2105,6 +2144,7 @@ test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
+test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
 test_open_prs_needing_the_captain_reach_waiting_on_you
