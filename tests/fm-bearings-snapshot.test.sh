@@ -509,6 +509,13 @@ test_bad_secondmate_homes_never_revive_parent_work() {
       and (.secondmates | any(.[]; .id == "unreadable" and (.reason | test("invalid home|unreadable"))))
       and (.secondmates | any(.[]; .id == "malformed" and (.reason | contains("unstructured current backlog row"))))
       and (.secondmates | any(.[]; .id == "timedout" and (.reason | contains("timed out"))))
+      and (([.board_items[] | select(.column == "Blocked") | .id] | sort)
+        == ["invalid","malformed","missing","timedout","unreadable"])
+      and (.board_items | any(.id == "unreadable" and .column == "Blocked"
+        and .detail == "secondmate home unavailable"
+        and (.summary | test("invalid home|unreadable"))))
+      and (.board_items | any(.id == "timedout" and .column == "Blocked"
+        and (.summary | contains("timed out"))))
   ' >/dev/null || fail "bad home outcomes revived stale work or lacked provenance: $json"
   pass "missing, invalid, unreadable, malformed, and timed-out homes stay explicit unknowns"
 }
@@ -1075,6 +1082,35 @@ EOF
       and ([.omitted[].surface] | any(startswith("board ")) | not)
   ' >/dev/null || fail "--all-queued must lift every gate column bound: $json"
   pass "Ready, Held, and Blocked each keep their share of one gate bound"
+}
+
+# The integrity gate is the one board item that says main current state is broken,
+# so a full Ready/Held queue must never crowd it out of Blocked at a low bound.
+test_integrity_gate_outranks_queued_work_at_a_full_bound() {
+  local home fakebin json
+  home=$(make_home integrity-bound)
+  : > "$home/data/secondmates.md"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] only-orphan - Structured in flight without meta (repo: firstmate) (kind: ship) (since 2026-07-11)
+
+## Queued
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] ready-2 - Ready two (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-2 - Held two (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+
+## Done
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "(main-inventory)") | .column] == ["Blocked"])
+      and (.gates | length) == 2
+      and (.gates | any(.id == "(main-inventory)"))
+      and ([.omitted[].surface] | index("board Held showing 0 of 2") != null)
+  ' >/dev/null || fail "a full queue crowded the main-inventory integrity gate off the board: $json"
+  pass "the main-inventory integrity gate outranks queued work when the gate bound is full"
 }
 
 test_open_prs_needing_the_captain_reach_waiting_on_you() {
@@ -2171,6 +2207,7 @@ test_board_columns_are_complete_and_classified
 test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
+test_integrity_gate_outranks_queued_work_at_a_full_bound
 test_open_prs_needing_the_captain_reach_waiting_on_you
 test_board_pr_ids_stay_unique_across_repositories
 test_toon_json_parity

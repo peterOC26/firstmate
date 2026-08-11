@@ -445,7 +445,19 @@ MODEL=$(printf '%s' "$SNAP" | jq \
           owner:"(main)",
           gate:"blocked"}]
       else [] end)
-     + [ .backlog.records[]
+     + [ $secondmates_all[]
+         | select(.state == "unknown")
+         | ((.reason // "") as $r | (.doing // "") as $d
+            | if ($r != "" and $r != "-") then $r
+              elif $d != "" then $d
+              else "home state unavailable" end) as $why
+         | {id,
+            title:($why | trunc(60)),
+            blocked_by:"-",
+            reason:"secondmate home unavailable",
+            owner:.id,
+            gate:"blocked"} ]) as $integrity_all
+  | ([ .backlog.records[]
          | . as $record
          | select(.structured and
              (.state == "queued" or
@@ -464,7 +476,8 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | {id,title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
             reason:gate_reason,owner:$m.id,
-            gate:gate_class} ]) as $gates_all
+            gate:gate_class} ]) as $queued_gates
+  | ($integrity_all + $queued_gates) as $gates_all
   | ([ .scout_reports[]
        | . as $r
        | select(($all_reports == 1) or (($rel_ids | index($r.id)) != null))
@@ -475,12 +488,15 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | (if $all_decisions == 1 then $decisions_all else $decisions_all[:$decisions_n] end) as $decisions
   | ($done | map({id, what:(.title | trunc(70)),
                   artifact:(.pr_url // .report_path // .local_note // "-"),owner:.home_id})) as $landed
-  | ([ $gates_all[] | select(.gate == "-") ]) as $gates_ready_all
-  | ([ $gates_all[] | select(.gate == "hold") ]) as $gates_held_all
-  | ([ $gates_all[] | select(.gate == "blocked") ]) as $gates_blocked_all
+  | ([ $queued_gates[] | select(.gate == "-") ]) as $gates_ready_all
+  | ([ $queued_gates[] | select(.gate == "hold") ]) as $gates_held_all
+  | ([ $queued_gates[] | select(.gate == "blocked") ]) as $gates_blocked_all
+  | (if $all_queued == 1 then $integrity_all else $integrity_all[:$gates_n] end) as $integrity
   | (if $all_queued == 1 then $gates_all
-     else (([$gates_ready_all, $gates_held_all, $gates_blocked_all] | round_robin($gates_n)) as $share
-           | [ $share[] | select(.gate == "-") ]
+     else (([($gates_n - ($integrity | length)), 0] | max) as $share_n
+           | ([$gates_ready_all, $gates_held_all, $gates_blocked_all] | round_robin($share_n)) as $share
+           | $integrity
+             + [ $share[] | select(.gate == "-") ]
              + [ $share[] | select(.gate == "hold") ]
              + [ $share[] | select(.gate == "blocked") ]) end) as $gates
   | (if $all_reports == 1 then $reports_all else $reports_all[:$reports_n] end) as $reports
@@ -580,7 +596,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $all_queued == 0 and ($gates_all | length) > ($gates | length) then {surface:("gates showing \($gates | length) of \($gates_all | length)"), reveal:"--all-queued"} else empty end),
         ([{column:"Ready",gate:"-",all:$gates_ready_all},
           {column:"Held",gate:"hold",all:$gates_held_all},
-          {column:"Blocked",gate:"blocked",all:$gates_blocked_all}][]
+          {column:"Blocked",gate:"blocked",all:($integrity_all + $gates_blocked_all)}][]
          | . as $c
          | ([$gates[] | select(.gate == $c.gate)] | length) as $shown
          | if $all_queued == 0 and ($c.all | length) > $shown
