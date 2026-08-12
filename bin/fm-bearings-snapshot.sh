@@ -59,6 +59,17 @@
 # The board_columns + board_items surfaces are the Kanban renderer source: every
 # column is declared every run, and each item is projected from the same bounded
 # arrays that already feed the legacy digest surfaces.
+#
+# Under way wording must stay honest about live and deliberately parked workers.
+# A failed/cancelled crew state whose source is the run step means the validation
+# run stopped, not that the worker died, so it reads as a validation park instead
+# of "failed, needs a look". The run-step source keys that shield, never detail
+# prose, so a genuine worker failure from any other source still reads as one.
+#
+# Under --include-prs, every discovered open PR reaches exactly one column and
+# none silently vanishes: it boards Waiting on you only when the captain must
+# review or merge it now, and otherwise boards Under way with its blocking state
+# (CI failing, checks pending, changes requested, conflicting).
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

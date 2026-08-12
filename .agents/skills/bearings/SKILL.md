@@ -61,7 +61,7 @@ It never tears down a task, merges a PR, dispatches new work, steers a worker, a
    - **Ready** - dispatchable queued work from the snapshot board.
    - **Held** - captain- or time-gated work that is not ready to dispatch.
    - **Blocked** - work waiting on another item or an action-free inventory integrity gate.
-   - **Under way** - live workers from the snapshot board, with current state and useful pickup pointers (`data/<id>/report.md` files when relevant).
+   - **Under way** - live workers from the snapshot board, with current state and useful pickup pointers (`data/<id>/report.md` files when relevant), plus every open PR that needs no captain action right now, each with its full `https://...` URL.
    - **Waiting on you** - every open decision, each PR ready to merge, and each needed credential or login, every PR with the full `https://...` URL, never a bare `#number`.
    - **Done** - the bounded current recent-completions baseline from structured state across the main fleet and every registered secondmate home, rendered in full on every run.
    After writing the file, return the concise six-column chat digest and include the report path or link without adding a seventh section.
@@ -74,7 +74,7 @@ Every `/bearings` chat response renders EXACTLY these six columns, in THIS order
 1. **Ready** - dispatchable queued work.
 2. **Held** - captain- or time-gated work that is not ready to dispatch.
 3. **Blocked** - queued work waiting on another item, plus action-free inventory integrity gates.
-4. **Under way** - live workers, one line of current state per direct report.
+4. **Under way** - live workers, one line of current state per direct report, plus every open PR that needs no captain action right now.
 5. **Waiting on you** - ONLY items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
 6. **Done** - the bounded current recent-completions baseline: merged PRs, completed scouts, and finished local-only merges across the main fleet and every registered secondmate home.
 
@@ -86,6 +86,8 @@ Rules that keep the contract unambiguous:
 - Done always renders the bounded current baseline, even when the same completions appeared in an earlier report.
 - The six buckets are mutually exclusive, so every board item is forced into exactly one column by `board_items`.
 - The strict boundary keeps action-free items OUT of Waiting on you: a working or validating task, a queued item blocked on another task or a date, landed work, a completed scout's report pointer, a declared `paused:` external wait, and a bare recorded PR with no merge-ready signal each belong to one of the other columns, never Waiting on you.
+- An open PR is never absent from the board: it reaches Waiting on you only when the captain must review or merge it now, and otherwise reaches Under way with its current state (CI failing, checks still running, changes requested, needs an author update).
+- Carry each item's `summary` and `detail` from `board_items` instead of re-deriving state wording from the older arrays, so a worker parked by a stopped validation run or a declared external wait keeps its honest parked or paused progress language and is never reported as a failure that needs a look.
 - A secondmate's own row appears Under way only for `active_child_work`, and a home awaiting the captain reaches Waiting on you through its own decisions.
 - Every secondmate hold reaches a column on its own terms: a hold recorded on the home's backlog boards through that queued item, and a hold that exists only because the home's own child is parked, paused, or blocked boards under Held as its own item. An unavailable home boards under Blocked as an unavailable-state gate. No home's held work is ever silently absent from all six columns, whatever else that home has queued.
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown`.
