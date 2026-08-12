@@ -106,24 +106,13 @@ fm_context_valid_positive_uint "$FM_CONTEXT_TAIL_BYTES" || FM_CONTEXT_TAIL_BYTES
 fm_context_valid_positive_uint "$FM_CONTEXT_HEAD_BYTES" || FM_CONTEXT_HEAD_BYTES=65536
 
 transcript_slice() {  # <file> <head|tail>
-  local file=$1 end=$2 size
-  size=$(wc -c < "$file" 2>/dev/null | tr -d '[:space:]')
-  fm_context_valid_uint "$size" || return 1
-  [ "$size" -gt 0 ] || return 1
+  local file=$1 end=$2
   case "$end" in
     head)
-      if [ "$size" -gt "$FM_CONTEXT_HEAD_BYTES" ]; then
-        head -c "$FM_CONTEXT_HEAD_BYTES" "$file"
-      else
-        cat "$file"
-      fi
+      head -c "$FM_CONTEXT_HEAD_BYTES" "$file"
       ;;
     tail)
-      if [ "$size" -gt "$FM_CONTEXT_TAIL_BYTES" ]; then
-        tail -c "$FM_CONTEXT_TAIL_BYTES" "$file" | sed '1d'
-      else
-        cat "$file"
-      fi
+      tail -c "$FM_CONTEXT_TAIL_BYTES" "$file" | sed '1d'
       ;;
     *) return 1 ;;
   esac
