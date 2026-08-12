@@ -383,16 +383,17 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ([ (.secondmate_current.records // [])[]
        | ([.decisions_open[]? | select(.source == "backlog" and .verb == "captain-hold")]) as $captain_holds
        | ([.holds[]? | select(.source == "backlog")]) as $backlog_holds
+       | (.holds // []) as $all_holds
+       | (if .current.state == "captain_decision" then
+            if ($captain_holds | length) > 0 then "captain_decision"
+            elif (.active_children | length) > 0 then "active_child_work"
+            elif ($all_holds | length) > 0 then "externally_held"
+            else "no_active_work" end
+          else .current.state end) as $bearings_state
        | . + {
            bearings_captain_holds:$captain_holds,
-           bearings_holds:(if .current.state == "captain_decision" then $backlog_holds else .holds end),
-           bearings_state:(
-             if .current.state == "captain_decision" then
-               if ($captain_holds | length) > 0 then "captain_decision"
-               elif (.active_children | length) > 0 then "active_child_work"
-               elif ($backlog_holds | length) > 0 then "externally_held"
-               else "unknown" end
-             else .current.state end)
+           bearings_holds:(if $bearings_state == "captain_decision" then $backlog_holds else $all_holds end),
+           bearings_state:$bearings_state
          } ]) as $secondmate_views
   | ([ if .secondmate_current.registry.available == false then
          {id:"(registry)",state:"unknown",doing:(.secondmate_current.registry.reason // "Registered secondmate table unavailable"),

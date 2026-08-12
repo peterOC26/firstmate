@@ -1154,12 +1154,62 @@ EOF
     ([.board_items[] | select(.id == "held-mate/mate-ship") | .column] == ["Held"])
       and (.board_items | any(.id == "held-mate/mate-ship"
         and .owner == "held-mate"
-        and (.summary | contains("mate-ship"))
+        and (.summary | contains("Ship the mate thing"))
         and (.detail | contains("upstream vendor release"))))
       and (.gates | any(.id == "held-mate/mate-ship"))
       and ([.board_items[] | select(.id == "mate-next") | .column] == ["Ready"])
   ' >/dev/null || fail "a held secondmate ship vanished from every board column: $json"
   pass "a secondmate ship held on its own child state stays under Held beside that home's queued work"
+}
+
+# A child's own status-log decision is not authoritative, so the home is NOT a
+# captain decision - but it is still perfectly readable. The board must never call
+# such a home unavailable; only a home the snapshot itself could not read is that.
+test_readable_home_with_status_only_child_decision_is_not_called_unavailable() {
+  local home fakebin mate wt json canonical
+  home=$(make_home mate-readable)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/mate-readable-home"
+  make_valid_secondmate_home readable-mate "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] mate-order - Choose the subscription order (repo: sample) (kind: ship) (since 2026-07-13)
+
+## Queued
+
+## Done
+EOF
+  wt="$mate/projects/mate-order"
+  fm_git_init_commit "$wt"
+  fm_write_meta "$mate/state/mate-order.meta" \
+    "window=firstmate:fm-mate-order" "worktree=$wt" "project=sample" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$mate/state" mate-order idle
+  printf 'needs-decision [key=k]: pick the order\n' > "$mate/state/mate-order.status"
+  append_secondmate_registry "$home" readable-mate "$mate"
+  fakebin=$(make_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    (.secondmate_current.records[] | select(.id == "readable-mate")
+      | .current.state == "captain_decision"
+        and .current.reason == null
+        and .provenance.selected == "structured-home"
+        and ([.holds[].source] == ["child-state"])
+        and ([.decisions_open[] | select(.source == "backlog")] | length) == 0)
+  ' >/dev/null || fail "fixture did not produce a readable status-only-decision home: $canonical"
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.secondmates | any(.[]; .id == "readable-mate" and .state != "unknown"))
+      and (.board_items | any(.detail == "secondmate home unavailable") | not)
+      and ([.board_items[] | .summary] | any(test("home state unavailable"; "i")) | not)
+      and ([.board_items[] | select(.id == "readable-mate/mate-order") | .column] == ["Held"])
+      and (.board_items | any(.id == "readable-mate/mate-order"
+        and (.summary | contains("Choose the subscription order"))
+        and (.detail | contains("pick the order"))))
+      and ([.decisions_open[].id] | any(test("readable-mate")) | not)
+  ' >/dev/null || fail "a readable secondmate home was boarded as unavailable: $json"
+  pass "a readable home whose child only logged a decision is never boarded as unavailable"
 }
 
 # The pinned integrity prefix must never eat the whole gate bound: many unreachable
@@ -2291,6 +2341,7 @@ test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
 test_integrity_gate_outranks_queued_work_at_a_full_bound
 test_externally_held_secondmate_home_stays_on_the_board
+test_readable_home_with_status_only_child_decision_is_not_called_unavailable
 test_many_unavailable_homes_do_not_starve_the_queued_columns
 test_open_prs_needing_the_captain_reach_waiting_on_you
 test_board_pr_ids_stay_unique_across_repositories
