@@ -24,6 +24,7 @@ EPOCH=11111111-1111-4111-8111-111111111111
 CODEX_ID=22222222-2222-4222-8222-222222222222
 CODEX_OTHER=33333333-3333-4333-8333-333333333333
 CLAUDE_ID=44444444-4444-4444-8444-444444444444
+CLAUDE_SINGLE=55555555-5555-4555-8555-555555555555
 CLAUDE_COMPACTED=88888888-8888-4888-8888-888888888888
 CODEX_BOUNDED=99999999-9999-4999-8999-999999999999
 
@@ -214,6 +215,18 @@ EOF
   [ "$(tokens_of claude-ok)" = 30058 ] || fail "Claude conservative finalized metric was not 30058"
   [ "$(status_of claude-ok)" = under ] || fail "Claude fixture should classify under"
   pass "Claude selects finalized usage and includes cache plus output tokens from an alternate config root"
+}
+
+test_claude_single_record_is_read() {
+  local file id=claude-single
+  file="$CLAUDE_ROOT/projects/worktree/$CLAUDE_SINGLE.jsonl"
+  cat > "$file" <<EOF
+{"type":"assistant","sessionId":"$CLAUDE_SINGLE","cwd":"$WT","version":"2.1.220","message":{"id":"msg-1","stop_reason":"end_turn","usage":{"input_tokens":2,"cache_creation_input_tokens":30047,"cache_read_input_tokens":5,"output_tokens":4}}}
+EOF
+  write_meta "$id" claude "$CLAUDE_ROOT" "$CLAUDE_SINGLE" 2.1.220
+  [ "$(tokens_of "$id")" = 30058 ] || fail "a one-record Claude transcript was not read"
+  [ "$(status_of "$id")" = under ] || fail "a one-record Claude transcript should classify under"
+  pass "a one-record finalized Claude transcript remains readable"
 }
 
 test_unknown_identity_version_and_remote_cases() {
@@ -409,6 +422,7 @@ test_threshold_is_preference_not_ceiling
 test_codex_exact_metric_multiple_sessions_and_statuses
 test_truncated_and_malformed_jsonl
 test_claude_finalized_conservative_metric
+test_claude_single_record_is_read
 test_compaction_shaped_records_report_current_usage
 test_reader_scan_is_bounded_by_the_transcript_tail
 test_unknown_rows_still_report_the_effective_threshold

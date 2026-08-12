@@ -97,9 +97,9 @@ find_transcript() {  # <harness> <root> <session-id>
 }
 
 # Bounded slice of a transcript, so a read costs the same on a 20 MB rollout as
-# on a fresh one. The tail slice drops its first line, which a byte-offset cut
-# leaves partial; the trailing line of a live transcript may also be partial and
-# is skipped by the per-line parse below rather than by another pass.
+# on a fresh one. A byte-offset cut may leave its first line partial, and the
+# trailing line of a live transcript may also be partial; both are skipped by
+# the per-line parse below.
 FM_CONTEXT_TAIL_BYTES=${FM_CONTEXT_TAIL_BYTES:-262144}
 FM_CONTEXT_HEAD_BYTES=${FM_CONTEXT_HEAD_BYTES:-65536}
 fm_context_valid_positive_uint "$FM_CONTEXT_TAIL_BYTES" || FM_CONTEXT_TAIL_BYTES=262144
@@ -112,7 +112,7 @@ transcript_slice() {  # <file> <head|tail>
       head -c "$FM_CONTEXT_HEAD_BYTES" "$file"
       ;;
     tail)
-      tail -c "$FM_CONTEXT_TAIL_BYTES" "$file" | sed '1d'
+      tail -c "$FM_CONTEXT_TAIL_BYTES" "$file"
       ;;
     *) return 1 ;;
   esac
