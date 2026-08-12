@@ -131,11 +131,19 @@ See [`trace-context.md`](trace-context.md) for carrier semantics, supported rout
 The optional local, gitignored `config/context-warning` file contains exactly one newline-terminated positive integer token threshold.
 It defaults to `150000` when absent and may be set higher or lower without a policy maximum.
 The primary's value is inherited into secondmate homes.
+An invalid or unsafe file has no effective threshold and produces `unknown` audit rows rather than a guessed default.
+
+The read-only audit reports `task`, `harness`, `tokens`, `threshold`, `context_window`, `status`, and `detail` in tab-separated output, or the same keys in JSON.
+`status` is exactly `under`, `warning`, `over`, or `unknown`, and every row includes the effective threshold when the home configuration is valid even when the other measurements are unavailable.
+
+Locally measurable Claude and Codex task records bind a spawn incarnation with `harness_session_epoch`, `harness_session_root`, `harness_version`, `harness_session_id`, and `harness_session_cwd`, plus Claude's effective `claude_config_dir` when applicable.
+Codex records may also carry `harness_session_conflict=1` when one incarnation receives conflicting thread identities.
 
 The threshold is observational only.
 It never changes a harness context window or compaction setting and never blocks, refuses, reroutes, rotates, interrupts, or otherwise alters a worker launch or lifecycle.
 After a locally bound Claude or Codex turn completes, the watcher surfaces the first transition at or above the threshold and deduplicates repeated readings until usage falls below it.
 Remote transcripts and unsupported or unrecognized transcript schemas report `unknown` instead of blocking dispatch.
+Other harnesses and raw-command launches remain dispatchable but unmeasured, so their rows are also `unknown`.
 
 The reading itself is deliberately best-effort and bounded rather than authoritative.
 Each read scans only a fixed-size window at the end of the bound transcript, so its cost does not grow with session length and it stays cheap enough to run after every completed turn.

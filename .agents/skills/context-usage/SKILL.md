@@ -25,7 +25,7 @@ A missing or conflicting binding, schema drift, unavailable exact transcript, or
 
 The reading is best-effort and bounded: only a fixed-size window at the end of the transcript is scanned, so a reported count can lag a turn, and a session whose latest usage record has scrolled past that window reports unknown.
 Report it as an indicator, never as an exact or authoritative account, and do not chase a more exact number by hand.
-Every row, unknown included, still carries the effective threshold.
+Every row carries the effective threshold when the home configuration is valid; an invalid threshold makes the row `unknown`.
 
 `warning` means usage reached the operator's configured threshold.
 `over` means usage exceeded a native context window reported by the runtime, not that Firstmate enforced or promised a ceiling.
