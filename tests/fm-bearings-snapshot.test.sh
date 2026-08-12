@@ -1069,15 +1069,15 @@ EOF
       and ([.board_items[] | select(.column == "Held") | .id] | length) == 1
       and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 1
       and (.gates | length) == 3
-      and ([.omitted[].surface] | index("gates showing 3 of 8") != null)
+      and ([.omitted[].surface] | index("gates showing 3 of 9") != null)
       and ([.omitted[].surface] | index("board Ready showing 1 of 2") != null)
-      and ([.omitted[].surface] | index("board Held showing 1 of 3") != null)
+      and ([.omitted[].surface] | index("board Held showing 1 of 4") != null)
       and ([.omitted[].surface] | index("board Blocked showing 1 of 3") != null)
   ' >/dev/null || fail "a shared gate bound starved a board column: $json"
   json=$(FM_BEARINGS_GATES=3 run "$home" "$fakebin" --json --all-queued)
   printf '%s' "$json" | jq -e '
     ([.board_items[] | select(.column == "Ready") | .id] | length) == 2
-      and ([.board_items[] | select(.column == "Held") | .id] | length) == 3
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 4
       and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 3
       and ([.omitted[].surface] | any(startswith("board ")) | not)
   ' >/dev/null || fail "--all-queued must lift every gate column bound: $json"
@@ -1127,6 +1127,7 @@ test_externally_held_secondmate_home_stays_on_the_board() {
 - [ ] mate-ship - Ship the mate thing (repo: sample) (kind: ship) (since 2026-07-13)
 
 ## Queued
+- [ ] mate-next - Unrelated dispatchable work (repo: sample) (kind: ship)
 
 ## Done
 EOF
@@ -1145,18 +1146,20 @@ EOF
     (.secondmate_current.records[] | select(.id == "held-mate")
       | .current.state == "externally_held"
         and .provenance.selected == "structured-home"
-        and (.queued | length) == 0
-        and (.holds | any(.source == "child-state")))
+        and ([.queued[].id] == ["mate-next"])
+        and (.holds | any(.source == "child-state" and .id == "mate-ship")))
   ' >/dev/null || fail "fixture did not produce a child-state held secondmate home: $canonical"
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
-    ([.board_items[] | select(.id == "held-mate") | .column] == ["Held"])
-      and (.board_items | any(.id == "held-mate"
-        and .detail == "secondmate home held on its own work"
-        and (.summary | contains("upstream vendor release"))))
-      and (.gates | any(.id == "held-mate"))
-  ' >/dev/null || fail "a held secondmate home vanished from every board column: $json"
-  pass "a secondmate home held on its own child work stays on the board under Held"
+    ([.board_items[] | select(.id == "held-mate/mate-ship") | .column] == ["Held"])
+      and (.board_items | any(.id == "held-mate/mate-ship"
+        and .owner == "held-mate"
+        and (.summary | contains("mate-ship"))
+        and (.detail | contains("upstream vendor release"))))
+      and (.gates | any(.id == "held-mate/mate-ship"))
+      and ([.board_items[] | select(.id == "mate-next") | .column] == ["Ready"])
+  ' >/dev/null || fail "a held secondmate ship vanished from every board column: $json"
+  pass "a secondmate ship held on its own child state stays under Held beside that home's queued work"
 }
 
 # The pinned integrity prefix must never eat the whole gate bound: many unreachable

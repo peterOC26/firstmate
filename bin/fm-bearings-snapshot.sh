@@ -464,13 +464,19 @@ MODEL=$(printf '%s' "$SNAP" | jq \
          | {id,title:(.title | trunc(60)),
             blocked_by:((.unresolved_blocker_ids // []) | if length > 0 then join(",") else "-" end | trunc(120)),
             reason:gate_reason,owner:$m.id,
-            gate:gate_class} ]) as $queued_gates
-  | ([ $queued_gates[] | .owner ] | unique) as $gate_owners
+            gate:gate_class} ]
+     + [ (.secondmate_current.records // [])[] as $m
+         | select($m.provenance.selected == "structured-home")
+         | $m.holds[]?
+         | select(.source == "child-state")
+         | {id:($m.id + "/" + .id),
+            title:((.title // .id) | trunc(60)),
+            blocked_by:"-",
+            reason:((.reason // "held") | trunc(40)),
+            owner:$m.id,
+            gate:"hold"} ]) as $queued_gates
   | ([ $secondmates_all[]
-       | . as $mate
-       | select(.state == "unknown"
-                or (.state == "externally_held"
-                    and (($gate_owners | index($mate.id)) == null)))
+       | select(.state == "unknown")
        | ((.reason // "") as $r | (.doing // "") as $d
           | if ($r != "" and $r != "-") then $r
             elif $d != "" then $d
@@ -478,10 +484,9 @@ MODEL=$(printf '%s' "$SNAP" | jq \
        | {id,
           title:($why | trunc(60)),
           blocked_by:"-",
-          reason:(if .state == "unknown" then "secondmate home unavailable"
-                  else "secondmate home held on its own work" end),
+          reason:"secondmate home unavailable",
           owner:.id,
-          gate:(if .state == "unknown" then "blocked" else "hold" end)} ]) as $secondmate_gates
+          gate:"blocked"} ]) as $secondmate_gates
   | ($pinned_gates + $secondmate_gates + $queued_gates) as $gates_all
   | ([ .scout_reports[]
        | . as $r
