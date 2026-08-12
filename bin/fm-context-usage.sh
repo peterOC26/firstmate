@@ -12,13 +12,26 @@
 # the freely configurable operator threshold. Over is reserved for tokens above
 # a native context window reported by the runtime; it is observational and has
 # no dispatch or lifecycle effect. Unknown covers missing, conflicting, remote,
-# unsafe, ambiguous, unrecognized-version, or schema-invalid bindings.
+# unsafe, ambiguous, unrecognized-version, or schema-invalid bindings. The
+# effective threshold belongs to the home's config rather than to a task, so
+# every row reports it, including an unknown one; only tokens and the native
+# context window are conditional.
 #
 # Codex metric: the last complete event_msg/payload.type=token_count record's
 # payload.info.last_token_usage.total_tokens. Cached input remains included.
 # Its payload.info.model_context_window is the native window when valid.
 # Claude metric: the last complete finalized assistant record's input_tokens +
 # cache_creation_input_tokens + cache_read_input_tokens + output_tokens.
+#
+# The reading is best-effort and bounded, not authoritative. Only the last
+# FM_CONTEXT_TAIL_BYTES of a transcript are scanned for a usage record (plus the
+# first FM_CONTEXT_HEAD_BYTES for Codex's session_meta identity line), so the
+# cost of a read never grows with session length and this stays cheap enough to
+# run on the watcher's turn-end path. A malformed or truncated line inside the
+# window is skipped rather than treated as fatal, and a transcript whose most
+# recent usage record sits outside the window reports unknown instead of
+# triggering a full-file scan. A reading that is stale by a turn, or missed
+# entirely, is expected; nothing here retries to close that gap.
 #
 # The command never guesses a transcript by cwd or mtime and never follows a
 # path that was not validated beneath the recorded harness-session root.
@@ -81,35 +94,57 @@ find_transcript() {  # <harness> <root> <session-id>
   printf '%s\n' "$found"
 }
 
-complete_jsonl_copy() {  # <source> <destination>
-  local source=$1 destination=$2 final_newline
-  [ -s "$source" ] || return 1
-  final_newline=$(tail -c 1 "$source" 2>/dev/null | wc -l | tr -d '[:space:]')
-  if [ "$final_newline" = 1 ]; then
-    cp "$source" "$destination" || return 1
-  else
-    sed '$d' "$source" > "$destination" || return 1
-  fi
-  [ -s "$destination" ] || return 1
-  jq -e . "$destination" >/dev/null 2>&1
+# Bounded slice of a transcript, so a read costs the same on a 20 MB rollout as
+# on a fresh one. The tail slice drops its first line, which a byte-offset cut
+# leaves partial; the trailing line of a live transcript may also be partial and
+# is skipped by the per-line parse below rather than by another pass.
+FM_CONTEXT_TAIL_BYTES=262144
+FM_CONTEXT_HEAD_BYTES=65536
+
+transcript_slice() {  # <file> <head|tail>
+  local file=$1 end=$2 size
+  size=$(wc -c < "$file" 2>/dev/null | tr -d '[:space:]')
+  fm_context_valid_uint "$size" || return 1
+  [ "$size" -gt 0 ] || return 1
+  case "$end" in
+    head)
+      if [ "$size" -gt "$FM_CONTEXT_HEAD_BYTES" ]; then
+        head -c "$FM_CONTEXT_HEAD_BYTES" "$file"
+      else
+        cat "$file"
+      fi
+      ;;
+    tail)
+      if [ "$size" -gt "$FM_CONTEXT_TAIL_BYTES" ]; then
+        tail -c "$FM_CONTEXT_TAIL_BYTES" "$file" | sed '1d'
+      else
+        cat "$file"
+      fi
+      ;;
+    *) return 1 ;;
+  esac
 }
 
+# Every jq program below is a single trailing-? expression: a line that is not
+# valid JSON, or whose shape does not match, yields nothing instead of aborting
+# the scan. tail -1 then takes the most recent matching record in the window,
+# which is what makes a post-compaction record win over a pre-compaction one.
 codex_usage() {  # <jsonl> <session-id> <cwd> <version>
   local file=$1 sid=$2 cwd=$3 version=$4 meta row tokens window
-  meta=$(jq -r 'select(.type == "session_meta") |
-    if (.payload.id|type)=="string" and (.payload.cwd|type)=="string" and (.payload.cli_version|type)=="string"
-    then [.payload.id,.payload.cwd,.payload.cli_version] | @tsv
-    else error("invalid session_meta") end' "$file" 2>/dev/null) || return 1
+  meta=$(transcript_slice "$file" head | jq -R -r '(fromjson |
+    select(.type == "session_meta") |
+    select((.payload.id|type)=="string" and (.payload.cwd|type)=="string" and (.payload.cli_version|type)=="string") |
+    [.payload.id,.payload.cwd,.payload.cli_version] | @tsv)?' 2>/dev/null) || return 1
   [ "$(printf '%s\n' "$meta" | grep -c .)" -eq 1 ] || return 1
   [ "$meta" = "$(printf '%s\t%s\t%s' "$sid" "$cwd" "$version")" ] || return 1
-  row=$(jq -r 'select(.type == "event_msg" and .payload.type == "token_count") |
-    if (.payload.info.last_token_usage.total_tokens|type)=="number"
-       and .payload.info.last_token_usage.total_tokens >= 0
-       and ((.payload.info.model_context_window == null) or
-            ((.payload.info.model_context_window|type)=="number" and .payload.info.model_context_window > 0))
-    then [.payload.info.last_token_usage.total_tokens,
-          (.payload.info.model_context_window // "")] | @tsv
-    else error("invalid token_count") end' "$file" 2>/dev/null | tail -1) || return 1
+  row=$(transcript_slice "$file" tail | jq -R -r '(fromjson |
+    select(.type == "event_msg" and .payload.type == "token_count") |
+    select((.payload.info.last_token_usage.total_tokens|type)=="number"
+           and .payload.info.last_token_usage.total_tokens >= 0) |
+    select((.payload.info.model_context_window == null) or
+           ((.payload.info.model_context_window|type)=="number" and .payload.info.model_context_window > 0)) |
+    [.payload.info.last_token_usage.total_tokens,
+     (.payload.info.model_context_window // "")] | @tsv)?' 2>/dev/null | tail -1) || return 1
   IFS=$(printf '\t') read -r tokens window <<EOF
 $row
 EOF
@@ -120,18 +155,18 @@ EOF
 
 claude_usage() {  # <jsonl> <session-id> <cwd> <version>
   local file=$1 sid=$2 cwd=$3 version=$4 tokens
-  tokens=$(jq -r --arg sid "$sid" --arg cwd "$cwd" --arg version "$version" '
+  tokens=$(transcript_slice "$file" tail \
+    | jq -R -r --arg sid "$sid" --arg cwd "$cwd" --arg version "$version" '(fromjson |
     select(.type == "assistant" and .message.usage != null and .message.stop_reason != null) |
-    if .sessionId == $sid and .cwd == $cwd and .version == $version
-       and ([.message.usage.input_tokens,
-             .message.usage.cache_creation_input_tokens,
-             .message.usage.cache_read_input_tokens,
-             .message.usage.output_tokens] | all(type == "number" and . >= 0))
-    then (.message.usage.input_tokens +
-          .message.usage.cache_creation_input_tokens +
-          .message.usage.cache_read_input_tokens +
-          .message.usage.output_tokens)
-    else error("invalid finalized Claude usage") end' "$file" 2>/dev/null | tail -1) || return 1
+    select(.sessionId == $sid and .cwd == $cwd and .version == $version) |
+    select([.message.usage.input_tokens,
+            .message.usage.cache_creation_input_tokens,
+            .message.usage.cache_read_input_tokens,
+            .message.usage.output_tokens] | all(type == "number" and . >= 0)) |
+    (.message.usage.input_tokens +
+     .message.usage.cache_creation_input_tokens +
+     .message.usage.cache_read_input_tokens +
+     .message.usage.output_tokens))?' 2>/dev/null | tail -1) || return 1
   fm_context_valid_uint "$tokens" || return 1
   printf '%s\t\n' "$tokens"
 }
@@ -151,17 +186,19 @@ emit() {  # <task> <harness> <tokens> <threshold> <window> <status> <detail>
 }
 
 audit_one() {
-  local id=$1 meta harness='' tokens='' threshold='' window='' status=unknown
-  local epoch root sid cwd version remote transcript complete usage
-  case "$id" in ''|*[!A-Za-z0-9._-]*|.*) emit "$id" "" "" "" "" unknown "invalid task id"; return ;; esac
+  local id=$1 meta harness='' tokens='' window='' status=unknown
+  local threshold=$THRESHOLD
+  local epoch root sid cwd version remote transcript usage
+  case "$id" in ''|*[!A-Za-z0-9._-]*|.*) emit "$id" "" "" "$threshold" "" unknown "invalid task id"; return ;; esac
+  # The effective threshold is task-independent, so every row reports it - only
+  # tokens, the native window, and the status stay conditional.
+  if [ -z "$threshold" ]; then emit "$id" "" "" "" "" unknown "context warning threshold is invalid"; return; fi
   meta="$STATE/$id.meta"
-  if [ ! -f "$meta" ] || [ -L "$meta" ]; then emit "$id" "" "" "" "" unknown "missing or unsafe metadata"; return; fi
+  if [ ! -f "$meta" ] || [ -L "$meta" ]; then emit "$id" "" "" "$threshold" "" unknown "missing or unsafe metadata"; return; fi
   harness=$(fm_context_meta_exact "$meta" harness 2>/dev/null || true)
-  case "$harness" in claude|codex) ;; *) emit "$id" "$harness" "" "" "" unknown "usage schema is not verified for this harness"; return ;; esac
+  case "$harness" in claude|codex) ;; *) emit "$id" "$harness" "" "$threshold" "" unknown "usage schema is not verified for this harness"; return ;; esac
   remote=$(grep -E '^(remote_host=.+|orca_remote=1)$' "$meta" 2>/dev/null || true)
-  if [ -n "$remote" ]; then emit "$id" "$harness" "" "" "" unknown "remote transcript is not locally reachable"; return; fi
-  threshold=$(fm_context_warning_threshold "$CONFIG" 2>/dev/null || true)
-  if ! fm_context_valid_positive_uint "$threshold"; then emit "$id" "$harness" "" "" "" unknown "context warning threshold is invalid"; return; fi
+  if [ -n "$remote" ]; then emit "$id" "$harness" "" "$threshold" "" unknown "remote transcript is not locally reachable"; return; fi
   epoch=$(fm_context_meta_exact "$meta" harness_session_epoch 2>/dev/null || true)
   root=$(fm_context_meta_exact "$meta" harness_session_root 2>/dev/null || true)
   sid=$(fm_context_meta_exact "$meta" harness_session_id 2>/dev/null || true)
@@ -187,23 +224,25 @@ audit_one() {
   fi
   transcript=$(find_transcript "$harness" "$root" "$sid" 2>/dev/null || true)
   if [ -z "$transcript" ]; then emit "$id" "$harness" "" "$threshold" "" unknown "exact transcript is missing or ambiguous"; return; fi
-  complete=$(mktemp "${TMPDIR:-/tmp}/fm-context-usage.XXXXXX") || { emit "$id" "$harness" "" "$threshold" "" unknown "temporary read failed"; return; }
-  if ! complete_jsonl_copy "$transcript" "$complete"; then rm -f "$complete"; emit "$id" "$harness" "" "$threshold" "" unknown "transcript has malformed complete JSON"; return; fi
   case "$harness" in
-    codex) usage=$(codex_usage "$complete" "$sid" "$cwd" "$version" 2>/dev/null || true) ;;
-    claude) usage=$(claude_usage "$complete" "$sid" "$cwd" "$version" 2>/dev/null || true) ;;
+    codex) usage=$(codex_usage "$transcript" "$sid" "$cwd" "$version" 2>/dev/null || true) ;;
+    claude) usage=$(claude_usage "$transcript" "$sid" "$cwd" "$version" 2>/dev/null || true) ;;
   esac
-  rm -f "$complete"
   IFS=$(printf '\t') read -r tokens window <<EOF
 $usage
 EOF
-  if ! fm_context_valid_uint "$tokens"; then emit "$id" "$harness" "" "$threshold" "" unknown "no valid finalized usage record"; return; fi
+  if ! fm_context_valid_uint "$tokens"; then emit "$id" "$harness" "" "$threshold" "" unknown "no valid usage record in the bounded transcript window"; return; fi
   if [ -n "$window" ] && fm_context_decimal_gt "$tokens" "$window"; then status=over
   elif fm_context_decimal_ge "$tokens" "$threshold"; then status=warning
   else status=under
   fi
   emit "$id" "$harness" "$tokens" "$threshold" "$window" "$status" "ok"
 }
+
+# One read of the operator threshold for the whole audit: it is a property of the
+# home's config, not of any task, so an unknown row still reports it.
+THRESHOLD=$(fm_context_warning_threshold "$CONFIG" 2>/dev/null || true)
+fm_context_valid_positive_uint "$THRESHOLD" || THRESHOLD=
 
 if [ "$FORMAT" = tsv ]; then
   printf 'task\tharness\ttokens\tthreshold\tcontext_window\tstatus\tdetail\n'

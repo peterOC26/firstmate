@@ -137,6 +137,11 @@ It never changes a harness context window or compaction setting and never blocks
 After a locally bound Claude or Codex turn completes, the watcher surfaces the first transition at or above the threshold and deduplicates repeated readings until usage falls below it.
 Remote transcripts and unsupported or unrecognized transcript schemas report `unknown` instead of blocking dispatch.
 
+The reading itself is deliberately best-effort and bounded rather than authoritative.
+Each read scans only a fixed-size window at the end of the bound transcript, so its cost does not grow with session length and it stays cheap enough to run after every completed turn.
+A malformed or truncated line inside that window is skipped, and a session whose most recent usage record has already scrolled past the window reports `unknown` rather than paying for a full-file scan.
+A reading that lags a turn behind, or is occasionally missed, is expected; treat the number as an indicator, not an exact account.
+
 `bin/fm-context-usage.sh --help` owns the audit fields, binding validation, and adapter metrics.
 [`verification/context-usage.md`](verification/context-usage.md) records the installed-version evidence behind those metrics.
 

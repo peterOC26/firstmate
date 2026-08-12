@@ -24,6 +24,8 @@ EPOCH=11111111-1111-4111-8111-111111111111
 CODEX_ID=22222222-2222-4222-8222-222222222222
 CODEX_OTHER=33333333-3333-4333-8333-333333333333
 CLAUDE_ID=44444444-4444-4444-8444-444444444444
+CLAUDE_COMPACTED=88888888-8888-4888-8888-888888888888
+CODEX_BOUNDED=99999999-9999-4999-8999-999999999999
 
 threshold_read() {
   bash -c '. "$1"; fm_context_warning_threshold "$2"' _ "$LIB" "$1" 2>&1
@@ -74,6 +76,7 @@ field_of() {  # <id> <column>
   FM_HOME="$HOME_DIR" "$READER" "$1" | awk -F '\t' -v column="$2" 'NR==2 {print $column}'
 }
 tokens_of() { field_of "$1" 3; }
+threshold_of() { field_of "$1" 4; }
 window_of() { field_of "$1" 5; }
 status_of() { field_of "$1" 6; }
 detail_of() { field_of "$1" 7; }
@@ -113,9 +116,74 @@ test_truncated_and_malformed_jsonl() {
     '{"type":"event_msg"' > "$file"
   [ "$(tokens_of codex-ok)" = 130000 ] || fail "unterminated tail displaced the last complete record"
   printf '\n%s\n' '{broken-complete-line' >> "$file"
-  [ "$(status_of codex-ok)" = unknown ] || fail "malformed complete JSON must be unknown"
-  assert_contains "$(detail_of codex-ok)" "malformed complete JSON" "malformed detail was not explicit"
-  pass "reader ignores an unterminated tail and rejects malformed complete JSON"
+  [ "$(tokens_of codex-ok)" = 130000 ] || fail "a malformed line must be skipped, not hide the last usage record"
+  [ "$(status_of codex-ok)" = under ] || fail "a malformed line must not make a readable transcript unknown"
+  # A record of the right type whose usage payload is not a valid number is
+  # skipped the same way, rather than poisoning the whole scan.
+  printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":"lots"}}}}' >> "$file"
+  [ "$(tokens_of codex-ok)" = 130000 ] || fail "an unusable usage payload displaced the last valid record"
+  pass "reader skips unterminated, malformed, and unusable lines instead of failing the whole read"
+}
+
+# Compaction lowers live usage: the reader must report what the session is
+# carrying NOW, not the pre-compaction peak and not the first record it sees.
+test_compaction_shaped_records_report_current_usage() {
+  local file id=claude-compacted
+  file="$CLAUDE_ROOT/projects/worktree/$CLAUDE_COMPACTED.jsonl"
+  cat > "$file" <<EOF
+{"type":"assistant","sessionId":"$CLAUDE_COMPACTED","cwd":"$WT","version":"2.1.220","message":{"id":"msg-1","stop_reason":"end_turn","usage":{"input_tokens":5,"cache_creation_input_tokens":100000,"cache_read_input_tokens":89990,"output_tokens":5}}}
+{"type":"system","subtype":"compact_boundary","sessionId":"$CLAUDE_COMPACTED","cwd":"$WT","version":"2.1.220","compactMetadata":{"trigger":"auto","preTokens":190000}}
+{"type":"assistant","sessionId":"$CLAUDE_COMPACTED","cwd":"$WT","version":"2.1.220","message":{"id":"msg-2","stop_reason":"end_turn","usage":{"input_tokens":3,"cache_creation_input_tokens":29995,"cache_read_input_tokens":0,"output_tokens":2}}}
+EOF
+  write_meta "$id" claude "$CLAUDE_ROOT" "$CLAUDE_COMPACTED" 2.1.220
+  [ "$(tokens_of "$id")" = 30000 ] || fail "post-compaction usage was not the reported reading"
+  [ "$(status_of "$id")" = under ] || fail "the pre-compaction peak still decided the status"
+  pass "a compacted transcript reports its current usage, not the pre-compaction peak"
+}
+
+# The turn-end path runs this reader on every completed turn, so a read must cost
+# the same on a long session as on a fresh one. Proven by bytes, not by clock: a
+# usage record pushed past the reader's bounded tail window stops being visible,
+# and a newer record inside the window is still read from the same large file.
+test_reader_scan_is_bounded_by_the_transcript_tail() {
+  local file id=codex-bounded pad i=0
+  file="$CODEX_ROOT/sessions/2026/08/12/rollout-bounded-$CODEX_BOUNDED.jsonl"
+  write_codex_transcript "$file" "$CODEX_BOUNDED" 111111 258400
+  write_meta "$id" codex "$CODEX_ROOT" "$CODEX_BOUNDED" 0.147.0
+  [ "$(tokens_of "$id")" = 111111 ] || fail "a short transcript was not read at all"
+  pad=$(printf '%*s' 8192 '' | tr ' ' x)
+  while [ "$i" -lt 64 ]; do
+    printf '{"type":"event_msg","payload":{"type":"agent_message","message":"%s"}}\n' "$pad" >> "$file"
+    i=$((i + 1))
+  done
+  [ "$(status_of "$id")" = unknown ] \
+    || fail "a usage record beyond the bounded tail window was still found, so the read is not bounded"
+  assert_contains "$(detail_of "$id")" "bounded transcript window" "bounded-window detail was not explicit"
+  [ "$(threshold_of "$id")" = 150000 ] || fail "a bounded-window unknown row dropped the effective threshold"
+  printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":140000},"model_context_window":258400}}}' >> "$file"
+  [ "$(tokens_of "$id")" = 140000 ] || fail "the newest usage record inside the window was not read"
+  [ "$(window_of "$id")" = 258400 ] || fail "the native window was lost on a long transcript"
+  pass "the reader scans a bounded transcript tail: older records fall out of view, newer ones are still read"
+}
+
+# The effective threshold comes from the home's config, not from a task, so an
+# unknown row still reports it - only tokens and the native window drop out.
+test_unknown_rows_still_report_the_effective_threshold() {
+  local id out
+  write_meta remote-threshold codex "$CODEX_ROOT" "$CODEX_ID" 0.147.0 'orca_remote=1'
+  write_meta unmeasured-harness opencode "$CODEX_ROOT" "$CODEX_ID" 0.147.0
+  printf '90000\n' > "$CONFIG/context-warning"
+  for id in remote-threshold unmeasured-harness absent-task; do
+    [ "$(status_of "$id")" = unknown ] || fail "$id should be unknown"
+    [ "$(threshold_of "$id")" = 90000 ] || fail "$id dropped the configured threshold from its unknown row"
+  done
+  rm -f "$CONFIG/context-warning"
+  [ "$(threshold_of remote-threshold)" = 150000 ] || fail "the default threshold is missing from an unknown row"
+  out=$(FM_HOME="$HOME_DIR" "$READER" --json remote-threshold)
+  [ "$(printf '%s' "$out" | jq -r '.threshold')" = 150000 ] || fail "--json unknown row reported a null threshold"
+  [ "$(printf '%s' "$out" | jq -r '.tokens')" = null ] || fail "--json unknown row invented a token count"
+  [ "$(printf '%s' "$out" | jq -r '.context_window')" = null ] || fail "--json unknown row invented a context window"
+  pass "remote, unmeasured-harness, and missing-metadata rows keep the effective threshold"
 }
 
 test_claude_finalized_conservative_metric() {
@@ -218,6 +286,9 @@ test_threshold_is_preference_not_ceiling
 test_codex_exact_metric_multiple_sessions_and_statuses
 test_truncated_and_malformed_jsonl
 test_claude_finalized_conservative_metric
+test_compaction_shaped_records_report_current_usage
+test_reader_scan_is_bounded_by_the_transcript_tail
+test_unknown_rows_still_report_the_effective_threshold
 test_unknown_identity_version_and_remote_cases
 test_codex_notify_binding_relaunch_and_supervision_independence
 test_warning_transition_and_dedup

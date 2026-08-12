@@ -719,6 +719,10 @@ spawn_orca_remote_task_tmp_sweep() {
 
 spawn_abort_cleanup() {
   local status=$?
+  if [ -n "${META_TMP:-}" ]; then
+    rm -f -- "$META_TMP" 2>/dev/null || true
+    META_TMP=
+  fi
   if [ "$HERDR_PROJECTION_ABORT_CLEANUP" = 1 ] \
      && [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" != 1 ]; then
     if ! spawn_herdr_presentation_order_lock_acquire "${HERDR_PROJECTION_ABORT_SESSION:-}"; then
@@ -2580,7 +2584,14 @@ fi
 
 META_WINDOW=$T
 [ "$BACKEND" = orca ] && META_WINDOW=$W
-if {
+# Publish through a sibling temp file: the group stays outside any condition
+# context so errexit still aborts the spawn on the first failing write, and the
+# rename makes a reader see either no record or the complete one.
+META_TMP=$(mktemp "$STATE/.$ID.meta.XXXXXX") || {
+  echo "error: could not publish task metadata: $STATE/$ID.meta" >&2
+  exit 1
+}
+{
   echo "window=$META_WINDOW"
   echo "endpoint_task_id=$ID"
   echo "worktree=$WT"
@@ -2649,12 +2660,12 @@ if {
     echo "home=$PROJ_ABS"
     echo "projects=$SECONDMATE_PROJECTS"
   fi
-} > "$STATE/$ID.meta"; then
-  :
-else
+} > "$META_TMP"
+mv -f -- "$META_TMP" "$STATE/$ID.meta" || {
   echo "error: could not publish task metadata: $STATE/$ID.meta" >&2
   exit 1
-fi
+}
+META_TMP=
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
