@@ -299,6 +299,60 @@ EOF
   pass "a callback whose prologue fails before any binding work still preserves the turn-end signal"
 }
 
+# A turn-end signal lost to a hang is lost exactly as thoroughly as one lost to
+# an early exit, and this callback runs on every completed turn: a state
+# filesystem that cannot host the lock at all would otherwise wedge one process
+# per turn, each of them still owing its crewmate a turn-end.
+test_binding_never_wedges_on_a_held_metadata_lock() {
+  local id=bind-lockwait meta turn payload lock holder binder waited=0 rc
+  meta="$STATE/$id.meta"
+  turn="$STATE/$id.turn-ended"
+  lock="$STATE/.$id.meta.lock"
+  cat > "$meta" <<EOF
+window=fixture:fm-$id
+endpoint_task_id=$id
+worktree=$WT
+harness=codex
+harness_session_epoch=$EPOCH
+EOF
+  rm -f "$turn" "$STATE/hold-open"
+  : > "$STATE/hold-open"
+  FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" bash -c \
+    '. "$1"; fm_lock_acquire_wait "$2"; while [ -e "$3" ]; do sleep 0.1; done' \
+    _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$STATE/hold-open" &
+  holder=$!
+  while [ ! -d "$lock" ] && [ ! -L "$lock" ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+    [ "$waited" -lt 50 ] || { rm -f "$STATE/hold-open"; kill "$holder" 2>/dev/null || true
+      fail "the metadata lock fixture was never taken"; }
+  done
+
+  payload=$(jq -cn --arg id "$CODEX_ID" --arg cwd "$WT" '{type:"agent-turn-complete","thread-id":$id,cwd:$cwd}')
+  FM_CONTEXT_BIND_LOCK_TICKS=3 "$BINDER" codex-notify "$STATE" "$id" "$EPOCH" "$WT" "$turn" "$payload" \
+    > "$STATE/bind-lockwait.out" 2>&1 &
+  binder=$!
+  waited=0
+  while kill -0 "$binder" 2>/dev/null; do
+    sleep 0.1
+    waited=$((waited + 1))
+    if [ "$waited" -ge 100 ]; then
+      kill "$binder" 2>/dev/null || true
+      wait "$binder" 2>/dev/null || true
+      rm -f "$STATE/hold-open"
+      wait "$holder" 2>/dev/null || true
+      fail "the callback never returned while the task metadata lock was held"
+    fi
+  done
+  wait "$binder"; rc=$?
+  rm -f "$STATE/hold-open"
+  wait "$holder" 2>/dev/null || true
+  expect_code 1 "$rc" "an unavailable metadata lock should refuse the binding"
+  [ -f "$turn" ] || fail "a bounded lock refusal dropped the crewmate's turn-end signal"
+  assert_no_grep "harness_session_id=" "$meta" "a refused binding still wrote into the locked record"
+  pass "a callback that cannot take the task metadata lock refuses in bounded time and still signals turn-end"
+}
+
 # Every completed turn of a bound incarnation re-runs this callback. Republishing
 # a byte-identical record would keep renaming a new inode over the file that the
 # decision-attestation and link writers append to.
@@ -361,5 +415,6 @@ test_unknown_rows_still_report_the_effective_threshold
 test_unknown_identity_version_and_remote_cases
 test_codex_notify_binding_relaunch_and_supervision_independence
 test_turn_end_survives_a_failed_callback_prologue
+test_binding_never_wedges_on_a_held_metadata_lock
 test_repeat_binding_leaves_bound_metadata_untouched
 test_warning_transition_and_dedup

@@ -10,6 +10,11 @@
 # atomically records the first thread id for the current spawn incarnation.
 # A different thread id in the same incarnation records a conflict so the
 # read-only reader returns unknown. A stale callback never replaces a relaunch.
+#
+# Every step is bounded, including the wait for the shared task-metadata lock:
+# this runs on every completed turn, so it refuses the binding rather than block
+# indefinitely and lose the turn-end signal it is here to preserve.
+# FM_CONTEXT_BIND_LOCK_TICKS overrides that bound in 0.1s ticks (default 50).
 set -euo pipefail
 
 usage() {
@@ -49,6 +54,26 @@ EPOCH=$4
 EXPECTED_CWD=$5
 PAYLOAD=$7
 
+# Every holder of the task-metadata lock takes it only across local file
+# operations, so a wait longer than this means the state filesystem itself is
+# unusable - and the shared unbounded wait would then spin forever, wedging one
+# process per completed turn and never reaching the turn-end trap above. Refuse
+# the binding instead: measurement is optional, the completed-turn signal is not.
+# FM_CONTEXT_BIND_LOCK_TICKS overrides the bound in 0.1s ticks (default 50).
+BIND_LOCK_TICKS=${FM_CONTEXT_BIND_LOCK_TICKS:-50}
+case "$BIND_LOCK_TICKS" in
+  ''|*[!0-9]*|0) BIND_LOCK_TICKS=50 ;;
+esac
+
+bind_lock_acquire() {  # <lock>
+  local lock=$1 tick=1
+  while ! fm_lock_try_acquire "$lock"; do
+    [ "$tick" -lt "$BIND_LOCK_TICKS" ] || return 1
+    tick=$((tick + 1))
+    sleep 0.1
+  done
+}
+
 case "$ID" in
   ''|*[!A-Za-z0-9._-]*|.*) echo "error: invalid task id" >&2; exit 1 ;;
 esac
@@ -83,7 +108,10 @@ NOTIFY_CWD=$(printf '%s\n' "$PAYLOAD" | jq -er '.cwd') || exit 1
 
 META="$STATE/$ID.meta"
 LOCK=$(fm_meta_lock_path "$META") || exit 1
-fm_lock_acquire_wait "$LOCK"
+bind_lock_acquire "$LOCK" || {
+  echo "error: task metadata lock for $ID was unavailable within the bound" >&2
+  exit 1
+}
 TMP=
 cleanup() {
   [ -z "$TMP" ] || rm -f -- "$TMP" 2>/dev/null || true
