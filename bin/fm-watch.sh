@@ -459,6 +459,28 @@ scan_signals() {
   return 0
 }
 
+# Read context usage only after a completed-turn marker changes. The separate
+# warning command owns threshold/dedup state and is deliberately observational:
+# it cannot block, reroute, interrupt, rotate, or alter the worker. Prints only
+# newly crossed warning/over transitions.
+context_warning_for_pending() {  # <scan_signals rows>
+  local pending=$1 sf sig f base id ids=''
+  while IFS=$(printf '\t') read -r sf sig f; do
+    [ -n "$sf" ] || continue
+    base=$(basename "$f")
+    case "$base" in
+      *.turn-ended) id=${base%.turn-ended} ;;
+      *) continue ;;
+    esac
+    case " $ids " in *" $id "*) ;; *) ids="$ids $id" ;; esac
+  done <<EOF
+$pending
+EOF
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086 # ids are validated task ids from state filenames.
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-context-warning.sh" $ids 2>/dev/null || true
+}
+
 # Deliver a durably queued process-event result to firstmate. Publication is
 # owned by bin/fm-procevent.sh - by the runner at capture time and by reconcile's
 # re-announcement - so this decides only whether a queued check record has been
@@ -871,6 +893,20 @@ while :; do
   if [ -n "$pending" ]; then
     sleep "$SIGNAL_GRACE"
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
+    context_warning=$(context_warning_for_pending "$pending")
+    if [ -n "$context_warning" ]; then
+      reason="check: $(printf '%s\n' "$context_warning" | paste -sd ';' -)"
+      fm_wake_append check context-usage "$reason" || exit 1
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        fm_wake_append signal "$(basename "$f")" "$reason" || exit 1
+        printf '%s' "$sig" > "$sf"
+        mark_surfaced "$f"
+      done <<EOF
+$pending
+EOF
+      wake "$reason"
+    fi
     files=""
     while IFS=$(printf '\t') read -r sf sig f; do
       [ -n "$sf" ] || continue

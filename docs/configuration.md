@@ -126,6 +126,20 @@ A Secondmate on a remote route is covered the same way: the primary resolves and
 The presence flag is session-scoped enablement, so it transfers at launch and is left unchanged by live convergence into a running home.
 See [`trace-context.md`](trace-context.md) for carrier semantics, supported routes, the manual fleet-restart requirement, the session boundary, and safety limits; `bin/fm-trace-context-lib.sh`'s header owns the exact mechanics, and [`verification/trace-context.md`](verification/trace-context.md) records repeatable evidence.
 
+## Worker context warning (config/context-warning)
+
+The optional local, gitignored `config/context-warning` file contains exactly one newline-terminated positive integer token threshold.
+It defaults to `150000` when absent and may be set higher or lower without a policy maximum.
+The primary's value is inherited into secondmate homes.
+
+The threshold is observational only.
+It never changes a harness context window or compaction setting and never blocks, refuses, reroutes, rotates, interrupts, or otherwise alters a worker launch or lifecycle.
+After a locally bound Claude or Codex turn completes, the watcher surfaces the first transition at or above the threshold and deduplicates repeated readings until usage falls below it.
+Remote transcripts and unsupported or unrecognized transcript schemas report `unknown` instead of blocking dispatch.
+
+`bin/fm-context-usage.sh --help` owns the audit fields, binding validation, and adapter metrics.
+[`verification/context-usage.md`](verification/context-usage.md) records the installed-version evidence behind those metrics.
+
 ## Gate defaults (.no-mistakes.yaml)
 
 The tracked `.no-mistakes.yaml` keeps test evidence outside the repo and pins `commands.lint` to `bin/fm-lint.sh` so local lint matches CI.
