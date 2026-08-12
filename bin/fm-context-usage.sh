@@ -31,7 +31,9 @@
 # window is skipped rather than treated as fatal, and a transcript whose most
 # recent usage record sits outside the window reports unknown instead of
 # triggering a full-file scan. A reading that is stale by a turn, or missed
-# entirely, is expected; nothing here retries to close that gap.
+# entirely, is expected; nothing here retries to close that gap. Both bounds are
+# environment overrides taking a positive integer byte count; an absent or
+# unusable value keeps the 262144 and 65536 defaults.
 #
 # The command never guesses a transcript by cwd or mtime and never follows a
 # path that was not validated beneath the recorded harness-session root.
@@ -98,8 +100,10 @@ find_transcript() {  # <harness> <root> <session-id>
 # on a fresh one. The tail slice drops its first line, which a byte-offset cut
 # leaves partial; the trailing line of a live transcript may also be partial and
 # is skipped by the per-line parse below rather than by another pass.
-FM_CONTEXT_TAIL_BYTES=262144
-FM_CONTEXT_HEAD_BYTES=65536
+FM_CONTEXT_TAIL_BYTES=${FM_CONTEXT_TAIL_BYTES:-262144}
+FM_CONTEXT_HEAD_BYTES=${FM_CONTEXT_HEAD_BYTES:-65536}
+fm_context_valid_positive_uint "$FM_CONTEXT_TAIL_BYTES" || FM_CONTEXT_TAIL_BYTES=262144
+fm_context_valid_positive_uint "$FM_CONTEXT_HEAD_BYTES" || FM_CONTEXT_HEAD_BYTES=65536
 
 transcript_slice() {  # <file> <head|tail>
   local file=$1 end=$2 size

@@ -25,6 +25,18 @@ esac
   exit 2
 }
 
+# Turn-end supervision is the pre-existing contract this callback extends, so it
+# is armed from the arguments alone, before any library, environment, or binding
+# work that could fail and take the crewmate's completed-turn signal with it.
+TURNEND=$6
+if [ "$TURNEND" != - ]; then
+  case "$TURNEND" in
+    "$2"/*.turn-ended) ;;
+    *) echo "error: invalid turn-end path" >&2; exit 1 ;;
+  esac
+  trap 'touch "$TURNEND" 2>/dev/null || true' EXIT
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-context-usage-lib.sh
 . "$SCRIPT_DIR/fm-context-usage-lib.sh"
@@ -35,7 +47,6 @@ STATE=$2
 ID=$3
 EPOCH=$4
 EXPECTED_CWD=$5
-TURNEND=$6
 PAYLOAD=$7
 
 case "$ID" in
@@ -50,7 +61,6 @@ if [ "$TURNEND" != - ]; then
     "$STATE"/*.turn-ended) ;;
     *) echo "error: invalid turn-end path" >&2; exit 1 ;;
   esac
-  trap 'touch "$TURNEND" 2>/dev/null || true' EXIT
 fi
 
 [ -d "$EXPECTED_CWD" ] || { echo "error: expected cwd is unavailable" >&2; exit 1; }
@@ -79,7 +89,7 @@ cleanup() {
   [ -z "$TMP" ] || rm -f -- "$TMP" 2>/dev/null || true
   fm_lock_release "$LOCK"
 }
-trap 'cleanup; [ "$TURNEND" = - ] || touch "$TURNEND" 2>/dev/null || true' EXIT
+trap '[ "$TURNEND" = - ] || touch "$TURNEND" 2>/dev/null || true; cleanup || true' EXIT
 
 [ -f "$META" ] && [ ! -L "$META" ] || { echo "error: task metadata is unavailable" >&2; exit 1; }
 CURRENT_EPOCH=$(fm_context_meta_exact "$META" harness_session_epoch) || { echo "error: task metadata has no unique session epoch" >&2; exit 1; }
@@ -93,6 +103,13 @@ META_WORKTREE=$(fm_context_meta_exact "$META" worktree) || { echo "error: task m
 
 EXISTING=$(grep '^harness_session_id=' "$META" 2>/dev/null | cut -d= -f2- || true)
 CONFLICT=$(grep '^harness_session_conflict=' "$META" 2>/dev/null | cut -d= -f2- || true)
+BOUND_CWD=$(grep '^harness_session_cwd=' "$META" 2>/dev/null | cut -d= -f2- || true)
+# The binding is already exactly what this notification would write, so every
+# later turn of a bound incarnation leaves the record untouched instead of
+# republishing byte-identical metadata over other writers' appends.
+if [ -z "$CONFLICT" ] && [ "$EXISTING" = "$THREAD_ID" ] && [ "$BOUND_CWD" = "$EXPECTED_CWD" ]; then
+  exit 0
+fi
 TMP=$(mktemp "$STATE/.$ID.meta.bind.XXXXXX") || exit 1
 awk '!/^harness_session_id=/ && !/^harness_session_cwd=/ && !/^harness_session_conflict=/' "$META" > "$TMP"
 if [ "$CONFLICT" = 1 ] || { [ -n "$EXISTING" ] && [ "$EXISTING" != "$THREAD_ID" ]; }; then

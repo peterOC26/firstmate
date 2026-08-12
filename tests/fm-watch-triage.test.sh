@@ -437,22 +437,31 @@ test_actionable_signal_surfaced() {
 # names without dragging an unrelated, provably-working worker's benign signal
 # through the same forced wake - that worker keeps its normal absorb triage.
 test_context_warning_surfaces_only_the_warned_task() {
-  local dir state fakebin out drain_out config sessions sid epoch pid rc
+  local dir state fakebin out out2 drain_out config sessions sid second_sid epoch pid rc
   dir=$(make_case context-warning-scope)
   dir=$(cd "$dir" && pwd -P)
   state="$dir/state"; fakebin="$dir/fakebin"
-  out="$dir/watch.out"; drain_out="$dir/drain.out"
+  out="$dir/watch.out"; out2="$dir/watch2.out"; drain_out="$dir/drain.out"
   config="$dir/config"; sessions="$dir/codex-home/sessions/2026/08/12"
   sid=22222222-2222-4222-8222-222222222222
+  second_sid=33333333-3333-4333-8333-333333333333
   epoch=11111111-1111-4111-8111-111111111111
   mkdir -p "$config" "$sessions" "$dir/worktree"
   printf '%s\n%s\n' \
     "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$sid\",\"cwd\":\"$dir/worktree\",\"cli_version\":\"0.147.0\"}}" \
     '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":160000},"model_context_window":258400}}}' \
     > "$sessions/rollout-warned-$sid.jsonl"
+  printf '%s\n%s\n' \
+    "{\"type\":\"session_meta\",\"payload\":{\"id\":\"$second_sid\",\"cwd\":\"$dir/worktree\",\"cli_version\":\"0.147.0\"}}" \
+    '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":170000},"model_context_window":258400}}}' \
+    > "$sessions/rollout-warnedtwo-$second_sid.jsonl"
   fm_write_meta "$state/warned.meta" "window=test:fm-warned" "worktree=$dir/worktree" \
     "harness=codex" "kind=ship" "harness_session_epoch=$epoch" "harness_version=0.147.0" \
     "harness_session_root=$dir/codex-home" "harness_session_id=$sid" \
+    "harness_session_cwd=$dir/worktree"
+  fm_write_meta "$state/warnedtwo.meta" "window=test:fm-warnedtwo" "worktree=$dir/worktree" \
+    "harness=codex" "kind=ship" "harness_session_epoch=$epoch" "harness_version=0.147.0" \
+    "harness_session_root=$dir/codex-home" "harness_session_id=$second_sid" \
     "harness_session_cwd=$dir/worktree"
   : > "$state/warned.turn-ended"
   printf 'working: compiling step 2\n' > "$state/quiet.status"
@@ -465,19 +474,33 @@ test_context_warning_surfaces_only_the_warned_task() {
   watch_bg "$state" "$fakebin" "$out"
   pid=$!
   wait_for_exit "$pid" 60; rc=$?
-  unset FM_CONFIG_OVERRIDE FM_FAKE_CREW_STATE_quiet
-  [ "$rc" -eq 0 ] || fail "watcher did not surface a crossed context usage threshold: $(cat "$out")"
-  grep -F "context usage warning: task=warned" "$out" >/dev/null \
+  [ "$rc" -eq 0 ] || { unset FM_CONFIG_OVERRIDE FM_FAKE_CREW_STATE_quiet
+    fail "watcher did not surface a crossed context usage threshold: $(cat "$out")"; }
+  grep -F "context usage warning: task=warned " "$out" >/dev/null \
     || fail "watcher did not print the context usage warning: $(cat "$out")"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the context warning failed"
-  grep "$(printf '\tcheck\t')" "$drain_out" | grep -F context-usage >/dev/null \
-    || fail "the context warning was not queued as a check record"
-  grep "$(printf '\tsignal\t')" "$drain_out" | grep -F warned.turn-ended >/dev/null \
+  grep "$(printf '\tsignal\t')" "$state/.wake-queue" | grep -F warned.turn-ended >/dev/null \
     || fail "the warned task's own turn-end was not surfaced with its warning"
-  grep "$(printf '\tsignal\t')" "$drain_out" | grep -F quiet.status >/dev/null \
+  grep "$(printf '\tsignal\t')" "$state/.wake-queue" | grep -F quiet.status >/dev/null \
     && fail "an unrelated provably-working signal was forced past triage by another task's warning"
   [ -s "$state/.seen-quiet_status" ] || fail "the absorbed unrelated signal did not advance its suppressor"
-  pass "a context usage warning surfaces only the task it names and leaves unrelated quiet workers absorbed"
+
+  # A second task crosses in a later cycle, before the captain has drained the
+  # first warning. The first task already wrote its dedup marker and will never
+  # warn again, so a queue record it shares with the second task loses it for good.
+  : > "$state/warnedtwo.turn-ended"
+  watch_bg "$state" "$fakebin" "$out2"
+  pid=$!
+  wait_for_exit "$pid" 60; rc=$?
+  unset FM_CONFIG_OVERRIDE FM_FAKE_CREW_STATE_quiet
+  [ "$rc" -eq 0 ] || fail "watcher did not surface the second task's crossing: $(cat "$out2")"
+  grep -F "context usage warning: task=warnedtwo " "$out2" >/dev/null \
+    || fail "watcher did not print the second task's context usage warning: $(cat "$out2")"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the context warnings failed"
+  grep "$(printf '\tcheck\t')" "$drain_out" | grep -F "task=warned " >/dev/null \
+    || fail "the earlier task's queued warning was dropped before delivery: $(cat "$drain_out")"
+  grep "$(printf '\tcheck\t')" "$drain_out" | grep -F "task=warnedtwo " >/dev/null \
+    || fail "the later task's queued warning was dropped before delivery: $(cat "$drain_out")"
+  pass "each task's context usage warning survives to delivery and unrelated quiet workers stay absorbed"
 }
 
 test_terminal_stale_surfaced() {

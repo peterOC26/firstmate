@@ -183,6 +183,23 @@ FM_LOCK_LOG_PREFIX=teardown
 META="$STATE/$ID.meta"
 [ -f "$META" ] || { echo "error: no meta for task $ID at $META" >&2; exit 1; }
 
+# Task metadata has concurrent atomic republishers - the harness session binder
+# on every completed turn, plus the PR and Relay link writers - so its removal
+# takes the same shared lock. Without it an in-flight rewrite renames a complete
+# record back into place after teardown has already removed it.
+remove_task_state_files() {  # <meta> <other-path>...
+  local meta=$1 lock status=0
+  shift
+  lock=$(fm_meta_lock_path "$meta") || {
+    rm -f -- "$meta" "$@"
+    return 0
+  }
+  fm_lock_acquire_wait "$lock"
+  rm -f -- "$meta" "$@" || status=1
+  fm_lock_release "$lock"
+  return "$status"
+}
+
 REMOTE_HANDOFF_DIR_PRESENT=0
 REMOTE_HANDOFF_DIR_REAL=
 REMOTE_OUTBOX_PRESENT=0
@@ -355,7 +372,7 @@ remote_secondmate_teardown() {
   tmp="$SECONDMATE_REG.tmp.$$"
   grep -vE "^- $ID( |$)" "$SECONDMATE_REG" > "$tmp" || true
   mv -f -- "$tmp" "$SECONDMATE_REG"
-  rm -f -- "$STATE/$ID.status" "$STATE/$ID.meta" "$STATE/$ID.turn-ended" \
+  remove_task_state_files "$STATE/$ID.meta" "$STATE/$ID.status" "$STATE/$ID.turn-ended" \
     "$STATE/.$ID.open-decisions-cursor" "$STATE/.$ID.context-warning"
   printf 'teardown %s complete (remote %s:%s)\n' "$ID" "$remote_host" "$remote_home"
   return 0
@@ -2792,7 +2809,8 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 [ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
-rm -f "$STATE/$ID.status" "$STATE/$ID.turn-ended" "$STATE/$ID.meta" \
+remove_task_state_files "$STATE/$ID.meta" \
+  "$STATE/$ID.status" "$STATE/$ID.turn-ended" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
   "$STATE/$ID.muse-session-current" \

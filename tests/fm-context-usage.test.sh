@@ -27,6 +27,15 @@ CLAUDE_ID=44444444-4444-4444-8444-444444444444
 CLAUDE_COMPACTED=88888888-8888-4888-8888-888888888888
 CODEX_BOUNDED=99999999-9999-4999-8999-999999999999
 
+# Platform-detected inode read: a rename publishes a new inode, so this is how a
+# republished record is told apart from an untouched one. Never the
+# "stat -f || stat -c" fallback form (see bin/fm-watch.sh).
+if [ "$(uname)" = Darwin ]; then
+  file_inode() { stat -f %i "$1" 2>/dev/null; }
+else
+  file_inode() { stat -c %i "$1" 2>/dev/null; }
+fi
+
 threshold_read() {
   bash -c '. "$1"; fm_context_warning_threshold "$2"' _ "$LIB" "$1" 2>&1
 }
@@ -151,8 +160,12 @@ test_reader_scan_is_bounded_by_the_transcript_tail() {
   write_codex_transcript "$file" "$CODEX_BOUNDED" 111111 258400
   write_meta "$id" codex "$CODEX_ROOT" "$CODEX_BOUNDED" 0.147.0
   [ "$(tokens_of "$id")" = 111111 ] || fail "a short transcript was not read at all"
-  pad=$(printf '%*s' 8192 '' | tr ' ' x)
-  while [ "$i" -lt 64 ]; do
+  # The window is an operator-settable byte bound, so the fixture states its own
+  # instead of padding megabytes to reach the default.
+  export FM_CONTEXT_TAIL_BYTES=4096 FM_CONTEXT_HEAD_BYTES=4096
+  [ "$(tokens_of "$id")" = 111111 ] || fail "a transcript inside the stated window stopped being read"
+  pad=$(printf '%*s' 1024 '' | tr ' ' x)
+  while [ "$i" -lt 8 ]; do
     printf '{"type":"event_msg","payload":{"type":"agent_message","message":"%s"}}\n' "$pad" >> "$file"
     i=$((i + 1))
   done
@@ -162,8 +175,12 @@ test_reader_scan_is_bounded_by_the_transcript_tail() {
   [ "$(threshold_of "$id")" = 150000 ] || fail "a bounded-window unknown row dropped the effective threshold"
   printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"total_tokens":140000},"model_context_window":258400}}}' >> "$file"
   [ "$(tokens_of "$id")" = 140000 ] || fail "the newest usage record inside the window was not read"
-  [ "$(window_of "$id")" = 258400 ] || fail "the native window was lost on a long transcript"
-  pass "the reader scans a bounded transcript tail: older records fall out of view, newer ones are still read"
+  [ "$(window_of "$id")" = 258400 ] || fail "the native window was lost past the window boundary"
+  export FM_CONTEXT_TAIL_BYTES=not-a-size
+  [ "$(tokens_of "$id")" = 140000 ] || fail "an unusable window override did not fall back to the default"
+  unset FM_CONTEXT_TAIL_BYTES FM_CONTEXT_HEAD_BYTES
+  [ "$(tokens_of "$id")" = 140000 ] || fail "the default window stopped reading a transcript it contains"
+  pass "the reader scans a bounded, operator-settable transcript tail and falls back on an unusable bound"
 }
 
 # The effective threshold comes from the home's config, not from a task, so an
@@ -258,6 +275,58 @@ EOF
   pass "Codex notify binds atomically, rejects stale relaunch callbacks, and never couples binding failure to supervision"
 }
 
+# Turn-end supervision predates this binding and must survive any failure in the
+# callback's own prologue, including one caused by the pane environment rather
+# than by the arguments the launch line baked in.
+test_turn_end_survives_a_failed_callback_prologue() {
+  local id=bind-prologue meta turn payload out rc blocked
+  meta="$STATE/$id.meta"
+  turn="$STATE/$id.turn-ended"
+  blocked="$TMP_ROOT/not-a-directory"
+  : > "$blocked"
+  cat > "$meta" <<EOF
+window=fixture:fm-$id
+endpoint_task_id=$id
+worktree=$WT
+harness=codex
+harness_session_epoch=$EPOCH
+EOF
+  rm -f "$turn"
+  payload=$(jq -cn --arg id "$CODEX_ID" --arg cwd "$WT" '{type:"agent-turn-complete","thread-id":$id,cwd:$cwd}')
+  out=$(FM_STATE_OVERRIDE="$blocked/state" "$BINDER" codex-notify "$STATE" "$id" "$EPOCH" "$WT" "$turn" "$payload" 2>&1); rc=$?
+  expect_code 1 "$rc" "an unusable ambient state directory should fail the binding"
+  [ -f "$turn" ] || fail "a failed callback prologue dropped the crewmate's turn-end signal: $out"
+  pass "a callback whose prologue fails before any binding work still preserves the turn-end signal"
+}
+
+# Every completed turn of a bound incarnation re-runs this callback. Republishing
+# a byte-identical record would keep renaming a new inode over the file that the
+# decision-attestation and link writers append to.
+test_repeat_binding_leaves_bound_metadata_untouched() {
+  local id=bind-idempotent meta payload before after inode_before inode_after
+  meta="$STATE/$id.meta"
+  cat > "$meta" <<EOF
+window=fixture:fm-$id
+endpoint_task_id=$id
+worktree=$WT
+harness=codex
+harness_session_epoch=$EPOCH
+EOF
+  payload=$(jq -cn --arg id "$CODEX_ID" --arg cwd "$WT" '{type:"agent-turn-complete","thread-id":$id,cwd:$cwd}')
+  "$BINDER" codex-notify "$STATE" "$id" "$EPOCH" "$WT" - "$payload"
+  assert_grep "harness_session_id=$CODEX_ID" "$meta" "the first notify did not bind the thread id"
+  printf 'decisions_reviewed=1\n' >> "$meta"
+  before=$(cat "$meta")
+  inode_before=$(file_inode "$meta")
+  "$BINDER" codex-notify "$STATE" "$id" "$EPOCH" "$WT" - "$payload"
+  after=$(cat "$meta")
+  inode_after=$(file_inode "$meta")
+  [ "$before" = "$after" ] || fail "a repeat notify on a bound incarnation changed the record"
+  [ "$inode_before" = "$inode_after" ] \
+    || fail "a repeat notify republished an unchanged record over concurrent metadata writers"
+  pass "a repeat notify on an already-bound incarnation leaves the metadata record untouched"
+}
+
 test_warning_transition_and_dedup() {
   local file out pending
   file="$CODEX_ROOT/sessions/2026/08/12/rollout-bound-$CODEX_ID.jsonl"
@@ -291,4 +360,6 @@ test_reader_scan_is_bounded_by_the_transcript_tail
 test_unknown_rows_still_report_the_effective_threshold
 test_unknown_identity_version_and_remote_cases
 test_codex_notify_binding_relaunch_and_supervision_independence
+test_turn_end_survives_a_failed_callback_prologue
+test_repeat_binding_leaves_bound_metadata_untouched
 test_warning_transition_and_dedup

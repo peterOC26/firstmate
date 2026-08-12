@@ -915,7 +915,17 @@ while :; do
     if [ -n "$context_warning" ]; then
       context_reason="check: $(printf '%s\n' "$context_warning" | paste -sd ';' -)"
       context_warned=" $(context_warning_task_ids "$context_warning")"
-      fm_wake_append check context-usage "$context_reason" || exit 1
+      # One queued record per warned task: the durable queue keeps only the last
+      # record per kind+key, so a shared key would drop every warning but one,
+      # and a task that already wrote its dedup marker never warns again.
+      while IFS= read -r context_line; do
+        [ -n "$context_line" ] || continue
+        context_id=$(context_warning_task_ids "$context_line")
+        context_id=${context_id%% *}
+        fm_wake_append check "context-usage:${context_id:-unnamed}" "check: $context_line" || exit 1
+      done <<EOF
+$context_warning
+EOF
       context_rest=
       while IFS=$(printf '\t') read -r sf sig f; do
         [ -n "$sf" ] || continue
