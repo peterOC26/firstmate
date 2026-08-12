@@ -170,7 +170,7 @@ emit() {  # <task> <harness> <tokens> <threshold> <window> <status> <detail>
       --arg window "$5" --arg status "$6" --arg detail "$7" '
       {task:$task,harness:$harness,
        tokens:(if $tokens=="" then null else ($tokens|tonumber) end),
-       threshold:(if $threshold=="" then null else ($threshold|tonumber) end),
+       threshold:(if $threshold=="" then null else $threshold end),
        context_window:(if $window=="" then null else ($window|tonumber) end),
        status:$status,detail:$detail}'
   else

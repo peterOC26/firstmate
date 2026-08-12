@@ -4,9 +4,9 @@
 # Usage: fm-context-warning.sh <task-id> [<task-id> ...]
 #
 # Calls the read-only fm-context-usage.sh interface. It prints one line when a
-# task first enters warning or over, and stays silent on repeated reads in the
-# same state. Returning under clears that task's marker so a later crossing can
-# surface again. Unknown neither warns nor clears a prior marker.
+# task first enters warning or over, and stays silent throughout the same
+# above-threshold episode. Returning under clears that task's marker so a later
+# crossing can surface again. Unknown neither warns nor clears a prior marker.
 #
 # The small state/.<id>.context-warning marker is deduplication state, not a
 # worker progress note. This command never blocks, refuses, reroutes, rotates,
@@ -46,7 +46,7 @@ for id in "$@"; do
       tokens=$(printf '%s\n' "$row" | jq -r '.tokens // empty')
       threshold=$(printf '%s\n' "$row" | jq -r '.threshold // empty')
       window=$(printf '%s\n' "$row" | jq -r '.context_window // empty')
-      signature="$status:$threshold:$window"
+      signature="$threshold"
       [ "$(cat "$marker" 2>/dev/null || true)" = "$signature" ] && continue
       tmp=$(mktemp "$STATE/.$id.context-warning.XXXXXX") || continue
       printf '%s' "$signature" > "$tmp" || { rm -f "$tmp"; continue; }

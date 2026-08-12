@@ -2726,6 +2726,9 @@ LAUNCH=${LAUNCH//__CODEXNOTIFY__/$CODEXNOTIFY}
 if [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "$ORCA_REMOTE" != 1 ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
 fi
+if [ "$HARNESS" = codex ] && [ -n "$HARNESS_SESSION_ROOT" ] && [ "$ORCA_REMOTE" != 1 ]; then
+  LAUNCH="CODEX_HOME=$(shell_quote "$HARNESS_SESSION_ROOT") $LAUNCH"
+fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")

@@ -187,7 +187,7 @@ test_reader_scan_is_bounded_by_the_transcript_tail() {
 # The effective threshold comes from the home's config, not from a task, so an
 # unknown row still reports it - only tokens and the native window drop out.
 test_unknown_rows_still_report_the_effective_threshold() {
-  local id out
+  local id out exact_threshold
   write_meta remote-threshold codex "$CODEX_ROOT" "$CODEX_ID" 0.147.0 'orca_remote=1'
   write_meta unmeasured-harness opencode "$CODEX_ROOT" "$CODEX_ID" 0.147.0
   printf '90000\n' > "$CONFIG/context-warning"
@@ -195,6 +195,13 @@ test_unknown_rows_still_report_the_effective_threshold() {
     [ "$(status_of "$id")" = unknown ] || fail "$id should be unknown"
     [ "$(threshold_of "$id")" = 90000 ] || fail "$id dropped the configured threshold from its unknown row"
   done
+  exact_threshold=900719925474099312345678901
+  printf '%s\n' "$exact_threshold" > "$CONFIG/context-warning"
+  out=$(FM_HOME="$HOME_DIR" "$READER" --json remote-threshold)
+  [ "$(printf '%s' "$out" | jq -r '.threshold')" = "$exact_threshold" ] \
+    || fail "--json rounded the configured threshold"
+  [ "$(printf '%s' "$out" | jq -r '.threshold | type')" = string ] \
+    || fail "--json did not preserve the threshold as an exact string"
   rm -f "$CONFIG/context-warning"
   [ "$(threshold_of remote-threshold)" = 150000 ] || fail "the default threshold is missing from an unknown row"
   out=$(FM_HOME="$HOME_DIR" "$READER" --json remote-threshold)
@@ -415,6 +422,14 @@ test_warning_transition_and_dedup() {
   write_codex_transcript "$file" "$CODEX_ID" 170000 258400
   out=$(FM_HOME="$HOME_DIR" "$WARNING" codex-ok)
   assert_contains "$out" "context usage warning" "warning did not re-arm after returning under"
+  write_codex_transcript "$file" "$CODEX_ID" 300000 258400
+  [ -z "$(FM_HOME="$HOME_DIR" "$WARNING" codex-ok)" ] \
+    || fail "warning re-emitted when status changed from warning to over"
+  write_codex_transcript "$file" "$CODEX_ID" 100000 258400
+  FM_HOME="$HOME_DIR" "$WARNING" codex-ok >/dev/null
+  write_codex_transcript "$file" "$CODEX_ID" 170000 258400
+  out=$(FM_HOME="$HOME_DIR" "$WARNING" codex-ok)
+  assert_contains "$out" "context usage warning" "warning did not re-arm after the over episode fell under threshold"
   pass "warning path surfaces a threshold transition, deduplicates it, and re-arms after usage falls under"
 }
 

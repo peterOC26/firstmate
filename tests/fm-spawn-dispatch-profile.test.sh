@@ -93,6 +93,7 @@ run_spawn() {
     FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
     CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
+    CODEX_HOME="${FM_TEST_CODEX_HOME:-}" \
     FM_FAKE_LAUNCH_LOG="$launchlog" GROK_HOME="$home/grok-home" PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
 }
@@ -658,6 +659,27 @@ test_non_claude_harness_ignores_config_dir() {
   pass "non-claude harnesses do not receive the claude CLAUDE_CONFIG_DIR prefix"
 }
 
+test_codex_forwards_effective_home() {
+  local rec id out status launch codex_home
+  id=profile-codex-home-z19a
+  rec=$(make_spawn_case profile-codex-home codex "$id")
+  read_case_record "$rec"
+  codex_home="$CASE_DIR/codex-home"
+  mkdir -p "$codex_home"
+  codex_home=$(cd "$codex_home" && pwd -P)
+
+  out=$(FM_TEST_CODEX_HOME="$codex_home" \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "codex spawn with an alternate CODEX_HOME should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "CODEX_HOME='$codex_home' codex" \
+    "codex launch did not forward the effective transcript home"
+  assert_grep "harness_session_root=$codex_home" "$HOME_DIR/state/$id.meta" \
+    "codex metadata did not record the forwarded transcript home"
+  pass "codex forwards the exact recorded transcript home to local workers"
+}
+
 test_context_warning_threshold_never_changes_launch() {
   local rec low_id high_id out status low_launch high_launch
   low_id=profile-context-warning-low-z20
@@ -726,6 +748,7 @@ test_batch_forwards_shared_profile_flags
 test_claude_forwards_firstmate_config_dir_when_set
 test_claude_omits_config_dir_prefix_when_unset
 test_non_claude_harness_ignores_config_dir
+test_codex_forwards_effective_home
 test_context_warning_threshold_never_changes_launch
 test_active_dispatch_profile_does_not_block_secondmate_launch
 
