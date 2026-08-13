@@ -18,6 +18,8 @@
 #     and the parent project clone is never mutated (no write through a project)
 #   - spawn meta records kind=secondmate, home=, and the project list; launch runs
 #     in the subhome with the persistent charter and cleared operational overrides
+#   - a secondmate launch never signals this home's turn end, while the
+#     measurement-only session binding it may carry still records its session
 #   - a bare `fm-<id>` send targets the window recorded in THIS home's meta
 #   - backlog items move verbatim into the subhome and leave the main backlog
 #   - recovery respawns from the durable registry + persistent home
@@ -110,6 +112,28 @@ phase_seed() {
   pass "seed: registry scope+projects, charter copied, clones+origins, no-mistakes init in subhome only"
 }
 
+# Replays the codex notify argv recorded on the secondmate launch line the way
+# codex itself invokes it - the configured argv plus one agent-turn-complete
+# notification - and requires that it binds the transcript session for the read
+# only usage audit. Whether it also left a turn-end signal behind is asserted by
+# the caller, against the whole parent state directory. A launch that carries no
+# notify argv at all is an unmeasured secondmate, which is equally allowed.
+assert_secondmate_notify_measures_without_turn_end() {  # <meta>
+  local meta=$1 notify payload thread arg
+  local -a argv=()
+  notify=$(sed -n "s/.*-c 'notify=\(\[[^']*\]\)'.*/\1/p" "$LOG" | head -n 1)
+  [ -n "$notify" ] || return 0
+  while IFS= read -r -d '' arg; do
+    argv+=("$arg")
+  done < <(printf '%s' "$notify" | jq -j '.[] + "\u0000"')
+  [ "${#argv[@]}" -gt 0 ] || fail "the secondmate codex notify argv did not parse as JSON"
+  thread=1f0c2a34-5b6d-4e78-9a0b-1c2d3e4f5061
+  payload=$(jq -cn --arg id "$thread" --arg cwd "$SUB_ABS" \
+    '{type:"agent-turn-complete","thread-id":$id,cwd:$cwd}')
+  "${argv[@]}" "$payload" || fail "the secondmate codex notify callback failed"
+  assert_grep "harness_session_id=$thread" "$meta" "the secondmate notify did not record its transcript session"
+}
+
 phase_spawn() {
   : > "$LOG"
   PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_CONFIG_OVERRIDE="$HOME_DIR/parent-config" \
@@ -127,8 +151,17 @@ phase_spawn() {
   assert_grep 'FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE=' "$LOG" "launch did not clear operational overrides"
   assert_grep 'FM_CONFIG_OVERRIDE=' "$LOG" "launch did not clear the config override"
   assert_grep "$SUB_ABS/data/charter.md" "$LOG" "launch did not use the persistent charter"
-  assert_no_grep 'notify=' "$LOG" "secondmate codex launch included the parent turn-end notify hook"
   assert_no_grep 'turn-ended' "$LOG" "secondmate codex launch referenced a parent turn-ended signal"
+  # A secondmate is persistently supervised and is never turn-end resumed by this
+  # home, so nothing on its launch may signal the parent's turn end. The codex
+  # notify slot itself is not the contract: the measurement-only session binding
+  # rides it with the turn-end argument disabled. Drive the configured callback
+  # exactly as codex does - the argv plus one agent-turn-complete notification -
+  # and require that it records the transcript session and leaves the parent's
+  # turn-end signal unwritten.
+  assert_secondmate_notify_measures_without_turn_end "$meta"
+  [ -z "$(find "$HOME_DIR/state" -maxdepth 1 -name '*.turn-ended' -print 2>/dev/null | head -n 1)" ] \
+    || fail "secondmate codex launch signalled a parent turn end"
   assert_no_grep 'treehouse get' "$LOG" "secondmate spawn ran a project treehouse get"
   pass "spawn: launches in the subhome with persistent charter, records routing meta"
 }
