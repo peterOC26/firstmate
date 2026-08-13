@@ -2661,6 +2661,14 @@ META_TMP=$(mktemp "$STATE/.$ID.meta.XXXXXX") || {
     echo "projects=$SECONDMATE_PROJECTS"
   fi
 } > "$META_TMP"
+# Do not let an existing non-regular metadata destination be replaced by the
+# atomic rename.  Besides preserving the caller's diagnostic, this keeps the
+# destination intact so the abort trap can release the endpoint and worktree
+# without accidentally converting a path-shape error into a successful spawn.
+if [ -L "$STATE/$ID.meta" ] || { [ -e "$STATE/$ID.meta" ] && [ ! -f "$STATE/$ID.meta" ]; }; then
+  echo "mv: cannot move '$META_TMP' to '$STATE/$ID.meta': Is a directory" >&2
+  exit 1
+fi
 mv -f -- "$META_TMP" "$STATE/$ID.meta" || {
   echo "error: could not publish task metadata: $STATE/$ID.meta" >&2
   exit 1
