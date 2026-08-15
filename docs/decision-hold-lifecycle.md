@@ -35,7 +35,7 @@ It resolves every repeated `blocked-by:` edge against structured Done records, k
 Its secondmate-home summary classifies an actionable captain hold as `captain_decision` and preserves blocked captain holds as queued work in the owning home.
 
 `bin/fm-bearings-snapshot.sh` projects actionable captain holds into `decisions_open` and leaves blocked captain holds in ordinary queued gates.
-It excludes completed kind `captain` records from Recently Landed.
+It excludes completed kind `captain` records from Done.
 The projection remains read-only and does not inspect historical prose.
 
 ## Verification record
@@ -70,7 +70,7 @@ ok - snapshot parses tasks-axi rows and respects operational overrides
 
 $ bash tests/fm-bearings-snapshot.test.sh
 ok - a completed scout with decision-like report prose is a pointer, not pending
-ok - action-free items (working/done/queued/landed) do not leak into Captain's Call
+ok - action-free items (working/done/queued/landed) do not leak into Waiting on you
 ok - mixed secondmate roles, partial state, and captain readiness project independently
 ok - main and secondmate captain actionability use the same blocker readiness
 
