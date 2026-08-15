@@ -93,6 +93,7 @@ run_spawn() {
     FM_PROJECTS_OVERRIDE="$home/projects" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$wt" TMUX="fake,1,0" \
     CLAUDE_CONFIG_DIR="${FM_TEST_CLAUDE_CONFIG_DIR:-}" \
+    CODEX_HOME="${FM_TEST_CODEX_HOME:-}" \
     FM_FAKE_LAUNCH_LOG="$launchlog" GROK_HOME="$home/grok-home" PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
 }
@@ -117,7 +118,7 @@ assert_meta_profile() {
 }
 
 test_no_profile_keeps_claude_profile_defaults() {
-  local rec id out status expected launch
+  local rec id out status expected launch session
   id=profile-off-z1
   rec=$(make_spawn_case profile-off claude "$id")
   read_case_record "$rec"
@@ -129,7 +130,10 @@ test_no_profile_keeps_claude_profile_defaults() {
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude default default
 
   launch=$(cat "$LAUNCH_LOG")
-  expected="CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < '$HOME_DIR/data/$id/brief.md')\""
+  session=$(awk -F= '$1 == "harness_session_id" { print $2 }' "$HOME_DIR/state/$id.meta")
+  printf '%s\n' "$session" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' \
+    || fail "claude spawn did not persist a UUID session identity"
+  expected="CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --session-id '$session' --dangerously-skip-permissions \"\$('${ROOT}/bin/fm-operational-input.sh' encode launch-brief < '$HOME_DIR/data/$id/brief.md')\""
   [ "$launch" = "$expected" ] || fail "no-profile claude launch did not use the canonical launch kind"$'\n'"expected: $expected"$'\n'"actual:   $launch"
   pass "no --model/--effort records defaults and types the claude launch instructions"
 }
@@ -377,7 +381,7 @@ test_claude_threads_model_and_effort() {
   expect_code 0 "$status" "claude spawn with profile flags should succeed"
   assert_meta_profile "$HOME_DIR/state/$id.meta" claude sonnet high
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "claude --dangerously-skip-permissions --model 'sonnet' --effort 'high'" \
+  assert_contains "$launch" "--dangerously-skip-permissions --model 'sonnet' --effort 'high'" \
     "claude launch did not thread model and effort flags"
   pass "claude receives --model and --effort profile flags"
 }
@@ -655,6 +659,52 @@ test_non_claude_harness_ignores_config_dir() {
   pass "non-claude harnesses do not receive the claude CLAUDE_CONFIG_DIR prefix"
 }
 
+test_codex_forwards_effective_home() {
+  local rec id out status launch codex_home
+  id=profile-codex-home-z19a
+  rec=$(make_spawn_case profile-codex-home codex "$id")
+  read_case_record "$rec"
+  codex_home="$CASE_DIR/codex-home"
+  mkdir -p "$codex_home"
+  codex_home=$(cd "$codex_home" && pwd -P)
+
+  out=$(FM_TEST_CODEX_HOME="$codex_home" \
+    run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "codex spawn with an alternate CODEX_HOME should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "CODEX_HOME='$codex_home' codex" \
+    "codex launch did not forward the effective transcript home"
+  assert_grep "harness_session_root=$codex_home" "$HOME_DIR/state/$id.meta" \
+    "codex metadata did not record the forwarded transcript home"
+  pass "codex forwards the exact recorded transcript home to local workers"
+}
+
+test_context_warning_threshold_never_changes_launch() {
+  local rec low_id high_id out status low_launch high_launch
+  low_id=profile-context-warning-low-z20
+  high_id=profile-context-warning-high-z21
+  rec=$(make_spawn_case profile-context-warning pi "$low_id" "$high_id")
+  read_case_record "$rec"
+
+  printf '1\n' > "$HOME_DIR/config/context-warning"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$low_id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a low context warning threshold must not block dispatch"
+  low_launch=$(cat "$LAUNCH_LOG")
+
+  printf '999999\n' > "$HOME_DIR/config/context-warning"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$high_id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "a high context warning threshold must not block dispatch"
+  high_launch=$(cat "$LAUNCH_LOG")
+
+  low_launch=${low_launch//$low_id/context-warning-worker}
+  high_launch=${high_launch//$high_id/context-warning-worker}
+  [ "$low_launch" = "$high_launch" ] || fail "context warning threshold altered the harness launch"
+  pass "context warning threshold may move in either direction without changing dispatch or launch"
+}
+
 test_active_dispatch_profile_does_not_block_secondmate_launch() {
   local rec id sm out status
   id=profile-secondmate-z16
@@ -698,6 +748,8 @@ test_batch_forwards_shared_profile_flags
 test_claude_forwards_firstmate_config_dir_when_set
 test_claude_omits_config_dir_prefix_when_unset
 test_non_claude_harness_ignores_config_dir
+test_codex_forwards_effective_home
+test_context_warning_threshold_never_changes_launch
 test_active_dispatch_profile_does_not_block_secondmate_launch
 
 echo "# all fm-spawn-dispatch-profile tests passed"

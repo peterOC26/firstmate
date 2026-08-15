@@ -478,6 +478,25 @@ fm_lock_release() {
   rmdir "$lockdir" 2>/dev/null || true
 }
 
+# fm_meta_lock_path <meta-file>: one shared mutation lock for every atomic
+# read-modify-write of a task metadata file. The callback that learns a Codex
+# thread id can run concurrently with PR and Relay link publication, so those
+# writers must serialize on the same path or one complete rewrite can erase the
+# other's fields.
+fm_meta_lock_path() {
+  local meta=$1 dir base
+  case "$meta" in
+    */*) dir=${meta%/*}; base=${meta##*/} ;;
+    *) dir=.; base=$meta ;;
+  esac
+  case "$base" in
+    *.meta) ;;
+    *) return 1 ;;
+  esac
+  [ -d "$dir" ] || return 1
+  printf '%s/.%s.lock\n' "$dir" "$base"
+}
+
 fm_failure_episode_reset() {
   local state=$1 mode=${2:-acquire} lock current pid acquired=0 path
   lock="$state/.turnend-claude-blocks.lock"

@@ -61,6 +61,21 @@ wait_child() { # <pid> <seconds>
   return 1
 }
 
+# Wait up to <seconds> for the supervisor started from <remote-root> to be
+# visible under its final command line; echoes its pid when it is. The library
+# starts the worker as `nohup env ... <worker>`, so the supervisor only presents
+# that command line once its exec chain reaches bash - polling instead of
+# sampling once keeps the fixture from losing that race on a loaded machine.
+wait_worker() { # <remote-root> <seconds>
+  local root=$1 deadline=$(( $(date +%s) + $2 )) pid
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    pid=$(pgrep -f "^/bin/bash $root/bin/fm-remote-job-worker.sh\$" 2>/dev/null | head -n 1)
+    case "$pid" in ''|*[!0-9]*) ;; *) printf '%s\n' "$pid"; return 0 ;; esac
+    sleep 0.1
+  done
+  return 1
+}
+
 # --- a real worker fixture, launched exactly the way fm-on's Linux start does -
 
 # build_remote_root <dir>: a minimal but genuine Firstmate code root carrying
@@ -89,7 +104,7 @@ start_worker() {
     # shellcheck source=bin/fm-remote-job-lib.sh
     . "$ROOT/bin/fm-remote-job-lib.sh"
     fm_remote_job_start_linux_worker "$root" "$account_home" >&2 || exit 1
-    pgrep -f "^/bin/bash $root/bin/fm-remote-job-worker.sh\$" | head -n 1
+    wait_worker "$root" 10
   ) || return 1
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
   printf '%s\n' "$pid"

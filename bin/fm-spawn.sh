@@ -143,6 +143,8 @@
 #     __BRIEF__    absolute path to data/<task-id>/brief.md
 #     __TURNEND__  absolute path to state/<task-id>.turn-ended (for harnesses whose
 #                  turn-end signal rides the launch command, e.g. codex -c notify=[...])
+#     __CLAUDESESSION__ generated --session-id binding when locally measurable
+#     __CODEXNOTIFY__ validated notify callback binding when locally measurable
 #     __PIEXT__    absolute path to state/<task-id>.pi-ext.ts (pi turn-end extension,
 #                  written by this script; outside the worktree to avoid pi's trust gate)
 #     __PITURNEND__ absolute path to .pi/extensions/fm-primary-turnend-guard.ts in a pi secondmate home
@@ -232,6 +234,8 @@ SUB_HOME_MARKER=".fm-secondmate-home"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-trace-context-lib.sh
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"
+# shellcheck source=bin/fm-context-usage-lib.sh
+. "$SCRIPT_DIR/fm-context-usage-lib.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
@@ -715,6 +719,10 @@ spawn_orca_remote_task_tmp_sweep() {
 
 spawn_abort_cleanup() {
   local status=$?
+  if [ -n "${META_TMP:-}" ]; then
+    rm -f -- "$META_TMP" 2>/dev/null || true
+    META_TMP=
+  fi
   if [ "$HERDR_PROJECTION_ABORT_CLEANUP" = 1 ] \
      && [ "$HERDR_PRESENTATION_ORDER_LOCK_HELD" != 1 ]; then
     if ! spawn_herdr_presentation_order_lock_acquire "${HERDR_PROJECTION_ABORT_SESSION:-}"; then
@@ -923,12 +931,12 @@ launch_template() {
     # does NOT suppress the interactive ghost text (verified empirically), so the env
     # var is the correct control. The dim-aware composer reader in fm-tmux-lib.sh is
     # the defense-in-depth backstop for any pane this flag cannot reach.
-    claude) printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
+    claude) printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude __CLAUDESESSION__--dangerously-skip-permissions __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
     codex)
-      if [ "$kind" = secondmate ] || [ "$turnend" = none ]; then
+      if [ "$turnend" = none ]; then
         printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
       else
-        printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox -c "notify=[\"bash\",\"-c\",\"touch __TURNEND__\"]" "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+        printf '%s' 'codex __MODELFLAG____EFFORTFLAG__--dangerously-bypass-approvals-and-sandbox __CODEXNOTIFY__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
       fi
       ;;
     opencode) printf '%s' 'OPENCODE_CONFIG_CONTENT='\''{"permission":{"*":"allow"}}'\'' opencode __MODELFLAG__--prompt "$(__OPINPUT__ encode launch-brief < __BRIEF__)"' ;;
@@ -1543,6 +1551,44 @@ BRIEF_REAL="$BRIEF_DIR_REAL/$(basename "$BRIEF")"
 # once here so every downstream comparison uses the same physical form
 # (docs/herdr-backend.md "Known gaps").
 PROJ_ABS_REAL=$(cd "$PROJ_ABS" 2>/dev/null && pwd -P) || PROJ_ABS_REAL="$PROJ_ABS"
+
+# Bind local Claude and Codex task incarnations to exact transcript sessions for
+# the read-only usage reader. Version probing is best-effort and never gates
+# dispatch. No compaction or context-window control is injected, and remote,
+# raw-command, and other-harness launches remain unchanged with usage unknown.
+HARNESS_SESSION_EPOCH=
+HARNESS_SESSION_ID=
+HARNESS_SESSION_ROOT=
+HARNESS_SESSION_CWD=
+HARNESS_VERSION=
+CLAUDE_CONFIG_EFFECTIVE=
+if [ "$ORCA_REMOTE" != 1 ] && [ "$LAUNCH_FROM_TEMPLATE" = 1 ]; then
+  case "$HARNESS" in
+    claude|codex)
+      HARNESS_SESSION_EPOCH=$(fm_context_uuid 2>/dev/null || true)
+      HARNESS_SESSION_CWD=$(cd "$WT" 2>/dev/null && pwd -P || true)
+      HARNESS_VERSION_OUTPUT=$("$HARNESS" --version 2>&1 || true)
+      HARNESS_VERSION=$(fm_context_normalize_version "$HARNESS" "$HARNESS_VERSION_OUTPUT" 2>/dev/null || true)
+      case "$HARNESS" in
+        claude)
+          HARNESS_SESSION_ID=$(fm_context_uuid 2>/dev/null || true)
+          CONTEXT_ROOT_RAW=${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}
+          ;;
+        codex)
+          CONTEXT_ROOT_RAW=${CODEX_HOME:-${HOME:-}/.codex}
+          ;;
+      esac
+      case "$CONTEXT_ROOT_RAW" in
+        /*) HARNESS_SESSION_ROOT=$CONTEXT_ROOT_RAW ;;
+        *) HARNESS_SESSION_ROOT="$HARNESS_SESSION_CWD/$CONTEXT_ROOT_RAW" ;;
+      esac
+      if [ -d "$HARNESS_SESSION_ROOT" ]; then
+        HARNESS_SESSION_ROOT=$(cd "$HARNESS_SESSION_ROOT" 2>/dev/null && pwd -P || true)
+      fi
+      [ "$HARNESS" != claude ] || CLAUDE_CONFIG_EFFECTIVE=$HARNESS_SESSION_ROOT
+      ;;
+  esac
+fi
 
 # A remote task's launch line runs on another machine, so every path baked into
 # it has to exist there. The brief and the operational-input encoder are copied
@@ -2538,6 +2584,13 @@ fi
 
 META_WINDOW=$T
 [ "$BACKEND" = orca ] && META_WINDOW=$W
+# Publish through a sibling temp file: the group stays outside any condition
+# context so errexit still aborts the spawn on the first failing write, and the
+# rename makes a reader see either no record or the complete one.
+META_TMP=$(mktemp "$STATE/.$ID.meta.XXXXXX") || {
+  echo "error: could not publish task metadata: $STATE/$ID.meta" >&2
+  exit 1
+}
 {
   echo "window=$META_WINDOW"
   echo "endpoint_task_id=$ID"
@@ -2558,6 +2611,16 @@ META_WINDOW=$T
   fi
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
+  if [ -n "$HARNESS_SESSION_EPOCH" ] && [ -n "$HARNESS_SESSION_ROOT" ] && [ -n "$HARNESS_SESSION_CWD" ]; then
+    echo "harness_session_epoch=$HARNESS_SESSION_EPOCH"
+    echo "harness_version=$HARNESS_VERSION"
+    echo "harness_session_root=$HARNESS_SESSION_ROOT"
+    if [ "$HARNESS" = claude ] && [ -n "$HARNESS_SESSION_ID" ]; then
+      echo "harness_session_id=$HARNESS_SESSION_ID"
+      echo "harness_session_cwd=$HARNESS_SESSION_CWD"
+      echo "claude_config_dir=$CLAUDE_CONFIG_EFFECTIVE"
+    fi
+  fi
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   # Default-off writes no traceparent= line (meta stays byte-identical).
   # backend= is written only for a non-default (non-tmux) backend, so the
@@ -2597,7 +2660,20 @@ META_WINDOW=$T
     echo "home=$PROJ_ABS"
     echo "projects=$SECONDMATE_PROJECTS"
   fi
-} > "$STATE/$ID.meta"
+} > "$META_TMP"
+# Do not let an existing non-regular metadata destination be replaced by the
+# atomic rename.  Besides preserving the caller's diagnostic, this keeps the
+# destination intact so the abort trap can release the endpoint and worktree
+# without accidentally converting a path-shape error into a successful spawn.
+if [ -L "$STATE/$ID.meta" ] || { [ -e "$STATE/$ID.meta" ] && [ ! -f "$STATE/$ID.meta" ]; }; then
+  echo "mv: cannot move '$META_TMP' to '$STATE/$ID.meta': Is a directory" >&2
+  exit 1
+fi
+mv -f -- "$META_TMP" "$STATE/$ID.meta" || {
+  echo "error: could not publish task metadata: $STATE/$ID.meta" >&2
+  exit 1
+}
+META_TMP=
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
@@ -2613,6 +2689,26 @@ sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
 sq_opinput=$(shell_quote "$sq_opinput_path")
+CLAUDESESSION=
+CODEXNOTIFY=
+if [ "$HARNESS" = claude ] && [ -n "$HARNESS_SESSION_ID" ]; then
+  CLAUDESESSION="--session-id $(shell_quote "$HARNESS_SESSION_ID") "
+elif [ "$HARNESS" = codex ] && [ -n "$HARNESS_SESSION_EPOCH" ]; then
+  CONTEXT_TURNEND=$TURNEND
+  [ "$KIND" != secondmate ] || CONTEXT_TURNEND=-
+  CODEX_NOTIFY_JSON=$(jq -cn \
+    --arg callback "$FM_ROOT/bin/fm-context-bind.sh" \
+    --arg state "$STATE_REAL" \
+    --arg id "$ID" \
+    --arg epoch "$HARNESS_SESSION_EPOCH" \
+    --arg cwd "$HARNESS_SESSION_CWD" \
+    --arg turnend "$CONTEXT_TURNEND" \
+    '["bash",$callback,"codex-notify",$state,$id,$epoch,$cwd,$turnend]' 2>/dev/null || true)
+  [ -z "$CODEX_NOTIFY_JSON" ] || CODEXNOTIFY="-c $(shell_quote "notify=$CODEX_NOTIFY_JSON") "
+fi
+if [ "$HARNESS" = codex ] && [ -z "$CODEXNOTIFY" ] && [ "$KIND" != secondmate ] && [ "$ORCA_REMOTE" != 1 ]; then
+  CODEXNOTIFY="-c $(shell_quote "notify=[\"bash\",\"-c\",\"touch $TURNEND\"]") "
+fi
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
 EFFORTFLAG=$(effort_flag_for_harness "$HARNESS" "$EFFORT")
 LAUNCH=${LAUNCH//__MODELFLAG__/$MODELFLAG}
@@ -2623,6 +2719,8 @@ LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
 LAUNCH=${LAUNCH//__PITURNEND__/$sq_piturnend}
 LAUNCH=${LAUNCH//__PIWATCH__/$sq_piwatch}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
+LAUNCH=${LAUNCH//__CLAUDESESSION__/$CLAUDESESSION}
+LAUNCH=${LAUNCH//__CODEXNOTIFY__/$CODEXNOTIFY}
 # Crewmate panes are created by a long-lived tmux/herdr daemon that does not
 # inherit firstmate's current environment, so a bare `claude` in the pane falls
 # back to the default ~/.claude store even when firstmate itself runs under a
@@ -2635,6 +2733,9 @@ LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 # credential store that does not exist there.
 if [ "$HARNESS" = claude ] && [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "$ORCA_REMOTE" != 1 ]; then
   LAUNCH="CLAUDE_CONFIG_DIR=$(shell_quote "$CLAUDE_CONFIG_DIR") $LAUNCH"
+fi
+if [ "$HARNESS" = codex ] && [ -n "$HARNESS_SESSION_ROOT" ] && [ "$ORCA_REMOTE" != 1 ]; then
+  LAUNCH="CODEX_HOME=$(shell_quote "$HARNESS_SESSION_ROOT") $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
   sq_home=$(shell_quote "$PROJ_ABS")

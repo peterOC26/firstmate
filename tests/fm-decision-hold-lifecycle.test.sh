@@ -379,6 +379,52 @@ EOF
   pass "resolved findings and decision-like prose do not create false holds"
 }
 
+# The completion attestation shares the task metadata file with the harness
+# session binder, which republishes the whole record on every completed turn.
+# Appending outside that shared lock writes into the replaced inode, so the
+# attestation silently disappears and the review gate re-fires.
+test_completion_attestation_waits_for_the_task_metadata_lock() {
+  local home id meta lock holder completer waited
+  home=$(make_home attestation-lock)
+  id=sample-lock-review
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Review sample metadata locking" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the locking fixture"
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Sample locking review\n\nNothing needs a captain decision.\n' > "$home/data/$id/report.md"
+  meta="$home/state/$id.meta"
+  lock="$home/state/.$id.meta.lock"
+
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c \
+    '. "$1"; fm_lock_acquire_wait "$2"; while [ -e "$3" ]; do sleep 0.1; done' \
+    _ "$ROOT/bin/fm-wake-lib.sh" "$lock" "$home/hold-open" &
+  holder=$!
+  : > "$home/hold-open"
+  waited=0
+  while [ ! -d "$lock" ] && [ ! -L "$lock" ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+    [ "$waited" -lt 50 ] || { kill "$holder" 2>/dev/null || true; fail "the metadata lock was never taken"; }
+  done
+
+  run_decisions "$home" complete "$id" --none > "$home/complete.out" 2> "$home/complete.err" &
+  completer=$!
+  sleep 1
+  if grep -q 'decisions_reviewed=1' "$meta"; then
+    rm -f "$home/hold-open"
+    kill "$holder" "$completer" 2>/dev/null || true
+    wait "$holder" "$completer" 2>/dev/null || true
+    fail "the completion attestation was appended while another writer held the task metadata lock"
+  fi
+  rm -f "$home/hold-open"
+  wait "$holder" 2>/dev/null || true
+  wait "$completer" || fail "completion failed once the metadata lock was released: $(cat "$home/complete.err")"
+  assert_grep "decisions_reviewed=1" "$meta" "the attestation was not recorded after the lock was released"
+  assert_grep "decision_keys=" "$meta" "the attestation recorded no decision inventory"
+  pass "the completion attestation serializes on the shared task metadata lock"
+}
+
 test_terminal_single_owner_status_decision_does_not_block_empty_inventory() {
   local home id open secondmate
   home=$(make_home stale-terminal-decision)
@@ -557,6 +603,7 @@ test_structured_holds_survive_teardown_and_route_resolution
 test_origin_slug_validation_precedes_path_construction
 test_visual_review_uses_shared_completion_owner
 test_none_inventory_and_resolved_prose_do_not_create_holds
+test_completion_attestation_waits_for_the_task_metadata_lock
 test_terminal_single_owner_status_decision_does_not_block_empty_inventory
 test_secondmate_hold_stays_in_authoritative_home
 test_resolve_matches_quoted_blocked_by_edges

@@ -459,6 +459,45 @@ scan_signals() {
   return 0
 }
 
+# Read context usage only after a completed-turn marker changes. The separate
+# warning command owns threshold/dedup state and is deliberately observational:
+# it cannot block, reroute, interrupt, rotate, or alter the worker. Prints only
+# newly crossed warning/over transitions.
+context_warning_for_pending() {  # <scan_signals rows>
+  local pending=$1 sf sig f base id ids=''
+  while IFS=$(printf '\t') read -r sf sig f; do
+    [ -n "$sf" ] || continue
+    base=$(basename "$f")
+    case "$base" in
+      *.turn-ended) id=${base%.turn-ended} ;;
+      *) continue ;;
+    esac
+    case " $ids " in *" $id "*) ;; *) ids="$ids $id" ;; esac
+  done <<EOF
+$pending
+EOF
+  [ -n "$ids" ] || return 0
+  # shellcheck disable=SC2086 # ids are validated task ids from state filenames.
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-context-warning.sh" $ids 2>/dev/null || true
+}
+
+# The task ids a warning actually names, from fm-context-warning.sh's printed
+# "... task=<id> ..." transition lines. Only those tasks' own signals are forced
+# past triage; every other pending signal keeps its normal classification, so an
+# unrelated quiet worker is never surfaced by another task's reading.
+context_warning_task_ids() {  # <warning-output>
+  printf '%s\n' "$1" \
+    | sed -n 's/.*[[:space:]]task=\([A-Za-z0-9._-][A-Za-z0-9._-]*\).*/\1/p' \
+    | sort -u | tr '\n' ' '
+}
+
+signal_task_id() {  # <signal-file>
+  local base
+  base=$(basename "$1")
+  base=${base%.status}
+  printf '%s' "${base%.turn-ended}"
+}
+
 # Deliver a durably queued process-event result to firstmate. Publication is
 # owned by bin/fm-procevent.sh - by the runner at capture time and by reconcile's
 # re-announcement - so this decides only whether a queued check record has been
@@ -871,6 +910,40 @@ while :; do
   if [ -n "$pending" ]; then
     sleep "$SIGNAL_GRACE"
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
+    context_warning=$(context_warning_for_pending "$pending")
+    context_reason=
+    if [ -n "$context_warning" ]; then
+      context_reason="check: $(printf '%s\n' "$context_warning" | paste -sd ';' -)"
+      context_warned=" $(context_warning_task_ids "$context_warning")"
+      # One queued record per warned task: the durable queue keeps only the last
+      # record per kind+key, so a shared key would drop every warning but one,
+      # and a task that already wrote its dedup marker never warns again.
+      while IFS= read -r context_line; do
+        [ -n "$context_line" ] || continue
+        context_id=$(context_warning_task_ids "$context_line")
+        context_id=${context_id%% *}
+        fm_wake_append check "context-usage:${context_id:-unnamed}" "check: $context_line" || exit 1
+      done <<EOF
+$context_warning
+EOF
+      context_rest=
+      while IFS=$(printf '\t') read -r sf sig f; do
+        [ -n "$sf" ] || continue
+        case "$context_warned" in
+          *" $(signal_task_id "$f") "*)
+            fm_wake_append signal "$(basename "$f")" "$context_reason" || exit 1
+            printf '%s' "$sig" > "$sf"
+            mark_surfaced "$f"
+            ;;
+          *) context_rest="$context_rest$sf"$'\t'"$sig"$'\t'"$f"$'\n' ;;
+        esac
+      done <<EOF
+$pending
+EOF
+      pending=${context_rest%$'\n'}
+      # Nothing else was pending, so the warning is the only thing to deliver.
+      [ -n "$pending" ] || wake "$context_reason"
+    fi
     files=""
     while IFS=$(printf '\t') read -r sf sig f; do
       [ -n "$sf" ] || continue
@@ -917,6 +990,9 @@ $pending
 EOF
       triage_log "absorbed benign $reason"
     fi
+    # Reached only when the remaining signals were absorbed (an actionable batch
+    # already woke and exited above), so a queued context warning still delivers.
+    [ -z "$context_reason" ] || wake "$context_reason"
   fi
 
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
