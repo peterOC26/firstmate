@@ -278,10 +278,10 @@ read_board() {
   project=
   while :; do
     if [ -n "$cursor" ]; then
-      page=$(gh api graphql -f query="$query" -F owner="$owner" -F number="$number" -F cursor="$cursor") \
+      page=$(gh api graphql -f query="$query" -f owner="$owner" -F number="$number" -f cursor="$cursor") \
         || die "cannot read GitHub project"
     else
-      page=$(gh api graphql -f query="$query" -F owner="$owner" -F number="$number") \
+      page=$(gh api graphql -f query="$query" -f owner="$owner" -F number="$number") \
         || die "cannot read GitHub project"
     fi
     printf '%s' "$page" | jq -e '.data.user.projectV2.id and .data.user.projectV2.field.id' >/dev/null \
@@ -421,7 +421,13 @@ board_changes() {
        | $live
        | select(.isArchived == false)
        | select(([ $state.tasks[].item_id ] | index($live.id)) == null)
-       | {type:"unmapped_item",item_id:.id,column:(.fieldValueByName.name // null)} ])
+       | (($state.unmapped_items // {})[$live.id] // null) as $baseline
+       | select($baseline == null or
+                (($live.fieldValueByName.name // null) != ($baseline.baseline_column // null)) or
+                (($live.content.state // null) != ($baseline.baseline_issue_state // null)))
+       | {type:"unmapped_item",item_id:.id,
+          column:(.fieldValueByName.name // null),
+          issue_state:(.content.state // null)} ])
     | unique_by([.type,.item_id])
   '
 }
@@ -717,7 +723,8 @@ reconcile() {
     item_id=$(printf '%s' "$live" | jq -er '.id')
     if ! printf '%s' "$updated_state" | jq -e --arg item_id "$item_id" \
       '.tasks | to_entries | any(.value.item_id == $item_id)' >/dev/null; then
-      signature=$(sha256_text "unmapped:$item_id:$(printf '%s' "$live" | jq -c '.')")
+      signature=$(sha256_text "unmapped:$item_id:$(printf '%s' "$live" | jq -rj \
+        '[(.fieldValueByName.name // ""),(.content.state // "")] | join(":")')")
       proposal=$(printf '%s' "$live" | jq --arg signature "$signature" --arg at "$NOW" '{
         signature:$signature,
         type:"unmapped_board_item",
@@ -740,7 +747,7 @@ reconcile() {
       --argjson new_proposals "$proposals" --argjson excluded "$excluded" --arg now "$NOW" '
       .project = $project
       | .synced_at = $now
-      | .proposals = ((.proposals + $new_proposals) | unique_by(.signature))
+      | .proposals = ($new_proposals | unique_by(.signature))
       | .excluded_reported = ((.excluded_reported + $excluded) | unique)
       | ([.tasks[].item_id] | unique) as $task_item_ids
       | reduce ($desired[] | select(.excluded == false)) as $want (.;
@@ -757,6 +764,7 @@ reconcile() {
           if ($task_item_ids | index($seen.id)) == null then
             .[$seen.id] = {
               baseline_column:($seen.fieldValueByName.name // null),
+              baseline_issue_state:($seen.content.state // null),
               title:($seen.content.title // "Untitled board item")
             }
           else . end))
@@ -787,11 +795,7 @@ reconcile() {
       project:$project,
       operations:$operations,
       proposals:$proposals,
-      excluded:$excluded,
-      manual_steps:[
-        "Disable the five built-in Status-writing workflows on project #1.",
-        "Remove leftover test projects #2 and #3."
-      ]
+      excluded:$excluded
     }'
 }
 
@@ -837,7 +841,11 @@ arm() {
   } > "$tmp" || { rm -f -- "$tmp"; die "cannot write board check"; }
   chmod 0700 "$tmp" || { rm -f -- "$tmp"; die "cannot protect board check"; }
   mv -f -- "$tmp" "$CHECK_FILE" || { rm -f -- "$tmp"; die "cannot install board check"; }
-  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE_DIR" "$SCRIPT_DIR/fm-check-register.sh" "$CHECK_ID"
+  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE_DIR" \
+    "$SCRIPT_DIR/fm-check-register.sh" "$CHECK_ID"; then
+    rm -f -- "$CHECK_FILE"
+    die "cannot bind state/$CHECK_ID.check.sh; removed the unauthenticated check"
+  fi
   printf 'armed: state/%s.check.sh\n' "$CHECK_ID"
 }
 

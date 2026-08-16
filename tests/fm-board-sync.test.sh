@@ -25,13 +25,14 @@ make_fixture() {
   cat > "$fakebin/gh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
+board_repo=${GH_REPO:-captain/fleet}
 {
   printf 'CALL\n'
   for arg in "$@"; do
     printf 'ARG\t%s\n' "$arg"
   done
 } >> "$GH_LOG"
-if [ "${1:-}" = api ] && [ "${2:-}" = "repos/captain/fleet" ]; then
+if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
   printf '%s\n' "${GH_PRIVATE:-true}"
   exit 0
 fi
@@ -39,7 +40,7 @@ if [ "${1:-}" = api ] && [ "${2:-}" = --method ] && [ "${3:-}" = GET ] && [ "${4
   printf '%s\n' '{"items":[]}'
   exit 0
 fi
-if [ "${1:-}" = api ] && [ "${2:-}" = --method ] && [ "${3:-}" = GET ] && [ "${4:-}" = "repos/captain/fleet/issues" ]; then
+if [ "${1:-}" = api ] && [ "${2:-}" = --method ] && [ "${3:-}" = GET ] && [ "${4:-}" = "repos/$board_repo/issues" ]; then
   if [ -n "${REPO_ISSUES:-}" ]; then
     cat "$REPO_ISSUES"
   else
@@ -50,6 +51,31 @@ fi
 if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
   case "$*" in
     *'query=query('* )
+      owner_value=
+      owner_typed=0
+      previous=
+      for arg in "$@"; do
+        case "$arg" in
+          owner=*)
+            if [ "$previous" = -F ] || [ "$previous" = -f ]; then
+              owner_value=${arg#owner=}
+              if [ "$previous" = -F ]; then
+                owner_typed=1
+              fi
+            fi
+            ;;
+        esac
+        previous=$arg
+      done
+      case "$owner_value" in
+        ''|*[!0-9]*) ;;
+        *)
+          if [ "$owner_typed" -eq 1 ]; then
+            printf '%s\n' 'Variable $owner of type String! was provided invalid value' >&2
+            exit 1
+          fi
+          ;;
+      esac
       if [ -n "${BOARD_FIXTURE_AFTER:-}" ] && [ -f "$GH_LOG.board-read" ]; then
         cat "$BOARD_FIXTURE_AFTER"
       else
@@ -257,6 +283,7 @@ run_sync() {
     FM_BOARD_FLEET_SNAPSHOT="${bearings%/bearings}/fleet-snapshot" \
     BOARD_FIXTURE="$board" BEARINGS_FIXTURE="${bearings}.json" \
     FLEET_FIXTURE="${bearings}.json.fleet" GH_LOG="$log" \
+    GH_REPO="${GH_REPO:-captain/fleet}" \
     REPO_ISSUES="${REPO_ISSUES:-}" BOARD_FIXTURE_AFTER="${BOARD_FIXTURE_AFTER:-}" "$SCRIPT" "$@"
 }
 
@@ -760,7 +787,213 @@ test_conflict_snaps_to_fleet_and_explains_it() {
   pass "both-changed conflicts preserve the proposal and explain the snapback"
 }
 
+test_arm_leaves_no_unauthenticated_check_when_binding_fails() {
+  local fixture root home fakebin bearings output rc
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  : "$fakebin" "$bearings"
+  mkdir -p "$home/state/board-watch.check-trust"
+  set +e
+  output=$(FM_HOME="$home" "$SCRIPT" arm 2>&1)
+  rc=$?
+  set -e
+  rmdir "$home/state/board-watch.check-trust"
+  [ "$rc" -ne 0 ] || fail "arm must fail when the custom check cannot be bound"
+  [ ! -e "$home/state/board-watch.check.sh" ] \
+    || fail "a failed bind must leave no unauthenticated check for the watcher to reject"
+  assert_contains "$output" 'removed the unauthenticated check' \
+    "arm should say it withdrew the check it could not bind"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "a failed trust binding withdraws the check instead of leaving it unauthenticated"
+}
+
+test_all_digit_owner_still_reads_the_board() {
+  local fixture root home fakebin bearings board log output rc
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  printf '%s\n' '{"owner":"123456","project_number":1,"repo":"123456/fleet"}' \
+    > "$home/config/board-sync.json"
+  write_bearings "${bearings}.json" Ready
+  write_board "$board" "$(jq -n '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Held",optionId:"held",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",
+      body:"<!-- fm-task: 12345678 -->",state:"OPEN",
+      url:"https://github.com/123456/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"123456/fleet",isPrivate:true}}
+  }]')"
+  jq -n '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{safe:{token:"12345678",repo:"123456/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/123456/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  set +e
+  output=$(GH_REPO=123456/fleet run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] \
+    || fail "an all-digit GitHub login must still read the board instead of failing type checking: $output"
+  [ "$output" = 'board-sync 1 board change(s) pending' ] \
+    || fail "an all-digit GitHub login must produce the ordinary pending-change pointer"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "an all-digit GitHub login is sent as a String and still reads the board"
+}
+
+test_unmapped_card_counts_once_and_again_only_when_it_moves() {
+  local fixture root home fakebin bearings board log token body first second third fourth
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  write_board "$board" "$(jq -n --arg body "$body" --arg owned Ready --arg foreign Blocked \
+    '[{
+      id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+      fieldValueByName:{name:$owned,optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+      content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    },{
+      id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+      fieldValueByName:{name:$foreign,optionId:"blocked",updatedAt:"2026-08-16T10:00:00Z"},
+      content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+        body:"added on the board",state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T10:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+
+  first=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$first" = 'board-sync 1 board change(s) pending' ] \
+    || fail "a card the sync does not own must wake firstmate once when it first appears"
+
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '.unmapped_items["PVTI_FOREIGN"].baseline_column == "Blocked"
+    and .unmapped_items["PVTI_FOREIGN"].baseline_issue_state == "OPEN"' \
+    "$home/state/board-sync.json" >/dev/null \
+    || fail "reconcile must record the observed baseline of a card it does not own"
+
+  second=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ -z "$second" ] || fail "an already-reported foreign card must go quiet while it is unchanged"
+
+  write_board "$board" "$(jq -n --arg body "$body" --arg owned Held --arg foreign Blocked \
+    '[{
+      id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T11:00:00Z",
+      fieldValueByName:{name:$owned,optionId:"held",updatedAt:"2026-08-16T11:00:00Z"},
+      content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T11:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    },{
+      id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+      fieldValueByName:{name:$foreign,optionId:"blocked",updatedAt:"2026-08-16T10:00:00Z"},
+      content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+        body:"added on the board",state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T10:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    }]')"
+  third=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$third" = 'board-sync 1 board change(s) pending' ] \
+    || fail "an unchanged foreign card must not inflate the count of genuinely pending changes"
+
+  write_board "$board" "$(jq -n --arg body "$body" --arg owned Ready --arg foreign Done \
+    '[{
+      id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T12:00:00Z",
+      fieldValueByName:{name:$owned,optionId:"ready",updatedAt:"2026-08-16T12:00:00Z"},
+      content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T12:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    },{
+      id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T12:00:00Z",
+      fieldValueByName:{name:$foreign,optionId:"98236657",updatedAt:"2026-08-16T12:00:00Z"},
+      content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+        body:"added on the board",state:"OPEN",
+        url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T12:00:00Z",
+        repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+    }]')"
+  fourth=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$fourth" = 'board-sync 1 board change(s) pending' ] \
+    || fail "a foreign card that actually moves must wake firstmate again"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "a card the sync does not own counts once and then only when it really moves"
+}
+
+test_proposals_drain_when_the_divergence_is_gone() {
+  local fixture root home fakebin bearings board log token body
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Held",optionId:"held",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Blocked",optionId:"blocked",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '(.proposals | length) == 2
+    and (.proposals | any(.type == "column_move"))
+    and (.proposals | any(.type == "unmapped_board_item"))' "$home/state/board-sync.json" >/dev/null \
+    || fail "reconcile must record one proposal per live divergence"
+
+  # GitHub touches the foreign card without changing what it means, and the captain
+  # puts the moved card back where the fleet has it.
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T13:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T13:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T13:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T13:30:00Z",
+    fieldValueByName:{name:"Blocked",optionId:"blocked",updatedAt:"2026-08-16T13:30:00Z"},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T13:30:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '(.proposals | map(select(.type == "column_move")) | length) == 0' \
+    "$home/state/board-sync.json" >/dev/null \
+    || fail "a proposal whose divergence is gone must drain instead of persisting forever"
+  jq -e '(.proposals | length) == 1 and (.proposals[0].type == "unmapped_board_item")' \
+    "$home/state/board-sync.json" >/dev/null \
+    || fail "a still-live foreign card must hold exactly one proposal, not one per GitHub touch"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "proposals drain when their divergence is gone and never accumulate per GitHub touch"
+}
+
 test_arm_status_and_disarm
+test_arm_leaves_no_unauthenticated_check_when_binding_fails
 test_allowlist_and_exclusions
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail
@@ -775,4 +1008,7 @@ test_board_move_becomes_proposal_without_fleet_or_snapback_write
 test_declined_proposal_stops_rewaking_the_watcher
 test_board_move_during_reconcile_is_never_silently_suppressed
 test_conflict_snaps_to_fleet_and_explains_it
+test_all_digit_owner_still_reads_the_board
+test_unmapped_card_counts_once_and_again_only_when_it_moves
+test_proposals_drain_when_the_divergence_is_gone
 printf 'board-sync tests: %s passed\n' "$TESTS_RUN"
