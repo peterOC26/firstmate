@@ -24,6 +24,25 @@ Wake, watcher, away-mode, and Relay-specific state mechanics remain with their n
 `AGENTS.md` retains the run-once and read-once operator rules, lock-refusal safety, installation consent, and direct-report recovery boundaries because those facts apply at every session start.
 Ordinary dead-direct-report recovery is owned by `stuck-crewmate-recovery`, while persistent-secondmate recovery is owned by `secondmate-provisioning`.
 
+## GitHub fleet board (config/board-sync.json / config/board-exclude)
+
+`bin/fm-board-sync.sh` is the single owner of the GitHub Projects v2 fleet-board data formats, sync mechanics, private-repository gate, allowlisted card profile, baseline merge, proposal handling, and custom-check lifecycle.
+The local gitignored `config/board-sync.json` object contains exactly `owner`, positive integer `project_number`, and `repo`, where `repo` is an `owner/name` issue repository under the same owner.
+The local gitignored `config/board-exclude` file contains one task id per line, with blank lines and `#` comments ignored.
+That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
+Reconcile refuses every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
+An excluded task that still carries a mapping is reported as a durable `excluded_task_still_carded` proposal, because retracting a live card stays a manual captain decision.
+A single reconcile runs at a time, guarded by `state/.board-sync.lock`, so overlapping runs cannot mint duplicate issues for one task.
+Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
+`reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
+A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and records board-side changes as durable proposals without writing fleet state.
+`poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
+Reconcile records the board state it just reported in `state/board-sync.seen`, so a proposal the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
+The check runs only while the ordinary supervision watcher is live, so a fully idle home may not notice a board edit until the next firstmate session or supervision cycle.
+GitHub's five built-in workflows that write Status must be disabled manually on the Fleet project, while its auto-add workflow stays enabled.
+Removing leftover test projects #2 and #3 is also a manual captain action.
+Current safety and behavior evidence lives in [`verification/board-sync.md`](verification/board-sync.md).
+
 ## Pi Calm preference (config/calm)
 
 The Pi Calm extension stores the captain's home-local presentation choice in gitignored `config/calm` under the effective Firstmate home, resolved from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root derived from the extension path, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present.
