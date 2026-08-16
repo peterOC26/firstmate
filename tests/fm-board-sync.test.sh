@@ -992,6 +992,168 @@ test_proposals_drain_when_the_divergence_is_gone() {
   pass "proposals drain when their divergence is gone and never accumulate per GitHub touch"
 }
 
+test_excluded_carded_report_retires_once_the_card_is_gone() {
+  local fixture root home fakebin bearings board log
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  write_board "$board" "$(jq -n '[{
+    id:"PVTI_EXCLUDED",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_EXCLUDED",number:7,title:"CROWN_JEWELS unannounced strategy",
+      body:"<!-- fm-task: deadbeef -->",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/7",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"excluded-task-alpha":{token:"deadbeef",repo:"captain/fleet",issue_number:7,issue_id:"I_EXCLUDED",
+      issue_url:"https://github.com/captain/fleet/issues/7",item_id:"PVTI_EXCLUDED",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '.proposals | any(.type == "excluded_task_still_carded" and .task_id == "excluded-task-alpha")' \
+    "$home/state/board-sync.json" >/dev/null \
+    || fail "an excluded task must be reported while its card is still live on the board"
+
+  # The captain does the one thing the report asks and retracts the card by hand.
+  write_board "$board" '[]'
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '.proposals | all(.type != "excluded_task_still_carded")' "$home/state/board-sync.json" >/dev/null \
+    || fail "the report must retire once the excluded card is actually gone"
+  assert_not_contains "$(<"$log")" 'deleteProjectV2Item' "retiring the report must never delete a card"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "an excluded-task card report retires once the captain has retracted the card"
+}
+
+test_unmapped_card_touched_by_github_keeps_one_stable_signature() {
+  local fixture root home fakebin bearings board log token body first second
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  write_board "$board" "$(jq -n --arg body "$body" --arg touched "2026-08-16T10:00:00Z" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:$touched,
+    fieldValueByName:{name:"Blocked",optionId:"blocked",updatedAt:$touched},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:$touched,
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  first=$(jq -er '[.proposals[] | select(.type == "unmapped_board_item")] | .[0].signature' \
+    "$home/state/board-sync.json") || fail "a card the sync does not own must carry a durable proposal signature"
+
+  # GitHub touches the card without changing its column or issue state.
+  write_board "$board" "$(jq -n --arg body "$body" --arg touched "2026-08-17T04:45:12Z" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:$touched,
+    fieldValueByName:{name:"Blocked",optionId:"blocked",updatedAt:$touched},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:$touched,
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  second=$(jq -er '[.proposals[] | select(.type == "unmapped_board_item")] | .[0].signature' \
+    "$home/state/board-sync.json") || fail "the re-observed card must still carry a proposal signature"
+  [ "$first" = "$second" ] \
+    || fail "a GitHub touch that changes no column or issue state must not mint a new proposal identity"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "a foreign card keeps one stable proposal signature across a bare GitHub touch"
+}
+
+test_unmapped_change_during_reconcile_is_never_silently_absorbed() {
+  local fixture root home fakebin bearings board after log token body woke
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  after="$root/board-after.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  # The read reconcile reports shows the foreign card in Ready and no second foreign card.
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  # The captain drags that card and adds another one after the reported read but
+  # before reconcile's post-write re-read.
+  write_board "$after" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_FOREIGN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:05:00Z",
+    fieldValueByName:{name:"Done",optionId:"98236657",updatedAt:"2026-08-16T10:05:00Z"},
+    content:{__typename:"Issue",id:"I_FOREIGN",number:9,title:"Hand added card",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/9",updatedAt:"2026-08-16T10:05:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  },{
+    id:"PVTI_LATE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T10:06:00Z",
+    fieldValueByName:{name:"Held",optionId:"held",updatedAt:"2026-08-16T10:06:00Z"},
+    content:{__typename:"Issue",id:"I_LATE",number:10,title:"Card added mid reconcile",
+      body:"added on the board",state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/10",updatedAt:"2026-08-16T10:06:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},proposals:[],pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  BOARD_FIXTURE_AFTER="$after" run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null
+  jq -e '.unmapped_items["PVTI_FOREIGN"].baseline_column == "Ready"' "$home/state/board-sync.json" >/dev/null \
+    || fail "the unmapped baseline must record the column this run reported, not one that arrived later"
+  jq -e '.unmapped_items | has("PVTI_LATE") | not' "$home/state/board-sync.json" >/dev/null \
+    || fail "a card that appeared inside the reconcile window must not be baselined as already reported"
+  woke=$(BOARD_FIXTURE_AFTER="$after" run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$woke" = 'board-sync 2 board change(s) pending' ] \
+    || fail "foreign-card changes landing inside the reconcile window must still wake firstmate"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "a foreign card changed or added mid-reconcile is never silently absorbed into the baseline"
+}
+
 test_arm_status_and_disarm
 test_arm_leaves_no_unauthenticated_check_when_binding_fails
 test_allowlist_and_exclusions
@@ -1010,5 +1172,8 @@ test_board_move_during_reconcile_is_never_silently_suppressed
 test_conflict_snaps_to_fleet_and_explains_it
 test_all_digit_owner_still_reads_the_board
 test_unmapped_card_counts_once_and_again_only_when_it_moves
+test_unmapped_change_during_reconcile_is_never_silently_absorbed
+test_unmapped_card_touched_by_github_keeps_one_stable_signature
 test_proposals_drain_when_the_divergence_is_gone
+test_excluded_carded_report_retires_once_the_card_is_gone
 printf 'board-sync tests: %s passed\n' "$TESTS_RUN"

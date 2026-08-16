@@ -39,7 +39,9 @@ A normal reconcile refuses all writes unless repository privacy is confirmed at 
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
 Reconcile records the board state it just reported in `state/board-sync.seen`, so a proposal the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
 Each reconcile recomputes the whole proposal list from the divergences it observes, so a proposal the fleet has adopted or the captain has undone drains out instead of accumulating forever.
+An excluded task that still holds a card is reported only while that card is genuinely still on the board, so the report retires by itself once the captain retracts the card.
 Reconcile also records a baseline column and issue state for every card the sync does not own, so a card added outside the sync counts as pending once and then only when it actually moves.
+That baseline records only the card state the run actually reported, so a foreign card changed or added inside the reconcile window stays un-baselined and still wakes firstmate on the next poll.
 The check runs only while the ordinary supervision watcher is live, so a fully idle home may not notice a board edit until the next firstmate session or supervision cycle.
 GitHub's five built-in workflows that write Status must be disabled manually on the project, while its auto-add workflow stays enabled.
 Current safety and behavior evidence lives in [`verification/board-sync.md`](verification/board-sync.md).

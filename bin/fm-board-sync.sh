@@ -550,17 +550,22 @@ reconcile() {
       excluded=$(jq -n --argjson old "$excluded" --arg id "$task_id" '$old + [$id]')
       mapping=$(printf '%s' "$updated_state" | jq -c --arg id "$task_id" '.tasks[$id] // null')
       if [ "$mapping" != null ]; then
-        signature=$(sha256_text "excluded-carded:$task_id:$(printf '%s' "$mapping" | jq -r '.item_id // ""')")
-        proposal=$(printf '%s' "$mapping" | jq --arg signature "$signature" --arg task_id "$task_id" \
-          --arg at "$NOW" '{
-            signature:$signature,
-            type:"excluded_task_still_carded",
-            task_id:$task_id,
-            issue_url:(.issue_url // null),
-            item_id:(.item_id // null),
-            observed_at:$at
-          }')
-        proposals=$(append_proposal "$proposals" "$proposal")
+        item_id=$(printf '%s' "$mapping" | jq -r '.item_id // empty')
+        issue_number=$(printf '%s' "$mapping" | jq -r '.issue_number // empty')
+        live=$(find_live_item "$board" "$item_id" "$issue_number" "$repo")
+        if [ "$live" != null ] && [ "$(printf '%s' "$live" | jq -r '.isArchived')" != true ]; then
+          signature=$(sha256_text "excluded-carded:$task_id:$(printf '%s' "$mapping" | jq -r '.item_id // ""')")
+          proposal=$(printf '%s' "$mapping" | jq --arg signature "$signature" --arg task_id "$task_id" \
+            --arg at "$NOW" '{
+              signature:$signature,
+              type:"excluded_task_still_carded",
+              task_id:$task_id,
+              issue_url:(.issue_url // null),
+              item_id:(.item_id // null),
+              observed_at:$at
+            }')
+          proposals=$(append_proposal "$proposals" "$proposal")
+        fi
       fi
       continue
     fi
@@ -744,6 +749,7 @@ reconcile() {
     updated_state=$(printf '%s' "$updated_state" | jq \
       --argjson project "$(printf '%s' "$post_board" | jq '.project')" \
       --argjson desired "$desired" --argjson live "$(printf '%s' "$post_board" | jq '.items')" \
+      --argjson reported_items "$(printf '%s' "$board" | jq '.items')" \
       --argjson new_proposals "$proposals" --argjson excluded "$excluded" --arg now "$NOW" '
       .project = $project
       | .synced_at = $now
@@ -760,8 +766,10 @@ reconcile() {
                 issue_state:($seen.content.state // null)
               }
             else . end)
-      | .unmapped_items = (reduce ($live[] | select(.isArchived == false)) as $seen ({};
-          if ($task_item_ids | index($seen.id)) == null then
+      | ([$live[] | select(.isArchived == false) | .id]) as $live_ids
+      | .unmapped_items = (reduce ($reported_items[] | select(.isArchived == false)) as $seen ({};
+          if (($task_item_ids | index($seen.id)) == null)
+            and (($live_ids | index($seen.id)) != null) then
             .[$seen.id] = {
               baseline_column:($seen.fieldValueByName.name // null),
               baseline_issue_state:($seen.content.state // null),
