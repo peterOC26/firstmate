@@ -1008,6 +1008,35 @@ test_board_render_uses_icons_and_verbatim_empty_sentences() {
   pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
 }
 
+# Captain chat carries no task ids or raw metadata paths (AGENTS.md section 9), so
+# the chat renderer keeps only the https:// PR artifact; the gitignored file report
+# is the one surface allowed to carry the report path and the local-merge note.
+test_chat_render_hides_paths_but_keeps_pr_urls() {
+  local home chat file
+  home=$(make_home render-artifacts)
+  cat > "$home/data/backlog.md" <<'EOF'
+## Done
+- [x] done-pr - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-report - Scouted the thing data/done-report/report.md (repo: firstmate) (kind: scout) (reported 2026-07-11)
+- [x] done-local - Merged locally - local main (repo: firstmate) (kind: ship) (done 2026-07-11)
+EOF
+  chat=$(FM_HOME="$home" "$BEARINGS" --render chat)
+  file=$(FM_HOME="$home" "$BEARINGS" --render file)
+  assert_contains "$chat" "https://github.com/kunchenguid/firstmate/pull/7" \
+    "chat render must keep the full PR URL artifact"
+  assert_not_contains "$chat" "data/done-report/report.md" \
+    "chat render must not expose a raw report path"
+  assert_not_contains "$chat" "local main" \
+    "chat render must not expose the local-merge note"
+  assert_contains "$file" "data/done-report/report.md" \
+    "file render must keep the report-path artifact"
+  assert_contains "$file" "local main" \
+    "file render must keep the local-merge note artifact"
+  printf '%s\n' "$chat" | grep -q '^- Scouted the thing - recent completion$' \
+    || fail "chat Done row lost its summary and detail when the artifact was suppressed: $chat"
+  pass "chat render suppresses report paths and local notes while keeping PR URLs"
+}
+
 # Only a no-mistakes run-step stop is the deliberate park that reads calmly. A crew
 # that reported its OWN failure is a real wreck and keeps the needs-a-look cue in
 # both summary and detail - including when its free-form `failed: {why}` prose
@@ -2365,6 +2394,7 @@ test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
 test_board_render_uses_icons_and_verbatim_empty_sentences
+test_chat_render_hides_paths_but_keeps_pr_urls
 test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound

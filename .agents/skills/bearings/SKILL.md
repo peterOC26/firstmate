@@ -110,7 +110,7 @@ Rules that keep the contract unambiguous:
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown`.
 - The digest always carries the required direct address to the captain: when a rendered empty-state sentence already addresses the captain it satisfies the rule, and when every column is populated the address belongs in the framing around the rendered columns. Never edit a rendered column heading, item line, or empty sentence to insert it.
 - Every PR appears as the full `https://...` URL; a shorthand `#number` is fine only as a back-reference after the full URL has already appeared in the same digest.
-- The chat follows `AGENTS.md` section 9 and carries one scannable line per item.
+- The chat follows `AGENTS.md` section 9 and carries one scannable line per item, so chat rows carry a PR URL artifact but never a raw `data/<id>/report.md` path or local-merge note; those artifact forms belong to the file report only.
 - Detailed decisions, plans, full gate reasons, and evidence belong in the file only when file mode is explicit, so plain chat stays concise and file-mode chat stays materially shorter than that file.
 - In file mode, include the report path or link inside the six-column digest without adding another heading.
 

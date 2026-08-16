@@ -660,7 +660,8 @@ if [ -n "$RENDER_MODE" ]; then
         + (if ($item.artifact // "-") != "-" then " - " + $item.artifact else "" end)
       else
         "- " + $item.summary + " - " + $item.detail
-        + (if ($item.artifact // "-") != "-" then " - " + $item.artifact else "" end)
+        + (($item.artifact // "-") as $a
+           | if $a != "-" and ($a | startswith("https://")) then " - " + $a else "" end)
       end;
     . as $root
     | $root.board_columns[] as $column
