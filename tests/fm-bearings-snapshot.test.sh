@@ -980,6 +980,19 @@ test_board_columns_are_complete_and_classified() {
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
+# board_columns is the single source of the empty-state wording, so this asserts the
+# rendered sentence under each heading against the sentence that column carries in the
+# same snapshot rather than restating any wording here.
+assert_empty_sentences_follow_their_headings() {  # <render-output> <json> <mode>
+  local render=$1 json=$2 mode=$3 column empty rendered
+  while IFS=$'\t' read -r column empty; do
+    rendered=$(printf '%s\n' "$render" |
+      awk -v col="$column" 'index($0, "## ") == 1 && substr($0, length($0) - length(col) + 1) == col {getline; print; exit}')
+    [ "$rendered" = "$empty" ] \
+      || fail "$mode render did not follow the $column heading with that column's own empty sentence: got '$rendered', want '$empty'"
+  done < <(printf '%s' "$json" | jq -r '.board_columns[] | [.column, .empty] | @tsv')
+}
+
 test_board_render_uses_icons_and_verbatim_empty_sentences() {
   local home chat file headings file_headings json
   home=$(make_home render)
@@ -989,22 +1002,12 @@ test_board_render_uses_icons_and_verbatim_empty_sentences() {
   headings=$(printf '%s\n' "$chat" | grep '^## ' | tr '\n' '|')
   [ "$headings" = '## 🟢 Ready|## ⏸️ Held|## 🚧 Blocked|## ⚙️ Under way|## ❓ Waiting on you|## ✅ Done|' ] \
     || fail "chat board headings did not use the selected leading icons: $chat"
-  assert_contains "$chat" "No dispatchable queued work." \
-    "empty Ready column sentence changed"
-  assert_contains "$chat" "No captain- or time-gated work." \
-    "empty Held column sentence changed"
-  assert_contains "$chat" "No queued work is waiting on another item." \
-    "empty Blocked column sentence changed"
-  assert_contains "$chat" "No live workers are under way." \
-    "empty Under way column sentence changed"
-  assert_contains "$chat" "Nothing needs your action right now, captain." \
-    "empty Waiting on you column sentence changed"
-  assert_contains "$chat" "No recent completions are in the current baseline." \
-    "empty Done column sentence changed"
+  assert_empty_sentences_follow_their_headings "$chat" "$json" chat
   file=$(FM_HOME="$home" "$BEARINGS" --render file)
   file_headings=$(printf '%s\n' "$file" | grep '^## ' | tr '\n' '|')
   [ "$file_headings" = "$headings" ] \
     || fail "file board headings did not match the chat icon set: $file"
+  assert_empty_sentences_follow_their_headings "$file" "$json" file
   pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
 }
 
