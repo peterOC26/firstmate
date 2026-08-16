@@ -42,6 +42,8 @@
 # Flags:
 #   (default)        compact projection, TOON, local-only
 #   --json           the same projected model as JSON (machine/debug; parity form)
+#   --render <mode>  chat|file: print the six board columns as captain-facing Markdown
+#                    instead of the structured projection (see Render mode below)
 #   --include-prs    ALSO do live open-PR discovery + checks (the only network path)
 #   --fields <list>  opt in to dropped surfaces: bodies,paths,actions,endpoints
 #   --all-in-flight  include every in-flight task
@@ -59,6 +61,17 @@
 # The board_columns + board_items surfaces are the Kanban renderer source: every
 # column is declared every run, and each item is projected from the same bounded
 # arrays that already feed the legacy digest surfaces.
+#
+# Render mode (--render chat|file) is a presentation-only view OVER that same
+# projection: it prints every column heading with its captain-approved leading icon
+# and, per column, either the projected item lines or the column's own `empty`
+# sentence verbatim. It never changes, reorders, or drops a column, and it never
+# alters the structured `fm-bearings.v1` contract that --json/TOON emit. It carries
+# no omitted[] disclosure, so a caller that renders must add the column-bounding
+# disclosures itself; .agents/skills/bearings/SKILL.md owns that captain-facing
+# contract, including the icon set and the disclosure placement rules. The chat and
+# file item lines differ only in detail density; the icons are captain-facing only
+# and must not reach crewmate-facing material, commits, PRs, briefs, or tool inputs.
 #
 # Under way wording must stay honest about live and deliberately parked workers.
 # A failed/cancelled crew state whose source is the run step means the validation

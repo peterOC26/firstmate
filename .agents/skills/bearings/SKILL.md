@@ -94,6 +94,9 @@ The captain-facing heading icons are presentation-only and are emitted by `fm-be
 - **Waiting on you** - ❓
 - **Done** - ✅
 
+These icons belong to the captain-facing chat digest and file-mode report only.
+Never carry them into crewmate-facing material, commits, PR titles or bodies, briefs, or any other tool input.
+
 Rules that keep the contract unambiguous:
 
 - Every column ALWAYS renders, even when empty; never omit a column.
