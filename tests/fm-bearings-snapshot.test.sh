@@ -1011,15 +1011,27 @@ test_board_render_uses_icons_and_verbatim_empty_sentences() {
   pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
 }
 
-# Captain chat carries no task ids or raw metadata paths (AGENTS.md section 9), so
-# the chat renderer keeps only the https:// PR artifact; the gitignored file report
-# is the one surface allowed to carry the report path and the local-merge note.
+# Captain chat carries no task ids or raw metadata paths (AGENTS.md section 9), so the
+# chat renderer keeps every PR URL whatever its scheme and drops the report-path and
+# local-merge-note forms; the gitignored file report is the one surface allowed to
+# carry those, and it labels each row with the owner it already holds.
 test_chat_render_hides_paths_but_keeps_pr_urls() {
-  local home chat file
+  local home chat file mate
   home=$(make_home render-artifacts)
+  mate=$(fixture_mate_home "$home")
+  mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
+  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
+  printf 'mate\n' > "$mate/.fm-secondmate-home"
+  printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-07-11)\n' \
+    "$mate" > "$home/data/secondmates.md"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## Done
+- [x] mate-landed - Secondmate-managed fix https://github.com/kunchenguid/firstmate/pull/50 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+EOF
   cat > "$home/data/backlog.md" <<'EOF'
 ## Done
 - [x] done-pr - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-http-pr - Landed older thing http://github.com/kunchenguid/firstmate/pull/8 (repo: firstmate) (kind: ship) (merged 2026-07-11)
 - [x] done-report - Scouted the thing data/done-report/report.md (repo: firstmate) (kind: scout) (reported 2026-07-11)
 - [x] done-local - Merged locally - local main (repo: firstmate) (kind: ship) (done 2026-07-11)
 EOF
@@ -1027,6 +1039,8 @@ EOF
   file=$(FM_HOME="$home" "$BEARINGS" --render file)
   assert_contains "$chat" "https://github.com/kunchenguid/firstmate/pull/7" \
     "chat render must keep the full PR URL artifact"
+  assert_contains "$chat" "http://github.com/kunchenguid/firstmate/pull/8" \
+    "chat render must keep a PR URL whatever its scheme"
   assert_not_contains "$chat" "data/done-report/report.md" \
     "chat render must not expose a raw report path"
   assert_not_contains "$chat" "local main" \
@@ -1035,6 +1049,12 @@ EOF
     "file render must keep the report-path artifact"
   assert_contains "$file" "local main" \
     "file render must keep the local-merge note artifact"
+  assert_contains "$file" "- Scouted the thing (main): recent completion" \
+    "file render must label a main-fleet row with its owner exactly once"
+  assert_not_contains "$file" "((main))" \
+    "file render must not double-wrap an already parenthesized owner"
+  assert_contains "$file" "- Secondmate-managed fix (mate): recent completion" \
+    "file render must parenthesize a bare secondmate owner id"
   printf '%s\n' "$chat" | grep -q '^- Scouted the thing - recent completion$' \
     || fail "chat Done row lost its summary and detail when the artifact was suppressed: $chat"
   pass "chat render suppresses report paths and local notes while keeping PR URLs"

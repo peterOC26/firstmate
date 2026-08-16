@@ -654,14 +654,17 @@ if [ -n "$RENDER_MODE" ]; then
       elif . == "Waiting on you" then "❓"
       elif . == "Done" then "✅"
       else error("unknown board column: " + .) end;
+    def owner_label($owner):
+      if ($owner | startswith("(")) and ($owner | endswith(")"))
+      then $owner else "(" + $owner + ")" end;
     def item_line($item):
       if $mode == "file" then
-        "- " + $item.summary + " (" + $item.owner + "): " + $item.detail
+        "- " + $item.summary + " " + owner_label($item.owner) + ": " + $item.detail
         + (if ($item.artifact // "-") != "-" then " - " + $item.artifact else "" end)
       else
         "- " + $item.summary + " - " + $item.detail
         + (($item.artifact // "-") as $a
-           | if $a != "-" and ($a | startswith("https://")) then " - " + $a else "" end)
+           | if $a != "-" and ($a | test("^https?://")) then " - " + $a else "" end)
       end;
     . as $root
     | $root.board_columns[] as $column
