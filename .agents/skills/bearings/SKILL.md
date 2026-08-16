@@ -49,10 +49,13 @@ It never tears down a task, merges a PR, dispatches new work, steers a worker, a
    The render mode adds the presentation-only leading icon to each heading while leaving the structured snapshot contract unchanged.
    The chat response uses the six complete columns in the chat-response contract below, in the same order, each always present.
    Render from `board_columns` and `board_items`; the older `in_flight`, `decisions_open`, `landed`, and `gates` arrays are supporting detail and compatibility surfaces, not a separate reader.
+   The render carries no disclosure, so you MUST add the step-1 snapshot's relevant `omitted` entries yourself: every `board <column> showing <n> of <m>` bound under that column, and the main-inventory integrity surfaces under Blocked, each with its `reveal` hint.
+   Never present a bounded column as complete, and never edit a rendered heading, item line, or empty sentence to carry a disclosure.
    Plain mode stops here and writes no report artifact.
 
 3. **In explicit file mode only, compose and replace the detailed report file.**
-   Use `bin/fm-bearings-snapshot.sh --render file` for the same six complete columns with the detail the chat omits.
+   Use `bin/fm-bearings-snapshot.sh --render file` for the six-column skeleton - headings, item lines, and empty sentences - and expand that skeleton into the full report below; the render itself contains none of the report's added detail.
+   Carry the same `omitted` disclosures into the report exactly as step 2 requires for the chat.
    The report uses the same six complete columns as the chat, in the same order.
    Never read an earlier `data/status-report-*.md` to decide what to omit, include, describe as changed, or call current.
    Write the full report to `data/status-report-<YYYY-MM-DD>.md` using today's date.
@@ -93,6 +96,7 @@ Rules that keep the contract unambiguous:
 
 - Every column ALWAYS renders, even when empty; never omit a column.
 - `board_columns` is the single source of the empty-state wording: render an empty column's `empty` sentence from `board_columns` verbatim, and never restate, paraphrase, or hardcode those sentences here or anywhere else.
+- A column whose `omitted` entry reports a bound shows that disclosure and its `reveal` hint under the column's own lines; a disclosure is part of its column, never a seventh section.
 - Every chat digest and file-mode report is a complete current snapshot, never a delta against a prior report.
 - Done always renders the bounded current baseline, even when the same completions appeared in an earlier report.
 - The six buckets are mutually exclusive, so every board item is forced into exactly one column by `board_items`.
