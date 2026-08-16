@@ -49,13 +49,15 @@ It never tears down a task, merges a PR, dispatches new work, steers a worker, a
    The render mode adds the presentation-only leading icon to each heading while leaving the structured snapshot contract unchanged.
    The chat response uses the six complete columns in the chat-response contract below, in the same order, each always present.
    Render from `board_columns` and `board_items`; the older `in_flight`, `decisions_open`, `landed`, and `gates` arrays are supporting detail and compatibility surfaces, not a separate reader.
-   The render carries no disclosure, so you MUST add the step-1 snapshot's relevant `omitted` entries yourself: every `board <column> showing <n> of <m>` bound under that column, and the main-inventory integrity surfaces under Blocked, each with its `reveal` hint.
+   The render carries no disclosure, so you MUST add every step-1 `omitted` entry that bounds a rendered column under the column it bounds, each with its `reveal` hint.
+   Map each entry to its column by the data it bounds, never by an exhaustive list of surface names: the `board <column> showing <n> of <m>` bounds cover Ready, Held, and Blocked; `in_flight showing ...` bounds Under way; `decisions_open showing ...` bounds Waiting on you; `landed showing ...`, `landed per-home capped ...`, and `secondmate home Done capped ...` bound Done; `candidate_prs showing ...` and `PR repositories showing ...` bound whichever columns carry PRs; the main-inventory integrity surfaces belong under Blocked.
+   Any other `omitted` entry that bounds what a column shows is disclosed the same way.
    Never present a bounded column as complete, and never edit a rendered heading, item line, or empty sentence to carry a disclosure.
    Plain mode stops here and writes no report artifact.
 
 3. **In explicit file mode only, compose and replace the detailed report file.**
    Use `bin/fm-bearings-snapshot.sh --render file` for the six-column skeleton - headings, item lines, and empty sentences - and expand that skeleton into the full report below; the render itself contains none of the report's added detail.
-   Carry the same `omitted` disclosures into the report exactly as step 2 requires for the chat.
+   Carry every column-bounding `omitted` disclosure into the report under its column exactly as step 2 requires for the chat.
    The report uses the same six complete columns as the chat, in the same order.
    Never read an earlier `data/status-report-*.md` to decide what to omit, include, describe as changed, or call current.
    Write the full report to `data/status-report-<YYYY-MM-DD>.md` using today's date.
