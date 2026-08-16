@@ -980,6 +980,86 @@ test_board_columns_are_complete_and_classified() {
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
+# board_columns is the single source of the empty-state wording, so this asserts the
+# rendered sentence under each heading against the sentence that column carries in the
+# same snapshot rather than restating any wording here.
+assert_empty_sentences_follow_their_headings() {  # <render-output> <json> <mode>
+  local render=$1 json=$2 mode=$3 column empty rendered
+  while IFS=$'\t' read -r column empty; do
+    rendered=$(printf '%s\n' "$render" |
+      awk -v col="$column" 'index($0, "## ") == 1 && substr($0, length($0) - length(col) + 1) == col {getline; print; exit}')
+    [ "$rendered" = "$empty" ] \
+      || fail "$mode render did not follow the $column heading with that column's own empty sentence: got '$rendered', want '$empty'"
+  done < <(printf '%s' "$json" | jq -r '.board_columns[] | [.column, .empty] | @tsv')
+}
+
+test_board_render_uses_icons_and_verbatim_empty_sentences() {
+  local home fakebin chat file headings file_headings json
+  home=$(make_home render); fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  assert_not_contains "$json" "🟢" "structured snapshot must not carry presentation icons"
+  chat=$(run "$home" "$fakebin" --render chat)
+  headings=$(printf '%s\n' "$chat" | grep '^## ' | tr '\n' '|')
+  [ "$headings" = '## 🟢 Ready|## ⏸️ Held|## 🚧 Blocked|## ⚙️ Under way|## ❓ Waiting on you|## ✅ Done|' ] \
+    || fail "chat board headings did not use the selected leading icons: $chat"
+  assert_empty_sentences_follow_their_headings "$chat" "$json" chat
+  file=$(run "$home" "$fakebin" --render file)
+  file_headings=$(printf '%s\n' "$file" | grep '^## ' | tr '\n' '|')
+  [ "$file_headings" = "$headings" ] \
+    || fail "file board headings did not match the chat icon set: $file"
+  assert_empty_sentences_follow_their_headings "$file" "$json" file
+  pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
+}
+
+# Captain chat carries no task ids or raw metadata paths (AGENTS.md section 9), so the
+# chat renderer keeps every PR URL whatever its scheme and drops the report-path and
+# local-merge-note forms; the gitignored file report is the one surface allowed to
+# carry those, and it labels each row with the owner it already holds.
+test_chat_render_hides_paths_but_keeps_pr_urls() {
+  local home fakebin chat file mate
+  home=$(make_home render-artifacts); fakebin=$(make_fakebin "$home")
+  mate=$(fixture_mate_home "$home")
+  mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
+  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
+  printf 'mate\n' > "$mate/.fm-secondmate-home"
+  printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-07-11)\n' \
+    "$mate" > "$home/data/secondmates.md"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## Done
+- [x] mate-landed - Secondmate-managed fix https://github.com/kunchenguid/firstmate/pull/50 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+EOF
+  cat > "$home/data/backlog.md" <<'EOF'
+## Done
+- [x] done-pr - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-http-pr - Landed older thing http://github.com/kunchenguid/firstmate/pull/8 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-report - Scouted the thing data/done-report/report.md (repo: firstmate) (kind: scout) (reported 2026-07-11)
+- [x] done-local - Merged locally - local main (repo: firstmate) (kind: ship) (done 2026-07-11)
+EOF
+  chat=$(run "$home" "$fakebin" --render chat)
+  file=$(run "$home" "$fakebin" --render file)
+  assert_contains "$chat" "https://github.com/kunchenguid/firstmate/pull/7" \
+    "chat render must keep the full PR URL artifact"
+  assert_contains "$chat" "http://github.com/kunchenguid/firstmate/pull/8" \
+    "chat render must keep a PR URL whatever its scheme"
+  assert_not_contains "$chat" "data/done-report/report.md" \
+    "chat render must not expose a raw report path"
+  assert_not_contains "$chat" "local main" \
+    "chat render must not expose the local-merge note"
+  assert_contains "$file" "data/done-report/report.md" \
+    "file render must keep the report-path artifact"
+  assert_contains "$file" "local main" \
+    "file render must keep the local-merge note artifact"
+  assert_contains "$file" "- Scouted the thing (main): recent completion" \
+    "file render must label a main-fleet row with its owner exactly once"
+  assert_not_contains "$file" "((main))" \
+    "file render must not double-wrap an already parenthesized owner"
+  assert_contains "$file" "- Secondmate-managed fix (mate): recent completion" \
+    "file render must parenthesize a bare secondmate owner id"
+  printf '%s\n' "$chat" | grep -q '^- Scouted the thing - recent completion$' \
+    || fail "chat Done row lost its summary and detail when the artifact was suppressed: $chat"
+  pass "chat render suppresses report paths and local notes while keeping PR URLs"
+}
+
 # Only a no-mistakes run-step stop is the deliberate park that reads calmly. A crew
 # that reported its OWN failure is a real wreck and keeps the needs-a-look cue in
 # both summary and detail - including when its free-form `failed: {why}` prose
@@ -2336,6 +2416,8 @@ test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
+test_board_render_uses_icons_and_verbatim_empty_sentences
+test_chat_render_hides_paths_but_keeps_pr_urls
 test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound

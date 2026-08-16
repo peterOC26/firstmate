@@ -45,13 +45,20 @@ It never tears down a task, merges a PR, dispatches new work, steers a worker, a
    Render it under Blocked with the related `omitted` disclosure, never invent an Under way row from backlog-only state, and never move it into Waiting on you.
 
 2. **Compose the six-column Kanban chat digest from the fresh snapshot.**
-   The gather step is deterministic; your judgment is scoped to ranking the command's facts by what matters right now and writing scannable captain-facing prose.
+   The gather step is deterministic; use `bin/fm-bearings-snapshot.sh --render chat` for the six captain-facing Markdown columns and carry its headings, item details, and empty sentences through verbatim.
+   The render mode adds the presentation-only leading icon to each heading while leaving the structured snapshot contract unchanged.
    The chat response uses the six complete columns in the chat-response contract below, in the same order, each always present.
    Render from `board_columns` and `board_items`; the older `in_flight`, `decisions_open`, `landed`, and `gates` arrays are supporting detail and compatibility surfaces, not a separate reader.
+   The render carries no disclosure, so you MUST add every step-1 `omitted` entry that bounds a rendered column under the column it bounds, each with its `reveal` hint.
+   Map each entry to its column by the data it bounds, never by an exhaustive list of surface names: the `board <column> showing <n> of <m>` bounds cover Ready, Held, and Blocked; `in_flight showing ...` bounds Under way; `decisions_open showing ...` bounds Waiting on you; `landed showing ...`, `landed per-home capped ...`, and `secondmate home Done capped ...` bound Done; `candidate_prs showing ...` and `PR repositories showing ...` bound whichever columns carry PRs; the main-inventory integrity surfaces belong under Blocked.
+   Any other `omitted` entry that bounds what a column shows is disclosed the same way.
+   Never present a bounded column as complete, and never edit a rendered heading, item line, or empty sentence to carry a disclosure.
    Plain mode stops here and writes no report artifact.
 
 3. **In explicit file mode only, compose and replace the detailed report file.**
-   The report uses the same six complete columns as the chat, in the same order, and adds the detail the chat omits.
+   Use `bin/fm-bearings-snapshot.sh --render file` for the six-column skeleton - headings, item lines, and empty sentences - and expand that skeleton into the full report below; the render itself contains none of the report's added detail.
+   Carry every column-bounding `omitted` disclosure into the report under its column exactly as step 2 requires for the chat.
+   The report uses the same six complete columns as the chat, in the same order.
    Never read an earlier `data/status-report-*.md` to decide what to omit, include, describe as changed, or call current.
    Write the full report to `data/status-report-<YYYY-MM-DD>.md` using today's date.
    If today's file already exists, delete it first, then create a new file from scratch.
@@ -78,10 +85,23 @@ Every `/bearings` chat response renders EXACTLY these six columns, in THIS order
 5. **Waiting on you** - ONLY items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
 6. **Done** - the bounded current recent-completions baseline: merged PRs, completed scouts, and finished local-only merges across the main fleet and every registered secondmate home.
 
+The captain-facing heading icons are presentation-only and are emitted by `fm-bearings-snapshot.sh --render chat|file`:
+
+- **Ready** - 🟢
+- **Held** - ⏸️
+- **Blocked** - 🚧
+- **Under way** - ⚙️
+- **Waiting on you** - ❓
+- **Done** - ✅
+
+These icons belong to the captain-facing chat digest and file-mode report only.
+Never carry them into crewmate-facing material, commits, PR titles or bodies, briefs, or any other tool input.
+
 Rules that keep the contract unambiguous:
 
 - Every column ALWAYS renders, even when empty; never omit a column.
 - `board_columns` is the single source of the empty-state wording: render an empty column's `empty` sentence from `board_columns` verbatim, and never restate, paraphrase, or hardcode those sentences here or anywhere else.
+- A column whose `omitted` entry reports a bound shows that disclosure and its `reveal` hint under the column's own lines; a disclosure is part of its column, never a seventh section.
 - Every chat digest and file-mode report is a complete current snapshot, never a delta against a prior report.
 - Done always renders the bounded current baseline, even when the same completions appeared in an earlier report.
 - The six buckets are mutually exclusive, so every board item is forced into exactly one column by `board_items`.
@@ -91,9 +111,9 @@ Rules that keep the contract unambiguous:
 - A secondmate's own row appears Under way only for `active_child_work`, and a home awaiting the captain reaches Waiting on you through its own decisions.
 - Every secondmate hold reaches a column on its own terms: a hold recorded on the home's backlog boards through that queued item, and a hold that exists only because the home's own child is parked, paused, or blocked boards under Held as its own item. An unavailable home boards under Blocked as an unavailable-state gate. No home's held work is ever silently absent from all six columns, whatever else that home has queued.
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown`.
-- Include the required direct address to the captain inside one item or empty-state sentence.
+- The digest always carries the required direct address to the captain: when a rendered empty-state sentence already addresses the captain it satisfies the rule, and when every column is populated the address belongs in the framing around the rendered columns. Never edit a rendered column heading, item line, or empty sentence to insert it.
 - Every PR appears as the full `https://...` URL; a shorthand `#number` is fine only as a back-reference after the full URL has already appeared in the same digest.
-- The chat follows `AGENTS.md` section 9 and carries one scannable line per item.
+- The chat follows `AGENTS.md` section 9 and carries one scannable line per item, so chat rows carry a PR URL artifact but never a raw `data/<id>/report.md` path or local-merge note; those artifact forms belong to the file report only.
 - Detailed decisions, plans, full gate reasons, and evidence belong in the file only when file mode is explicit, so plain chat stays concise and file-mode chat stays materially shorter than that file.
 - In file mode, include the report path or link inside the six-column digest without adding another heading.
 

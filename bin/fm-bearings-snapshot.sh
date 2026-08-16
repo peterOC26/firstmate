@@ -42,6 +42,8 @@
 # Flags:
 #   (default)        compact projection, TOON, local-only
 #   --json           the same projected model as JSON (machine/debug; parity form)
+#   --render <mode>  chat|file: print the six board columns as captain-facing Markdown
+#                    instead of the structured projection (see Render mode below)
 #   --include-prs    ALSO do live open-PR discovery + checks (the only network path)
 #   --fields <list>  opt in to dropped surfaces: bodies,paths,actions,endpoints
 #   --all-in-flight  include every in-flight task
@@ -59,6 +61,17 @@
 # The board_columns + board_items surfaces are the Kanban renderer source: every
 # column is declared every run, and each item is projected from the same bounded
 # arrays that already feed the legacy digest surfaces.
+#
+# Render mode (--render chat|file) is a presentation-only view OVER that same
+# projection: it prints every column heading with its captain-approved leading icon
+# and, per column, either the projected item lines or the column's own `empty`
+# sentence verbatim. It never changes, reorders, or drops a column, and it never
+# alters the structured `fm-bearings.v1` contract that --json/TOON emit. It carries
+# no omitted[] disclosure, so a caller that renders must add the column-bounding
+# disclosures itself; .agents/skills/bearings/SKILL.md owns that captain-facing
+# contract, including the icon set and the disclosure placement rules. The chat and
+# file item lines differ only in detail density; the icons are captain-facing only
+# and must not reach crewmate-facing material, commits, PRs, briefs, or tool inputs.
 #
 # Under way wording must stay honest about live and deliberately parked workers.
 # A failed/cancelled crew state whose source is the run step means the validation
@@ -109,7 +122,7 @@ validate_bound FM_BEARINGS_PR_LIMIT "$FM_BEARINGS_PR_LIMIT"
 
 usage() {
   cat <<'EOF'
-usage: fm-bearings-snapshot.sh [--json] [--include-prs] [--fields <list>]
+usage: fm-bearings-snapshot.sh [--json] [--render <chat|file>] [--include-prs] [--fields <list>]
                                [--all-in-flight] [--all-decisions]
                                [--all-secondmates] [--all-landed]
                                [--all-reports] [--all-queued]
@@ -118,6 +131,8 @@ usage: fm-bearings-snapshot.sh [--json] [--include-prs] [--fields <list>]
 
 Compact bearings projection over fm-fleet-snapshot.sh. TOON by default.
 Default is LOCAL-ONLY (no network); --include-prs is the only path that fetches.
+--render chat|file renders the six captain-facing board columns as Markdown with
+their presentation icons; it leaves the structured snapshot unchanged.
 
 Default fields: schema, home, generated, prs, board_columns{column,empty},
   board_items{column,id,summary,owner,detail,artifact}, in_flight{id,kind,state,doing},
@@ -142,6 +157,7 @@ EOF
 }
 
 FORMAT=toon
+RENDER_MODE=
 INCLUDE_PRS=0
 ALL_REPORTS=0
 ALL_QUEUED=0
@@ -156,6 +172,14 @@ FIELDS=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --json) FORMAT=json ;;
+    --render)
+      shift
+      case "${1:-}" in
+        chat|file) RENDER_MODE=$1 ;;
+        *) usage >&2; exit 2 ;;
+      esac
+      ;;
+    --render=chat|--render=file) RENDER_MODE=${1#--render=} ;;
     --include-prs) INCLUDE_PRS=1 ;;
     --all-reports) ALL_REPORTS=1 ;;
     --all-queued) ALL_QUEUED=1 ;;
@@ -632,6 +656,39 @@ MODEL=$(printf '%s' "$SNAP" | jq \
         (if $include_prs == 1 and $pr_rows_capped > 0 then {surface:("candidate_prs showing \($candidate_prs | length) of at least \($pr_rows_min_total); capped in \($pr_rows_capped) repo(s)"), reveal:"raise FM_BEARINGS_PR_LIMIT"} else empty end),
         (if $include_prs == 1 then empty else {surface:"live PR discovery + checks", reveal:"--include-prs"} end) ]) }
 ') || { echo "fm-bearings-snapshot: projection failed" >&2; exit 1; }
+
+if [ -n "$RENDER_MODE" ]; then
+  printf '%s\n' "$MODEL" | jq -r --arg mode "$RENDER_MODE" '
+    def icon:
+      if . == "Ready" then "🟢"
+      elif . == "Held" then "⏸️"
+      elif . == "Blocked" then "🚧"
+      elif . == "Under way" then "⚙️"
+      elif . == "Waiting on you" then "❓"
+      elif . == "Done" then "✅"
+      else error("unknown board column: " + .) end;
+    def owner_label($owner):
+      if ($owner | startswith("(")) and ($owner | endswith(")"))
+      then $owner else "(" + $owner + ")" end;
+    def item_line($item):
+      if $mode == "file" then
+        "- " + $item.summary + " " + owner_label($item.owner) + ": " + $item.detail
+        + (if ($item.artifact // "-") != "-" then " - " + $item.artifact else "" end)
+      else
+        "- " + $item.summary + " - " + $item.detail
+        + (($item.artifact // "-") as $a
+           | if $a != "-" and ($a | test("^https?://")) then " - " + $a else "" end)
+      end;
+    . as $root
+    | $root.board_columns[] as $column
+    | ("## " + ($column.column | icon) + " " + $column.column),
+      ([$root.board_items[] | select(.column == $column.column)] as $items
+       | if ($items | length) == 0 then $column.empty
+         else ($items[] | item_line(.))
+         end)
+  ' || { echo "fm-bearings-snapshot: Markdown rendering failed" >&2; exit 1; }
+  exit 0
+fi
 
 if [ "$FORMAT" = json ]; then
   printf '%s\n' "$MODEL"
