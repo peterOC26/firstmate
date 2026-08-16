@@ -994,16 +994,16 @@ assert_empty_sentences_follow_their_headings() {  # <render-output> <json> <mode
 }
 
 test_board_render_uses_icons_and_verbatim_empty_sentences() {
-  local home chat file headings file_headings json
-  home=$(make_home render)
-  json=$(FM_HOME="$home" "$BEARINGS" --json)
+  local home fakebin chat file headings file_headings json
+  home=$(make_home render); fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
   assert_not_contains "$json" "🟢" "structured snapshot must not carry presentation icons"
-  chat=$(FM_HOME="$home" "$BEARINGS" --render chat)
+  chat=$(run "$home" "$fakebin" --render chat)
   headings=$(printf '%s\n' "$chat" | grep '^## ' | tr '\n' '|')
   [ "$headings" = '## 🟢 Ready|## ⏸️ Held|## 🚧 Blocked|## ⚙️ Under way|## ❓ Waiting on you|## ✅ Done|' ] \
     || fail "chat board headings did not use the selected leading icons: $chat"
   assert_empty_sentences_follow_their_headings "$chat" "$json" chat
-  file=$(FM_HOME="$home" "$BEARINGS" --render file)
+  file=$(run "$home" "$fakebin" --render file)
   file_headings=$(printf '%s\n' "$file" | grep '^## ' | tr '\n' '|')
   [ "$file_headings" = "$headings" ] \
     || fail "file board headings did not match the chat icon set: $file"
@@ -1016,8 +1016,8 @@ test_board_render_uses_icons_and_verbatim_empty_sentences() {
 # local-merge-note forms; the gitignored file report is the one surface allowed to
 # carry those, and it labels each row with the owner it already holds.
 test_chat_render_hides_paths_but_keeps_pr_urls() {
-  local home chat file mate
-  home=$(make_home render-artifacts)
+  local home fakebin chat file mate
+  home=$(make_home render-artifacts); fakebin=$(make_fakebin "$home")
   mate=$(fixture_mate_home "$home")
   mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
   printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
@@ -1035,8 +1035,8 @@ EOF
 - [x] done-report - Scouted the thing data/done-report/report.md (repo: firstmate) (kind: scout) (reported 2026-07-11)
 - [x] done-local - Merged locally - local main (repo: firstmate) (kind: ship) (done 2026-07-11)
 EOF
-  chat=$(FM_HOME="$home" "$BEARINGS" --render chat)
-  file=$(FM_HOME="$home" "$BEARINGS" --render file)
+  chat=$(run "$home" "$fakebin" --render chat)
+  file=$(run "$home" "$fakebin" --render file)
   assert_contains "$chat" "https://github.com/kunchenguid/firstmate/pull/7" \
     "chat render must keep the full PR URL artifact"
   assert_contains "$chat" "http://github.com/kunchenguid/firstmate/pull/8" \
