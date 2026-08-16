@@ -102,7 +102,7 @@ Rules that keep the contract unambiguous:
 - A secondmate's own row appears Under way only for `active_child_work`, and a home awaiting the captain reaches Waiting on you through its own decisions.
 - Every secondmate hold reaches a column on its own terms: a hold recorded on the home's backlog boards through that queued item, and a hold that exists only because the home's own child is parked, paused, or blocked boards under Held as its own item. An unavailable home boards under Blocked as an unavailable-state gate. No home's held work is ever silently absent from all six columns, whatever else that home has queued.
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown`.
-- Include the required direct address to the captain inside one item or empty-state sentence.
+- The digest always carries the required direct address to the captain: when a rendered empty-state sentence already addresses the captain it satisfies the rule, and when every column is populated the address belongs in the framing around the rendered columns. Never edit a rendered column heading, item line, or empty sentence to insert it.
 - Every PR appears as the full `https://...` URL; a shorthand `#number` is fine only as a back-reference after the full URL has already appeared in the same digest.
 - The chat follows `AGENTS.md` section 9 and carries one scannable line per item.
 - Detailed decisions, plans, full gate reasons, and evidence belong in the file only when file mode is explicit, so plain chat stays concise and file-mode chat stays materially shorter than that file.
