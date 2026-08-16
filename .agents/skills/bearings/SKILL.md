@@ -45,13 +45,15 @@ It never tears down a task, merges a PR, dispatches new work, steers a worker, a
    Render it under Blocked with the related `omitted` disclosure, never invent an Under way row from backlog-only state, and never move it into Waiting on you.
 
 2. **Compose the six-column Kanban chat digest from the fresh snapshot.**
-   The gather step is deterministic; your judgment is scoped to ranking the command's facts by what matters right now and writing scannable captain-facing prose.
+   The gather step is deterministic; use `bin/fm-bearings-snapshot.sh --render chat` for the six captain-facing Markdown columns and carry its headings, item details, and empty sentences through verbatim.
+   The render mode adds the presentation-only leading icon to each heading while leaving the structured snapshot contract unchanged.
    The chat response uses the six complete columns in the chat-response contract below, in the same order, each always present.
    Render from `board_columns` and `board_items`; the older `in_flight`, `decisions_open`, `landed`, and `gates` arrays are supporting detail and compatibility surfaces, not a separate reader.
    Plain mode stops here and writes no report artifact.
 
 3. **In explicit file mode only, compose and replace the detailed report file.**
-   The report uses the same six complete columns as the chat, in the same order, and adds the detail the chat omits.
+   Use `bin/fm-bearings-snapshot.sh --render file` for the same six complete columns with the detail the chat omits.
+   The report uses the same six complete columns as the chat, in the same order.
    Never read an earlier `data/status-report-*.md` to decide what to omit, include, describe as changed, or call current.
    Write the full report to `data/status-report-<YYYY-MM-DD>.md` using today's date.
    If today's file already exists, delete it first, then create a new file from scratch.
@@ -77,6 +79,15 @@ Every `/bearings` chat response renders EXACTLY these six columns, in THIS order
 4. **Under way** - live workers, one line of current state per direct report, plus every open PR that needs no captain action right now.
 5. **Waiting on you** - ONLY items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
 6. **Done** - the bounded current recent-completions baseline: merged PRs, completed scouts, and finished local-only merges across the main fleet and every registered secondmate home.
+
+The captain-facing heading icons are presentation-only and are emitted by `fm-bearings-snapshot.sh --render chat|file`:
+
+- **Ready** - 🟢
+- **Held** - ⏸️
+- **Blocked** - 🚧
+- **Under way** - ⚙️
+- **Waiting on you** - ❓
+- **Done** - ✅
 
 Rules that keep the contract unambiguous:
 

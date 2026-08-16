@@ -980,6 +980,34 @@ test_board_columns_are_complete_and_classified() {
   pass "Kanban board columns are complete and projected from the bounded snapshot"
 }
 
+test_board_render_uses_icons_and_verbatim_empty_sentences() {
+  local home chat file headings file_headings json
+  home=$(make_home render)
+  json=$(FM_HOME="$home" "$BEARINGS" --json)
+  assert_not_contains "$json" "🟢" "structured snapshot must not carry presentation icons"
+  chat=$(FM_HOME="$home" "$BEARINGS" --render chat)
+  headings=$(printf '%s\n' "$chat" | grep '^## ' | tr '\n' '|')
+  [ "$headings" = '## 🟢 Ready|## ⏸️ Held|## 🚧 Blocked|## ⚙️ Under way|## ❓ Waiting on you|## ✅ Done|' ] \
+    || fail "chat board headings did not use the selected leading icons: $chat"
+  assert_contains "$chat" "No dispatchable queued work." \
+    "empty Ready column sentence changed"
+  assert_contains "$chat" "No captain- or time-gated work." \
+    "empty Held column sentence changed"
+  assert_contains "$chat" "No queued work is waiting on another item." \
+    "empty Blocked column sentence changed"
+  assert_contains "$chat" "No live workers are under way." \
+    "empty Under way column sentence changed"
+  assert_contains "$chat" "Nothing needs your action right now, captain." \
+    "empty Waiting on you column sentence changed"
+  assert_contains "$chat" "No recent completions are in the current baseline." \
+    "empty Done column sentence changed"
+  file=$(FM_HOME="$home" "$BEARINGS" --render file)
+  file_headings=$(printf '%s\n' "$file" | grep '^## ' | tr '\n' '|')
+  [ "$file_headings" = "$headings" ] \
+    || fail "file board headings did not match the chat icon set: $file"
+  pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
+}
+
 # Only a no-mistakes run-step stop is the deliberate park that reads calmly. A crew
 # that reported its OWN failure is a real wreck and keeps the needs-a-look cue in
 # both summary and detail - including when its free-form `failed: {why}` prose
@@ -2336,6 +2364,7 @@ test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
 test_board_columns_are_complete_and_classified
+test_board_render_uses_icons_and_verbatim_empty_sentences
 test_real_worker_failure_is_not_dressed_as_a_deliberate_park
 test_landed_blocker_frees_queued_work_to_ready
 test_gate_columns_keep_their_share_of_the_bound
