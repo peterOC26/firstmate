@@ -13,7 +13,7 @@ The focused behavior command is:
 bin/fm-test-run.sh tests/fm-board-sync.test.sh
 ```
 
-Its twenty-seven behavioral cases prove custom-check arm/status/disarm, withdrawal of a check whose trust binding fails, allowlisted issue bodies, exclusion-file enforcement, opaque titles for tasks with no structured title, escalation of excluded tasks that still hold a card, retirement of that report once the card is gone, single-instance reconcile locking, pending-create recovery, private-repository refusal, mutation-free dry runs for both new and already-mapped tasks, pointer-only poll deduplication, escalation-only pull, wake quiescence for an already-reported board move, no silent suppression of a mapped board move that lands inside the reconcile window, no silent absorption of a foreign-card change or addition that lands in that same window, explained fleet-authoritative conflict snapback, escalation of a write over an unrecorded baseline without inventing a captain move, escalation of a cleared Status by the run that restores the column, escalation of a hand-archived card that is otherwise left completely alone, an ordinary forward column write that is never called a snapback, a brand-new board card carried as the one adoption, a board read that survives an all-digit GitHub login, a foreign card that counts once and then only when it really moves, a bare GitHub touch that never re-wakes the poll, and escalations that report only what the run actually observes.
+Its thirty-two behavioral cases prove custom-check arm/status/disarm, withdrawal of a check whose trust binding fails, allowlisted issue bodies, exclusion-file enforcement, opaque titles for tasks with no structured title, escalation of excluded tasks that still hold a card, retirement of that report once the card is gone, single-instance reconcile locking, pending-create recovery, private-repository refusal, mutation-free dry runs for both new and already-mapped tasks, pointer-only poll deduplication, escalation-only pull, wake quiescence for an already-reported board move, no silent suppression of a mapped board move that lands inside the reconcile window, no silent absorption of a foreign-card change or addition that lands in that same window, explained fleet-authoritative conflict snapback, escalation of a write over an unrecorded baseline without inventing a captain move, escalation of a cleared Status by the run that restores the column, escalation of a hand-archived card that is otherwise left completely alone, an ordinary forward column write that is never called a snapback, a brand-new board card carried as the one adoption, adoption of a hand-filed card as its task's own card instead of a duplicate, escalation of a matching draft card for conversion with nothing minted meanwhile, exactly one truthful escalation for a card removed from the board, retirement of a mapping the sync no longer owns once its card is gone, a dry run that recovers an existing card by token instead of proposing a duplicate adoption, a board read that survives an all-digit GitHub login, a foreign card that counts once and then only when it really moves, a bare GitHub touch that never re-wakes the poll, and escalations that report only what the run actually observes.
 
 The security fixtures contain free-form hold detail, a private path, a credential-shaped value, an excluded confidential title, and internal task ids, all of them invented for the fixture and describing nothing real.
 The fake GitHub boundary records every argument and fails the case if any forbidden fixture value reaches a GitHub call.
@@ -23,13 +23,15 @@ Each of these guarantees was confirmed to fail when its implementation was neutr
 The cases added for the all-digit login, the foreign-card baseline, the mid-reconcile foreign-card window, the retiring excluded-card report, and the withdrawn check binding were each confirmed to fail against the code that preceded their fix, so each one reproduces the reported defect.
 The cases added for the cleared Status, the hand-archived card, and the truthful forward-write explanation were confirmed the same way against the code that preceded each of those fixes.
 Together with the conflict and unrecorded-baseline cases they assert the standing property that a board-side change is escalated by the same run that observes it, whether or not that run also set the card back to the fleet column.
+The cases added for card adoption, the matching draft card, the removed card, mapping retirement, and the dry-run token recovery were each confirmed to fail against the code that preceded their fix.
+The adoption case is the end-to-end proof of the one automatic pull action: a hand-filed card becomes its task's own card with no second issue minted and no further adoption report.
 The fake GitHub boundary rejects a numeric-looking `owner` sent as a typed GraphQL variable exactly as the real API type checker would, so the all-digit login case exercises the coercion rather than asserting the flag.
 
 The exact focused result for this revision is:
 
 ```text
-board-sync tests: 27 passed
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=31805
+board-sync tests: 32 passed
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=36663
 ```
 
 The affected projection, documentation, and runner surfaces were exercised together with:
@@ -41,9 +43,9 @@ bin/fm-test-run.sh tests/fm-board-sync.test.sh tests/fm-bearings-snapshot.test.s
 The exact aggregate result was:
 
 ```text
-FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=197324
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=27939 failed=0
-FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=3 duration_ms=168733 failed=0
+FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=202884
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=27216 failed=0
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=3 duration_ms=175351 failed=0
 ```
 
 Pinned lint and documentation classification returned:

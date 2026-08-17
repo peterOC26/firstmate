@@ -37,12 +37,17 @@ Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `s
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
 A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
 A board card with no mapping is the one board-side change reconcile acts on by itself, and the plan lists it under `adoptions` as a card to carry as a new queued task.
+Once that task exists, the next reconcile adopts the captain's own card as the task's card rather than minting a second one, by matching the unique unmapped card whose issue title equals the task title, stamping the allowlisted body carrying the correlation token onto that issue, and recording the ordinary mapping.
+A matching draft card is escalated for conversion instead, because a draft holds no issue that could carry the token, and no duplicate is minted while it waits.
+Two or more unmapped cards sharing one task title are escalated as an ambiguity rather than guessed at, and again nothing is minted.
 Every other board-side change becomes exactly one line under `escalations` for firstmate to act on under its own authority.
-A column move, a cleared Status, a hand-archived card, a card removed from the board, an issue the captain closed, and a card with no agreed baseline each produce one such line.
-There is no durable queue and nothing to acknowledge, so each run reports the board changes it actually observes and a change the captain has since undone is simply not reported again.
-Because the report is not durable, the line is always emitted by the same run that observed the change, whether or not that run also set the card back to the fleet column.
+A column move, a cleared Status, a hand-archived card, a card removed from the board, an issue the captain closed, and a card with no agreed baseline each produce exactly one such line.
+Each run reports only the board changes it actually observes, so a change the captain has since undone is simply not reported again.
+The line is always emitted by the same run that observed the change, whether or not that run also set the card back to the fleet column.
 Fleet state wins the card, and a run that overrides a column the captain changed says so, while an ordinary forward write to a card still holding the last agreed column is not a snapback and is not described as one.
 A hand-archived card is escalated and otherwise left completely alone, because this tool never deletes, archives, or unarchives a card.
+A task mapping is retired once the sync no longer owns the task, meaning the task is excluded or gone from the fleet, and no live card remains for it, so the pending pointer returns to zero instead of counting a retracted card forever.
+Retirement forgets only the local mapping and never touches the board, and a task whose card is still live keeps its mapping and keeps being escalated.
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
 That comparison uses item identity, column, and issue state only and never a GitHub timestamp, so a bare touch on a card stays quiet.
 Reconcile records the board state it just reported in `state/board-sync.seen`, so a board change the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
