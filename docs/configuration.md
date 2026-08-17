@@ -26,23 +26,26 @@ Ordinary dead-direct-report recovery is owned by `stuck-crewmate-recovery`, whil
 
 ## GitHub fleet board (config/board-sync.json / config/board-exclude)
 
-`bin/fm-board-sync.sh` is the single owner of the GitHub Projects v2 fleet-board data formats, sync mechanics, private-repository gate, allowlisted card profile, baseline merge, proposal handling, and custom-check lifecycle.
+`bin/fm-board-sync.sh` is the single owner of the GitHub Projects v2 fleet-board data formats, sync mechanics, private-repository gate, allowlisted card profile, baseline merge, board-change reporting, and custom-check lifecycle.
 The local gitignored `config/board-sync.json` object contains exactly `owner`, positive integer `project_number`, and `repo`, where `repo` is an `owner/name` issue repository under the same owner.
 The local gitignored `config/board-exclude` file contains one task id per line, with blank lines and `#` comments ignored.
 That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
 Reconcile refuses every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
-An excluded task that still carries a mapping is reported as a durable `excluded_task_still_carded` proposal, because retracting a live card stays a manual captain decision.
+An excluded task that still holds a live card is escalated rather than retracted, because retracting a card stays a manual captain decision.
 A single reconcile runs at a time, guarded by `state/.board-sync.lock`, so overlapping runs cannot mint duplicate issues for one task.
 Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
-A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and records board-side changes as durable proposals without writing fleet state.
+A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
+A board card with no mapping is the one board-side change reconcile acts on by itself, and the plan lists it under `adoptions` as a card to carry as a new queued task.
+Every other board-side change becomes exactly one line under `escalations` for firstmate to act on under its own authority.
+A column move, a cleared Status, a hand-archived card, a card removed from the board, an issue the captain closed, and a card with no agreed baseline each produce one such line.
+There is no durable queue and nothing to acknowledge, so each run reports the board changes it actually observes and a change the captain has since undone is simply not reported again.
+Because the report is not durable, the line is always emitted by the same run that observed the change, whether or not that run also set the card back to the fleet column.
+Fleet state wins the card, and a run that overrides a column the captain changed says so, while an ordinary forward write to a card still holding the last agreed column is not a snapback and is not described as one.
+A hand-archived card is escalated and otherwise left completely alone, because this tool never deletes, archives, or unarchives a card.
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
-Reconcile records the board state it just reported in `state/board-sync.seen`, so a proposal the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
-Each reconcile recomputes the whole proposal list from the divergences it observes, so a proposal the fleet has adopted or the captain has undone drains out instead of accumulating forever.
-The one exception is a captain board move that reconcile itself erased by snapping the card back to the fleet column, which is marked `retained` and survives later reconciles until `bin/fm-board-sync.sh ack <signature>` retires it, because a card drag must never be discarded merely because the board now agrees again.
-Reconcile never performs that snapback without recording the move, including when it holds no agreed baseline for the card and reports the previous column as `null`.
-Every proposal carries a `subject` and at most one proposal is live per subject, so a newer observation supersedes the older one and the queue still cannot grow without bound.
-An excluded task that still holds a card is reported only while that card is genuinely still on the board, so the report retires by itself once the captain retracts the card.
+That comparison uses item identity, column, and issue state only and never a GitHub timestamp, so a bare touch on a card stays quiet.
+Reconcile records the board state it just reported in `state/board-sync.seen`, so a board change the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
 Reconcile also records a baseline column and issue state for every card the sync does not own, so a card added outside the sync counts as pending once and then only when it actually moves.
 That baseline records only the card state the run actually reported, so a foreign card changed or added inside the reconcile window stays un-baselined and still wakes firstmate on the next poll.
 The check runs only while the ordinary supervision watcher is live, so a fully idle home may not notice a board edit until the next firstmate session or supervision cycle.

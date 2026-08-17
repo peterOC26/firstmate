@@ -13,23 +13,23 @@ The focused behavior command is:
 bin/fm-test-run.sh tests/fm-board-sync.test.sh
 ```
 
-Its twenty-four behavioral cases prove custom-check arm/status/disarm, withdrawal of a check whose trust binding fails, allowlisted issue bodies, exclusion-file enforcement, opaque titles for tasks with no structured title, reporting of excluded tasks that still hold a card, retirement of that report once the card is gone, single-instance reconcile locking, pending-create recovery, private-repository refusal, mutation-free dry runs for both new and already-mapped tasks, pointer-only poll deduplication, proposal-only pull, wake quiescence for a declined proposal, no silent suppression of a mapped board move that lands inside the reconcile window, no silent absorption of a foreign-card change or addition that lands in that same window, explained fleet-authoritative conflict snapback, survival of a snapped-back captain move across later reconciles until `ack` retires it, a durable record for a snapback taken with no agreed baseline, a board read that survives an all-digit GitHub login, a foreign card that counts once and then only when it really moves, one stable proposal signature across a bare GitHub touch, and proposals that drain once their divergence is gone.
+Its twenty-seven behavioral cases prove custom-check arm/status/disarm, withdrawal of a check whose trust binding fails, allowlisted issue bodies, exclusion-file enforcement, opaque titles for tasks with no structured title, escalation of excluded tasks that still hold a card, retirement of that report once the card is gone, single-instance reconcile locking, pending-create recovery, private-repository refusal, mutation-free dry runs for both new and already-mapped tasks, pointer-only poll deduplication, escalation-only pull, wake quiescence for an already-reported board move, no silent suppression of a mapped board move that lands inside the reconcile window, no silent absorption of a foreign-card change or addition that lands in that same window, explained fleet-authoritative conflict snapback, escalation of a write over an unrecorded baseline without inventing a captain move, escalation of a cleared Status by the run that restores the column, escalation of a hand-archived card that is otherwise left completely alone, an ordinary forward column write that is never called a snapback, a brand-new board card carried as the one adoption, a board read that survives an all-digit GitHub login, a foreign card that counts once and then only when it really moves, a bare GitHub touch that never re-wakes the poll, and escalations that report only what the run actually observes.
 
 The security fixtures contain free-form hold detail, a private path, a credential-shaped value, an excluded confidential title, and internal task ids, all of them invented for the fixture and describing nothing real.
 The fake GitHub boundary records every argument and fails the case if any forbidden fixture value reaches a GitHub call.
 A missing, empty, unreadable, or symlinked `config/board-exclude` is a separate negative case that must exit nonzero before the first GitHub call, so the exclusion guarantee is not only an absence assertion against a compliant fixture.
 A task carrying only free-form runtime detail is a second negative case whose issue title must degrade to the opaque correlation token rather than that detail.
 Each of these guarantees was confirmed to fail when its implementation was neutralized, so none of them passes vacuously.
-The four cases added for the all-digit login, the foreign-card baseline, the proposal drain, and the withdrawn check binding were each confirmed to fail against the code that preceded their fix, so each one reproduces the reported defect.
-The three cases added for the mid-reconcile foreign-card window, the stable unmapped-card signature, and the retiring excluded-card report were confirmed the same way against the code that preceded each of those fixes.
-The two cases added for the retained snapback proposal and the snapback with no agreed baseline were confirmed the same way, and both assert the standing invariant that reconcile never discards a captain board move without leaving a durable proposal behind.
+The cases added for the all-digit login, the foreign-card baseline, the mid-reconcile foreign-card window, the retiring excluded-card report, and the withdrawn check binding were each confirmed to fail against the code that preceded their fix, so each one reproduces the reported defect.
+The cases added for the cleared Status, the hand-archived card, and the truthful forward-write explanation were confirmed the same way against the code that preceded each of those fixes.
+Together with the conflict and unrecorded-baseline cases they assert the standing property that a board-side change is escalated by the same run that observes it, whether or not that run also set the card back to the fleet column.
 The fake GitHub boundary rejects a numeric-looking `owner` sent as a typed GraphQL variable exactly as the real API type checker would, so the all-digit login case exercises the coercion rather than asserting the flag.
 
 The exact focused result for this revision is:
 
 ```text
-board-sync tests: 24 passed
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=29116
+board-sync tests: 27 passed
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=31805
 ```
 
 The affected projection, documentation, and runner surfaces were exercised together with:
@@ -41,9 +41,9 @@ bin/fm-test-run.sh tests/fm-board-sync.test.sh tests/fm-bearings-snapshot.test.s
 The exact aggregate result was:
 
 ```text
-FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=192692
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=27870 failed=0
-FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=3 duration_ms=164545 failed=0
+FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=197324
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=27939 failed=0
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=3 duration_ms=168733 failed=0
 ```
 
 Pinned lint and documentation classification returned:
