@@ -40,11 +40,11 @@ A board card with no mapping is left untouched and becomes one line under `escal
 Every fleet task instead receives a separate Firstmate-managed canonical issue and card, regardless of a manual card's title, repository, or item type.
 Token recovery rebinds only an issue whose title and complete body exactly match the Firstmate-generated title and allowlisted body, so a captain-authored issue that happens to carry the marker is never claimed or rewritten.
 Every other board-side change also becomes exactly one line under `escalations` for firstmate to act on under its own authority.
-A column move, a cleared Status, a hand-archived card, a card removed from the board, an issue the captain closed, and a card with no agreed baseline each produce exactly one such line.
+A column move, a cleared Status, a card removed from the board, an issue the captain closed, and a card with no agreed baseline each produce exactly one such line.
 Each run reports only the board changes it actually observes, so a change the captain has since undone is simply not reported again.
 The line is always emitted by the same run that observed the change, whether or not that run also set the card back to the fleet column.
 Fleet state wins the card, and a run that overrides a column the captain changed says so, while an ordinary forward write to a card still holding the last agreed column is not a snapback and is not described as one.
-A hand-archived card is escalated and otherwise left completely alone, because this tool never deletes, archives, or unarchives a card.
+A hand-archived card produces one archive escalation that supersedes simultaneous column and issue-state details, and it is otherwise left completely alone because this tool never deletes, archives, or unarchives a card.
 A task mapping is retired once the sync no longer owns the task, meaning the task is excluded or gone from the fleet, and no live card remains for it, so the pending pointer returns to zero instead of counting a retracted card forever.
 Retirement forgets only the local mapping and never touches the board, and a task whose card is still live keeps its mapping and keeps being escalated.
 A card the captain archives under a task the fleet still owns keeps its mapping instead, and its observed archived state, column, and issue state are recorded independently of the fleet column, so it reports once and stays quiet until one of those board facts changes again.

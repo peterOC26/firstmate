@@ -33,7 +33,19 @@ board_repo=${GH_REPO:-captain/fleet}
   done
 } >> "$GH_LOG"
 if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
-  printf '%s\n' "${GH_PRIVATE:-true}"
+  visibility=${GH_PRIVATE:-true}
+  if [ "${GH_PRIVATE_AFTER_FIRST:-}" = false ]; then
+    privacy_count=0
+    if [ -f "$GH_LOG.privacy-count" ]; then
+      read -r privacy_count < "$GH_LOG.privacy-count"
+    fi
+    privacy_count=$((privacy_count + 1))
+    printf '%s\n' "$privacy_count" > "$GH_LOG.privacy-count"
+    if [ "$privacy_count" -gt 1 ]; then
+      visibility=false
+    fi
+  fi
+  printf '%s\n' "$visibility"
   exit 0
 fi
 if [ "${1:-}" = api ] && [ "${2:-}" = --method ] && [ "${3:-}" = GET ] && [ "${4:-}" = search/issues ]; then
@@ -525,6 +537,32 @@ test_private_repo_is_a_hard_gate() {
   assert_not_contains "$(<"$log")" $'ARG\tPATCH' "visibility refusal must precede update mutations"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "public or unknown repository visibility refuses every push"
+}
+
+test_private_repo_is_revalidated_at_the_mutation_boundary() {
+  local fixture root home fakebin bearings board log output rc
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Ready
+  set +e
+  output=$(GH_PRIVATE_AFTER_FIRST=false \
+    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a repository made public before mutation must fail reconcile"
+  assert_contains "$output" 'public or its visibility is unknown' \
+    "the mutation-boundary visibility refusal should be explicit"
+  [ "$(<"$log.privacy-count")" -eq 2 ] \
+    || fail "repository privacy must be checked again at the mutation boundary"
+  assert_not_contains "$(<"$log")" $'ARG\tPOST' \
+    "visibility loss immediately before mutation must prevent issue creation"
+  assert_not_contains "$(<"$log")" 'mutation(' \
+    "visibility loss immediately before mutation must prevent project writes"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "repository privacy is revalidated immediately before mutation"
 }
 
 test_dry_run_has_complete_plan_and_no_mutations() {
@@ -1242,11 +1280,11 @@ test_archived_card_is_escalated_and_left_untouched() {
   write_bearings "${bearings}.json" 'Under way'
   token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
   body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
-  # The captain archived the card by hand, which hides it but keeps its field values.
+  # The captain archived, moved, and closed the card before this observation.
   write_board "$board" "$(jq -n --arg body "$body" '[{
     id:"PVTI_ONE",type:"ISSUE",isArchived:true,updatedAt:"2026-08-16T10:00:00Z",
     fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T10:00:00Z"},
-    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"CLOSED",
       url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T10:00:00Z",
       repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
   }]')"
@@ -1262,15 +1300,17 @@ test_archived_card_is_escalated_and_left_untouched() {
     || fail "an archived mapped card must not be invisible to the poll"
   output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
   printf '%s' "$output" | jq -e '
-    (.escalations | any(contains("task safe-task-internal-id")
-      and contains("the board card is archived")))
+    (.escalations | length == 1)
+    and (.escalations[0] | contains("task safe-task-internal-id")
+      and contains("the board card is archived"))
     and (.operations | all(.task_id != "safe-task-internal-id"))
-  ' >/dev/null || fail "an archived card must be escalated and otherwise left alone"
+  ' >/dev/null || fail "an archive must supersede simultaneous move and close details"
   assert_not_contains "$(<"$log")" 'updateProjectV2ItemFieldValue' "an archived card must not be written to"
   assert_not_contains "$(<"$log")" 'addProjectV2ItemById' "an archived card must never be auto-unarchived"
   assert_not_contains "$(<"$log")" 'deleteProjectV2Item' "an archived card must never be deleted"
   jq -e '.tasks["safe-task-internal-id"].baseline.archived == true
-    and .tasks["safe-task-internal-id"].baseline.column == "Ready"' \
+    and .tasks["safe-task-internal-id"].baseline.column == "Ready"
+    and .tasks["safe-task-internal-id"].baseline.issue_state == "CLOSED"' \
     "$home/state/board-sync.json" >/dev/null \
     || fail "the observed archived state and column must be recorded independently of fleet state"
   woke=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
@@ -1756,6 +1796,7 @@ test_excluded_task_with_a_live_card_is_reported
 test_concurrent_reconcile_fails_closed
 test_pending_create_recovers_without_duplicating
 test_private_repo_is_a_hard_gate
+test_private_repo_is_revalidated_at_the_mutation_boundary
 test_dry_run_has_complete_plan_and_no_mutations
 test_dry_run_plans_pending_work_for_mapped_tasks
 test_poll_prints_only_a_deduplicated_pointer

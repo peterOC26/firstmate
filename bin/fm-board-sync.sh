@@ -22,9 +22,10 @@
 # Every other board-side change becomes exactly one line in `escalations`,
 # emitted by the same run that observed it and whether or not that run also set
 # the card back to the fleet column; every run reports only what it sees.
-# A cleared Status, an archived card, a card removed from the board, an issue
-# the captain closed, a column move, and a card with no agreed baseline each
-# produce one such line, and each produces exactly one.
+# A cleared Status, a card removed from the board, an issue the captain closed,
+# a column move, and a card with no agreed baseline each produce exactly one such
+# line.  An archived card produces one archive line for the complete observation,
+# with simultaneous column and issue-state details folded into that line.
 #
 # A mapping is retired once the sync no longer owns the task, meaning the task is
 # excluded or gone from the fleet, and no live card is left for it.  Retirement
@@ -60,7 +61,7 @@
 # escalated, because this script never deletes or archives a card.
 #
 # GitHub writes fail closed unless the configured repository is confirmed
-# private immediately before reconcile.  Issue bodies are built from an
+# private immediately before each GitHub mutation.  Issue bodies are built from an
 # allowlist only: optional project/kind labels, an HTTPS PR URL, and the opaque
 # correlation token.  Issue titles come only from the structured backlog title,
 # falling back to the opaque token, never to a runtime summary.  Free-form
@@ -246,6 +247,12 @@ repo_is_private() {
   local repo=$1 visibility
   visibility=$(gh api "repos/$repo" --jq '.private' 2>/dev/null) || return 1
   [ "$visibility" = true ]
+}
+
+github_mutation_guard() {
+  local repo=$1
+  repo_is_private "$repo" \
+    || die "refusing GitHub writes: $repo is public or its visibility is unknown"
 }
 
 board_query() {
@@ -506,29 +513,34 @@ append_escalation() {
 
 issue_create() {
   local repo=$1 title=$2 body=$3
+  github_mutation_guard "$repo"
   gh api --method POST "repos/$repo/issues" -f title="$title" -f body="$body"
 }
 
 issue_update() {
   local repo=$1 number=$2 title=$3 body=$4
+  github_mutation_guard "$repo"
   gh api --method PATCH "repos/$repo/issues/$number" -f title="$title" -f body="$body"
 }
 
 issue_close() {
   local repo=$1 number=$2
+  github_mutation_guard "$repo"
   gh api --method PATCH "repos/$repo/issues/$number" -f state=closed
 }
 
 project_add_item() {
-  local project_id=$1 issue_id=$2
+  local repo=$1 project_id=$2 issue_id=$3
   # shellcheck disable=SC2016
+  github_mutation_guard "$repo"
   gh api graphql -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
     -F project="$project_id" -F content="$issue_id"
 }
 
 project_set_column() {
-  local project_id=$1 item_id=$2 field_id=$3 option_id=$4
+  local repo=$1 project_id=$2 item_id=$3 field_id=$4 option_id=$5
   # shellcheck disable=SC2016
+  github_mutation_guard "$repo"
   gh api graphql -f query='mutation($project:ID!,$item:ID!,$field:ID!,$option:String!){updateProjectV2ItemFieldValue(input:{projectId:$project,itemId:$item,fieldId:$field,value:{singleSelectOptionId:$option}}){projectV2Item{id}}}' \
     -F project="$project_id" -F item="$item_id" -F field="$field_id" -f option="$option_id"
 }
@@ -670,7 +682,7 @@ reconcile() {
           '{action:$action,task_id:$task_id,issue_url:$issue_url}')
         operations=$(append_operation "$operations" "$operation")
         if [ "$dry_run" = 0 ]; then
-          add_result=$(project_add_item "$project_id" "$issue_id") || die "cannot add issue to project"
+          add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot add issue to project"
           item_id=$(printf '%s' "$add_result" | jq -er '.data.addProjectV2ItemById.item.id') \
             || die "GitHub project add returned invalid data"
         fi
@@ -715,7 +727,7 @@ reconcile() {
       card_absent=1
       issue_id=$(printf '%s' "$mapping" | jq -er '.issue_id')
       if [ "$dry_run" = 0 ]; then
-        add_result=$(project_add_item "$project_id" "$issue_id") || die "cannot restore project item"
+        add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot restore project item"
         item_id=$(printf '%s' "$add_result" | jq -er '.data.addProjectV2ItemById.item.id') \
           || die "GitHub project add returned invalid data"
         updated_state=$(printf '%s' "$updated_state" | jq --arg id "$task_id" --arg item_id "$item_id" \
@@ -780,7 +792,7 @@ reconcile() {
     fi
     if [ "$write_column" = 1 ]; then
       if [ "$dry_run" = 0 ]; then
-        project_set_column "$project_id" "$item_id" "$field_id" "$option_id" >/dev/null \
+        project_set_column "$repo" "$project_id" "$item_id" "$field_id" "$option_id" >/dev/null \
           || die "cannot set project Status"
       fi
       if [ "$snapback" = 1 ]; then
