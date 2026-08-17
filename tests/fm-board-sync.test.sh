@@ -146,6 +146,12 @@ SH
   chmod +x "$fakebin/gh"
   cat > "$root/bearings" <<'SH'
 #!/usr/bin/env bash
+if [ -n "${BEARINGS_BLOCK_READY:-}" ]; then
+  : > "$BEARINGS_BLOCK_READY"
+  while [ ! -e "$BEARINGS_BLOCK_RELEASE" ]; do
+    sleep 0.05
+  done
+fi
 cat "$BEARINGS_FIXTURE"
 SH
   chmod +x "$root/bearings"
@@ -315,6 +321,9 @@ test_arm_status_and_disarm() {
     || fail "arm should initialize protected baseline state"
   FM_HOME="$home" "$SCRIPT" status | jq -e '.armed == true and .mapped_tasks == 0' >/dev/null \
     || fail "status should report the armed baseline"
+  printf '\n' >> "$home/state/board-watch.check.sh"
+  FM_HOME="$home" "$SCRIPT" status | jq -e '.armed == false' >/dev/null \
+    || fail "status must reject a check whose bytes no longer match its trust binding"
   FM_HOME="$home" "$SCRIPT" disarm >/dev/null
   [ ! -e "$home/state/board-watch.check.sh" ] && [ ! -e "$home/state/board-watch.check-trust" ] \
     || fail "disarm should remove only custom-check artifacts"
@@ -354,6 +363,30 @@ test_allowlist_and_exclusions() {
   assert_not_contains "$(<"$log")" 'safe-task-internal-id' "internal task ids must never reach GitHub"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "GitHub writes contain only allowlisted fields and skip excluded tasks"
+}
+
+test_credential_bearing_artifact_is_not_published() {
+  local fixture root home fakebin bearings board output log credential_url
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Ready
+  credential_url='https://captain:credential@github.com/acme/app/pull/9'
+  jq --arg url "$credential_url" '
+    .board_items |= map(if .id == "safe-task-internal-id" then .artifact = $url else . end)
+    | .recorded_prs |= map(if .id == "safe-task-internal-id" then .url = $url else . end)
+  ' "${bearings}.json" > "${bearings}.json.next"
+  mv "${bearings}.json.next" "${bearings}.json"
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  printf '%s' "$output" | jq -e '
+    .operations | any(.action == "create_issue" and (.body | contains("PR:") | not))
+  ' >/dev/null || fail "a credential-bearing artifact must be excluded from the published body"
+  assert_not_contains "$(<"$log")" 'captain:credential@' \
+    "URL userinfo must never cross the GitHub publication boundary"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "credential-bearing artifacts never enter GitHub issue bodies"
 }
 
 test_exclusion_file_is_a_hard_gate() {
@@ -484,6 +517,46 @@ test_concurrent_reconcile_fails_closed() {
   assert_not_contains "$(<"$log")" $'ARG\tPOST' "a refused reconcile must not create a duplicate issue"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "overlapping reconciles fail closed instead of minting duplicate issues"
+}
+
+test_live_reconcile_lock_cannot_be_stolen() {
+  local fixture root home fakebin bearings board log holder output rc dead_pid
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Ready
+  BEARINGS_BLOCK_READY="$root/holder-ready" BEARINGS_BLOCK_RELEASE="$root/holder-release" \
+    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile \
+    > "$root/holder.out" 2> "$root/holder.err" &
+  holder=$!
+  while [ ! -e "$root/holder-ready" ]; do
+    kill -0 "$holder" 2>/dev/null || fail "the lock holder exited before blocking"
+    sleep 0.05
+  done
+  set +e
+  output=$(FM_BOARD_LOCK_STALE_SECS=0 \
+    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "elapsed time must never let a second reconcile steal a live lock"
+  assert_contains "$output" 'another fm-board-sync reconcile holds' \
+    "a live lock owner should be reported explicitly"
+  : > "$root/holder-release"
+  wait "$holder" || fail "the original lock holder failed after the competing attempt"
+
+  dead_pid=9999999
+  while kill -0 "$dead_pid" 2>/dev/null; do
+    dead_pid=$((dead_pid + 1))
+  done
+  mkdir "$home/state/.board-sync.lock"
+  printf '%s\n' "$dead_pid" > "$home/state/.board-sync.lock/pid"
+  printf '%s\n' 'stale-process-identity' > "$home/state/.board-sync.lock/pid-identity"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null \
+    || fail "a lock whose recorded owner is confirmed dead must be reclaimed"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "live reconcile locks cannot be stolen and dead owners are reclaimed"
 }
 
 test_pending_create_recovers_without_duplicating() {
@@ -1697,6 +1770,48 @@ test_archive_during_reconcile_is_not_absorbed() {
   pass "an archive arriving mid-reconcile remains pending for the next poll"
 }
 
+test_unarchive_during_reconcile_has_a_distinct_signature() {
+  local fixture root home fakebin bearings board after log token body output woke
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  after="$root/board-after.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Ready
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:true,updatedAt:"2026-08-17T10:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-17T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-17T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  write_board "$after" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-17T10:05:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-17T10:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-17T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_ONE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN",archived:false}}},
+    unmapped_items:{},pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  output=$(BOARD_FIXTURE_AFTER="$after" run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  printf '%s' "$output" | jq -e '.escalations | length == 1' >/dev/null \
+    || fail "the observed archive must be reported by its reconcile pass"
+  cp "$after" "$board"
+  woke=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$woke" = 'board-sync 1 board change(s) pending' ] \
+    || fail "an unarchive arriving after an archive report must retain a distinct pending signature"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "opposite archive transitions never collide in poll signatures"
+}
+
 test_issue_close_during_reconcile_is_not_absorbed() {
   local fixture root home fakebin bearings board after log token body output woke
   fixture=$(make_fixture)
@@ -1790,10 +1905,12 @@ test_dry_run_recovers_only_allowlisted_canonical_card() {
 test_arm_status_and_disarm
 test_arm_leaves_no_unauthenticated_check_when_binding_fails
 test_allowlist_and_exclusions
+test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail
 test_excluded_task_with_a_live_card_is_reported
 test_concurrent_reconcile_fails_closed
+test_live_reconcile_lock_cannot_be_stolen
 test_pending_create_recovers_without_duplicating
 test_private_repo_is_a_hard_gate
 test_private_repo_is_revalidated_at_the_mutation_boundary
@@ -1815,6 +1932,7 @@ test_dry_run_plan_matches_the_real_operation_list
 test_draft_card_is_left_manual_while_canonical_card_is_created
 test_removed_card_is_escalated_once_and_truthfully
 test_archive_during_reconcile_is_not_absorbed
+test_unarchive_during_reconcile_has_a_distinct_signature
 test_issue_close_during_reconcile_is_not_absorbed
 test_mapping_retires_once_its_card_is_legitimately_gone
 test_dry_run_recovers_only_allowlisted_canonical_card

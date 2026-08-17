@@ -32,10 +32,10 @@ The local gitignored `config/board-exclude` file contains one task id per line, 
 That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
 Reconcile refuses every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
 An excluded task that still holds a live card is escalated rather than retracted, because retracting a card stays a manual captain decision.
-A single reconcile runs at a time, guarded by `state/.board-sync.lock`, so overlapping runs cannot mint duplicate issues for one task.
+A single reconcile runs at a time, guarded by an identity-owned `state/.board-sync.lock` that a live or unverifiable owner cannot lose to elapsed time, so overlapping runs cannot mint duplicate issues for one task.
 Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
-A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
+A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
 A board card with no mapping is left untouched and becomes one line under `escalations` as a captain-intent request for firstmate to act on under its own authority.
 Every fleet task instead receives a separate Firstmate-managed canonical issue and card, regardless of a manual card's title, repository, or item type.
 Token recovery rebinds only an issue whose title and complete body exactly match the Firstmate-generated title and allowlisted body, so a captain-authored issue that happens to carry the marker is never claimed or rewritten.

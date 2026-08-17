@@ -73,7 +73,7 @@
 # Environment overrides used by tests and isolated homes:
 #   FM_ROOT_OVERRIDE, FM_HOME, FM_CONFIG_OVERRIDE, FM_STATE_OVERRIDE,
 #   FM_BOARD_BEARINGS, FM_BOARD_FLEET_SNAPSHOT, FM_BOARD_BEARINGS_HOME,
-#   FM_BOARD_NOW, FM_BOARD_LOCK_STALE_SECS.
+#   FM_BOARD_NOW.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -93,6 +93,9 @@ BEARINGS="${FM_BOARD_BEARINGS:-$SCRIPT_DIR/fm-bearings-snapshot.sh}"
 FLEET_SNAPSHOT="${FM_BOARD_FLEET_SNAPSHOT:-$SCRIPT_DIR/fm-fleet-snapshot.sh}"
 BEARINGS_HOME="${FM_BOARD_BEARINGS_HOME:-$FM_HOME}"
 NOW="${FM_BOARD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
+# shellcheck source=bin/fm-wake-lib.sh
+. "$SCRIPT_DIR/fm-wake-lib.sh"
 
 usage() {
   sed -n '2,/^set -eu$/s/^# \{0,1\}//p' "$0" >&2
@@ -220,26 +223,52 @@ load_exclusions() {
 }
 
 board_lock_acquire() {
-  local tries=0 now mtime age
+  local tries=0 owner_pid owner_identity current_identity lock_pid lock_identity
   while ! mkdir "$LOCK_DIR" 2>/dev/null; do
     tries=$((tries + 1))
     if [ "$tries" -ge 20 ]; then
-      now=$(date +%s)
-      mtime=$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || echo "$now")
-      age=$((now - mtime))
-      if [ "$age" -ge "${FM_BOARD_LOCK_STALE_SECS:-600}" ]; then
-        rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR" 2>/dev/null || true
-        if mkdir "$LOCK_DIR" 2>/dev/null; then
-          break
-        fi
+      owner_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+      owner_identity=$(cat "$LOCK_DIR/pid-identity" 2>/dev/null || true)
+      case "$owner_pid" in
+        ''|*[!0-9]*)
+          die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
+          ;;
+      esac
+      [ -n "$owner_identity" ] \
+        || die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
+      if fm_pid_alive "$owner_pid"; then
+        current_identity=$(fm_pid_identity "$owner_pid" 2>/dev/null) \
+          || die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
+        [ "$current_identity" != "$owner_identity" ] \
+          || die "another fm-board-sync reconcile holds $LOCK_DIR; retry once it finishes"
       fi
-      die "another fm-board-sync reconcile holds $LOCK_DIR; retry once it finishes"
+      rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
+      rmdir "$LOCK_DIR" 2>/dev/null || true
+      tries=0
+      continue
     fi
     sleep 0.05
   done
+  lock_pid=$(fm_current_pid)
+  lock_identity=$(fm_pid_identity "$lock_pid" 2>/dev/null) \
+    || { rmdir "$LOCK_DIR" 2>/dev/null || true; die "cannot identify reconcile lock owner"; }
+  if ! printf '%s\n' "$lock_pid" > "$LOCK_DIR/pid" \
+    || ! printf '%s\n' "$lock_identity" > "$LOCK_DIR/pid-identity"; then
+    rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+    die "cannot record reconcile lock owner"
+  fi
 }
 
 board_lock_release() {
+  local owner_pid owner_identity current_pid current_identity
+  owner_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+  owner_identity=$(cat "$LOCK_DIR/pid-identity" 2>/dev/null || true)
+  current_pid=$(fm_current_pid)
+  current_identity=$(fm_pid_identity "$current_pid" 2>/dev/null || true)
+  [ "$owner_pid" = "$current_pid" ] && [ -n "$current_identity" ] \
+    && [ "$owner_identity" = "$current_identity" ] || return 0
+  rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
   rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 
@@ -357,6 +386,9 @@ fleet_metadata_snapshot() {
 desired_items() {
   local snapshot=$1 metadata=$2 salt=$3 exclusions=$4 base task_id token item
   base=$(jq -n --argjson root "$snapshot" --argjson metadata "$metadata" '
+    def valid_pr_url:
+      type == "string"
+      and test("^https://github[.]com/[^/@?#[:space:]]+/[^/@?#[:space:]]+/pull/[1-9][0-9]*$");
     ([$root.board_items[]
         | select(.owner == "(main)")
         | select(.id != "(main-inventory)")
@@ -367,7 +399,7 @@ desired_items() {
         | . as $task
         | (($metadata.backlog.records[]? | select(.id == $task.id)) // {}) as $meta
         | (($root.recorded_prs[]? | select(.id == $task.id) | .url) //
-           (if (.artifact | test("^https://")) then .artifact else null end)) as $pr
+           (if (.artifact | valid_pr_url) then .artifact else null end)) as $pr
         | (($root.board_items[]?
             | select((.id | contains("#")) and .artifact == $pr)) // null) as $prrow
         | (($root.in_flight[]? | select(.id == $task.id) | .kind) //
@@ -378,7 +410,7 @@ desired_items() {
             column:($prrow.column // .column),
             kind:($meta.kind // $kind),
             project:(if (($meta.repo // "-") == "-") then null else $meta.repo end),
-            pr_url:(if (($pr // "") | test("^https://[^[:space:]]+$")) then $pr else null end)
+            pr_url:(if ($pr | valid_pr_url) then $pr else null end)
           }
       ]
   ') || die "bearings snapshot does not provide valid board items"
@@ -456,7 +488,8 @@ board_changes() {
                 $observed.archived != ($mapped.value.baseline.archived // false))
        | {type:"mapped_change",task_id:$mapped.key,item_id:$mapped.value.item_id,
           column:$observed.column,
-          issue_state:$observed.issue_state} ]
+          issue_state:$observed.issue_state,
+          archived:$observed.archived} ]
      +
      [ $board.items[] as $live
        | $live
@@ -906,7 +939,8 @@ reconcile() {
             .type == $change.type
             and .item_id == $change.item_id
             and ((.column // null) == ($change.column // null))
-            and ((.issue_state // null) == ($change.issue_state // null)))) ]
+            and ((.issue_state // null) == ($change.issue_state // null))
+            and ((.archived // false) == ($change.archived // false)))) ]
     ') || die "cannot reconcile poll signature against reported changes"
     store_seen_signature "$residual"
   fi
@@ -990,7 +1024,11 @@ status_cmd() {
   need jq
   config=$(load_config)
   state=$(ensure_state)
-  if [ -f "$CHECK_FILE" ] && [ ! -L "$CHECK_FILE" ] && [ -f "$TRUST_FILE" ] && [ ! -L "$TRUST_FILE" ]; then
+  # shellcheck source=bin/fm-pr-lib.sh
+  . "$SCRIPT_DIR/fm-pr-lib.sh"
+  # shellcheck source=bin/fm-check-lib.sh
+  . "$SCRIPT_DIR/fm-check-lib.sh"
+  if fm_custom_check_registered "$STATE_DIR" "$CHECK_ID"; then
     armed=true
   fi
   jq -n --argjson config "$config" --argjson state "$state" --argjson armed "$armed" '{
