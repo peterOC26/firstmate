@@ -251,7 +251,7 @@ board_lock_read_owner() {
 board_lock_acquire() {
   local tries=0 owner_pid owner_identity current_identity lock_pid lock_identity lock_temp
   private_dir "$LOCK_DIR"
-  lock_pid=$(fm_current_pid)
+  lock_pid=${BASHPID:-$$}
   lock_identity=$(fm_pid_identity "$lock_pid" 2>/dev/null) \
     || die "cannot identify reconcile lock owner"
   umask 077
@@ -293,7 +293,7 @@ board_lock_release() {
   board_lock_read_owner || return 0
   owner_pid=$FM_BOARD_LOCK_OWNER_PID
   owner_identity=$FM_BOARD_LOCK_OWNER_IDENTITY
-  current_pid=$(fm_current_pid)
+  current_pid=${BASHPID:-$$}
   current_identity=$(fm_pid_identity "$current_pid" 2>/dev/null || true)
   [ "$owner_pid" = "$current_pid" ] && [ -n "$current_identity" ] \
     && [ "$owner_identity" = "$current_identity" ] || return 0
