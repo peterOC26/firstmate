@@ -1273,8 +1273,25 @@ test_archived_card_is_escalated_and_left_untouched() {
   assert_not_contains "$(<"$log")" 'updateProjectV2ItemFieldValue' "an archived card must not be written to"
   assert_not_contains "$(<"$log")" 'addProjectV2ItemById' "an archived card must never be auto-unarchived"
   assert_not_contains "$(<"$log")" 'deleteProjectV2Item' "an archived card must never be deleted"
+  jq -e '.tasks["safe-task-internal-id"].baseline.archived == true' "$home/state/board-sync.json" >/dev/null \
+    || fail "the archived state must be recorded as the agreed baseline"
+  woke=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ -z "$woke" ] \
+    || fail "an archived card the run already reported must stop counting as pending forever"
+
+  # Unarchiving it is a genuine board change, so it must wake firstmate again.
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_ONE",type:"ISSUE",isArchived:false,updatedAt:"2026-08-16T12:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-16T12:00:00Z"},
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-16T12:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  woke=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" poll)
+  [ "$woke" = 'board-sync 1 board change(s) pending' ] \
+    || fail "unarchiving the card must wake firstmate again"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "a hand-archived card is escalated once and never silently written, unarchived, or deleted"
+  pass "a hand-archived card is escalated, counts pending once, and is never written, unarchived, or deleted"
 }
 
 test_forward_column_write_is_not_reported_as_a_snapback() {
@@ -1358,7 +1375,7 @@ test_new_board_card_is_reported_for_adoption() {
 }
 
 test_hand_filed_card_is_adopted_instead_of_duplicated() {
-  local fixture root home fakebin bearings board log output
+  local fixture root home fakebin bearings board log output token
   fixture=$(make_fixture)
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
   board="$root/board.json"
@@ -1370,7 +1387,7 @@ test_hand_filed_card_is_adopted_instead_of_duplicated() {
     id:"PVTI_CAPTAIN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-17T10:00:00Z",
     fieldValueByName:{name:"Blocked",optionId:"blocked",updatedAt:"2026-08-17T10:00:00Z"},
     content:{__typename:"Issue",id:"I_CAPTAIN",number:21,title:"Safe board title",
-      body:"filed on the board by hand",state:"OPEN",
+      body:"filed on the board by hand\n\nsecond paragraph the captain wrote",state:"OPEN",
       url:"https://github.com/captain/fleet/issues/21",updatedAt:"2026-08-17T10:00:00Z",
       repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
   }]')"
@@ -1386,15 +1403,95 @@ test_hand_filed_card_is_adopted_instead_of_duplicated() {
   ' >/dev/null || fail "the captain's own card must be adopted as the task card, not re-reported as new"
   jq -e '.tasks["safe-task-internal-id"].issue_number == 21
     and .tasks["safe-task-internal-id"].item_id == "PVTI_CAPTAIN"
-    and .tasks["safe-task-internal-id"].issue_id == "I_CAPTAIN"' \
+    and .tasks["safe-task-internal-id"].issue_id == "I_CAPTAIN"
+    and .tasks["safe-task-internal-id"].origin == "captain"' \
     "$home/state/board-sync.json" >/dev/null \
-    || fail "the adopted card must be recorded as that task's ordinary mapping"
-  assert_contains "$(<"$log")" '<!-- fm-task: ' "the adopted issue must be stamped with the correlation token"
-  assert_contains "$(<"$log")" 'project: demo-project' "the stamped body must be the allowlisted body"
-  assert_not_contains "$(<"$log")" 'SUPERSECRET_HOLD' "adoption must not publish free-form detail"
+    || fail "the adopted card must be recorded as that task's ordinary captain-origin mapping"
+  assert_contains "$(<"$log")" '<!-- fm-task: ' "the adopted issue must carry the correlation token"
+  assert_contains "$(<"$log")" 'filed on the board by hand' \
+    "adoption must preserve the captain's own body"
+  assert_contains "$(<"$log")" 'second paragraph the captain wrote' \
+    "adoption must preserve every line of the captain's body"
+  assert_not_contains "$(<"$log")" 'project: demo-project' \
+    "adoption must not replace the captain's body with the allowlisted body"
+  assert_not_contains "$(<"$log")" 'SUPERSECRET_HOLD' "adoption must not publish free-form fleet detail"
   assert_not_contains "$(<"$log")" 'deleteProjectV2Item' "adoption must never delete a card"
+
+  # A second reconcile must leave the adopted body exactly as it now stands.
+  token=$(jq -er '.tasks["safe-task-internal-id"].token' "$home/state/board-sync.json")
+  write_board "$board" "$(jq -n --arg token "$token" '[{
+    id:"PVTI_CAPTAIN",type:"ISSUE",isArchived:false,updatedAt:"2026-08-17T11:00:00Z",
+    fieldValueByName:{name:"Ready",optionId:"ready",updatedAt:"2026-08-17T11:00:00Z"},
+    content:{__typename:"Issue",id:"I_CAPTAIN",number:21,title:"Safe board title",
+      body:("filed on the board by hand\n\nsecond paragraph the captain wrote\n\n<!-- fm-task: " + $token + " -->"),
+      state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/21",updatedAt:"2026-08-17T11:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  : > "$log"
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  printf '%s' "$output" | jq -e '.operations | all(.action != "update_issue")' >/dev/null \
+    || fail "an already-stamped captain body must not be rewritten on every run"
+  assert_not_contains "$(<"$log")" $'ARG\tPATCH' "a settled adopted card must need no issue write"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "a hand-filed card is adopted as its task's own card instead of being duplicated"
+  pass "a hand-filed card is adopted with the captain's body preserved verbatim and the token appended"
+}
+
+test_reAdded_card_under_a_new_item_id_still_reconciles() {
+  local fixture root home fakebin bearings board log token body output
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" 'Under way'
+  token=$(printf '%s' 'safe-task-internal-idaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | shasum -a 256 | awk '{print substr($1,1,8)}')
+  body=$(printf 'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9\n<!-- fm-task: %s -->' "$token")
+  # The captain removed the card and re-added the same issue, which mints a new item id.
+  write_board "$board" "$(jq -n --arg body "$body" '[{
+    id:"PVTI_REBOUND",type:"ISSUE",isArchived:false,updatedAt:"2026-08-17T10:00:00Z",
+    fieldValueByName:null,
+    content:{__typename:"Issue",id:"I_ONE",number:1,title:"Safe board title",body:$body,state:"OPEN",
+      url:"https://github.com/captain/fleet/issues/1",updatedAt:"2026-08-17T10:00:00Z",
+      repository:{nameWithOwner:"captain/fleet",isPrivate:true}}
+  }]')"
+  jq -n --arg token "$token" '{
+    schema:"fm-board-sync.v1",salt:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",project:{},synced_at:null,
+    tasks:{"safe-task-internal-id":{token:$token,repo:"captain/fleet",issue_number:1,issue_id:"I_ONE",
+      issue_url:"https://github.com/captain/fleet/issues/1",item_id:"PVTI_STALE",
+      baseline:{column:"Ready",option_id:"ready",issue_state:"OPEN"}}},
+    unmapped_items:{},pending:[],excluded_reported:[]
+  }' > "$home/state/board-sync.json"
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  printf '%s' "$output" | jq -e '.operations | any(.action == "set_column" and .column == "Under way")' \
+    >/dev/null || fail "a card re-added under a new item id must still be synced to the fleet column"
+  jq -e '.tasks["safe-task-internal-id"].item_id == "PVTI_REBOUND"' "$home/state/board-sync.json" >/dev/null \
+    || fail "the stored mapping must adopt the item id the run actually resolved"
+  printf '%s' "$output" | jq -e '.adoptions | length == 0' >/dev/null \
+    || fail "the re-added card must not be reported as an unowned card to adopt"
+  assert_contains "$(<"$log")" 'PVTI_REBOUND' "the column write must target the live item id"
+  assert_not_contains "$(<"$log")" 'PVTI_STALE' "no GitHub call may target the stale item id"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "a card re-added under a new item id reconciles and rebinds instead of wedging"
+}
+
+test_dry_run_plan_matches_the_real_operation_list() {
+  local fixture root home fakebin bearings board log planned actual
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Done
+  planned=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run \
+    | jq -c '[.operations[] | {action,task_id,column,explanation}]')
+  actual=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile \
+    | jq -c '[.operations[] | {action,task_id,column,explanation}]')
+  [ "$planned" = "$actual" ] \
+    || fail "the dry-run plan must match the real operation list exactly: $planned vs $actual"
+  printf '%s' "$planned" | jq -e 'any(.action == "set_column" and .explanation != null)' >/dev/null \
+    || fail "a dry-run set_column must carry the same explanation as its real counterpart"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "the dry-run plan and the real run build the same operation list from one code path"
 }
 
 test_draft_card_is_escalated_for_conversion_without_duplicating() {
@@ -1590,6 +1687,8 @@ test_archived_card_is_escalated_and_left_untouched
 test_forward_column_write_is_not_reported_as_a_snapback
 test_new_board_card_is_reported_for_adoption
 test_hand_filed_card_is_adopted_instead_of_duplicated
+test_reAdded_card_under_a_new_item_id_still_reconciles
+test_dry_run_plan_matches_the_real_operation_list
 test_draft_card_is_escalated_for_conversion_without_duplicating
 test_removed_card_is_escalated_once_and_truthfully
 test_mapping_retires_once_its_card_is_legitimately_gone

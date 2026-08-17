@@ -37,7 +37,8 @@ Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `s
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
 A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
 A board card with no mapping is the one board-side change reconcile acts on by itself, and the plan lists it under `adoptions` as a card to carry as a new queued task.
-Once that task exists, the next reconcile adopts the captain's own card as the task's card rather than minting a second one, by matching the unique unmapped card whose issue title equals the task title, stamping the allowlisted body carrying the correlation token onto that issue, and recording the ordinary mapping.
+Once that task exists, the next reconcile adopts the captain's own card as the task's card rather than minting a second one, by matching the unique unmapped card whose issue title equals the task title, appending the correlation-token marker to the body the captain already wrote, and recording the ordinary mapping.
+An adopted body is never replaced, reformatted, or truncated, because the captain's own text in his own private repository is not fleet-derived, so the strict allowlist body applies only to issues firstmate itself creates.
 A matching draft card is escalated for conversion instead, because a draft holds no issue that could carry the token, and no duplicate is minted while it waits.
 Two or more unmapped cards sharing one task title are escalated as an ambiguity rather than guessed at, and again nothing is minted.
 Every other board-side change becomes exactly one line under `escalations` for firstmate to act on under its own authority.
@@ -48,6 +49,8 @@ Fleet state wins the card, and a run that overrides a column the captain changed
 A hand-archived card is escalated and otherwise left completely alone, because this tool never deletes, archives, or unarchives a card.
 A task mapping is retired once the sync no longer owns the task, meaning the task is excluded or gone from the fleet, and no live card remains for it, so the pending pointer returns to zero instead of counting a retracted card forever.
 Retirement forgets only the local mapping and never touches the board, and a task whose card is still live keeps its mapping and keeps being escalated.
+A card the captain archives under a task the fleet still owns keeps its mapping instead, and its archived state is recorded in the baseline, so it counts as pending once and then stays quiet until it is unarchived or moved again.
+Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card the captain removes and re-adds by hand cannot wedge later runs against a stale item id.
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
 That comparison uses item identity, column, and issue state only and never a GitHub timestamp, so a bare touch on a card stays quiet.
 Reconcile records the board state it just reported in `state/board-sync.seen`, so a board change the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
