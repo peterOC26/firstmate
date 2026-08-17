@@ -734,6 +734,7 @@ test_dry_run_has_complete_plan_and_no_mutations() {
   log="$root/gh.log"
   write_board "$board" '[]'
   write_bearings "${bearings}.json" Ready
+  rmdir "$home/state"
   output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
   printf '%s' "$output" | jq -e '
     .dry_run == true
@@ -743,10 +744,8 @@ test_dry_run_has_complete_plan_and_no_mutations() {
   assert_not_contains "$(<"$log")" $'ARG\tPOST' "dry-run must not call issue create mutations"
   assert_not_contains "$(<"$log")" $'ARG\tPATCH' "dry-run must not call issue update mutations"
   assert_not_contains "$(<"$log")" 'mutation(' "dry-run must not call project mutations"
-  [ ! -e "$home/state/board-sync.json" ] \
-    || fail "dry-run must not initialize persistent mapping state"
-  [ ! -e "$home/state/.board-sync.lock" ] \
-    || fail "dry-run must not initialize a persistent reconcile lock"
+  [ ! -e "$home/state" ] \
+    || fail "dry-run must not initialize the persistent state directory"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "dry-run is complete but performs no GitHub or baseline mutations"
 }

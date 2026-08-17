@@ -97,9 +97,6 @@ FLEET_SNAPSHOT="${FM_BOARD_FLEET_SNAPSHOT:-$SCRIPT_DIR/fm-fleet-snapshot.sh}"
 BEARINGS_HOME="${FM_BOARD_BEARINGS_HOME:-$FM_HOME}"
 NOW="${FM_BOARD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
-# shellcheck source=bin/fm-wake-lib.sh
-. "$SCRIPT_DIR/fm-wake-lib.sh"
-
 usage() {
   sed -n '2,/^set -eu$/s/^# \{0,1\}//p' "$0" >&2
 }
@@ -674,6 +671,8 @@ reconcile() {
     fi
   else
     private_dir "$STATE_DIR"
+    # shellcheck source=bin/fm-wake-lib.sh
+    . "$SCRIPT_DIR/fm-wake-lib.sh"
     board_lock_acquire
     trap board_lock_release EXIT
     state=$(ensure_state)
