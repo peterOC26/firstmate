@@ -88,6 +88,7 @@ STATE_FILE="$STATE_DIR/board-sync.json"
 SEEN_FILE="$STATE_DIR/board-sync.seen"
 LOCK_DIR="$STATE_DIR/.board-sync.lock"
 LOCK_FILE="$LOCK_DIR/owner"
+LOCK_RECLAIM="$STATE_DIR/.board-sync.lock-reclaim"
 CHECK_ID='board-watch'
 CHECK_FILE="$STATE_DIR/$CHECK_ID.check.sh"
 TRUST_FILE="$STATE_DIR/$CHECK_ID.check-trust"
@@ -175,6 +176,11 @@ ensure_state() {
     state=$(empty_state "$(new_salt)")
     write_json_atomic "$STATE_FILE" "$state"
   fi
+  load_state
+}
+
+load_state() {
+  local state
   [ -f "$STATE_FILE" ] && [ ! -L "$STATE_FILE" ] || die "state file is unavailable"
   state=$(jq -c . "$STATE_FILE") || die "invalid state/board-sync.json"
   printf '%s' "$state" | jq -e '
@@ -262,10 +268,23 @@ board_lock_acquire() {
     rm -f -- "$lock_temp"
     die "cannot record reconcile lock owner"
   fi
-  while ! ln "$lock_temp" "$LOCK_FILE" 2>/dev/null; do
+  while :; do
+    if [ ! -e "$LOCK_RECLAIM" ] && [ ! -L "$LOCK_RECLAIM" ] \
+      && ln "$lock_temp" "$LOCK_FILE" 2>/dev/null; then
+      break
+    fi
     tries=$((tries + 1))
     if [ "$tries" -ge 20 ]; then
+      while ! fm_lock_try_acquire "$LOCK_RECLAIM"; do
+        sleep 0.05
+      done
+      if [ ! -e "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] \
+        && ln "$lock_temp" "$LOCK_FILE" 2>/dev/null; then
+        fm_lock_release "$LOCK_RECLAIM"
+        break
+      fi
       if ! board_lock_read_owner; then
+        fm_lock_release "$LOCK_RECLAIM"
         rm -f -- "$lock_temp"
         die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
       fi
@@ -273,13 +292,19 @@ board_lock_acquire() {
       owner_identity=$FM_BOARD_LOCK_OWNER_IDENTITY
       if fm_pid_alive "$owner_pid"; then
         current_identity=$(fm_pid_identity "$owner_pid" 2>/dev/null) \
-          || { rm -f -- "$lock_temp"; die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"; }
+          || { fm_lock_release "$LOCK_RECLAIM"; rm -f -- "$lock_temp"; die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"; }
         if [ "$current_identity" = "$owner_identity" ]; then
+          fm_lock_release "$LOCK_RECLAIM"
           rm -f -- "$lock_temp"
           die "another fm-board-sync reconcile holds $LOCK_DIR; retry once it finishes"
         fi
       fi
       rm -f -- "$LOCK_FILE"
+      if ln "$lock_temp" "$LOCK_FILE" 2>/dev/null; then
+        fm_lock_release "$LOCK_RECLAIM"
+        break
+      fi
+      fm_lock_release "$LOCK_RECLAIM"
       tries=0
       continue
     fi
@@ -641,10 +666,18 @@ reconcile() {
   need gh
   config=$(load_config)
   exclusions=$(load_exclusions)
-  private_dir "$STATE_DIR"
-  board_lock_acquire
-  trap board_lock_release EXIT
-  state=$(ensure_state)
+  if [ "$dry_run" -eq 1 ]; then
+    if [ -e "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
+      state=$(load_state)
+    else
+      state=$(empty_state "$(new_salt)")
+    fi
+  else
+    private_dir "$STATE_DIR"
+    board_lock_acquire
+    trap board_lock_release EXIT
+    state=$(ensure_state)
+  fi
   state=$(printf '%s' "$state" | jq '
     .tasks |= with_entries(
       select((.value.origin // "firstmate") != "captain")

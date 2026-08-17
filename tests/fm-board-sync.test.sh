@@ -522,7 +522,7 @@ test_concurrent_reconcile_fails_closed() {
 }
 
 test_live_reconcile_lock_cannot_be_stolen() {
-  local fixture root home fakebin bearings board log holder output rc dead_pid
+  local fixture root home fakebin bearings board log holder output rc dead_pid first second winner loser attempts
   fixture=$(make_fixture)
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
   board="$root/board.json"
@@ -557,8 +557,76 @@ test_live_reconcile_lock_cannot_be_stolen() {
     > "$home/state/.board-sync.lock/owner"
   run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null \
     || fail "a lock whose recorded owner is confirmed dead must be reclaimed"
+
+  cat > "$fakebin/rm" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_BOARD_TEST_SLOW_OWNER_REMOVE:-0}" = 1 ]; then
+  for arg in "$@"; do
+    case "$arg" in
+      */.board-sync.lock/owner) sleep 0.2 ;;
+    esac
+  done
+fi
+exec /bin/rm "$@"
+SH
+  chmod +x "$fakebin/rm"
+  printf '%s\n%s\n' "$dead_pid" 'stale-process-identity' \
+    > "$home/state/.board-sync.lock/owner"
+  FM_BOARD_TEST_SLOW_OWNER_REMOVE=1 \
+    BEARINGS_BLOCK_READY="$root/first-ready" BEARINGS_BLOCK_RELEASE="$root/first-release" \
+    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile \
+    > "$root/first.out" 2> "$root/first.err" &
+  first=$!
+  FM_BOARD_TEST_SLOW_OWNER_REMOVE=1 \
+    BEARINGS_BLOCK_READY="$root/second-ready" BEARINGS_BLOCK_RELEASE="$root/second-release" \
+    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile \
+    > "$root/second.out" 2> "$root/second.err" &
+  second=$!
+  while [ ! -e "$root/first-ready" ] && [ ! -e "$root/second-ready" ]; do
+    kill -0 "$first" 2>/dev/null || kill -0 "$second" 2>/dev/null \
+      || fail "both stale-lock contenders exited before either acquired the lock"
+    sleep 0.05
+  done
+  sleep 0.4
+  if [ -e "$root/first-ready" ] && [ -e "$root/second-ready" ]; then
+    : > "$root/first-release"
+    : > "$root/second-release"
+    wait "$first" || true
+    wait "$second" || true
+    fail "competing stale-lock reclaimers must not both enter reconcile"
+  fi
+  if [ -e "$root/first-ready" ]; then
+    winner=$first
+    loser=$second
+  else
+    winner=$second
+    loser=$first
+  fi
+  attempts=0
+  while kill -0 "$loser" 2>/dev/null && [ "$attempts" -lt 60 ]; do
+    attempts=$((attempts + 1))
+    sleep 0.05
+  done
+  if kill -0 "$loser" 2>/dev/null; then
+    : > "$root/first-release"
+    : > "$root/second-release"
+    wait "$first" || true
+    wait "$second" || true
+    fail "the losing stale-lock reclaimer must fail while the winner still holds the lock"
+  fi
+  set +e
+  wait "$loser"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "one competing stale-lock reclaimer must fail closed"
+  if [ "$winner" -eq "$first" ]; then
+    : > "$root/first-release"
+  else
+    : > "$root/second-release"
+  fi
+  wait "$winner" || fail "the serialized stale-lock winner failed"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "live reconcile locks cannot be stolen and dead owners are reclaimed"
+  pass "live reconcile locks cannot be stolen and stale reclaimers serialize"
 }
 
 test_incomplete_lock_publication_never_wedges_reconcile() {
@@ -675,8 +743,10 @@ test_dry_run_has_complete_plan_and_no_mutations() {
   assert_not_contains "$(<"$log")" $'ARG\tPOST' "dry-run must not call issue create mutations"
   assert_not_contains "$(<"$log")" $'ARG\tPATCH' "dry-run must not call issue update mutations"
   assert_not_contains "$(<"$log")" 'mutation(' "dry-run must not call project mutations"
-  [ "$(jq '.tasks | length' "$home/state/board-sync.json")" -eq 0 ] \
-    || fail "dry-run must not mutate mapping state"
+  [ ! -e "$home/state/board-sync.json" ] \
+    || fail "dry-run must not initialize persistent mapping state"
+  [ ! -e "$home/state/.board-sync.lock" ] \
+    || fail "dry-run must not initialize a persistent reconcile lock"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "dry-run is complete but performs no GitHub or baseline mutations"
 }
