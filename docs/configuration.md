@@ -39,6 +39,9 @@ A normal reconcile refuses all writes unless repository privacy is confirmed at 
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
 Reconcile records the board state it just reported in `state/board-sync.seen`, so a proposal the fleet does not adopt stops waking every sweep while a genuinely new board move still does.
 Each reconcile recomputes the whole proposal list from the divergences it observes, so a proposal the fleet has adopted or the captain has undone drains out instead of accumulating forever.
+The one exception is a captain board move that reconcile itself erased by snapping the card back to the fleet column, which is marked `retained` and survives later reconciles until `bin/fm-board-sync.sh ack <signature>` retires it, because a card drag must never be discarded merely because the board now agrees again.
+Reconcile never performs that snapback without recording the move, including when it holds no agreed baseline for the card and reports the previous column as `null`.
+Every proposal carries a `subject` and at most one proposal is live per subject, so a newer observation supersedes the older one and the queue still cannot grow without bound.
 An excluded task that still holds a card is reported only while that card is genuinely still on the board, so the report retires by itself once the captain retracts the card.
 Reconcile also records a baseline column and issue state for every card the sync does not own, so a card added outside the sync counts as pending once and then only when it actually moves.
 That baseline records only the card state the run actually reported, so a foreign card changed or added inside the reconcile window stays un-baselined and still wakes firstmate on the next poll.
