@@ -44,8 +44,9 @@
 #
 # `poll` performs one paginated Projects v2 read, compares it with the baseline,
 # and prints only `board-sync N board change(s) pending` when a new change
-# signature appears.  That signature is derived from item identity, column, and
-# issue state only, never from a GitHub timestamp, so a bare touch stays quiet.
+# signature appears.  That signature is derived from item identity, column,
+# issue state, and archive state only, never from a GitHub timestamp, so a bare
+# touch stays quiet.
 #
 # `arm` creates state/board-watch.check.sh as a byte-static custom watcher check,
 # initializes state/board-sync.json when absent, and binds the check with
@@ -86,6 +87,7 @@ EXCLUDE_FILE="$CONFIG_DIR/board-exclude"
 STATE_FILE="$STATE_DIR/board-sync.json"
 SEEN_FILE="$STATE_DIR/board-sync.seen"
 LOCK_DIR="$STATE_DIR/.board-sync.lock"
+LOCK_FILE="$LOCK_DIR/owner"
 CHECK_ID='board-watch'
 CHECK_FILE="$STATE_DIR/$CHECK_ID.check.sh"
 TRUST_FILE="$STATE_DIR/$CHECK_ID.check-trust"
@@ -222,54 +224,80 @@ load_exclusions() {
   printf '%s\n' "$exclusions"
 }
 
+FM_BOARD_LOCK_OWNER_PID=
+FM_BOARD_LOCK_OWNER_IDENTITY=
+
+board_lock_read_owner() {
+  local extra
+  FM_BOARD_LOCK_OWNER_PID=
+  FM_BOARD_LOCK_OWNER_IDENTITY=
+  [ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] || return 1
+  exec 9< "$LOCK_FILE" || return 1
+  IFS= read -r FM_BOARD_LOCK_OWNER_PID <&9 \
+    || { exec 9<&-; return 1; }
+  IFS= read -r FM_BOARD_LOCK_OWNER_IDENTITY <&9 \
+    || { exec 9<&-; return 1; }
+  if IFS= read -r extra <&9; then
+    exec 9<&-
+    return 1
+  fi
+  exec 9<&-
+  case "$FM_BOARD_LOCK_OWNER_PID" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ -n "$FM_BOARD_LOCK_OWNER_IDENTITY" ]
+}
+
 board_lock_acquire() {
-  local tries=0 owner_pid owner_identity current_identity lock_pid lock_identity
-  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+  local tries=0 owner_pid owner_identity current_identity lock_pid lock_identity lock_temp
+  private_dir "$LOCK_DIR"
+  lock_pid=$(fm_current_pid)
+  lock_identity=$(fm_pid_identity "$lock_pid" 2>/dev/null) \
+    || die "cannot identify reconcile lock owner"
+  umask 077
+  lock_temp=$(mktemp "$LOCK_DIR/.owner.XXXXXX") \
+    || die "cannot create reconcile lock owner"
+  if ! printf '%s\n%s\n' "$lock_pid" "$lock_identity" > "$lock_temp" \
+    || ! chmod 0600 "$lock_temp"; then
+    rm -f -- "$lock_temp"
+    die "cannot record reconcile lock owner"
+  fi
+  while ! ln "$lock_temp" "$LOCK_FILE" 2>/dev/null; do
     tries=$((tries + 1))
     if [ "$tries" -ge 20 ]; then
-      owner_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-      owner_identity=$(cat "$LOCK_DIR/pid-identity" 2>/dev/null || true)
-      case "$owner_pid" in
-        ''|*[!0-9]*)
-          die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
-          ;;
-      esac
-      [ -n "$owner_identity" ] \
-        || die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
+      if ! board_lock_read_owner; then
+        rm -f -- "$lock_temp"
+        die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
+      fi
+      owner_pid=$FM_BOARD_LOCK_OWNER_PID
+      owner_identity=$FM_BOARD_LOCK_OWNER_IDENTITY
       if fm_pid_alive "$owner_pid"; then
         current_identity=$(fm_pid_identity "$owner_pid" 2>/dev/null) \
-          || die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"
-        [ "$current_identity" != "$owner_identity" ] \
-          || die "another fm-board-sync reconcile holds $LOCK_DIR; retry once it finishes"
+          || { rm -f -- "$lock_temp"; die "another fm-board-sync reconcile holds $LOCK_DIR with unverifiable ownership"; }
+        if [ "$current_identity" = "$owner_identity" ]; then
+          rm -f -- "$lock_temp"
+          die "another fm-board-sync reconcile holds $LOCK_DIR; retry once it finishes"
+        fi
       fi
-      rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
-      rmdir "$LOCK_DIR" 2>/dev/null || true
+      rm -f -- "$LOCK_FILE"
       tries=0
       continue
     fi
     sleep 0.05
   done
-  lock_pid=$(fm_current_pid)
-  lock_identity=$(fm_pid_identity "$lock_pid" 2>/dev/null) \
-    || { rmdir "$LOCK_DIR" 2>/dev/null || true; die "cannot identify reconcile lock owner"; }
-  if ! printf '%s\n' "$lock_pid" > "$LOCK_DIR/pid" \
-    || ! printf '%s\n' "$lock_identity" > "$LOCK_DIR/pid-identity"; then
-    rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
-    rmdir "$LOCK_DIR" 2>/dev/null || true
-    die "cannot record reconcile lock owner"
-  fi
+  rm -f -- "$lock_temp"
 }
 
 board_lock_release() {
   local owner_pid owner_identity current_pid current_identity
-  owner_pid=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-  owner_identity=$(cat "$LOCK_DIR/pid-identity" 2>/dev/null || true)
+  board_lock_read_owner || return 0
+  owner_pid=$FM_BOARD_LOCK_OWNER_PID
+  owner_identity=$FM_BOARD_LOCK_OWNER_IDENTITY
   current_pid=$(fm_current_pid)
   current_identity=$(fm_pid_identity "$current_pid" 2>/dev/null || true)
   [ "$owner_pid" = "$current_pid" ] && [ -n "$current_identity" ] \
     && [ "$owner_identity" = "$current_identity" ] || return 0
-  rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/pid-identity"
-  rmdir "$LOCK_DIR" 2>/dev/null || true
+  rm -f -- "$LOCK_FILE"
 }
 
 repo_is_private() {

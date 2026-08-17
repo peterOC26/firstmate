@@ -507,10 +507,12 @@ test_concurrent_reconcile_fails_closed() {
   write_board "$board" '[]'
   write_bearings "${bearings}.json" Ready
   mkdir -p "$home/state/.board-sync.lock"
+  printf '%s\n' 'unverifiable-owner' > "$home/state/.board-sync.lock/owner"
   set +e
   output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
   rc=$?
   set -e
+  rm "$home/state/.board-sync.lock/owner"
   rmdir "$home/state/.board-sync.lock"
   [ "$rc" -ne 0 ] || fail "a held reconcile lock must refuse the second run"
   assert_contains "$output" 'holds' "a held lock should be explained"
@@ -550,13 +552,31 @@ test_live_reconcile_lock_cannot_be_stolen() {
   while kill -0 "$dead_pid" 2>/dev/null; do
     dead_pid=$((dead_pid + 1))
   done
-  mkdir "$home/state/.board-sync.lock"
-  printf '%s\n' "$dead_pid" > "$home/state/.board-sync.lock/pid"
-  printf '%s\n' 'stale-process-identity' > "$home/state/.board-sync.lock/pid-identity"
+  mkdir -p "$home/state/.board-sync.lock"
+  printf '%s\n%s\n' "$dead_pid" 'stale-process-identity' \
+    > "$home/state/.board-sync.lock/owner"
   run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null \
     || fail "a lock whose recorded owner is confirmed dead must be reclaimed"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "live reconcile locks cannot be stolen and dead owners are reclaimed"
+}
+
+test_incomplete_lock_publication_never_wedges_reconcile() {
+  local fixture root home fakebin bearings board log
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Ready
+  mkdir -p "$home/state/.board-sync.lock"
+  printf '%s\n' 'incomplete-owner' > "$home/state/.board-sync.lock/.owner.interrupted"
+  run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile >/dev/null \
+    || fail "an interrupted lock publication must not wedge later reconciles"
+  [ ! -e "$home/state/.board-sync.lock/owner" ] \
+    || fail "a completed reconcile must release its atomically published owner claim"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "an interrupted lock publication leaves no ownership claim to wedge later runs"
 }
 
 test_pending_create_recovers_without_duplicating() {
@@ -1911,6 +1931,7 @@ test_untitled_task_never_publishes_runtime_detail
 test_excluded_task_with_a_live_card_is_reported
 test_concurrent_reconcile_fails_closed
 test_live_reconcile_lock_cannot_be_stolen
+test_incomplete_lock_publication_never_wedges_reconcile
 test_pending_create_recovers_without_duplicating
 test_private_repo_is_a_hard_gate
 test_private_repo_is_revalidated_at_the_mutation_boundary

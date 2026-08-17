@@ -32,7 +32,7 @@ The local gitignored `config/board-exclude` file contains one task id per line, 
 That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
 Reconcile refuses every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
 An excluded task that still holds a live card is escalated rather than retracted, because retracting a card stays a manual captain decision.
-A single reconcile runs at a time, guarded by an identity-owned `state/.board-sync.lock` that a live or unverifiable owner cannot lose to elapsed time, so overlapping runs cannot mint duplicate issues for one task.
+A single reconcile runs at a time, guarded by an atomically published identity-owned claim under `state/.board-sync.lock` that a live or unverifiable owner cannot lose to elapsed time, so overlapping runs cannot mint duplicate issues for one task.
 Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or baseline state.
 A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
@@ -50,7 +50,7 @@ Retirement forgets only the local mapping and never touches the board, and a tas
 A card the captain archives under a task the fleet still owns keeps its mapping instead, and its observed archived state, column, and issue state are recorded independently of the fleet column, so it reports once and stays quiet until one of those board facts changes again.
 Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card the captain removes and re-adds by hand cannot wedge later runs against a stale item id.
 `poll` reads only the board and emits a compact pointer when live board state differs from the last-agreed baseline, so the existing watcher can wake firstmate without placing a lossy payload in the wake record.
-That comparison uses item identity, column, and issue state only and never a GitHub timestamp, so a bare touch on a card stays quiet.
+That comparison uses item identity, column, issue state, and archive state only and never a GitHub timestamp, so a bare touch on a card stays quiet.
 Reconcile records the board state it just reported in `state/board-sync.seen`, so a board change the fleet does not apply stops waking every sweep while a genuinely new board move still does.
 Reconcile also records a baseline column and issue state for every card the sync does not own, so a card added outside the sync counts as pending once and then only when it actually moves.
 That baseline records only the card state the run actually reported, so a foreign card changed or added inside the reconcile window stays un-baselined and still wakes firstmate on the next poll.
