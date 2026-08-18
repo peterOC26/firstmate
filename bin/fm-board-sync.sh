@@ -69,12 +69,14 @@
 # before the sync ever mapped it has no mapping, so it is reported as an
 # ordinary unmanaged card and still left untouched.
 #
-# GitHub writes fail closed unless the configured repository is confirmed
-# private immediately before each GitHub mutation.  Issue bodies are built from
-# an allowlist only: optional project/kind labels and an HTTPS PR URL.  Issue
-# titles come only from the structured backlog title, falling back to an opaque
-# short label, never to a runtime summary.  Free-form detail, holds, paths,
-# runtime metadata, and task ids never enter a GitHub title/body mutation.
+# GitHub writes fail closed unless the repository a write targets - a task's
+# own mapped repository, or the configured one when creating its first issue -
+# is confirmed private immediately before that GitHub mutation.  Issue bodies
+# are built from an allowlist only: optional project/kind labels and an HTTPS PR
+# URL.  Issue titles come only from the structured backlog title, falling back
+# to an opaque short label, never to a runtime summary.  Free-form detail,
+# holds, paths, runtime metadata, and task ids never enter a GitHub title/body
+# mutation.
 # The label salt is a stable hash of the effective home and exact board config,
 # so the same task keeps the same opaque label across runs without persisting
 # anything.
