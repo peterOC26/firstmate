@@ -13,7 +13,7 @@ The focused behavior command is:
 bin/fm-test-run.sh tests/fm-board-sync.test.sh
 ```
 
-Its thirty-four behavioral cases prove custom-check arm, status, and disarm with trust-binding verification, withdrawal of a check whose trust binding fails, allowlisted issue bodies that reject credential-bearing artifacts, exclusion-file enforcement in both reconcile and poll, opaque titles for tasks with no structured title, identity-owned single-instance reconcile locking that preserves live owners, serializes competing stale-owner reclaimers, reclaims dead ones, and cannot be wedged by an interrupted claim publication, private-repository refusal at startup and again immediately before mutation, mutation-free dry runs for both new and already-mapped tasks, a dry-run plan that matches the real operation list field for field, persisted state that holds only the task mapping, pointer-only poll deduplication, a card off its fleet column that is noted and pushed back, a cleared Status that is noted and restored, a card removed from the board that is noted and restored at its fleet column, an archived card that is reported and never written, unarchived, or deleted, a closed issue that is reported and never reopened, an excluded task that receives no card, no write, and no note, an unmanaged card that is reported and left untouched, a separate canonical card created beside a same-title hand-filed issue and beside a manual draft, a card re-added under a new board item id that reconciles and rebinds instead of wedging, a board read that survives an all-digit GitHub login, an already-reported board difference that stops re-waking the watcher while a new one still wakes it, board moves, archives, issue closes, and unmanaged-card changes landing inside the reconcile window that are never silently absorbed, a bare GitHub touch that never re-wakes the poll, and notes that report only what the run actually observes.
+Its thirty-five behavioral cases prove custom-check arm, status, and disarm with trust-binding verification, withdrawal of a check whose trust binding fails, allowlisted issue bodies that reject credential-bearing artifacts, exclusion-file enforcement in both reconcile and poll, opaque titles for tasks with no structured title, identity-owned single-instance reconcile locking that blocks a second run while a live owner holds the lock, serializes competing stale-owner reclaimers, reclaims dead ones, and cannot be wedged by an interrupted claim publication, private-repository refusal at startup and again immediately before mutation, mutation-free dry runs for both new and already-mapped tasks, a dry-run plan that matches the real operation list field for field, persisted state that holds only the task mapping, pointer-only poll deduplication, a card off its fleet column that is noted and pushed back, a cleared Status that is noted and restored, a card removed from the board that is noted and restored at its fleet column, an archived card that is reported and never written, unarchived, or deleted, a closed issue that is reported and never reopened, an excluded task that receives no card, no write, and no note, an unmanaged card that is reported and left untouched, a separate canonical card created beside a same-title hand-filed issue and beside a manual draft, a card re-added under a new board item id that reconciles and rebinds instead of wedging, issue writes that follow the repository a task's own mapping records rather than a reconfigured one, a board read that survives an all-digit GitHub login, an already-reported board difference that stops re-waking the watcher while a new one still wakes it, board moves, archives, issue closes, and unmanaged-card changes landing inside the reconcile window that are never silently absorbed, a bare GitHub touch that never re-wakes the poll, and notes that report only what the run actually observes.
 
 The suite asserts the reduced contract directly.
 `test_state_holds_only_the_task_mapping` pins the persisted state and `status` keys, so no baseline, pending, orphan, retirement, or correlation-token field can return unnoticed.
@@ -26,15 +26,16 @@ A missing, empty, unreadable, or symlinked `config/board-exclude` is a separate 
 A task carrying only free-form runtime detail is a second negative case whose issue title must degrade to the opaque label rather than that detail.
 The fake GitHub boundary rejects a numeric-looking `owner` sent as a typed GraphQL variable exactly as the real API type checker would, so the all-digit login case exercises the coercion rather than asserting the flag.
 
-Three guarantees were confirmed to fail when their implementation was neutralized on this revision, so they do not pass vacuously.
+Four guarantees were confirmed to fail when their implementation was neutralized on this revision, so they do not pass vacuously.
 Dropping the intersection that keeps only notes the run both reported and still observed failed `a board move landing inside the reconcile window must still wake firstmate`.
 Removing the skip that leaves an archived card alone failed `an archived card must produce one note and no operation at all`.
 Removing the exclusion filter from the push loop failed `excluded task title must never reach GitHub (unexpected: 'CROWN_JEWELS')`.
+Sending issue writes to the configured repository instead of the one a task's mapping records failed `issue writes must target the repository the mapping records (missing: 'repos/captain/legacy/issues/1')`.
 
 The exact focused result for this revision is:
 
 ```text
-board-sync tests: 34 passed
+board-sync tests: 35 passed
 ```
 
 The affected projection, documentation, and runner surfaces were exercised together with:
@@ -55,7 +56,7 @@ Pinned lint and documentation classification returned:
 
 ```text
 fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
-fm-doc-audience-check: ok surfaces=68 local_links=219
+fm-doc-audience-check: ok surfaces=68 local_links=220
 ```
 
 Refresh shell syntax, lint, documentation classification, and changed-surface evidence with:

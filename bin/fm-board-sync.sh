@@ -36,9 +36,13 @@
 # Writes always target the board item the run actually resolved, and the
 # resolved item id is persisted as soon as it differs from the recorded one, so
 # a card the captain removes and re-adds by hand cannot wedge later runs against
-# a stale id.  A run interrupted between creating an issue and recording its
-# mapping leaves that issue behind; the next run creates the canonical card
-# again and reports the leftover as an unmanaged card rather than adopting it.
+# a stale id.  A mapped task is reached only through its own recorded mapping,
+# so every write for it targets the repository that mapping records; the
+# configured repository is used only to create a new canonical issue for a task
+# that has no mapping yet.  A run interrupted between creating an issue and
+# recording its mapping leaves that issue behind; the next run creates the
+# canonical card again and reports the leftover as an unmanaged card rather than
+# adopting it.
 #
 # `poll` performs one paginated Projects v2 read, derives the same notes, and
 # prints only `board-sync N board change(s) pending` when the note set changes.
@@ -55,9 +59,11 @@
 # config/board-exclude is one task id per line with blank lines and `#` comments
 # ignored.  That captain-owned local file is the only source of excluded ids;
 # reconcile and poll refuse every GitHub call unless it is a readable regular
-# file that yields at least one id.  An excluded task is left out of the push
-# entirely: no card is created for it, and any card it already has is neither
-# written to nor reported as unmanaged.
+# file that yields at least one id.  An excluded task is never pushed and never
+# gets a card, and a card this sync has already mapped for it is never written
+# to and never reported as unmanaged.  A hand-filed card for a task excluded
+# before the sync ever mapped it has no mapping, so it is reported as an
+# ordinary unmanaged card and still left untouched.
 #
 # GitHub writes fail closed unless the configured repository is confirmed
 # private immediately before each GitHub mutation.  Issue bodies are built from
@@ -609,7 +615,7 @@ reconcile() {
   local dry_run=0 config exclusions state owner number repo board snapshot metadata desired
   local project_id field_id options operations='[]' escalations excluded
   local item task_id title column body mapping live theirs issue_state
-  local live_item_id
+  local live_item_id mapped_repo
   local issue issue_number issue_id issue_url item_id option_id operation
   local created add_result post_board updated_state residual post_notes
   if [ "${1:-}" = --dry-run ]; then
@@ -661,7 +667,8 @@ reconcile() {
     mapping=$(printf '%s' "$updated_state" | jq -c --arg id "$task_id" '.tasks[$id] // null')
     item_id=$(printf '%s' "$mapping" | jq -r '.item_id // empty')
     issue_number=$(printf '%s' "$mapping" | jq -r '.issue_number // empty')
-    live=$(find_live_item "$board" "$item_id" "$issue_number" "$repo")
+    mapped_repo=$(printf '%s' "$mapping" | jq -r '.repo // empty')
+    live=$(find_live_item "$board" "$item_id" "$issue_number" "$mapped_repo")
     if [ "$live" != null ] && [ "$(printf '%s' "$live" | jq -r '.isArchived')" = true ]; then
       continue
     fi
@@ -713,6 +720,7 @@ reconcile() {
 
     issue_number=$(printf '%s' "$mapping" | jq -er '.issue_number')
     item_id=$(printf '%s' "$mapping" | jq -er '.item_id')
+    mapped_repo=$(printf '%s' "$mapping" | jq -er '.repo')
     if [ "$live" != null ]; then
       live_item_id=$(printf '%s' "$live" | jq -r '.id // empty')
       if [ -n "$live_item_id" ] && [ "$live_item_id" != "$item_id" ]; then
@@ -727,7 +735,7 @@ reconcile() {
     if [ "$live" = null ]; then
       issue_id=$(printf '%s' "$mapping" | jq -er '.issue_id')
       if [ "$dry_run" = 0 ]; then
-        add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot restore project item"
+        add_result=$(project_add_item "$mapped_repo" "$project_id" "$issue_id") || die "cannot restore project item"
         item_id=$(printf '%s' "$add_result" | jq -er '.data.addProjectV2ItemById.item.id') \
           || die "GitHub project add returned invalid data"
         updated_state=$(printf '%s' "$updated_state" | jq --arg id "$task_id" --arg item_id "$item_id" \
@@ -745,7 +753,7 @@ reconcile() {
       if [ "$(printf '%s' "$live" | jq -r '.content.title // empty')" != "$title" ] ||
         [ "$(printf '%s' "$live" | jq -r '.content.body // empty')" != "$body" ]; then
         if [ "$dry_run" = 0 ]; then
-          issue_update "$repo" "$issue_number" "$title" "$body" >/dev/null \
+          issue_update "$mapped_repo" "$issue_number" "$title" "$body" >/dev/null \
             || die "cannot update board issue"
         fi
         operation=$(jq -n --arg action update_issue --arg task_id "$task_id" \
@@ -755,7 +763,7 @@ reconcile() {
     fi
     if [ "$theirs" != "$column" ]; then
       if [ "$dry_run" = 0 ]; then
-        project_set_column "$repo" "$project_id" "$item_id" "$field_id" "$option_id" >/dev/null \
+        project_set_column "$mapped_repo" "$project_id" "$item_id" "$field_id" "$option_id" >/dev/null \
           || die "cannot set project Status"
       fi
       operation=$(jq -n --arg action set_column --arg task_id "$task_id" --arg column "$column" \
@@ -765,7 +773,7 @@ reconcile() {
     fi
     if [ "$column" = Done ] && [ "$issue_state" = OPEN ]; then
       if [ "$dry_run" = 0 ]; then
-        issue_close "$repo" "$issue_number" >/dev/null || die "cannot close completed board issue"
+        issue_close "$mapped_repo" "$issue_number" >/dev/null || die "cannot close completed board issue"
       fi
       operation=$(jq -n --arg action close_issue --arg task_id "$task_id" \
         '{action:$action,task_id:$task_id}')

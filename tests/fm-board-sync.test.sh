@@ -50,6 +50,10 @@ if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
   printf '%s\n' "$visibility"
   exit 0
 fi
+if [ "${1:-}" = api ] && [ -n "${GH_REPO_MAPPED:-}" ] && [ "${2:-}" = "repos/$GH_REPO_MAPPED" ]; then
+  printf '%s\n' 'true'
+  exit 0
+fi
 if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
   case "$*" in
     *'query=query('* )
@@ -342,7 +346,7 @@ run_sync() {
     FM_BOARD_FLEET_SNAPSHOT="${bearings%/bearings}/fleet-snapshot" \
     BOARD_FIXTURE="$board" BEARINGS_FIXTURE="${bearings}.json" \
     FLEET_FIXTURE="${bearings}.json.fleet" GH_LOG="$log" \
-    GH_REPO="${GH_REPO:-captain/fleet}" \
+    GH_REPO="${GH_REPO:-captain/fleet}" GH_REPO_MAPPED="${GH_REPO_MAPPED:-}" \
     BOARD_FIXTURE_AFTER="${BOARD_FIXTURE_AFTER:-}" "$SCRIPT" "$@"
 }
 
@@ -552,7 +556,7 @@ test_concurrent_reconcile_fails_closed() {
   pass "overlapping reconciles fail closed instead of minting duplicate issues"
 }
 
-test_live_reconcile_lock_cannot_be_stolen() {
+test_live_lock_owner_blocks_a_second_reconcile() {
   local fixture root home fakebin bearings board log holder output rc dead_pid first second winner loser attempts
   fixture=$(make_fixture)
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
@@ -569,11 +573,10 @@ test_live_reconcile_lock_cannot_be_stolen() {
     sleep 0.05
   done
   set +e
-  output=$(FM_BOARD_LOCK_STALE_SECS=0 \
-    run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
   rc=$?
   set -e
-  [ "$rc" -ne 0 ] || fail "elapsed time must never let a second reconcile steal a live lock"
+  [ "$rc" -ne 0 ] || fail "a second reconcile must fail closed while a live owner holds the lock"
   assert_contains "$output" 'another fm-board-sync reconcile holds' \
     "a live lock owner should be reported explicitly"
   : > "$root/holder-release"
@@ -657,7 +660,7 @@ SH
   fi
   wait "$winner" || fail "the serialized stale-lock winner failed"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "live reconcile locks cannot be stolen and stale reclaimers serialize"
+  pass "a live lock owner blocks a second reconcile, a dead owner is reclaimed, and reclaimers serialize"
 }
 
 test_incomplete_lock_publication_never_wedges_reconcile() {
@@ -1120,6 +1123,35 @@ test_reAdded_card_under_a_new_item_id_still_reconciles() {
   pass "a card re-added under a new item id reconciles and rebinds instead of wedging"
 }
 
+test_issue_writes_follow_the_recorded_mapping_repository() {
+  local fixture root home fakebin bearings board log output
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Done
+  # The card was mapped while `repo` still pointed at captain/legacy; issue 1 of
+  # the newly configured captain/fleet is an unrelated issue that shares its number.
+  write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Done OPEN false \
+    2026-08-16T10:00:00Z captain/legacy | jq '.content.title = "Drifted card title"')" '[$card]')"
+  write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE safe-task-internal-id 1 captain/legacy)"
+  GH_REPO_MAPPED=captain/legacy
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  unset GH_REPO_MAPPED
+  printf '%s' "$output" | jq -e '
+    (.operations | any(.action == "update_issue" and .task_id == "safe-task-internal-id"))
+    and (.operations | any(.action == "close_issue" and .task_id == "safe-task-internal-id"))
+  ' >/dev/null || fail "a mapped card must still be pushed back into step and closed at Done"
+  assert_contains "$(<"$log")" 'repos/captain/legacy/issues/1' \
+    "issue writes must target the repository the mapping records"
+  assert_not_contains "$(<"$log")" 'repos/captain/fleet/issues/1' \
+    "no issue write may reach the configured repository with the mapping's issue number"
+  assert_contains "$(<"$log")" 'repos/captain/legacy' \
+    "the privacy gate must run against the repository each mutation actually targets"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "issue writes follow the recorded mapping repository, never the reconfigured one"
+}
+
 test_all_digit_owner_still_reads_the_board() {
   local fixture root home fakebin bearings board log output rc
   fixture=$(make_fixture)
@@ -1322,7 +1354,7 @@ test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail
 test_concurrent_reconcile_fails_closed
-test_live_reconcile_lock_cannot_be_stolen
+test_live_lock_owner_blocks_a_second_reconcile
 test_incomplete_lock_publication_never_wedges_reconcile
 test_private_repo_is_a_hard_gate
 test_private_repo_is_revalidated_at_the_mutation_boundary
@@ -1341,6 +1373,7 @@ test_unmanaged_card_is_noted_and_left_untouched
 test_hand_filed_card_never_binds_to_a_fleet_task
 test_draft_card_is_left_manual_while_canonical_card_is_created
 test_reAdded_card_under_a_new_item_id_still_reconciles
+test_issue_writes_follow_the_recorded_mapping_repository
 test_all_digit_owner_still_reads_the_board
 test_reported_board_state_stops_rewaking_the_watcher
 test_board_move_during_reconcile_is_never_silently_suppressed
