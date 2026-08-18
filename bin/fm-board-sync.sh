@@ -8,48 +8,45 @@
 #   fm-board-sync.sh disarm
 #   fm-board-sync.sh status
 #
-# `reconcile` reads every fleet column from fm-bearings-snapshot.sh and mirrors
-# those columns to real issues in the configured private board repository.
-# It uses state/board-sync.json as the task mapping and last-agreed baseline.
-# This script never writes fleet state, dispatches work, closes backlog items,
-# merges, or tears down.
+# The sync is one-directional plus notifications.
 #
-# A board card with no mapping is left untouched and reported once as a
-# captain-intent request.  Every fleet task has a separate Firstmate-managed
-# canonical issue and card.  Token recovery rebinds only an issue whose title
-# and body exactly match the Firstmate-generated allowlisted shape.
+# `reconcile` reads every fleet column from fm-bearings-snapshot.sh and pushes
+# those columns onto real issues in the configured private board repository.  It
+# creates a canonical card for every fleet task the sync owns, restores a card
+# that left the board, keeps that card's allowlisted title and body in step,
+# sets the card's column to its own task's fleet column, and closes the issue
+# once that task reaches Done.  Every applied change is listed under
+# `operations`.
 #
-# Every other board-side change becomes exactly one line in `escalations`,
-# emitted by the same run that observed it and whether or not that run also set
-# the card back to the fleet column; every run reports only what it sees.
-# A cleared Status, a card removed from the board, an issue the captain closed,
-# a column move, and a card with no agreed baseline each produce exactly one such
-# line.  An archived card produces one archive line for the complete observation,
-# with simultaneous column and issue-state details folded into that line.
+# The sync never reads board state back into the fleet.  It never observes,
+# owns, retires, or acts on captain-made board or issue state, never writes
+# fleet state, dispatches work, closes backlog items, merges, or tears down, and
+# never deletes, archives, or unarchives a card.  state/board-sync.json holds
+# only the task-to-issue mapping the push needs.
 #
-# A mapping is retired once the sync no longer owns the task, meaning the task is
-# excluded or gone from the fleet, and no live card is left for it.  Retirement
-# only forgets the local mapping; no card is ever deleted, archived, or
-# unarchived.  A card the captain archives under a task the fleet still owns keeps
-# its mapping, and the observed archived state is recorded independently of its
-# fleet column, so it reports once and stays quiet until it changes again.
+# Board facts that do not match fleet state become one-line informational notes
+# under `escalations`, each a plain `board changed: ...` observation of what the
+# run saw when it read the board.  A note is a report, never an instruction and
+# never an action, and it carries no attribution because a board read cannot
+# tell who made a change.  An archived card, an issue closed while the fleet
+# holds a non-Done column, and a card the sync does not manage are reported and
+# then left exactly as they are.  Every run reports what it observes, so a note
+# repeats while its board fact persists and stops once the fact is gone.
 #
-# Writes always target the board item the run actually resolved, and the resolved
-# item id is persisted as soon as it differs from the recorded one, so a card the
-# captain removes and re-adds by hand cannot wedge later runs against a stale id.
+# Writes always target the board item the run actually resolved, and the
+# resolved item id is persisted as soon as it differs from the recorded one, so
+# a card the captain removes and re-adds by hand cannot wedge later runs against
+# a stale id.  A run interrupted between creating an issue and recording its
+# mapping leaves that issue behind; the next run creates the canonical card
+# again and reports the leftover as an unmanaged card rather than adopting it.
 #
-# Fleet state wins the card.  A run that overrides a column the captain changed
-# says so, while an ordinary forward write to a card still holding the last
-# agreed column is not a snapback and is not described as one.
+# `poll` performs one paginated Projects v2 read, derives the same notes, and
+# prints only `board-sync N board change(s) pending` when the note set changes.
+# The signature is derived from the note text alone, never from a GitHub
+# timestamp, so a bare touch stays quiet.
 #
-# `poll` performs one paginated Projects v2 read, compares it with the baseline,
-# and prints only `board-sync N board change(s) pending` when a new change
-# signature appears.  That signature is derived from item identity, column,
-# issue state, and archive state only, never from a GitHub timestamp, so a bare
-# touch stays quiet.
-#
-# `arm` creates state/board-watch.check.sh as a byte-static custom watcher check,
-# initializes state/board-sync.json when absent, and binds the check with
+# `arm` creates state/board-watch.check.sh as a byte-static custom watcher
+# check, initializes state/board-sync.json when absent, and binds the check with
 # fm-check-register.sh.  The existing watcher sweep remains the only poller.
 # `disarm` removes only that check and its trust binding.
 #
@@ -57,19 +54,20 @@
 #   {"owner":"LOGIN","project_number":1,"repo":"OWNER/REPO"}
 # config/board-exclude is one task id per line with blank lines and `#` comments
 # ignored.  That captain-owned local file is the only source of excluded ids;
-# reconcile refuses every GitHub call unless it is a readable regular file that
-# yields at least one id.  An excluded task that still holds a live card is
-# escalated, because this script never deletes or archives a card.
+# reconcile and poll refuse every GitHub call unless it is a readable regular
+# file that yields at least one id.  An excluded task is left out of the push
+# entirely: no card is created for it, and any card it already has is neither
+# written to nor reported as unmanaged.
 #
 # GitHub writes fail closed unless the configured repository is confirmed
-# private immediately before each GitHub mutation.  Issue bodies are built from an
-# allowlist only: optional project/kind labels, an HTTPS PR URL, and the opaque
-# correlation token.  Issue titles come only from the structured backlog title,
-# falling back to the opaque token, never to a runtime summary.  Free-form
-# detail, holds, paths, runtime metadata, and task ids never enter a GitHub
-# title/body mutation.
-# The token salt is a stable hash of the effective home and exact board config,
-# so losing volatile state in the same home still permits token-based recovery.
+# private immediately before each GitHub mutation.  Issue bodies are built from
+# an allowlist only: optional project/kind labels and an HTTPS PR URL.  Issue
+# titles come only from the structured backlog title, falling back to an opaque
+# short label, never to a runtime summary.  Free-form detail, holds, paths,
+# runtime metadata, and task ids never enter a GitHub title/body mutation.
+# The label salt is a stable hash of the effective home and exact board config,
+# so the same task keeps the same opaque label across runs without persisting
+# anything.
 #
 # Environment overrides used by tests and isolated homes:
 #   FM_ROOT_OVERRIDE, FM_HOME, FM_CONFIG_OVERRIDE, FM_STATE_OVERRIDE,
@@ -145,33 +143,26 @@ write_json_atomic() {
   mv -f -- "$tmp" "$destination" || { rm -f -- "$tmp"; die "cannot replace $destination"; }
 }
 
-new_salt() {
+label_salt() {
   local config seed
-  config=$(jq -cS . "$CONFIG_FILE") || die "cannot derive board token salt"
+  config=$(jq -cS . "$CONFIG_FILE") || die "cannot derive board label salt"
   seed="fm-board-sync.v1:$FM_HOME:$config"
   sha256_text "$seed" | cut -c1-32
 }
 
 empty_state() {
-  local salt=$1
-  jq -n --arg salt "$salt" '{
+  jq -n '{
     schema:"fm-board-sync.v1",
-    salt:$salt,
     project:{},
     synced_at:null,
-    tasks:{},
-    unmapped_items:{},
-    pending:[],
-    excluded_reported:[]
+    tasks:{}
   }'
 }
 
 ensure_state() {
-  local state
   private_dir "$STATE_DIR"
   if [ ! -e "$STATE_FILE" ]; then
-    state=$(empty_state "$(new_salt)")
-    write_json_atomic "$STATE_FILE" "$state"
+    write_json_atomic "$STATE_FILE" "$(empty_state)"
   fi
   load_state
 }
@@ -183,12 +174,8 @@ load_state() {
   printf '%s' "$state" | jq -e '
     type == "object"
     and .schema == "fm-board-sync.v1"
-    and (.salt | type == "string" and test("^[0-9a-f]{32}$"))
     and (.project | type == "object")
     and (.tasks | type == "object")
-    and (.unmapped_items | type == "object")
-    and (.pending | type == "array")
-    and (.excluded_reported | type == "array")
   ' >/dev/null || die "invalid state/board-sync.json"
   printf '%s\n' "$state"
 }
@@ -231,7 +218,6 @@ FM_BOARD_LOCK_OWNER_PID=
 FM_BOARD_LOCK_OWNER_IDENTITY=
 
 board_lock_read_owner() {
-  local extra
   FM_BOARD_LOCK_OWNER_PID=
   FM_BOARD_LOCK_OWNER_IDENTITY=
   [ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] || return 1
@@ -240,7 +226,7 @@ board_lock_read_owner() {
     || { exec 9<&-; return 1; }
   IFS= read -r FM_BOARD_LOCK_OWNER_IDENTITY <&9 \
     || { exec 9<&-; return 1; }
-  if IFS= read -r extra <&9; then
+  if IFS= read -r <&9; then
     exec 9<&-
     return 1
   fi
@@ -434,7 +420,7 @@ fleet_metadata_snapshot() {
 }
 
 desired_items() {
-  local snapshot=$1 metadata=$2 salt=$3 exclusions=$4 base task_id token item
+  local snapshot=$1 metadata=$2 salt=$3 exclusions=$4 base task_id label item
   base=$(jq -n --argjson root "$snapshot" --argjson metadata "$metadata" '
     def valid_pr_url:
       type == "string"
@@ -469,21 +455,20 @@ desired_items() {
   ' >/dev/null || die "bearings snapshot does not provide the six canonical columns"
   while IFS= read -r item; do
     task_id=$(printf '%s' "$item" | jq -er '.id')
-    token=$(sha256_text "$task_id$salt" | cut -c1-8)
-    item=$(printf '%s' "$item" | jq --arg token "$token" --argjson exclusions "$exclusions" '
+    label=$(sha256_text "$task_id$salt" | cut -c1-8)
+    item=$(printf '%s' "$item" | jq --arg label "$label" --argjson exclusions "$exclusions" '
       . as $item
       | $item + {
-        token:$token,
+        label:$label,
         excluded:($exclusions | index($item.id) != null)
       }
       | .title = (if (.title | type) == "string" and (.title | length) > 0
                   then .title
-                  else "Fleet task " + .token end)
+                  else "Fleet task " + .label end)
       | .body = ([
           (if .project then "project: " + .project else empty end),
           (if .kind then "kind: " + .kind else empty end),
-          (if .pr_url then "PR: " + .pr_url else empty end),
-          "<!-- fm-task: " + .token + " -->"
+          (if .pr_url then "PR: " + .pr_url else empty end)
         ] | join("\n"))
     ')
     printf '%s\n' "$item"
@@ -500,75 +485,65 @@ find_live_item() {
   '
 }
 
-find_issue_by_token() {
-  local repo=$1 token=$2 title=$3 body=$4 result
-  result=$(gh api --method GET "search/issues" -f q="repo:$repo $token in:body" -f per_page=2) \
-    || die "cannot search board issue tokens"
-  printf '%s' "$result" | jq --arg repo "$repo" --arg title "$title" --arg body "$body" '
-    [.items[]
-     | select(.repository_url | endswith("/repos/" + $repo))
-     | select(.title == $title and (.body // "") == $body)]
-    | if length > 1 then error("duplicate correlation token") else .[0] // null end
-  ' || die "duplicate or invalid board issue token result"
-}
-
-resolve_pending_issue() {
-  local repo=$1 token=$2 title=$3 body=$4 result
-  result=$(gh api --method GET "repos/$repo/issues" -f state=all -f per_page=100 \
-    -f sort=created -f direction=desc) || die "cannot list board issues for pending recovery"
-  printf '%s' "$result" | jq --arg token "$token" --arg title "$title" --arg body "$body" '
-    [.[]
-     | select(((.body // "") | contains("<!-- fm-task: " + $token + " -->")))
-     | select(.title == $title and (.body // "") == $body)]
-    | if length > 1 then error("duplicate correlation token") else .[0] // null end
-  ' || die "duplicate or invalid pending board issue result"
-}
-
-board_changes() {
-  local state=$1 board=$2
-  jq -n --argjson state "$state" --argjson board "$board" '
-    ([ $state.tasks | to_entries[] as $mapped
-       | ([$board.items[] | select(.id == $mapped.value.item_id)][0] // null) as $item
-       | (if $item == null then {column:null,issue_state:null,archived:false}
-          else {column:($item.fieldValueByName.name // null),
-                issue_state:($item.content.state // null),
-                archived:($item.isArchived == true)} end) as $observed
-       | select($observed.column != ($mapped.value.baseline.column // null) or
-                $observed.issue_state != ($mapped.value.baseline.issue_state // null) or
-                $observed.archived != ($mapped.value.baseline.archived // false))
-       | {type:"mapped_change",task_id:$mapped.key,item_id:$mapped.value.item_id,
-          column:$observed.column,
-          issue_state:$observed.issue_state,
-          archived:$observed.archived} ]
-     +
-     [ $board.items[] as $live
-       | $live
-       | select(.isArchived == false)
-       | select(([ $state.tasks[].item_id ] | index($live.id)) == null)
-       | (($state.unmapped_items // {})[$live.id] // null) as $baseline
-       | select($baseline == null or
-                (($live.fieldValueByName.name // null) != ($baseline.baseline_column // null)) or
-                (($live.content.state // null) != ($baseline.baseline_issue_state // null)))
-       | {type:"unmapped_item",item_id:.id,
-          column:(.fieldValueByName.name // null),
-          issue_state:(.content.state // null)} ])
-    | unique_by([.type,.item_id])
-  '
+# Single owner of the informational note set.  Notes are derived only from the
+# board read and the current fleet columns, never from stored board history, so
+# they state what is true now and claim nothing about who made it true.
+board_notes() {
+  local state=$1 board=$2 desired=$3
+  jq -n --argjson state "$state" --argjson board "$board" --argjson desired "$desired" '
+    def owned_item($mapping):
+      [ $board.items[]
+        | select((.id == ($mapping.item_id // "") and ($mapping.item_id // "") != "")
+                 or (.content.__typename == "Issue"
+                     and .content.number == ($mapping.issue_number // -1)
+                     and .content.repository.nameWithOwner == ($mapping.repo // ""))) ][0] // null;
+    def is_mapped($item):
+      [ $state.tasks[]
+        | select((.item_id // "") == $item.id
+                 or (.issue_number == ($item.content.number // -1)
+                     and (.repo // "") == ($item.content.repository.nameWithOwner // ""))) ]
+      | length > 0;
+    ([ $desired[]
+       | select(.excluded == false)
+       | . as $want
+       | ($state.tasks[$want.id] // null) as $mapping
+       | select($mapping != null)
+       | owned_item($mapping) as $item
+       | if $item == null then
+           ["board changed: task \($want.id) has no card on the board while the fleet says \"\($want.column)\"."]
+         elif $item.isArchived == true then
+           ["board changed: task \($want.id) has an archived card while the fleet says \"\($want.column)\"."]
+         else
+           (if ($item.fieldValueByName.name // null) != $want.column then
+              ["board changed: task \($want.id) card is in \"\($item.fieldValueByName.name // "no column")\" while the fleet says \"\($want.column)\"."]
+            else [] end)
+           + (if (($item.content.state // "") | ascii_upcase) == "CLOSED" and $want.column != "Done" then
+                ["board changed: task \($want.id) issue is closed while the fleet says \"\($want.column)\"."]
+              else [] end)
+         end ]
+     | add // [])
+    + [ $board.items[]
+        | select(.isArchived == false)
+        | . as $item
+        | select(is_mapped($item) | not)
+        | "board changed: an unmanaged card titled \"\(($item.content.title // "Untitled board item") | gsub("[[:space:]]+"; " "))\" is on the board in \"\($item.fieldValueByName.name // "no column")\"; it was left untouched." ]
+    | unique
+  ' || die "cannot derive board notes"
 }
 
 seen_signature() {
-  local changes=$1
-  sha256_text "$(printf '%s' "$changes" | jq -cS '.')"
+  local notes=$1
+  sha256_text "$(printf '%s' "$notes" | jq -cS '.')"
 }
 
 store_seen_signature() {
-  local changes=$1 count signature
-  count=$(printf '%s' "$changes" | jq 'length')
+  local notes=$1 count signature
+  count=$(printf '%s' "$notes" | jq 'length')
   if [ "$count" -eq 0 ]; then
     rm -f -- "$SEEN_FILE"
     return 0
   fi
-  signature=$(seen_signature "$changes")
+  signature=$(seen_signature "$notes")
   private_dir "$STATE_DIR"
   [ ! -L "$SEEN_FILE" ] || die "$SEEN_FILE must not be a symlink"
   umask 077
@@ -579,19 +554,6 @@ store_seen_signature() {
 append_operation() {
   local operations=$1 operation=$2
   jq -n --argjson operations "$operations" --argjson operation "$operation" '$operations + [$operation]'
-}
-
-append_claim() {
-  local claimed=$1 item_id=$2
-  jq -n --argjson claimed "$claimed" --arg item_id "$item_id" '($claimed + [$item_id]) | unique'
-}
-
-append_escalation() {
-  local escalations=$1 line=$2
-  jq -n --argjson escalations "$escalations" --arg line "$line" '
-    ($escalations + [$line])
-    | reduce .[] as $one ([]; if any(. == $one) then . else . + [$one] end)
-  '
 }
 
 issue_create() {
@@ -614,46 +576,42 @@ issue_close() {
 
 project_add_item() {
   local repo=$1 project_id=$2 issue_id=$3
-  # shellcheck disable=SC2016
   github_mutation_guard "$repo"
+  # shellcheck disable=SC2016
   gh api graphql -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
     -F project="$project_id" -F content="$issue_id"
 }
 
 project_set_column() {
   local repo=$1 project_id=$2 item_id=$3 field_id=$4 option_id=$5
-  # shellcheck disable=SC2016
   github_mutation_guard "$repo"
+  # shellcheck disable=SC2016
   gh api graphql -f query='mutation($project:ID!,$item:ID!,$field:ID!,$option:String!){updateProjectV2ItemFieldValue(input:{projectId:$project,itemId:$item,fieldId:$field,value:{singleSelectOptionId:$option}}){projectV2Item{id}}}' \
     -F project="$project_id" -F item="$item_id" -F field="$field_id" -f option="$option_id"
 }
 
 record_mapping() {
-  local state=$1 task_id=$2 token=$3 repo=$4 issue=$5 item_id=$6
+  local state=$1 task_id=$2 repo=$3 issue=$4 item_id=$5
   printf '%s' "$state" | jq \
-    --arg task_id "$task_id" --arg token "$token" --arg repo "$repo" \
+    --arg task_id "$task_id" --arg repo "$repo" \
     --arg item_id "$item_id" --argjson issue "$issue" '
-    .tasks[$task_id] = ((.tasks[$task_id] // {}) + {
-      token:$token,
+    .tasks[$task_id] = {
       repo:$repo,
       issue_number:$issue.number,
       issue_id:($issue.node_id // $issue.id),
       issue_url:($issue.html_url // $issue.url),
-      item_id:$item_id,
-      baseline:(.tasks[$task_id].baseline // null)
-    })
-    | .pending = [.pending[] | select(.task_id != $task_id)]
+      item_id:$item_id
+    }
   '
 }
 
 reconcile() {
   local dry_run=0 config exclusions state owner number repo board snapshot metadata desired
-  local project_id field_id options operations='[]' escalations='[]' excluded='[]'
-  local item task_id title column body token mapping live base theirs issue_state
-  local board_moved unrecorded_baseline write_column snapback explanation line card_absent
-  local claimed='[]' live_item_id archived_reported baseline_matches title_one_line
+  local project_id field_id options operations='[]' escalations excluded
+  local item task_id title column body mapping live theirs issue_state
+  local live_item_id
   local issue issue_number issue_id issue_url item_id option_id operation
-  local created add_result post_board updated_state residual reported closed='[]'
+  local created add_result post_board updated_state residual post_notes
   if [ "${1:-}" = --dry-run ]; then
     dry_run=1
     shift
@@ -667,7 +625,7 @@ reconcile() {
     if [ -e "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
       state=$(load_state)
     else
-      state=$(empty_state "$(new_salt)")
+      state=$(empty_state)
     fi
   else
     private_dir "$STATE_DIR"
@@ -677,10 +635,6 @@ reconcile() {
     trap board_lock_release EXIT
     state=$(ensure_state)
   fi
-  state=$(printf '%s' "$state" | jq '
-    .tasks |= with_entries(
-      select((.value.origin // "firstmate") != "captain")
-      | .value |= del(.origin))')
   owner=$(printf '%s' "$config" | jq -er '.owner')
   number=$(printf '%s' "$config" | jq -er '.project_number')
   repo=$(printf '%s' "$config" | jq -er '.repo')
@@ -692,30 +646,16 @@ reconcile() {
   options=$(printf '%s' "$board" | jq '.project.options')
   snapshot=$(bearings_snapshot) || die "cannot read bearings snapshot"
   metadata=$(fleet_metadata_snapshot) || die "cannot read fleet metadata snapshot"
-  desired=$(desired_items "$snapshot" "$metadata" "$(printf '%s' "$state" | jq -er '.salt')" "$exclusions")
+  desired=$(desired_items "$snapshot" "$metadata" "$(label_salt)" "$exclusions")
+  excluded=$(printf '%s' "$desired" | jq -c '[.[] | select(.excluded) | .id]')
+  escalations=$(board_notes "$state" "$board" "$desired")
   updated_state=$state
 
   while IFS= read -r item; do
     task_id=$(printf '%s' "$item" | jq -er '.id')
-    if [ "$(printf '%s' "$item" | jq -r '.excluded')" = true ]; then
-      excluded=$(jq -n --argjson old "$excluded" --arg id "$task_id" '$old + [$id]')
-      mapping=$(printf '%s' "$updated_state" | jq -c --arg id "$task_id" '.tasks[$id] // null')
-      if [ "$mapping" != null ]; then
-        item_id=$(printf '%s' "$mapping" | jq -r '.item_id // empty')
-        issue_number=$(printf '%s' "$mapping" | jq -r '.issue_number // empty')
-        live=$(find_live_item "$board" "$item_id" "$issue_number" "$repo")
-        if [ "$live" != null ] && [ "$(printf '%s' "$live" | jq -r '.isArchived')" != true ]; then
-          claimed=$(append_claim "$claimed" "$(printf '%s' "$live" | jq -r '.id')")
-          escalations=$(append_escalation "$escalations" \
-            "task $task_id: excluded from the board but still holds a live card at $(printf '%s' "$mapping" | jq -r '.issue_url // "an unknown url"'); retracting it stays a manual captain action.")
-        fi
-      fi
-      continue
-    fi
     title=$(printf '%s' "$item" | jq -er '.title')
     column=$(printf '%s' "$item" | jq -er '.column')
     body=$(printf '%s' "$item" | jq -er '.body')
-    token=$(printf '%s' "$item" | jq -er '.token')
     option_id=$(printf '%s' "$options" | jq -er --arg column "$column" '.[$column]') \
       || die "missing GitHub Status option: $column"
     mapping=$(printf '%s' "$updated_state" | jq -c --arg id "$task_id" '.tasks[$id] // null')
@@ -723,87 +663,56 @@ reconcile() {
     issue_number=$(printf '%s' "$mapping" | jq -r '.issue_number // empty')
     live=$(find_live_item "$board" "$item_id" "$issue_number" "$repo")
     if [ "$live" != null ] && [ "$(printf '%s' "$live" | jq -r '.isArchived')" = true ]; then
-      archived_reported=$(printf '%s' "$mapping" | jq -r '.baseline.archived // false')
-      baseline_matches=$(jq -n --argjson mapping "$mapping" --argjson live "$live" '
-        ($mapping.baseline.archived == true)
-        and (($mapping.baseline.column // null) == ($live.fieldValueByName.name // null))
-        and (($mapping.baseline.issue_state // null) == ($live.content.state // null))')
-      if [ "$archived_reported" != true ] || [ "$baseline_matches" != true ]; then
-        escalations=$(append_escalation "$escalations" \
-          "task $task_id: the board card is archived so the fleet has no visible card, and the fleet says $column; restoring or retiring it stays a manual captain action.")
-      fi
       continue
     fi
 
     if [ "$mapping" = null ]; then
-      issue=$(find_issue_by_token "$repo" "$token" "$title" "$body")
-      if [ "$issue" = null ] && printf '%s' "$updated_state" | jq -e \
-        --arg id "$task_id" --arg token "$token" \
-        '.pending | any(.task_id == $id and .token == $token)' >/dev/null; then
-        issue=$(resolve_pending_issue "$repo" "$token" "$title" "$body")
-      fi
-      if [ "$issue" = null ]; then
-        operation=$(jq -n --arg action create_issue --arg task_id "$task_id" --arg title "$title" \
-          --arg body "$body" --arg column "$column" \
-          '{action:$action,task_id:$task_id,title:$title,body:$body,column:$column}')
-        operations=$(append_operation "$operations" "$operation")
-        if [ "$dry_run" = 0 ]; then
-          updated_state=$(printf '%s' "$updated_state" | jq --arg id "$task_id" --arg token "$token" \
-            '.pending = ([.pending[] | select(.task_id != $id)] + [{task_id:$id,token:$token}])')
-          write_json_atomic "$STATE_FILE" "$updated_state"
-          created=$(issue_create "$repo" "$title" "$body") || die "cannot create board issue"
-          issue=$(printf '%s' "$created" | jq -e '{number,id,node_id,html_url,url,title,body,state}') \
-            || die "GitHub issue create returned invalid data"
-        else
-          issue='null'
-        fi
-      fi
-      if [ "$issue" = null ]; then
+      if [ "$dry_run" = 0 ]; then
+        created=$(issue_create "$repo" "$title" "$body") || die "cannot create board issue"
+        issue=$(printf '%s' "$created" | jq -e '{number,id,node_id,html_url,url,title,body,state}') \
+          || die "GitHub issue create returned invalid data"
+      else
         issue=$(jq -n --arg url "https://github.com/$repo/issues/(new)" \
           --arg title "$title" --arg body "$body" '{
           number:0,id:"(new)",node_id:"(new)",html_url:$url,url:$url,
           title:$title,body:$body,state:"OPEN"}')
       fi
+      operation=$(jq -n --arg action create_issue --arg task_id "$task_id" --arg title "$title" \
+        --arg body "$body" --arg column "$column" \
+        '{action:$action,task_id:$task_id,title:$title,body:$body,column:$column}')
+      operations=$(append_operation "$operations" "$operation")
       issue_number=$(printf '%s' "$issue" | jq -er '.number')
       issue_id=$(printf '%s' "$issue" | jq -er '.node_id // .id')
       issue_url=$(printf '%s' "$issue" | jq -er '.html_url // .url')
-      live=$(printf '%s' "$board" | jq -c --arg url "$issue_url" \
-        '[.items[] | select(.content.url == $url)][0] // null')
-      item_id=$(printf '%s' "$live" | jq -r '.id // empty')
-      if [ -z "$item_id" ]; then
-        operation=$(jq -n --arg action add_item --arg task_id "$task_id" --arg issue_url "$issue_url" \
-          '{action:$action,task_id:$task_id,issue_url:$issue_url}')
-        operations=$(append_operation "$operations" "$operation")
-        if [ "$dry_run" = 0 ]; then
-          add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot add issue to project"
-          item_id=$(printf '%s' "$add_result" | jq -er '.data.addProjectV2ItemById.item.id') \
-            || die "GitHub project add returned invalid data"
-        fi
+      item_id=
+      operation=$(jq -n --arg action add_item --arg task_id "$task_id" --arg issue_url "$issue_url" \
+        '{action:$action,task_id:$task_id,issue_url:$issue_url}')
+      operations=$(append_operation "$operations" "$operation")
+      if [ "$dry_run" = 0 ]; then
+        add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot add issue to project"
+        item_id=$(printf '%s' "$add_result" | jq -er '.data.addProjectV2ItemById.item.id') \
+          || die "GitHub project add returned invalid data"
       fi
-      updated_state=$(record_mapping "$updated_state" "$task_id" "$token" "$repo" "$issue" \
-        "$item_id")
+      updated_state=$(record_mapping "$updated_state" "$task_id" "$repo" "$issue" "$item_id")
       if [ "$dry_run" = 0 ]; then
         write_json_atomic "$STATE_FILE" "$updated_state"
       fi
-      if [ "$live" = null ]; then
-        live=$(jq -n --arg id "$item_id" --argjson issue "$issue" '{
-          id:$id,
-          isArchived:false,
-          fieldValueByName:null,
-          content:{
-            title:$issue.title,
-            body:$issue.body,
-            state:$issue.state,
-            url:($issue.html_url // $issue.url)
-          }
-        }')
-      fi
+      live=$(jq -n --arg id "$item_id" --argjson issue "$issue" '{
+        id:$id,
+        isArchived:false,
+        fieldValueByName:null,
+        content:{
+          title:$issue.title,
+          body:$issue.body,
+          state:$issue.state,
+          url:($issue.html_url // $issue.url)
+        }
+      }')
       mapping=$(printf '%s' "$updated_state" | jq -c --arg id "$task_id" '.tasks[$id]')
     fi
 
     issue_number=$(printf '%s' "$mapping" | jq -er '.issue_number')
     item_id=$(printf '%s' "$mapping" | jq -er '.item_id')
-    base=$(printf '%s' "$mapping" | jq -r '.baseline.column // empty')
     if [ "$live" != null ]; then
       live_item_id=$(printf '%s' "$live" | jq -r '.id // empty')
       if [ -n "$live_item_id" ] && [ "$live_item_id" != "$item_id" ]; then
@@ -815,9 +724,7 @@ reconcile() {
         fi
       fi
     fi
-    card_absent=0
     if [ "$live" = null ]; then
-      card_absent=1
       issue_id=$(printf '%s' "$mapping" | jq -er '.issue_id')
       if [ "$dry_run" = 0 ]; then
         add_result=$(project_add_item "$repo" "$project_id" "$issue_id") || die "cannot restore project item"
@@ -830,8 +737,6 @@ reconcile() {
       operation=$(jq -n --arg action add_item --arg task_id "$task_id" \
         '{action:$action,task_id:$task_id}')
       operations=$(append_operation "$operations" "$operation")
-      escalations=$(append_escalation "$escalations" \
-        "task $task_id: the card was gone from the board, so it was put back at the fleet column $column.")
       theirs=
       issue_state=OPEN
     else
@@ -848,160 +753,37 @@ reconcile() {
         operations=$(append_operation "$operations" "$operation")
       fi
     fi
-    if [ -n "$item_id" ]; then
-      claimed=$(append_claim "$claimed" "$item_id")
-    fi
-    board_moved=0
-    unrecorded_baseline=0
-    if [ "$card_absent" = 0 ] && [ -n "$base" ] && [ "$theirs" != "$base" ]; then
-      board_moved=1
-    fi
-    if [ "$card_absent" = 0 ] && [ -z "$base" ] && [ -n "$theirs" ] && [ "$theirs" != "$column" ]; then
-      unrecorded_baseline=1
-    fi
-    write_column=0
-    if [ -z "$theirs" ]; then
-      write_column=1
-    elif [ "$theirs" != "$column" ] &&
-      ! { [ "$board_moved" = 1 ] && [ "$column" = "$base" ]; }; then
-      write_column=1
-    fi
-    snapback=0
-    if [ "$write_column" = 1 ] && [ "$board_moved" = 1 ]; then
-      snapback=1
-    fi
-    if [ "$board_moved" = 1 ]; then
-      if [ -z "$theirs" ]; then
-        line="task $task_id: the captain cleared the board Status that was $base, so the card was set back to the fleet column $column."
-      elif [ "$write_column" = 1 ]; then
-        line="task $task_id: the captain moved the card from $base to $theirs while the fleet advanced to $column, so the card was set back to $column."
-      else
-        line="task $task_id: the captain moved the card from $base to $theirs and the fleet still says $column, so the card was left where the captain put it."
-      fi
-      escalations=$(append_escalation "$escalations" "$line")
-    elif [ "$unrecorded_baseline" = 1 ]; then
-      escalations=$(append_escalation "$escalations" \
-        "task $task_id: no agreed board column is recorded, so the card at $theirs was set to the fleet column $column without knowing who last moved it.")
-    fi
-    if [ "$write_column" = 1 ]; then
+    if [ "$theirs" != "$column" ]; then
       if [ "$dry_run" = 0 ]; then
         project_set_column "$repo" "$project_id" "$item_id" "$field_id" "$option_id" >/dev/null \
           || die "cannot set project Status"
       fi
-      if [ "$snapback" = 1 ]; then
-        explanation="$title moved back to $column because fleet state remains authoritative; this run escalates the board change."
-      else
-        explanation="$title set to $column to match fleet state."
-      fi
       operation=$(jq -n --arg action set_column --arg task_id "$task_id" --arg column "$column" \
-        --arg explanation "$explanation" \
+        --arg explanation "$title set to $column to match fleet state." \
         '{action:$action,task_id:$task_id,column:$column,explanation:$explanation}')
       operations=$(append_operation "$operations" "$operation")
     fi
     if [ "$column" = Done ] && [ "$issue_state" = OPEN ]; then
       if [ "$dry_run" = 0 ]; then
         issue_close "$repo" "$issue_number" >/dev/null || die "cannot close completed board issue"
-        closed=$(jq -n --argjson closed "$closed" --arg task_id "$task_id" \
-          '($closed + [$task_id]) | unique')
       fi
       operation=$(jq -n --arg action close_issue --arg task_id "$task_id" \
         '{action:$action,task_id:$task_id}')
       operations=$(append_operation "$operations" "$operation")
-    elif [ "$column" != Done ] && [ "$issue_state" = CLOSED ]; then
-      escalations=$(append_escalation "$escalations" \
-        "task $task_id: the captain closed the board issue while the fleet says $column, so the fleet was left untouched.")
     fi
-  done < <(printf '%s' "$desired" | jq -c '.[]')
-
-  while IFS= read -r live; do
-    item_id=$(printf '%s' "$live" | jq -er '.id')
-    if ! printf '%s' "$updated_state" | jq -e --arg item_id "$item_id" \
-      '.tasks | to_entries | any(.value.item_id == $item_id)' >/dev/null \
-      && ! printf '%s' "$claimed" | jq -e --arg item_id "$item_id" \
-        'index($item_id) != null' >/dev/null; then
-      baseline_matches=$(printf '%s' "$updated_state" | jq -r --arg item_id "$item_id" --argjson live "$live" '
-        ((.unmapped_items[$item_id] // null) as $baseline
-         | $baseline != null
-         and (($baseline.baseline_column // null) == ($live.fieldValueByName.name // null))
-         and (($baseline.baseline_issue_state // null) == ($live.content.state // null)))')
-      if [ "$baseline_matches" != true ]; then
-        title_one_line=$(printf '%s' "$live" | jq -r '(.content.title // "Untitled board item")
-          | gsub("[[:space:]]+"; " ")')
-        escalations=$(append_escalation "$escalations" \
-          "board item $item_id titled '$title_one_line' is not Firstmate-managed; leave it untouched and treat it as a captain-intent request.")
-      fi
-    fi
-  done < <(printf '%s' "$board" | jq -c '.items[] | select(.isArchived == false)')
+  done < <(printf '%s' "$desired" | jq -c '.[] | select(.excluded == false)')
 
   if [ "$dry_run" = 0 ]; then
     post_board=$(read_board "$owner" "$number")
     validate_columns "$post_board"
     updated_state=$(printf '%s' "$updated_state" | jq \
-      --argjson project "$(printf '%s' "$post_board" | jq '.project')" \
-      --argjson desired "$desired" --argjson live "$(printf '%s' "$post_board" | jq '.items')" \
-      --argjson reported_items "$(printf '%s' "$board" | jq '.items')" \
-      --argjson excluded "$excluded" --argjson closed "$closed" --arg now "$NOW" '
-      del(.proposals)
-      | .project = $project
-      | .synced_at = $now
-      | .excluded_reported = ((.excluded_reported + $excluded) | unique)
-      | ([$desired[] | select(.excluded == false) | .id]) as $owned_ids
-      | .tasks = (.tasks | with_entries(
-          . as $entry
-          | select(($owned_ids | index($entry.key)) != null
-                   or ([$live[]
-                        | select(.isArchived == false)
-                        | select(.id == $entry.value.item_id
-                                 or (.content.number == $entry.value.issue_number
-                                     and .content.repository.nameWithOwner == $entry.value.repo))]
-                       | length > 0))))
-      | ([.tasks[].item_id] | unique) as $task_item_ids
-      | reduce ($desired[] | select(.excluded == false)) as $want (.;
-          (.tasks[$want.id].item_id // "") as $mapped_id
-          | ([$live[] | select(.id == $mapped_id)][0] // null) as $seen
-          | ([$reported_items[] | select(.id == $mapped_id)][0] // null) as $reported
-          | if $reported and $reported.isArchived == true then
-              .tasks[$want.id].baseline = {
-                column:($reported.fieldValueByName.name // null),
-                option_id:($reported.fieldValueByName.optionId // null),
-                issue_state:($reported.content.state // null),
-                archived:true
-              }
-            elif $seen and (($seen.fieldValueByName.name // null) == $want.column) then
-              .tasks[$want.id].baseline = {
-                column:$want.column,
-                option_id:($seen.fieldValueByName.optionId // null),
-                issue_state:(if ($closed | index($want.id)) != null then "CLOSED"
-                             elif $reported then ($reported.content.state // null)
-                             else ($seen.content.state // null) end),
-                archived:(if $reported then ($reported.isArchived == true)
-                          else ($seen.isArchived == true) end)
-              }
-            else . end)
-      | ([$live[] | select(.isArchived == false) | .id]) as $live_ids
-      | .unmapped_items = (reduce ($reported_items[] | select(.isArchived == false)) as $seen ({};
-          if (($task_item_ids | index($seen.id)) == null)
-            and (($live_ids | index($seen.id)) != null) then
-            .[$seen.id] = {
-              baseline_column:($seen.fieldValueByName.name // null),
-              baseline_issue_state:($seen.content.state // null),
-              title:($seen.content.title // "Untitled board item")
-            }
-          else . end))
-    ')
+      --argjson project "$(printf '%s' "$post_board" | jq '.project')" --arg now "$NOW" '
+      .project = $project | .synced_at = $now')
     write_json_atomic "$STATE_FILE" "$updated_state"
-    residual=$(board_changes "$updated_state" "$post_board")
-    reported=$(board_changes "$state" "$board")
-    residual=$(jq -n --argjson residual "$residual" --argjson reported "$reported" '
-      [ $residual[]
-        | . as $change
-        | select(any($reported[];
-            .type == $change.type
-            and .item_id == $change.item_id
-            and ((.column // null) == ($change.column // null))
-            and ((.issue_state // null) == ($change.issue_state // null))
-            and ((.archived // false) == ($change.archived // false)))) ]
-    ') || die "cannot reconcile poll signature against reported changes"
+    post_notes=$(board_notes "$updated_state" "$post_board" "$desired")
+    residual=$(jq -n --argjson post "$post_notes" --argjson reported "$escalations" '
+      [ $post[] | select(. as $note | $reported | index($note) != null) ]') \
+      || die "cannot reconcile poll signature against reported notes"
     store_seen_signature "$residual"
   fi
 
@@ -1021,26 +803,31 @@ reconcile() {
 }
 
 poll() {
-  local config state owner number board changes signature previous count
+  local config exclusions state owner number board snapshot metadata desired
+  local notes signature previous count
   [ "$#" -eq 0 ] || { usage; exit 2; }
   need jq
   need gh
   config=$(load_config)
+  exclusions=$(load_exclusions)
   state=$(ensure_state)
   owner=$(printf '%s' "$config" | jq -er '.owner')
   number=$(printf '%s' "$config" | jq -er '.project_number')
   board=$(read_board "$owner" "$number")
   validate_columns "$board"
-  changes=$(board_changes "$state" "$board")
-  count=$(printf '%s' "$changes" | jq 'length')
+  snapshot=$(bearings_snapshot) || die "cannot read bearings snapshot"
+  metadata=$(fleet_metadata_snapshot) || die "cannot read fleet metadata snapshot"
+  desired=$(desired_items "$snapshot" "$metadata" "$(label_salt)" "$exclusions")
+  notes=$(board_notes "$state" "$board" "$desired")
+  count=$(printf '%s' "$notes" | jq 'length')
   if [ "$count" -eq 0 ]; then
     rm -f -- "$SEEN_FILE"
     exit 0
   fi
-  signature=$(seen_signature "$changes")
+  signature=$(seen_signature "$notes")
   previous=$(sed -n '1p' "$SEEN_FILE" 2>/dev/null || true)
   [ "$signature" != "$previous" ] || exit 0
-  store_seen_signature "$changes"
+  store_seen_signature "$notes"
   printf 'board-sync %s board change(s) pending\n' "$count"
 }
 
@@ -1097,9 +884,7 @@ status_cmd() {
     armed:$armed,
     config:$config,
     synced_at:$state.synced_at,
-    mapped_tasks:($state.tasks | length),
-    pending_creates:($state.pending | length),
-    excluded_reported:($state.excluded_reported | length)
+    mapped_tasks:($state.tasks | length)
   }'
 }
 
