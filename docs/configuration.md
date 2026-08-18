@@ -34,7 +34,7 @@ That captain-owned local file is the only source of excluded ids, and no exclude
 Reconcile and poll both refuse every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
 An excluded task is never pushed and never gets a card, and a card this sync has already mapped for it is never written to and never reported as unmanaged.
 A hand-filed card for a task that was excluded before the sync ever mapped it has no mapping, so it is still reported as an ordinary unmanaged card and still left completely untouched.
-A single reconcile runs at a time, guarded by an atomically published identity-owned claim under `state/.board-sync.lock` that a live or unverifiable owner cannot lose to elapsed time, so overlapping runs cannot mint duplicate issues for one task.
+A single reconcile runs at a time, guarded by an atomically published identity-owned claim under `state/.board-sync.lock` that is released only by its own owner and reclaimed only once the recorded owner is confirmed dead or its process identity no longer matches, while an unreadable ownership record makes the second run refuse rather than reclaim, so overlapping runs cannot mint duplicate issues for one task.
 Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or local state.
 A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
@@ -44,6 +44,7 @@ Every fleet task receives its own canonical card, regardless of a manual card's 
 `state/board-sync.json` therefore holds only the task-to-issue mapping that push needs, and the sync stores no board history, no agreed column, and no record of captain-made state.
 Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card removed and re-added by hand cannot wedge later runs against a stale item id.
 A mapped task is reached only through its own recorded mapping, so every write for it targets the repository that mapping records, and `repo` in `config/board-sync.json` is used only to create a new canonical issue for a task that has no mapping yet.
+A mapping recording a repository other than the configured one is confirmed private and reachable before that task is written to, and a failed confirmation skips only that one task, which gets no write and no operation and is reported as a one-line note while the rest of the run proceeds normally.
 A run interrupted between creating an issue and recording its mapping leaves that issue behind; the next run creates the canonical card again and reports the leftover as an unmanaged card rather than adopting it.
 
 Board facts that do not match fleet state become one-line informational notes under `escalations`, each a plain `board changed: ...` observation of what that run saw when it read the board.

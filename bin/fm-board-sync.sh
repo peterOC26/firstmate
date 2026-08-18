@@ -39,7 +39,11 @@
 # a stale id.  A mapped task is reached only through its own recorded mapping,
 # so every write for it targets the repository that mapping records; the
 # configured repository is used only to create a new canonical issue for a task
-# that has no mapping yet.  A run interrupted between creating an issue and
+# that has no mapping yet.  A mapping recording a repository other than the
+# configured one is confirmed private and reachable before that task is written
+# to, and when that confirmation fails only that one task is skipped: it gets no
+# write and no operation, its skip is reported as a one-line note, and the rest
+# of the run proceeds normally.  A run interrupted between creating an issue and
 # recording its mapping leaves that issue behind; the next run creates the
 # canonical card again and reports the leftover as an unmanaged card rather than
 # adopting it.
@@ -326,6 +330,26 @@ github_mutation_guard() {
     || die "refusing GitHub writes: $repo is public or its visibility is unknown"
 }
 
+FM_BOARD_REPO_CONFIRMED=
+FM_BOARD_REPO_REFUSED=
+
+mapped_repo_confirmed() {
+  local repo=$1
+  [[ $repo =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || return 1
+  case "$FM_BOARD_REPO_CONFIRMED" in
+    *"|$repo|"*) return 0 ;;
+  esac
+  case "$FM_BOARD_REPO_REFUSED" in
+    *"|$repo|"*) return 1 ;;
+  esac
+  if repo_is_private "$repo"; then
+    FM_BOARD_REPO_CONFIRMED="$FM_BOARD_REPO_CONFIRMED|$repo|"
+    return 0
+  fi
+  FM_BOARD_REPO_REFUSED="$FM_BOARD_REPO_REFUSED|$repo|"
+  return 1
+}
+
 board_query() {
   cat <<'GRAPHQL'
 query($owner:String!,$number:Int!,$cursor:String) {
@@ -562,6 +586,12 @@ append_operation() {
   jq -n --argjson operations "$operations" --argjson operation "$operation" '$operations + [$operation]'
 }
 
+append_note() {
+  local notes=$1 note=$2
+  jq -n --argjson notes "$notes" --arg note "$note" '$notes + [$note] | unique' \
+    || die "cannot record board note"
+}
+
 issue_create() {
   local repo=$1 title=$2 body=$3
   github_mutation_guard "$repo"
@@ -670,6 +700,12 @@ reconcile() {
     mapped_repo=$(printf '%s' "$mapping" | jq -r '.repo // empty')
     live=$(find_live_item "$board" "$item_id" "$issue_number" "$mapped_repo")
     if [ "$live" != null ] && [ "$(printf '%s' "$live" | jq -r '.isArchived')" = true ]; then
+      continue
+    fi
+    if [ -n "$mapped_repo" ] && [ "$mapped_repo" != "$repo" ] \
+      && ! mapped_repo_confirmed "$mapped_repo"; then
+      escalations=$(append_note "$escalations" \
+        "board changed: task $task_id is mapped to board repository $mapped_repo, which cannot be confirmed private or reachable, so the task was skipped and left untouched.")
       continue
     fi
 

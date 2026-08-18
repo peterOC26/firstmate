@@ -51,7 +51,23 @@ if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
   exit 0
 fi
 if [ "${1:-}" = api ] && [ -n "${GH_REPO_MAPPED:-}" ] && [ "${2:-}" = "repos/$GH_REPO_MAPPED" ]; then
-  printf '%s\n' 'true'
+  mapped_visibility=${GH_PRIVATE_MAPPED:-true}
+  if [ "${GH_PRIVATE_MAPPED_AFTER_FIRST:-}" = false ]; then
+    mapped_count=0
+    if [ -f "$GH_LOG.mapped-privacy-count" ]; then
+      read -r mapped_count < "$GH_LOG.mapped-privacy-count"
+    fi
+    mapped_count=$((mapped_count + 1))
+    printf '%s\n' "$mapped_count" > "$GH_LOG.mapped-privacy-count"
+    if [ "$mapped_count" -gt 1 ]; then
+      mapped_visibility=false
+    fi
+  fi
+  if [ "$mapped_visibility" = missing ]; then
+    printf '%s\n' 'Not Found' >&2
+    exit 1
+  fi
+  printf '%s\n' "$mapped_visibility"
   exit 0
 fi
 if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
@@ -307,6 +323,53 @@ write_bearings() {
   }' > "${path}.fleet"
 }
 
+# Two non-excluded fleet tasks, so one task can be skipped while the other pushes.
+write_bearings_pair() {
+  local path=$1
+  jq -n '{
+    schema:"fm-bearings.v1",
+    board_columns:[
+      {column:"Ready",empty:"-"},
+      {column:"Held",empty:"-"},
+      {column:"Blocked",empty:"-"},
+      {column:"Under way",empty:"-"},
+      {column:"Waiting on you",empty:"-"},
+      {column:"Done",empty:"-"}
+    ],
+    board_items:[
+      {
+        column:"Ready",
+        id:"safe-task-internal-id",
+        summary:"Safe board title",
+        owner:"(main)",
+        detail:"SUPERSECRET_HOLD",
+        artifact:"-"
+      },
+      {
+        column:"Under way",
+        id:"second-task-internal-id",
+        summary:"Second safe board title",
+        owner:"(main)",
+        detail:"SUPERSECRET_HOLD",
+        artifact:"-"
+      }
+    ],
+    in_flight:[{id:"second-task-internal-id",kind:"ship",state:"working",doing:"secret"}],
+    decisions_open:[],
+    recorded_prs:[],
+    reports:[],
+    gates:[],
+    landed:[]
+  }' > "$path"
+  jq -n '{
+    schema:"fm-fleet.v1",
+    backlog:{records:[
+      {id:"safe-task-internal-id",title:"Safe board title",repo:"demo-project",kind:"ship"},
+      {id:"second-task-internal-id",title:"Second safe board title",repo:"demo-project",kind:"ship"}
+    ]}
+  }' > "${path}.fleet"
+}
+
 write_bearings_untitled() {
   local path=$1
   jq -n '{
@@ -347,6 +410,8 @@ run_sync() {
     BOARD_FIXTURE="$board" BEARINGS_FIXTURE="${bearings}.json" \
     FLEET_FIXTURE="${bearings}.json.fleet" GH_LOG="$log" \
     GH_REPO="${GH_REPO:-captain/fleet}" GH_REPO_MAPPED="${GH_REPO_MAPPED:-}" \
+    GH_PRIVATE_MAPPED="${GH_PRIVATE_MAPPED:-}" \
+    GH_PRIVATE_MAPPED_AFTER_FIRST="${GH_PRIVATE_MAPPED_AFTER_FIRST:-}" \
     BOARD_FIXTURE_AFTER="${BOARD_FIXTURE_AFTER:-}" "$SCRIPT" "$@"
 }
 
@@ -1146,10 +1211,80 @@ test_issue_writes_follow_the_recorded_mapping_repository() {
     "issue writes must target the repository the mapping records"
   assert_not_contains "$(<"$log")" 'repos/captain/fleet/issues/1' \
     "no issue write may reach the configured repository with the mapping's issue number"
-  assert_contains "$(<"$log")" 'repos/captain/legacy' \
-    "the privacy gate must run against the repository each mutation actually targets"
+  assert_contains "$(<"$log")" $'ARG\trepos/captain/legacy\n' \
+    "the mapping's own repository must be read as a bare visibility check, not only as a PATCH path"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "issue writes follow the recorded mapping repository, never the reconfigured one"
+}
+
+test_mapped_repo_privacy_is_revalidated_at_the_mutation_boundary() {
+  local fixture root home fakebin bearings board log output rc
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings "${bearings}.json" Done
+  write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Done OPEN false \
+    2026-08-16T10:00:00Z captain/legacy | jq '.content.title = "Drifted card title"')" '[$card]')"
+  write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE safe-task-internal-id 1 captain/legacy)"
+  # The mapping's repository passes the pre-write confirmation and then goes public.
+  GH_REPO_MAPPED=captain/legacy
+  GH_PRIVATE_MAPPED_AFTER_FIRST=false
+  set +e
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile 2>&1)
+  rc=$?
+  set -e
+  unset GH_REPO_MAPPED GH_PRIVATE_MAPPED_AFTER_FIRST
+  [ "$rc" -ne 0 ] \
+    || fail "a mapping repository made public before mutation must refuse the write"
+  assert_contains "$output" 'captain/legacy is public or its visibility is unknown' \
+    "the refusal must name the repository the mutation actually targets"
+  assert_not_contains "$(<"$log")" 'repos/captain/legacy/issues/1' \
+    "visibility loss immediately before mutation must prevent the issue write"
+  assert_not_contains "$(<"$log")" 'repos/captain/fleet/issues/1' \
+    "the configured repository must never stand in for the mapping's repository"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "the privacy gate is revalidated against the mapping's own repository immediately before mutation"
+}
+
+test_unreachable_mapping_repo_skips_one_task_and_finishes_the_run() {
+  local fixture root home fakebin bearings board log output rc
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_bearings_pair "${bearings}.json"
+  # The first task is mapped to a repository that has since been deleted.
+  write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Held OPEN false \
+    2026-08-16T10:00:00Z captain/legacy | jq '.content.title = "Drifted card title"')" '[$card]')"
+  write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE safe-task-internal-id 1 captain/legacy)"
+  GH_REPO_MAPPED=captain/legacy
+  GH_PRIVATE_MAPPED=missing
+  set +e
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+  rc=$?
+  set -e
+  unset GH_REPO_MAPPED GH_PRIVATE_MAPPED
+  [ "$rc" -eq 0 ] \
+    || fail "one unreachable mapping repository must not abort the whole reconcile"
+  printf '%s' "$output" | jq -e '
+    (.escalations | any(startswith("board changed: ")
+      and contains("safe-task-internal-id")
+      and contains("cannot be confirmed private or reachable")))
+    and (.operations | all(.task_id != "safe-task-internal-id"))
+    and (.operations | any(.action == "create_issue" and .task_id == "second-task-internal-id"))
+    and (.operations | any(.action == "set_column" and .task_id == "second-task-internal-id"))
+  ' >/dev/null || fail "the unreachable task must be noted and skipped while the reachable task still pushes"
+  assert_not_contains "$(<"$log")" 'repos/captain/legacy/issues' \
+    "a skipped task must produce no issue write"
+  assert_not_contains "$(<"$log")" 'PVTI_ONE' \
+    "a skipped task must produce no project write against its board item"
+  jq -e '.synced_at != null' "$home/state/board-sync.json" >/dev/null \
+    || fail "the post-run state write must still happen after a skip"
+  [ -s "$home/state/board-sync.seen" ] \
+    || fail "the residual poll signature must still be recorded after a skip"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "an unreachable mapping repository skips only its own task and the run still completes"
 }
 
 test_all_digit_owner_still_reads_the_board() {
@@ -1374,6 +1509,8 @@ test_hand_filed_card_never_binds_to_a_fleet_task
 test_draft_card_is_left_manual_while_canonical_card_is_created
 test_reAdded_card_under_a_new_item_id_still_reconciles
 test_issue_writes_follow_the_recorded_mapping_repository
+test_mapped_repo_privacy_is_revalidated_at_the_mutation_boundary
+test_unreachable_mapping_repo_skips_one_task_and_finishes_the_run
 test_all_digit_owner_still_reads_the_board
 test_reported_board_state_stops_rewaking_the_watcher
 test_board_move_during_reconcile_is_never_silently_suppressed
