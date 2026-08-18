@@ -24,6 +24,41 @@ Wake, watcher, away-mode, and Relay-specific state mechanics remain with their n
 `AGENTS.md` retains the run-once and read-once operator rules, lock-refusal safety, installation consent, and direct-report recovery boundaries because those facts apply at every session start.
 Ordinary dead-direct-report recovery is owned by `stuck-crewmate-recovery`, while persistent-secondmate recovery is owned by `secondmate-provisioning`.
 
+## GitHub fleet board (config/board-sync.json / config/board-exclude)
+
+`bin/fm-board-sync.sh` is the single owner of the GitHub Projects v2 fleet-board data formats, sync mechanics, private-repository gate, allowlisted card profile, board-note wording, and custom-check lifecycle.
+The sync is one-directional plus notifications: fleet state is pushed onto the board, and board state is only ever reported back as informational notes.
+The local gitignored `config/board-sync.json` object contains exactly `owner`, positive integer `project_number`, and `repo`, where `repo` is an `owner/name` issue repository under the same owner.
+The local gitignored `config/board-exclude` file contains one task id per line, with blank lines and `#` comments ignored.
+That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
+Reconcile and poll both refuse every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
+An excluded task is never pushed and never gets a card, and a card this sync has already mapped for it is never written to and never reported as unmanaged.
+A hand-filed card for a task that was excluded before the sync ever mapped it has no mapping, so it is still reported as an ordinary unmanaged card and still left completely untouched.
+A single reconcile runs at a time, guarded by an atomically published identity-owned claim under `state/.board-sync.lock` that is released only by its own owner and reclaimed only once the recorded owner is confirmed dead or its process identity no longer matches, while an unreadable ownership record makes the second run refuse rather than reclaim, so overlapping runs cannot mint duplicate issues for one task.
+Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
+`reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or local state.
+A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
+
+The push is everything under `operations`: a canonical Firstmate-managed issue and card for every fleet task the sync owns, a card put back on the board when it is missing, an allowlisted title and body kept in step, the card's column set to its own task's fleet column, and the issue closed once that task reaches Done.
+Every fleet task receives its own canonical card, regardless of a manual card's title, repository, or item type, and the sync never adopts an existing issue.
+`state/board-sync.json` therefore holds only the task-to-issue mapping that push needs, and the sync stores no board history, no agreed column, and no record of captain-made state.
+Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card removed and re-added by hand cannot wedge later runs against a stale item id.
+A mapped task is reached only through its own recorded mapping, so every write for it targets the repository that mapping records, and `repo` in `config/board-sync.json` is used only to create a new canonical issue for a task that has no mapping yet.
+A mapping recording a repository other than the configured one is confirmed private and reachable before that task is written to, and a failed confirmation skips only that one task, which gets no write and no operation and is reported as a one-line note while the rest of the run proceeds normally.
+A run interrupted between creating an issue and recording its mapping leaves that issue behind; the next run creates the canonical card again and reports the leftover as an unmanaged card rather than adopting it.
+
+Board facts that do not match fleet state become one-line informational notes under `escalations`, each a plain `board changed: ...` observation of what that run saw when it read the board.
+A note is a report and never an action: the sync neither owns, retires, nor reconciles board or issue state from one, and it never deletes, archives, or unarchives a card.
+Notes carry no attribution, because a board read cannot establish who made a change.
+An archived card, an issue closed while the fleet holds a non-Done column, and a card the sync does not manage are each reported and then left exactly as they are; a card off its fleet column and a card missing from the board are reported by the same run that pushes them back.
+Every run reports what it observes, so a note repeats while its board fact persists and stops as soon as that fact is gone.
+`poll` performs the same read, derives the same notes, and emits a compact pointer instead of a lossy payload, so the existing watcher can wake firstmate.
+The pointer's signature comes from the note text alone and never from a GitHub timestamp, so a bare touch on a card stays quiet.
+Reconcile records in `state/board-sync.seen` only the notes it both reported and still observed after its writes, so an unchanged board fact stops waking every sweep while a change that landed inside the reconcile window still wakes firstmate on the next poll.
+The check runs only while the ordinary supervision watcher is live, so a fully idle home may not notice a board edit until the next firstmate session or supervision cycle.
+GitHub's five built-in workflows that write Status must be disabled manually on the project, while its auto-add workflow stays enabled.
+Current safety and behavior evidence lives in [`verification/board-sync.md`](verification/board-sync.md).
+
 ## Pi Calm preference (config/calm)
 
 The Pi Calm extension stores the captain's home-local presentation choice in gitignored `config/calm` under the effective Firstmate home, resolved from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root derived from the extension path, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present.

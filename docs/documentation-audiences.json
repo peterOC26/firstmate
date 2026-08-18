@@ -325,6 +325,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/verification/board-sync.md",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "docs/verification/context-usage.md",
       "audience": "maintainer-verification"
     },
