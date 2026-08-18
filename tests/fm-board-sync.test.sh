@@ -12,6 +12,18 @@ TESTS_RUN=0
 CANONICAL_TITLE='Safe board title'
 CANONICAL_BODY=$'project: demo-project\nkind: ship\nPR: https://github.com/acme/app/pull/9'
 
+# Platform-detected, never the `stat -f <fmt> || stat -c <fmt>` fallback: on
+# Linux `stat -f` is *filesystem* stat, so it dumps the filesystem for the path
+# to stdout and only then fails on the format string - and the fallback's
+# substitution captures that dump alongside the real mode.
+file_mode() {
+  if [ "$(uname)" = Darwin ]; then
+    stat -f %Lp "$1"
+  else
+    stat -c %a "$1"
+  fi
+}
+
 make_fixture() {
   local root home fakebin
   root=$(fm_test_tmproot fm-board-sync)
@@ -421,7 +433,7 @@ test_arm_status_and_disarm() {
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
   output=$(FM_HOME="$home" "$SCRIPT" arm)
   assert_contains "$output" 'armed: state/board-watch.check.sh' "arm should register the existing custom-check path"
-  [ "$(stat -f %Lp "$home/state/board-watch.check.sh" 2>/dev/null || stat -c %a "$home/state/board-watch.check.sh")" = 700 ] \
+  [ "$(file_mode "$home/state/board-watch.check.sh")" = 700 ] \
     || fail "armed check must be mode 0700"
   jq -e '.schema == "fm-board-sync.v1" and (.tasks | length) == 0' "$home/state/board-sync.json" >/dev/null \
     || fail "arm should initialize protected mapping state"
