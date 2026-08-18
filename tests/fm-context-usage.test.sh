@@ -327,7 +327,7 @@ test_binding_never_wedges_on_a_held_metadata_lock() {
   local id=bind-lockwait meta turn payload lock holder binder waited=0 rc
   meta="$STATE/$id.meta"
   turn="$STATE/$id.turn-ended"
-  lock="$STATE/.$id.meta.lock"
+  lock="$STATE/.meta-$id.lock"
   cat > "$meta" <<EOF
 window=fixture:fm-$id
 endpoint_task_id=$id
