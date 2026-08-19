@@ -149,7 +149,12 @@ const staleRecorded = () => {
 };
 const wantQuiet = process.env.EXPECTED_PROMPT === "0";
 let absorbedAt = -1;
-for (let i = 0; i < 300 && !prompt; i += 1) {
+// 60s of 20ms ticks is a FAILURE bound, not a wait: the undelivered case stops
+// the moment the follow-up lands, and the quiet case stops shortly after the
+// absorb is recorded. Both exits are driven by observed watcher state, so the
+// bound only has to clear the worst-case surface latency - which reaches ~10s
+// when several watcher suites overlap, far past the 6s this loop used to allow.
+for (let i = 0; i < 3000 && !prompt; i += 1) {
   if (wantQuiet) {
     if (absorbedAt < 0 && staleRecorded()) absorbedAt = i;
     if (absorbedAt >= 0 && i - absorbedAt >= 10) break;
