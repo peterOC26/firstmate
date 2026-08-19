@@ -618,9 +618,24 @@ test_terminal_stale_surfaced() {
   pass "a stale pane sitting on a terminal status is surfaced (queue + exit)"
 }
 
+# Wait for the watcher to record <hash> as the classified stale hash for a key
+# while it stays alive and silent. A watcher that surfaces instead prints its
+# reason and exits, so this reports that case immediately (1) rather than racing
+# a fixed sleep against the absorb; 2 means neither happened within the limit.
+await_absorbed_stale() {  # <pid> <out> <marker> <hash> [limit-tenths]
+  local pid=$1 out=$2 marker=$3 want=$4 limit=${5:-100} i=0
+  while [ "$i" -lt "$limit" ]; do
+    { [ -s "$out" ] || ! kill -0 "$pid" 2>/dev/null; } && return 1
+    [ "$(cat "$marker" 2>/dev/null || true)" = "$want" ] && return 0
+    sleep 0.1
+    i=$((i + 1))
+  done
+  return 2
+}
+
 test_delivered_terminal_footer_change_is_absorbed() {
   local dir state fakebin out capture_file window key first_hash second_hash pid status_file
-  local raw_capture raw_status raw_window raw_key raw_hash sig
+  local raw_capture raw_status raw_window raw_key raw_hash sig absorbed
   dir=$(make_case terminal-footer-change); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; capture_file="$dir/pane.txt"
   window="test:fm-footer"
@@ -639,10 +654,13 @@ test_delivered_terminal_footer_change_is_absorbed() {
     FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=0.1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
-  wait_live "$pid" 20 || { reap "$pid"; fail "a delivered terminal state with an unchanged footer woke the watcher: $(cat "$out")"; }
-  [ ! -s "$out" ] || { reap "$pid"; fail "delivered terminal state printed a wake before the footer changed: $(cat "$out")"; }
+  absorbed=0
+  await_absorbed_stale "$pid" "$out" "$state/.stale-$key" "$first_hash" || absorbed=$?
+  case "$absorbed" in
+    1) reap "$pid"; fail "a delivered terminal state with an unchanged footer woke the watcher: $(cat "$out")" ;;
+    2) reap "$pid"; fail "stale bookkeeping did not advance for the delivered terminal state" ;;
+  esac
   [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "delivered terminal state enqueued a duplicate wake before the footer changed"; }
-  [ "$(cat "$state/.stale-$key" 2>/dev/null || true)" = "$first_hash" ] || { reap "$pid"; fail "stale bookkeeping did not advance for the delivered terminal state"; }
   [ ! -e "$state/.stale-since-$key" ] || { reap "$pid"; fail "delivered terminal state started a wedge timer"; }
   [ ! -e "$state/.wedge-escalations-$key" ] || { reap "$pid"; fail "delivered terminal state retained wedge escalation bookkeeping"; }
 
@@ -650,11 +668,13 @@ test_delivered_terminal_footer_change_is_absorbed() {
   second_hash=$(hash_text $'finished, awaiting review\n⏱  16m | 12% context')
   printf '%s' "$second_hash" > "$state/.hash-$key"
   printf '1\n' > "$state/.count-$key"
-  sleep 0.8
-  kill -0 "$pid" 2>/dev/null || { wait "$pid" 2>/dev/null || true; fail "a cosmetic footer change woke the watcher: $(cat "$out")"; }
-  [ ! -s "$out" ] || { reap "$pid"; fail "cosmetic footer change printed a wake: $(cat "$out")"; }
+  absorbed=0
+  await_absorbed_stale "$pid" "$out" "$state/.stale-$key" "$second_hash" || absorbed=$?
+  case "$absorbed" in
+    1) reap "$pid"; fail "a cosmetic footer change woke the watcher: $(cat "$out")" ;;
+    2) reap "$pid"; fail "stale bookkeeping did not advance after the cosmetic footer change" ;;
+  esac
   [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "cosmetic footer change enqueued a duplicate wake"; }
-  [ "$(cat "$state/.stale-$key" 2>/dev/null || true)" = "$second_hash" ] || { reap "$pid"; fail "stale bookkeeping did not advance after the cosmetic footer change"; }
   [ ! -e "$state/.stale-since-$key" ] || { reap "$pid"; fail "cosmetic footer change started a wedge timer"; }
   reap "$pid"
   ack_stopped_cycle "$state" || fail "could not acknowledge the intentional quiet watcher stop"

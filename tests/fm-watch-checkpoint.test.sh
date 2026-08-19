@@ -47,6 +47,19 @@ SH
   fi
 }
 
+# assert_no_live_watch_lock <lockdir> <msg> - the checkpoint must leave no LIVE
+# watcher holding <lockdir>. A live holder is what wedges the next arm; a marker
+# left by a watcher the checkpoint killed is reclaimed by the next arm's
+# liveness/recovery path instead, so only liveness is asserted here.
+assert_no_live_watch_lock() {
+  local pid
+  pid=$(cat "$1/pid" 2>/dev/null || true)
+  case "$pid" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  ! kill -0 "$pid" 2>/dev/null || fail "$2 (live pid $pid)"
+}
+
 test_quiet_checkpoint_exits_124_cleanly() {
   local home out err status
   home=$(make_home quiet)
@@ -120,18 +133,32 @@ test_existing_singleton_watcher_is_not_success() {
 }
 
 test_delivered_terminal_footer_checkpoint_is_quiet() {
-  local home out status
+  local home out status absorbed
   home=$(make_home terminal-footer-delivered)
   out="$home/out.txt"
   write_terminal_footer_case "$home" 1
+  absorbed=$(hash_text $'finished, awaiting review\n⏱  16m | 12% context')
   status=0
+  # Quiet is only evidence of the delivered-status dedup once the watcher has
+  # actually reached this pane's terminal-stale triage; a window shorter than
+  # that latency would go quiet on the pre-fix watcher too and prove nothing.
+  # Measured latency from checkpoint start to the pre-fix surface is ~2.6-4.3s
+  # serial and ~10s when several watcher tests overlap, so the window carries
+  # real headroom and the absorb assertion below fails loudly rather than
+  # passing vacuously if the watcher never got that far.
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_WINDOW=test:fm-footer \
     FM_POLL=0.2 FM_SIGNAL_GRACE=0.1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    "$CHECKPOINT" --seconds 2 >"$out" 2>&1 || status=$?
+    "$CHECKPOINT" --seconds 20 >"$out" 2>&1 || status=$?
   expect_code 124 "$status" "delivered changing-footer checkpoint exit"
-  assert_contains "$(cat "$out")" "checkpoint: no actionable wake within 2s" "quiet delivered checkpoint line missing"
+  assert_contains "$(cat "$out")" "checkpoint: no actionable wake within 20s" "quiet delivered checkpoint line missing"
   assert_absent "$home/state/.wake-queue" "delivered changing-footer checkpoint queued a wake"
-  assert_absent "$home/state/.watch.lock/pid" "delivered changing-footer checkpoint left a lock"
+  [ "$(cat "$home/state/.stale-test_fm-footer" 2>/dev/null || true)" = "$absorbed" ] \
+    || fail "the quiet checkpoint never reached the delivered-terminal absorb: stale=$(cat "$home/state/.stale-test_fm-footer" 2>/dev/null || true) expected=$absorbed"
+  # Unlike the sibling cases, this watcher polls a real pane every FM_POLL, so it
+  # is usually inside a forked capture when the checkpoint expires. Without
+  # coreutils timeout(1) the perl fallback SIGKILLs the process group 0.2s after
+  # SIGTERM, which can beat the watcher's lock-releasing EXIT trap under load.
+  assert_no_live_watch_lock "$home/state/.watch.lock" "delivered changing-footer checkpoint left a live watcher"
   pass "delivered changing-footer state stays quiet through the Codex checkpoint"
 }
 
@@ -141,9 +168,12 @@ test_undelivered_terminal_footer_checkpoint_wakes_once() {
   out="$home/out.txt"
   write_terminal_footer_case "$home" 0
   status=0
+  # The checkpoint returns as soon as the wake lands, so this window is only a
+  # failure bound and costs nothing on success - keep it well clear of the ~10s
+  # wake latency seen when several watcher tests overlap.
   PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_WINDOW=test:fm-footer \
     FM_POLL=0.2 FM_SIGNAL_GRACE=0.1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    "$CHECKPOINT" --seconds 8 >"$out" 2>&1 || status=$?
+    "$CHECKPOINT" --seconds 60 >"$out" 2>&1 || status=$?
   expect_code 0 "$status" "undelivered changing-footer checkpoint exit"
   [ "$(grep -c '^stale: test:fm-footer$' "$out")" -eq 1 ] \
     || fail "undelivered changing-footer checkpoint did not pass through exactly one stale wake: $(cat "$out")"
