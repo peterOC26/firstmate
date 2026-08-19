@@ -847,8 +847,26 @@ resurface_after_downtime() {
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
+  # Context-usage warnings are discovered only from unseen completed-turn
+  # markers. Let that signal reach the normal warning path before the generic
+  # recovery wake, otherwise a successor can postpone the warning for a full
+  # handling turn while the durable queue remains pending.
+  pending_recovery_signals=$(scan_signals)
+  while IFS=$(printf '\t') read -r _recovery_seen _recovery_sig _recovery_file; do
+    [ -n "$_recovery_file" ] || continue
+    case "$_recovery_file" in
+      *.turn-ended)
+        FM_WATCH_RESURFACE_DEFERRED=1
+        return 0
+        ;;
+    esac
+  done <<EOF
+$pending_recovery_signals
+EOF
   wake "check: rearm-resurface"
 }
+
+FM_WATCH_RESURFACE_DEFERRED=0
 
 if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   touch "$STATE/.last-watcher-beat"
@@ -1074,6 +1092,11 @@ EOF
     # Reached only when the remaining signals were absorbed (an actionable batch
     # already woke and exited above), so a queued context warning still delivers.
     [ -z "$context_reason" ] || wake "$context_reason"
+  fi
+
+  if [ "$FM_WATCH_RESURFACE_DEFERRED" -eq 1 ]; then
+    FM_WATCH_RESURFACE_DEFERRED=0
+    wake "check: rearm-resurface"
   fi
 
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
