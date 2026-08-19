@@ -100,7 +100,7 @@ write_pi_terminal_footer_arm() {
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 set -u
-PATH="$FM_HOME/fakebin:$PATH" FM_STATE_OVERRIDE="$FM_HOME/state" FM_CREW_STATE_BIN="$FM_HOME/fakebin/fm-crew-state.sh" \
+exec env PATH="$FM_HOME/fakebin:$PATH" FM_STATE_OVERRIDE="$FM_HOME/state" FM_CREW_STATE_BIN="$FM_HOME/fakebin/fm-crew-state.sh" \
   FM_FAKE_TMUX_WINDOW=test:fm-footer FM_FAKE_TMUX_CAPTURE="$FM_HOME/state/pane.txt" FM_POLL=0.2 FM_SIGNAL_GRACE=0.1 \
   FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 sh -c '
     if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
@@ -138,7 +138,7 @@ const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!handler) throw new Error("Pi watch command was not registered");
 await handler("footer-case", { ui: { notify() {} } });
-for (let i = 0; i < 600 && !prompt; i += 1) {
+for (let i = 0; i < 150 && !prompt; i += 1) {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
 if (process.env.EXPECTED_PROMPT === "0") {

@@ -438,11 +438,9 @@ surface_nonterminal_stale() {  # <window> <hash>
   wake "stale: $win"
 }
 
-stale_state_already_delivered() {  # <window>
-  local win=$1 task last surfaced
-  task=$(window_to_task "$win" "$STATE")
+stale_state_already_delivered() {  # <task> <last-status-line>
+  local task=$1 last=$2 surfaced
   [ -n "$task" ] || return 1
-  last=$(last_status_line "$STATE/$task.status")
   [ -n "$last" ] || return 1
   surfaced=$(cat "$(_hb_surfaced_path "$task")" 2>/dev/null || true)
   [ "$last" = "$surfaced" ]
@@ -1180,7 +1178,7 @@ EOF
               printf '%s' "$h" > "$sf"
               date +%s > "$ssf"
               triage_log "absorbed stale (provably working, overriding a stale captain-relevant status): $w"
-            elif stale_state_already_delivered "$w"; then
+            elif stale_state_already_delivered "$task" "$last"; then
               printf '%s' "$h" > "$sf"
               rm -f "$ssf" "$ewf"
               triage_log "absorbed stale (terminal status already delivered, cosmetic pane change only): $w"

@@ -203,7 +203,7 @@ if [ "${FM_TEST_FOOTER_TICK:-0}" = 1 ] && watcher_live "$pid"; then
   printf 'finished, awaiting review\n⏱  16m | 12%% context\n' > "$FM_HOME/state/pane.txt"
 fi
  i=0
- while watcher_live "$pid" && [ "$i" -lt 100 ]; do
+ while watcher_live "$pid" && [ "$i" -lt 25 ]; do
    sleep 0.1
    i=$((i + 1))
  done
