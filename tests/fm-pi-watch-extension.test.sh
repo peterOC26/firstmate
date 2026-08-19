@@ -34,6 +34,7 @@ export class UserMessageComponent {
   render() { return []; }
   invalidate() {}
 }
+
 JS
   cat > "$repo/node_modules/@earendil-works/pi-tui/package.json" <<'JSON'
 {"name":"@earendil-works/pi-tui","type":"module","exports":"./index.js"}
@@ -57,6 +58,113 @@ export const Type = {
   },
 };
 JS
+}
+
+write_pi_terminal_footer_case() {
+  local home=$1 delivered=$2 key hash sig
+  mkdir -p "$home/state" "$home/config" "$home/fakebin"
+  cat > "$home/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+case "${1:-}" in
+  capture-pane) cat "$FM_HOME/state/pane.txt"; exit 0 ;;
+  display-message) printf '\n'; exit 0 ;;
+  list-windows)
+    [ -n "${FM_FAKE_TMUX_WINDOW:-}" ] && printf '%s\n' "$FM_FAKE_TMUX_WINDOW"
+    exit 0
+    ;;
+esac
+exit 1
+SH
+  cat > "$home/fakebin/fm-crew-state.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'state: unknown · source: none · quiet fixture\n'
+SH
+  chmod +x "$home/fakebin/tmux" "$home/fakebin/fm-crew-state.sh"
+  printf 'window=test:fm-footer\nkind=ship\n' > "$home/state/footer.meta"
+  printf 'done: PR https://example.test/pr/footer\n' > "$home/state/footer.status"
+  printf 'finished, awaiting review\n⏱  15m | 12%% context\n' > "$home/state/pane.txt"
+  sig=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/footer.status")
+  printf '%s' "$sig" > "$home/state/.seen-footer_status"
+  key=test_fm-footer
+  hash=$(printf '%s' $'finished, awaiting review\n⏱  15m | 12% context' | md5 -q)
+  printf '%s' "$hash" > "$home/state/.hash-$key"
+  printf '1\n' > "$home/state/.count-$key"
+  if [ "$delivered" = 1 ]; then
+    printf 'done: PR https://example.test/pr/footer' > "$home/state/.hb-surfaced-footer"
+  fi
+}
+
+write_pi_terminal_footer_arm() {
+  local repo=$1
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+PATH="$FM_HOME/fakebin:$PATH" FM_STATE_OVERRIDE="$FM_HOME/state" FM_CREW_STATE_BIN="$FM_HOME/fakebin/fm-crew-state.sh" \
+  FM_FAKE_TMUX_WINDOW=test:fm-footer FM_FAKE_TMUX_CAPTURE="$FM_HOME/state/pane.txt" FM_POLL=0.2 FM_SIGNAL_GRACE=0.1 \
+  FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 sh -c '
+    if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+      printf "watcher: started pid=%s (beacon fresh)\\n" "$$"
+    fi
+    exec "$FM_WATCH_SCRIPT"
+  '
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+}
+
+run_pi_terminal_footer_case() {
+  local repo=$1 home=$2 expected=$3
+  PLUGIN="$repo/.pi/extensions/fm-primary-pi-watch.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" \
+    FM_WATCH_SCRIPT="$ROOT/bin/fm-watch.sh" EXPECTED_PROMPT="$expected" node --input-type=module 2>&1 <<'EOF'
+import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+let handler = null;
+let prompt = "";
+let sends = 0;
+const pi = {
+  on() {},
+  registerCommand(name, options) {
+    if (name === "fm-watch-arm-pi") handler = options.handler;
+  },
+  registerTool() {},
+  sendUserMessage: async (message) => {
+    sends += 1;
+    prompt = message;
+  },
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+if (!handler) throw new Error("Pi watch command was not registered");
+await handler("footer-case", { ui: { notify() {} } });
+for (let i = 0; i < 600 && !prompt; i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+if (process.env.EXPECTED_PROMPT === "0") {
+  if (sends !== 0 || prompt) throw new Error(`delivered footer state sent a Pi follow-up: ${prompt}`);
+} else if (sends !== 1 || !prompt.includes("stale: test:fm-footer")) {
+  throw new Error(`undelivered footer state did not send one real Pi follow-up: sends=${sends} prompt=${prompt}`);
+}
+process.exit(0);
+EOF
+}
+
+test_delivered_terminal_footer_change_does_not_send_pi_followup() {
+  local repo home
+  repo="$TMP_ROOT/pi-footer-root"
+  home="$TMP_ROOT/pi-footer-delivered"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  write_pi_terminal_footer_case "$home" 1
+  write_pi_terminal_footer_arm "$repo"
+  run_pi_terminal_footer_case "$repo" "$home" 0 || fail "Pi delivered footer fixture failed"
+
+  home="$TMP_ROOT/pi-footer-undelivered"
+  mkdir -p "$home/state" "$home/config"
+  write_pi_terminal_footer_case "$home" 0
+  run_pi_terminal_footer_case "$repo" "$home" 1 || fail "Pi undelivered footer fixture failed"
+  pass "Pi sends no follow-up for delivered changing-footer state and sends one for the first undelivered state"
 }
 
 test_pi_extension_reports_external_healthy_watcher() {
@@ -2150,6 +2258,7 @@ EOF
   pass "OpenCode healthy arm output does not suppress the turn-end guard"
 }
 
+test_delivered_terminal_footer_change_does_not_send_pi_followup
 test_pi_extension_reports_external_healthy_watcher
 test_pi_tool_returns_agent_tool_result
 test_pi_redundant_tool_call_is_owned_noop
