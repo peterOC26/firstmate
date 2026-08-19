@@ -178,7 +178,7 @@ SH
   sig=$(FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$dir/state/footer.status")
   printf '%s' "$sig" > "$dir/state/.seen-footer_status"
   key=test_fm-footer
-  hash=$(printf '%s' $'finished, awaiting review\n⏱  15m | 12% context' | md5 -q)
+  hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
   printf '%s' "$hash" > "$dir/state/.hash-$key"
   printf '1\n' > "$dir/state/.count-$key"
   if [ "$delivered" = 1 ]; then
@@ -202,11 +202,17 @@ sleep 0.3
 if [ "${FM_TEST_FOOTER_TICK:-0}" = 1 ] && watcher_live "$pid"; then
   printf 'finished, awaiting review\n⏱  16m | 12%% context\n' > "$FM_HOME/state/pane.txt"
 fi
- i=0
- while watcher_live "$pid" && [ "$i" -lt 25 ]; do
-   sleep 0.1
-   i=$((i + 1))
- done
+i=0
+settled=0
+while watcher_live "$pid" && [ "$i" -lt 60 ]; do
+  if [ -n "${FM_TEST_FOOTER_STALE_HASH:-}" ] &&
+     [ "$(cat "$FM_HOME/state/.stale-test_fm-footer" 2>/dev/null || true)" = "$FM_TEST_FOOTER_STALE_HASH" ]; then
+    settled=$((settled + 1))
+    [ "$settled" -ge 5 ] && break
+  fi
+  sleep 0.1
+  i=$((i + 1))
+done
 if watcher_live "$pid"; then
   printf '%s\n' "$pid" > "$FM_HOME/state/fixture-watcher-pid"
   kill "$pid" 2>/dev/null || true
@@ -416,14 +422,18 @@ test_actionable_close_rewakes_with_reason() {
 }
 
 test_delivered_terminal_footer_change_does_not_rewake_claude() {
-  local dir out status watch_pid
+  local dir out status watch_pid post_tick_hash
   dir=$(make_primary_dir "$TMP_ROOT/terminal-footer-delivered")
   : > "$dir/state/task.meta"
   write_real_terminal_watch_fixture "$dir" 1
-  out=$(FM_WATCH_SCRIPT="$ROOT/bin/fm-watch.sh" FM_TEST_FOOTER_TICK=1 run_autoarm "$dir" 2>/dev/null); status=$?
+  post_tick_hash=$(hash_text $'finished, awaiting review\n⏱  16m | 12% context')
+  out=$(FM_WATCH_SCRIPT="$ROOT/bin/fm-watch.sh" FM_TEST_FOOTER_TICK=1 \
+    FM_TEST_FOOTER_STALE_HASH="$post_tick_hash" run_autoarm "$dir" 2>/dev/null); status=$?
   [ "$status" -eq 0 ] || fail "a delivered terminal footer change must not trigger a Claude Stop rewake: rc=$status output=$out queue=$(cat "$dir/state/.wake-queue" 2>/dev/null || true)"
   [ -z "$out" ] || fail "a delivered terminal footer change produced Claude Stop feedback: $out"
   [ "$(epoch_outcome "$dir")" = clean ] || fail "a delivered terminal footer change did not record a clean Claude cycle"
+  [ "$(cat "$dir/state/.stale-test_fm-footer" 2>/dev/null || true)" = "$post_tick_hash" ] || fail "the quiet Claude cycle never reached the delivered-terminal absorb: stale=$(cat "$dir/state/.stale-test_fm-footer" 2>/dev/null || true) expected=$post_tick_hash"
+  [ ! -e "$dir/state/.stale-since-test_fm-footer" ] || fail "the delivered terminal footer absorb left a wedge timer running"
   watch_pid=$(cat "$dir/state/fixture-watcher-pid")
   kill "$watch_pid" 2>/dev/null || true
   wait "$watch_pid" 2>/dev/null || true

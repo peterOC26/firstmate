@@ -39,7 +39,7 @@ SH
   printf '%s' "$sig" > "$home/state/.seen-footer_status"
   printf 'finished, awaiting review\n⏱  16m | 12%% context\n' > "$home/state/pane.txt"
   key=test_fm-footer
-  hash=$(printf '%s' $'finished, awaiting review\n⏱  15m | 12% context' | md5 -q)
+  hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
   printf '%s' "$hash" > "$home/state/.hash-$key"
   printf '1\n' > "$home/state/.count-$key"
   if [ "$delivered" = 1 ]; then

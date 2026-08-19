@@ -87,7 +87,7 @@ SH
   sig=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/footer.status")
   printf '%s' "$sig" > "$home/state/.seen-footer_status"
   key=test_fm-footer
-  hash=$(printf '%s' $'finished, awaiting review\n⏱  15m | 12% context' | md5 -q)
+  hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
   printf '%s' "$hash" > "$home/state/.hash-$key"
   printf '1\n' > "$home/state/.count-$key"
   if [ "$delivered" = 1 ]; then
@@ -113,10 +113,11 @@ SH
 }
 
 run_pi_terminal_footer_case() {
-  local repo=$1 home=$2 expected=$3
+  local repo=$1 home=$2 expected=$3 stale_hash=${4:-}
   PLUGIN="$repo/.pi/extensions/fm-primary-pi-watch.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" \
-    FM_WATCH_SCRIPT="$ROOT/bin/fm-watch.sh" EXPECTED_PROMPT="$expected" node --input-type=module 2>&1 <<'EOF'
-import { writeFileSync } from "node:fs";
+    FM_WATCH_SCRIPT="$ROOT/bin/fm-watch.sh" EXPECTED_PROMPT="$expected" EXPECTED_STALE_HASH="$stale_hash" \
+    node --input-type=module 2>&1 <<'EOF'
+import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 let handler = null;
@@ -138,11 +139,26 @@ const mod = await import(pathToFileURL(process.env.PLUGIN).href);
 mod.default(pi);
 if (!handler) throw new Error("Pi watch command was not registered");
 await handler("footer-case", { ui: { notify() {} } });
-for (let i = 0; i < 150 && !prompt; i += 1) {
+const staleMarker = `${process.env.FM_HOME}/state/.stale-test_fm-footer`;
+const staleRecorded = () => {
+  try {
+    return readFileSync(staleMarker, "utf8") === process.env.EXPECTED_STALE_HASH;
+  } catch {
+    return false;
+  }
+};
+const wantQuiet = process.env.EXPECTED_PROMPT === "0";
+let absorbedAt = -1;
+for (let i = 0; i < 300 && !prompt; i += 1) {
+  if (wantQuiet) {
+    if (absorbedAt < 0 && staleRecorded()) absorbedAt = i;
+    if (absorbedAt >= 0 && i - absorbedAt >= 10) break;
+  }
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
-if (process.env.EXPECTED_PROMPT === "0") {
+if (wantQuiet) {
   if (sends !== 0 || prompt) throw new Error(`delivered footer state sent a Pi follow-up: ${prompt}`);
+  if (absorbedAt < 0) throw new Error("delivered footer state never reached the delivered-terminal absorb");
 } else if (sends !== 1 || !prompt.includes("stale: test:fm-footer")) {
   throw new Error(`undelivered footer state did not send one real Pi follow-up: sends=${sends} prompt=${prompt}`);
 }
@@ -151,14 +167,17 @@ EOF
 }
 
 test_delivered_terminal_footer_change_does_not_send_pi_followup() {
-  local repo home
+  local repo home pane_hash
   repo="$TMP_ROOT/pi-footer-root"
   home="$TMP_ROOT/pi-footer-delivered"
   mkdir -p "$repo/bin" "$home/state" "$home/config"
   install_pi_watch_extension_fixture "$repo"
   write_pi_terminal_footer_case "$home" 1
   write_pi_terminal_footer_arm "$repo"
-  run_pi_terminal_footer_case "$repo" "$home" 0 || fail "Pi delivered footer fixture failed"
+  pane_hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
+  run_pi_terminal_footer_case "$repo" "$home" 0 "$pane_hash" || fail "Pi delivered footer fixture failed"
+  [ "$(cat "$home/state/.stale-test_fm-footer" 2>/dev/null || true)" = "$pane_hash" ] || fail "the quiet Pi cycle never reached the delivered-terminal absorb: stale=$(cat "$home/state/.stale-test_fm-footer" 2>/dev/null || true) expected=$pane_hash"
+  [ ! -e "$home/state/.stale-since-test_fm-footer" ] || fail "the delivered terminal footer absorb left a wedge timer running for Pi"
 
   home="$TMP_ROOT/pi-footer-undelivered"
   mkdir -p "$home/state" "$home/config"
