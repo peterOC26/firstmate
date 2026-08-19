@@ -244,34 +244,6 @@ meta_value() {  # <meta> <key>
   grep "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2- || true
 }
 
-# Loaded only for a metadata mutation: sourcing the lock owner eagerly would
-# create $FM_HOME/state during read-only identity and verify commands.
-meta_lock_load() {
-  if ! declare -F fm_meta_lock_path >/dev/null 2>&1; then
-    # shellcheck source=bin/fm-wake-lib.sh
-    # shellcheck disable=SC1091
-    . "$SCRIPT_DIR/fm-wake-lib.sh"
-  fi
-}
-
-# The completion attestation shares the task metadata file with the harness
-# session binder, which republishes the whole record; appending outside that
-# shared lock writes to the replaced inode and silently loses the attestation.
-meta_attest_append() {  # <meta> <keys>
-  local meta=$1 keys=$2 lock
-  meta_lock_load
-  lock=$(fm_meta_lock_path "$meta") || fail "could not resolve the task metadata lock for $meta"
-  fm_lock_acquire_wait "$lock"
-  if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] \
-     || [ "$(meta_value "$meta" decision_keys)" != "$keys" ]; then
-    printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta" || {
-      fm_lock_release "$lock"
-      fail "could not record the completion attestation in $meta"
-    }
-  fi
-  fm_lock_release "$lock"
-}
-
 origin_open_decisions() {  # <origin-id>
   local origin=$1 meta="$STATE/$1.meta" status_file="$STATE/$1.status" open kind last verb
   open=$(status_open_decisions "$status_file")
@@ -471,6 +443,9 @@ command_complete() {
   meta="$STATE/$origin.meta"
   [ -f "$meta" ] && has_meta=1
   if [ "$has_meta" = 1 ]; then
+    # The completion attestation shares the task metadata file with the harness
+    # session binder, which republishes the whole record; appending outside that
+    # shared lock writes to the replaced inode and silently loses the attestation.
     DECISION_META_LOCK=$(fm_meta_lock_path "$meta") || fail "could not resolve task metadata lock"
     fm_lock_acquire_wait "$DECISION_META_LOCK"
     DECISION_META_LOCK_HELD=1
@@ -514,7 +489,8 @@ EOF
 
   if [ "$has_meta" = 1 ]; then
     if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] || [ "$previous" != "$keys" ]; then
-      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta"
+      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta" \
+        || fail "could not record the completion attestation in $meta"
     fi
     fm_lock_release "$DECISION_META_LOCK"
     DECISION_META_LOCK_HELD=0

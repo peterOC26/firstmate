@@ -1100,16 +1100,6 @@ content_in_default() {
   local name ref default_tree merged_tree local_ref
   name=$(default_branch) || return 1
   local_ref="refs/heads/$name"
-  # A local default branch that already contains the task is direct landing
-  # evidence. Prefer that proof before consulting a possibly stale origin ref;
-  # this is also the normal local-only landing shape when the clone has no
-  # authoritative forge update to fetch.
-  if task_git "$WT" rev-parse --quiet --verify "$local_ref^{tree}" >/dev/null 2>&1; then
-    default_tree=$(task_git "$WT" rev-parse --quiet --verify "$local_ref^{tree}" 2>/dev/null) || return 1
-    merged_tree=$(task_git "$WT" merge-tree --write-tree "$local_ref" HEAD 2>/dev/null) || merged_tree=
-    merged_tree=$(printf '%s\n' "$merged_tree" | head -1)
-    [ "$merged_tree" = "$default_tree" ] && return 0
-  fi
   if task_git "$WT" remote get-url origin >/dev/null 2>&1; then
     task_git "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
     ref="refs/remotes/origin/$name"
@@ -2486,13 +2476,14 @@ FMEOF
 
 teardown_herdr_require_prerequisites() {  # <task-id>
   local task_id=$1 prerequisite
+  # A missing adapter file cannot be caught by fm_backend_source's own return:
+  # `.` on an unreadable path terminates this shell outright under set -e, so
+  # the refusal has to be decided before the source is attempted.
   if [ ! -f "${FM_BACKEND_LIB_DIR:-$SCRIPT_DIR}/backends/herdr.sh" ]; then
     echo "error: herdr teardown prerequisites are unavailable for $task_id; nothing was changed - restore the adapter and rerun teardown" >&2
     return 1
   fi
-  if fm_backend_source herdr; then
-    :
-  else
+  if ! fm_backend_source herdr; then
     echo "error: herdr teardown prerequisites are unavailable for $task_id; nothing was changed - restore the adapter and rerun teardown" >&2
     return 1
   fi
@@ -2835,11 +2826,6 @@ fi
 # pruned code root. Best effort - a sweep failure never blocks this teardown.
 "$SCRIPT_DIR/fm-remote-job-reap-orphans.sh" >&2 || true
 
-# The task temporary root is private scratch. All worktree, landing, and
-# process-safety gates have completed before this point, so remove it before a
-# best-effort endpoint close can leave scratch behind on an adapter failure.
-[ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
-
 # A Herdr close may reposition shared workspace order, so the whole
 # destructive sequence below (worktree return, pane close, record removal)
 # runs under the named-session presentation lock, acquired BEFORE anything is
@@ -3003,6 +2989,7 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # only thing this path could delete here is whatever else happens to occupy that
 # absolute path on THIS machine - a task recorded before tasktmp= stopped naming
 # a local root for remote tasks still reaches this line.
+[ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 status_retire_presentation_task "$STATE" "$ID" || exit 1

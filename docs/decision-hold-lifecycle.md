@@ -93,7 +93,7 @@ The initial Bearings snapshot correctly has no open decision, and the new teardo
 A later regression covers tasks-axi's quoted multi-entry `blocked_by` output so `resolve` matches the first, middle, and last ids and rejects a genuinely absent id.
 
 Three further regressions cover the close paths that route no work.
-A declined decision closes with a recorded answer, satisfies `verify`, leaves Bearings' Captain's Call, and is refused while the hold still blocks routed work.
+A declined decision closes with a recorded answer, satisfies `verify`, leaves Bearings' Waiting on you, and is refused while the hold still blocks routed work.
 A hold closed by a direct `tasks-axi done` reproduces the shape that fails `verify` and blocks teardown, and `repair` with a captain decision file clears both.
 An unanswered decision still blocks completion and teardown, and neither `decline` nor `repair` can close a hold that is still actively held or supply an answer with a missing or empty decision file.
 `repair` also refuses a closed captain-kind task that was never held for the captain.

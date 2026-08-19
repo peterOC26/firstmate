@@ -3131,13 +3131,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
   fm_lock_release "$SPAWN_META_LOCK"
   SPAWN_META_LOCK_HELD=0
 fi
-if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
-  # The record is published, so this task is now part of the set a teardown
-  # enumerates and locks per task. The set lock is only needed across that
-  # publication.
-  SPAWN_TASK_SET_LOCK_HELD=0
-  fm_lock_release "$SPAWN_TASK_SET_LOCK"
-  fi
 if [ "$RELAUNCH" -ne 1 ]; then
   # Do not replace an existing non-regular metadata destination with the
   # atomic rename.
@@ -3150,6 +3143,13 @@ if [ "$RELAUNCH" -ne 1 ]; then
     exit 1
   }
   META_TMP=
+fi
+if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
+  # The record is published, so this task is now part of the set a teardown
+  # enumerates and locks per task. The set lock is only needed across that
+  # publication.
+  SPAWN_TASK_SET_LOCK_HELD=0
+  fm_lock_release "$SPAWN_TASK_SET_LOCK"
 fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
