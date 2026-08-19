@@ -197,6 +197,9 @@ teardown_release_locks() {
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
+  if declare -F task_remote_exec_release >/dev/null 2>&1; then
+    task_remote_exec_release || true
+  fi
   for ((i=${#DESCENDANT_LOCK_PATHS[@]} - 1; i >= 0; i--)); do
     fm_lock_release "${DESCENDANT_LOCK_PATHS[$i]}" || true
   done
@@ -759,7 +762,7 @@ fi
 # checks below can see the task's files at all, so a normal teardown refuses
 # here; --force is the approved discard path and continues without them.
 if [ "$TASK_REMOTE" = 1 ]; then
-  trap 'task_remote_exec_release' EXIT INT TERM
+  trap 'task_remote_exec_release' INT TERM
   if ! task_remote_exec_open; then
     if [ "$FORCE" != "--force" ]; then
       echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to inspect $ID for uncommitted or unlanded work; preserving task state." >&2
@@ -1103,7 +1106,7 @@ content_in_default() {
   if task_git "$WT" remote get-url origin >/dev/null 2>&1; then
     task_git "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
     ref="refs/remotes/origin/$name"
-  elif task_git "$WT" rev-parse --quiet --verify "$local_ref^{tree}" >/dev/null 2>&1; then
+  elif task_git "$WT" rev-parse --quiet --verify "$local_ref" >/dev/null 2>&1; then
     ref="$local_ref"
   else
     return 1

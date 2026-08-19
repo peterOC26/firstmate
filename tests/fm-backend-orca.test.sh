@@ -578,7 +578,7 @@ test_remote_teardown_refuses_uncommitted_work_on_the_host() {
 }
 
 test_remote_teardown_refuses_when_the_host_is_unreachable() {
-  local id out status
+  local id out status retry retry_status
   id="orcaremotez6"
   remote_spawn_case remote-td-unreachable "$id"
   remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
@@ -592,6 +592,17 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
   assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
     "an unreachable host must not lead to removing the worktree anyway"
   assert_grep "orca_remote=1" "$STATE/$id.meta" "a refused cleanup must preserve the task record"
+  [ ! -e "$STATE/.control-$id.lock" ] \
+    || fail "the refusal left the lifecycle control lock behind, held by a pid that is already gone"
+  [ ! -e "$STATE/.meta-$id.lock" ] \
+    || fail "the refusal left the task metadata lock behind, held by a pid that is already gone"
+  retry=$(run_remote_teardown "$id")
+  retry_status=$?
+  [ "$retry_status" -ne 0 ] || fail "the retry must still refuse while the host stays unreachable"
+  assert_not_contains "$retry" "another lifecycle action is already running" \
+    "the retry the refusal instructs the operator to run must not be blocked by the previous run's own lock"
+  assert_contains "$retry" "cannot reach Orca host" \
+    "the retry must reach the real unreachable-host refusal, not a stale-lock refusal"
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
 }
 
@@ -783,7 +794,10 @@ test_remote_teardown_releases_work_already_landed_on_the_host() {
   git -C "$WT" -c user.email=t@example.com -c user.name=t commit -qm "landed change"
   # Fast-forwarded into the project's default branch, with no remote configured -
   # so the commit is still listed by HEAD --not --remotes and only the
-  # landed-work check can tell that it is safe to release.
+  # landed-work check can tell that it is safe to release. fm_git_worktree
+  # attaches an origin to every case, so this one drops it again to be the
+  # clone-with-no-forge shape the landed-work fallback exists for.
+  git -C "$PROJ" remote remove origin
   git -C "$PROJ" merge --ff-only -q "fm/$id"
   [ ! -d /fm-hostonly ] || fail "the host prefix must not exist on the caller's filesystem"
   fm_write_meta "$STATE/$id.meta" \
