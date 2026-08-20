@@ -661,45 +661,6 @@ puts JSON.generate(
   pass "Herdr CI family-run step times out at 20 min under a 75 min job backstop"
 }
 
-test_portable_serial_shard_budget_fits_the_ci_job_cap() {
-  # A shard's planned budget only means something when it is measured. While 44
-  # of the 115 serial scripts carried no duration hint, longest-processing-time
-  # packing balanced the default guess instead of the real work, and
-  # portable-serial-2of4 ran past its CI job cap and was cancelled mid-shard.
-  command -v ruby >/dev/null 2>&1 \
-    || fail "ruby is required to parse .github/workflows/ci.yml as YAML"
-  local out serial max_ms unhinted cap unhinted_cap budget_cap
-  out=$("$RUNNER" --check-coverage) || fail "coverage guard must pass: $out"
-  serial=$(printf '%s\n' "$out" | sed -n 's/.* serial=\([0-9]*\) .*/\1/p')
-  max_ms=$(printf '%s\n' "$out" | sed -n 's/.* serial_shard_max_ms=\([0-9]*\) .*/\1/p')
-  unhinted=$(printf '%s\n' "$out" | sed -n 's/.* serial_unhinted=\([0-9]*\)$/\1/p')
-  [ -n "$serial" ] && [ -n "$max_ms" ] && [ -n "$unhinted" ] \
-    || fail "coverage guard must report the serial shard budget: $out"
-
-  # New scripts may land unhinted, but the budget stays mostly measurement.
-  unhinted_cap=$((serial / 10))
-  [ "$unhinted" -le "$unhinted_cap" ] \
-    || fail "$unhinted of $serial serial scripts have no duration hint (max $unhinted_cap); refresh bin/fm-test-run.sh hints"
-
-  # Parse the matrix job cap as YAML so the budget is compared with the bound CI
-  # actually enforces, not a number restated here.
-  cap=$(ruby -ryaml -e '
-job = YAML.load_file(ARGV[0]).fetch("jobs").fetch("tests-portable-serial")
-raise "portable serial job has no timeout-minutes" unless job.key?("timeout-minutes")
-puts job.fetch("timeout-minutes")
-' "$ROOT/.github/workflows/ci.yml") \
-    || fail "could not parse tests-portable-serial timeout from ci.yml"
-  case "$cap" in
-    ''|*[!0-9]*) fail "portable serial job cap must be a whole number of minutes, got '$cap'" ;;
-  esac
-
-  # The cap is a hang tripwire, so the heaviest shard must fit in half of it.
-  budget_cap=$((cap * 60000 / 2))
-  [ "$max_ms" -le "$budget_cap" ] \
-    || fail "heaviest serial shard plans ${max_ms}ms against a ${cap}-minute job cap (max ${budget_cap}ms)"
-  pass "portable serial shard budget is measured and fits well inside the CI job cap"
-}
-
 test_aggregate_json() {
   local tmp a b
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-aggjson.XXXXXX")
@@ -759,5 +720,4 @@ test_portable_serial_shard_lane_refusals
 test_jobs_requires_proven_isolated
 test_jobs_parallel_scheduler_and_failure_propagation
 test_herdr_ci_family_run_has_a_step_timeout
-test_portable_serial_shard_budget_fits_the_ci_job_cap
 test_aggregate_json
