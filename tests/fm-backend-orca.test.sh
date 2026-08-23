@@ -2626,15 +2626,52 @@ local_orca_absent_case() {  # <prefix> <id> -> sets LOCAL_ORCA_STATE LOCAL_ORCA_
   LOCAL_ORCA_STATE="$TMP_ROOT/$prefix-state"
   LOCAL_ORCA_DATA="$TMP_ROOT/$prefix-data"
   LOCAL_ORCA_CONFIG="$TMP_ROOT/$prefix-config"
+  LOCAL_ORCA_WT="$TMP_ROOT/$prefix-wt"
+  LOCAL_ORCA_PROJECT="$TMP_ROOT/$prefix-project"
   mkdir -p "$LOCAL_ORCA_DATA/$id" "$LOCAL_ORCA_STATE" "$LOCAL_ORCA_CONFIG"
   printf 'report\n' > "$LOCAL_ORCA_DATA/$id/report.md"
   touch "$LOCAL_ORCA_STATE/.last-watcher-beat"
   fm_write_meta "$LOCAL_ORCA_STATE/$id.meta" \
     "window=fm-$id" "endpoint_task_id=$id" "terminal=term-$id" \
-    "worktree=$TMP_ROOT/$prefix-wt" "project=$TMP_ROOT/$prefix-project" \
+    "worktree=$LOCAL_ORCA_WT" "project=$LOCAL_ORCA_PROJECT" \
     "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
     "backend=orca" "orca_worktree_id=wt-$id" \
     "decisions_reviewed=1" "decision_keys="
+}
+
+arm_orca_task_artifacts() {  # <state> <id>
+  local state=$1 id=$2
+  printf 'status\n' > "$state/$id.status"
+  printf 'turn ended\n' > "$state/$id.turn-ended"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$state/$id.check.sh"
+  printf 'trusted check\n' > "$state/$id.check-trust"
+  printf 'poll data\n' > "$state/$id.pr-poll"
+  printf 'poll registration\n' > "$state/$id.pr-poll-registration"
+  chmod 600 "$state/$id.check.sh" "$state/$id.check-trust" \
+    "$state/$id.pr-poll" "$state/$id.pr-poll-registration"
+}
+
+assert_orca_task_artifacts_present() {  # <state> <id> <label>
+  local state=$1 id=$2 label=$3 suffix
+  for suffix in meta status turn-ended check.sh check-trust pr-poll pr-poll-registration; do
+    assert_present "$state/$id.$suffix" "$label lost $id.$suffix"
+  done
+}
+
+assert_local_checkout_preservation_refusal() {  # <output> <worktree>
+  local out=$1 worktree=$2
+  assert_contains "$out" "recorded local checkout directory $worktree still exists" \
+    "the refusal did not name the surviving recorded checkout"
+  assert_contains "$out" "Land or discard the contents of $worktree, then remove that directory. After it is removed, rerun with --force to retire the remaining task state." \
+    "the refusal did not give the required checkout-resolution action"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "a surviving local checkout was reported as an unreachable host"
+  assert_not_contains "$out" "no longer exists" \
+    "a surviving local checkout was reported as already gone"
+  assert_not_contains "$out" "already absent" \
+    "a surviving local checkout was reported as already absent"
+  assert_not_contains "$out" "nothing left to release" \
+    "a surviving local checkout was reported as leaving nothing to release"
 }
 
 run_local_orca_teardown() {  # <id> [<extra args>...]
@@ -2719,6 +2756,56 @@ test_local_orca_force_teardown_retires_an_absent_worktree_but_not_an_unproven_on
   assert_present "$LOCAL_ORCA_STATE/$id.meta" \
     "an unproven Orca removal failure removed task metadata"
   pass "fm-teardown.sh backend=orca --force: retires a proven-absent local worktree and still refuses an unproven one"
+}
+
+test_local_orca_teardown_preserves_an_existing_checkout_missing_from_orca() {
+  local id out rc log_text
+  id="orcalocalcheckoutz1"
+  orca_case local-orca-checkout-refuse
+  local_orca_absent_case local-orca-checkout-refuse "$id"
+  fm_git_worktree "$LOCAL_ORCA_PROJECT" "$LOCAL_ORCA_WT" "fm/$id"
+  arm_orca_task_artifacts "$LOCAL_ORCA_STATE" "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  set +e
+  out=$(run_local_orca_teardown "$id")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "ordinary teardown removed a checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$LOCAL_ORCA_WT"
+  assert_orca_task_artifacts_present "$LOCAL_ORCA_STATE" "$id" \
+    "ordinary local-checkout refusal"
+  assert_present "$LOCAL_ORCA_WT" "ordinary local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "ordinary local-checkout refusal closed the terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "ordinary local-checkout refusal called worktree removal"
+
+  id="orcalocalcheckoutz2"
+  orca_case local-orca-checkout-force-refuse
+  local_orca_absent_case local-orca-checkout-force-refuse "$id"
+  fm_git_worktree "$LOCAL_ORCA_PROJECT" "$LOCAL_ORCA_WT" "fm/$id"
+  arm_orca_task_artifacts "$LOCAL_ORCA_STATE" "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  set +e
+  out=$(run_local_orca_teardown "$id" --force)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "--force removed a checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$LOCAL_ORCA_WT"
+  assert_orca_task_artifacts_present "$LOCAL_ORCA_STATE" "$id" \
+    "forced local-checkout refusal"
+  assert_present "$LOCAL_ORCA_WT" "forced local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "forced local-checkout refusal closed the terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "forced local-checkout refusal called worktree removal"
+  pass "fm-teardown.sh backend=orca: preserves a surviving checkout missing from Orca with and without --force"
 }
 
 test_scout_teardown_refuses_orca_missing_report_when_path_missing() {
@@ -3042,6 +3129,53 @@ test_secondmate_force_teardown_retires_a_local_orca_child_whose_worktree_is_gone
   assert_absent "$home/state/domain.meta" \
     "--force left the parent record behind after retiring its only child"
   pass "fm-teardown.sh --force: retires a local Orca child whose worktree Orca no longer records"
+}
+
+test_secondmate_force_teardown_preserves_a_local_orca_child_checkout_missing_from_orca() {
+  local home subhome childproj childwt child_id neutral out rc log_text
+  child_id="orcachildcheckoutz1"
+  home="$TMP_ROOT/orca-local-child-checkout-parent"
+  subhome="$TMP_ROOT/orca-local-child-checkout-secondmate"
+  childproj="$subhome/projects/alpha"
+  childwt="$TMP_ROOT/orca-local-child-checkout-wt"
+  mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
+  printf 'domain\n' > "$subhome/.fm-secondmate-home"
+  fm_git_worktree "$childproj" "$childwt" "fm/$child_id"
+  fm_write_meta "$home/state/domain.meta" \
+    "window=firstmate:fm-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "home=$subhome" "projects=alpha"
+  printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
+    > "$home/data/secondmates.md"
+  fm_write_meta "$subhome/state/$child_id.meta" \
+    "window=fm-$child_id" "endpoint_task_id=$child_id" \
+    "terminal=term-$child_id" "worktree=$childwt" "project=$childproj" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
+    "backend=orca" "orca_worktree_id=wt-$child_id"
+  arm_orca_task_artifacts "$subhome/state" "$child_id"
+  orca_case secondmate-local-child-checkout-refuse
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "forced secondmate teardown removed a local child checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$childwt"
+  assert_orca_task_artifacts_present "$subhome/state" "$child_id" \
+    "forced child local-checkout refusal"
+  assert_present "$home/state/domain.meta" \
+    "forced child local-checkout refusal removed parent metadata"
+  assert_present "$childwt" "forced child local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "forced child local-checkout refusal closed the child terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "forced child local-checkout refusal called child worktree removal"
+  pass "fm-teardown.sh --force: preserves a local child checkout missing from Orca"
 }
 
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
@@ -3422,6 +3556,7 @@ test_teardown_removes_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
 test_local_orca_teardown_refuses_an_absent_worktree_without_discard_authority
 test_local_orca_force_teardown_retires_an_absent_worktree_but_not_an_unproven_one
+test_local_orca_teardown_preserves_an_existing_checkout_missing_from_orca
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
 test_ship_teardown_refuses_orca_missing_worktree_path
 test_ship_teardown_removes_orca_worktree_when_id_path_matches
@@ -3431,6 +3566,7 @@ test_teardown_refuses_orca_missing_worktree_id
 test_teardown_refuses_orca_worktree_without_terminal_handle
 test_secondmate_force_teardown_removes_orca_child_via_orca
 test_secondmate_force_teardown_retires_a_local_orca_child_whose_worktree_is_gone
+test_secondmate_force_teardown_preserves_a_local_orca_child_checkout_missing_from_orca
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child
 test_secondmate_force_teardown_verifies_remote_orca_child_identity

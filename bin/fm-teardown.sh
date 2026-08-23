@@ -793,8 +793,6 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   [ -z "$T_ORCA" ] || T=$T_ORCA
 fi
 
-# One inspection shell for the whole teardown of a remote task, opened before
-# the first check and released on every exit. Without it none of the protective
 # orca_worktree_presence_rc: is <worktree-id> still in Orca's own inventory?
 # 0 present, 1 gone for certain, 2 cannot tell. An adapter that will not load
 # answers 2, never 1: "could not ask" and "asked, and it is gone" are the two
@@ -808,6 +806,8 @@ orca_worktree_presence_rc() {  # <worktree-id>
   fm_backend_orca_worktree_presence "$1"
 }
 
+# One inspection shell for the whole teardown of a remote task, opened before
+# the first check and released on every exit. Without it none of the protective
 # checks below can see the task's files at all, so a normal teardown refuses
 # here; --force is the approved discard path and continues without them.
 if [ "$TASK_REMOTE" = 1 ]; then
@@ -1865,8 +1865,17 @@ EOF
 }
 
 require_orca_worktree_path_match() {
-  local worktree_id=$1 inspected=$2 resolved inspected_abs resolved_abs
+  local worktree_id=$1 inspected=$2 label=${3:-task $ID} resolved inspected_abs resolved_abs presence_rc
   resolved=$(fm_backend_worktree_path orca "$worktree_id") || {
+    presence_rc=0
+    if [ "$TASK_REMOTE" != 1 ] && [ -n "$inspected" ] && [ -e "$inspected" ]; then
+      orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
+      if [ "$presence_rc" -eq 1 ]; then
+        echo "REFUSED: Orca no longer records worktree $worktree_id for $label, but the recorded local checkout directory $inspected still exists; preserving every task artifact." >&2
+        echo "Land or discard the contents of $inspected, then remove that directory. After it is removed, rerun with --force to retire the remaining task state." >&2
+        return 1
+      fi
+    fi
     echo "REFUSED: cannot resolve Orca worktree id $worktree_id to a path; preserving metadata." >&2
     return 1
   }
@@ -2596,7 +2605,7 @@ validate_firstmate_home_children_removal() {
       elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
+        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" "child $child_id" || return 1
       fi
     elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
       child_proj=$(meta_value "$child_meta" project)
