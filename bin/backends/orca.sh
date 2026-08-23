@@ -350,6 +350,35 @@ fm_backend_orca_worktree_host() {
   printf '%s' "$host"
 }
 
+# fm_backend_orca_worktree_presence: ask Orca whether <worktree-id> is still in
+# its authoritative inventory. Returns 0 when present, 1 only for Orca's exact
+# selector-not-found answer, and 2 when the answer cannot be obtained or parsed.
+# That third state must never be treated as absence: an unreachable runtime and
+# a malformed reply preserve work just as an unreachable task host does.
+fm_backend_orca_worktree_presence() {  # <worktree-id>
+  local worktree_id=${1:-} out code
+  [ -n "$worktree_id" ] || return 2
+  fm_backend_orca_tool_check || return 2
+  out=$(orca worktree show --worktree "id:$worktree_id" --json 2>/dev/null) || return 2
+  if printf '%s' "$out" | fm_backend_orca_json_get worktree-path >/dev/null 2>&1; then
+    return 0
+  fi
+  code=$(printf '%s' "$out" | node -e '
+const fs = require("fs");
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(0, "utf8"));
+} catch (_) {
+  process.exit(2);
+}
+const code = data && data.ok === false && data.error && data.error.code;
+if (typeof code !== "string" || code.length === 0) process.exit(1);
+process.stdout.write(code);
+' 2>/dev/null) || return 2
+  [ "$code" = selector_not_found ] && return 1
+  return 2
+}
+
 fm_backend_orca_capture() {  # <terminal-id> <lines>
   local terminal=$1 lines=${2:-40} out
   fm_backend_orca_tool_check || return 1
@@ -488,6 +517,11 @@ FM_BACKEND_ORCA_EXEC_INTERVAL=${FM_BACKEND_ORCA_EXEC_INTERVAL:-0.5}
 # (raise this when a slow host fetch causes a refusal). Exceeding even this stays
 # a transport failure that refuses - never a silent pass.
 FM_BACKEND_ORCA_EXEC_FETCH_POLLS=${FM_BACKEND_ORCA_EXEC_FETCH_POLLS:-1200}
+# A fetch-class wait stays quiet on its ordinary fast path, then reports bounded
+# progress at this many unanswered polls. At the default interval, 20 polls is
+# ten seconds - frequent enough to distinguish a slow network from a frozen
+# teardown without printing on every read.
+FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS=${FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS:-20}
 # Set for the duration of one fetch-class call; empty means the ordinary budget.
 FM_BACKEND_ORCA_EXEC_POLL_BUDGET=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-}
 # Only how wide each read is, never a correctness bound - and widening it is not
@@ -499,6 +533,26 @@ FM_BACKEND_ORCA_EXEC_POLL_BUDGET=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-}
 FM_BACKEND_ORCA_EXEC_READ_LIMIT=${FM_BACKEND_ORCA_EXEC_READ_LIMIT:-2000}
 FM_BACKEND_ORCA_PUSH_CHUNK=${FM_BACKEND_ORCA_PUSH_CHUNK:-2000}
 FM_BACKEND_ORCA_EXEC_SEQ=0
+
+fm_backend_orca_exec_progress() {  # <task-id> <host> <operation> <poll> <budget>
+  local task=$1 host=$2 operation=$3 poll=$4 budget=$5
+  local fd=${FM_BACKEND_ORCA_EXEC_PROGRESS_FD:-}
+  case "$fd" in
+    ''|*[!0-9]*)
+      printf 'orca: task %s on host %s is still waiting for %s (poll %s of %s)\n' \
+        "$task" "$host" "$operation" "$poll" "$budget" >&2
+      ;;
+    *)
+      if [ -e "/dev/fd/$fd" ]; then
+        printf 'orca: task %s on host %s is still waiting for %s (poll %s of %s)\n' \
+          "$task" "$host" "$operation" "$poll" "$budget" >&"$fd"
+      else
+        printf 'orca: task %s on host %s is still waiting for %s (poll %s of %s)\n' \
+          "$task" "$host" "$operation" "$poll" "$budget" >&2
+      fi
+      ;;
+  esac
+}
 
 # The markers are what tell this reply apart from every other reply the same
 # terminal is still holding, so the nonce has to be unique per INVOCATION. The
@@ -570,10 +624,14 @@ FM_BACKEND_ORCA_EXEC_MAX_SLICES=${FM_BACKEND_ORCA_EXEC_MAX_SLICES:-4096}
 # Prints "<rc> <declared-len> <payload>"; returns non-zero only on transport
 # failure, so a caller can tell "could not ask" from "asked, and the answer was".
 fm_backend_orca_exec_marked() {  # <handle> <command>
-  local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0 budget
+  local handle=$1 command=$2 nonce start wrapped out text payload rc declared i=0 budget progress_every
   budget=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-$FM_BACKEND_ORCA_EXEC_POLLS}
   case "$budget" in
     ''|*[!0-9]*) budget=$FM_BACKEND_ORCA_EXEC_POLLS ;;
+  esac
+  progress_every=$FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS
+  case "$progress_every" in
+    ''|0|*[!0-9]*) progress_every=20 ;;
   esac
   nonce=$(fm_backend_orca_exec_nonce)
   start=$(fm_backend_orca_exec_cursor "$handle") || {
@@ -594,6 +652,13 @@ fm_backend_orca_exec_marked() {  # <handle> <command>
       esac
     fi
     i=$((i + 1))
+    if [ -n "${FM_BACKEND_ORCA_EXEC_WAIT_OPERATION:-}" ] \
+      && [ $((i % progress_every)) -eq 0 ]; then
+      fm_backend_orca_exec_progress \
+        "${FM_BACKEND_ORCA_EXEC_TASK_ID:-<unknown>}" \
+        "${FM_BACKEND_ORCA_EXEC_HOST:-<unknown>}" \
+        "$FM_BACKEND_ORCA_EXEC_WAIT_OPERATION" "$i" "$budget"
+    fi
     if [ "$i" -ge "$budget" ]; then
       echo "error: Orca inspection command did not complete on terminal $handle within the poll budget" >&2
       return "$FM_BACKEND_ORCA_EXEC_TRANSPORT_RC"
@@ -871,6 +936,7 @@ fm_backend_orca_shell_quote() {  # <word>
 fm_backend_orca_remote_git() {  # <handle> <worktree-path> <git-arg>...
   local handle=$1 worktree=$2 cmd out rc arg verb='' wants_value=0
   local FM_BACKEND_ORCA_EXEC_POLL_BUDGET=${FM_BACKEND_ORCA_EXEC_POLL_BUDGET:-}
+  local FM_BACKEND_ORCA_EXEC_WAIT_OPERATION=${FM_BACKEND_ORCA_EXEC_WAIT_OPERATION:-}
   shift 2
   cmd="git -C $(fm_backend_orca_shell_quote "$worktree")"
   # The verb is the first argument that is neither an option nor an option's
@@ -892,7 +958,10 @@ fm_backend_orca_remote_git() {  # <handle> <worktree-path> <git-arg>...
   # "could not ask" to the landed-work chain, which then refuses work that has
   # in fact landed.
   case "$verb" in
-    fetch|pull|push|clone|ls-remote) FM_BACKEND_ORCA_EXEC_POLL_BUDGET=$FM_BACKEND_ORCA_EXEC_FETCH_POLLS ;;
+    fetch|pull|push|clone|ls-remote)
+      FM_BACKEND_ORCA_EXEC_POLL_BUDGET=$FM_BACKEND_ORCA_EXEC_FETCH_POLLS
+      FM_BACKEND_ORCA_EXEC_WAIT_OPERATION="git $verb"
+      ;;
   esac
   while [ "$#" -gt 0 ]; do
     cmd="$cmd $(fm_backend_orca_shell_quote "$1")"

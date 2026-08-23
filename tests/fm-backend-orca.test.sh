@@ -556,6 +556,7 @@ run_remote_teardown() {  # <id> [<extra args>...]
     FM_BACKEND_ORCA_EXEC_POLLS="${FM_BACKEND_ORCA_EXEC_POLLS:-}" \
     FM_BACKEND_ORCA_EXEC_INTERVAL="${FM_BACKEND_ORCA_EXEC_INTERVAL:-}" \
     FM_BACKEND_ORCA_EXEC_FETCH_POLLS="${FM_BACKEND_ORCA_EXEC_FETCH_POLLS:-}" \
+    FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS="${FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS:-}" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
 }
@@ -603,7 +604,41 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
     "the retry the refusal instructs the operator to run must not be blocked by the previous run's own lock"
   assert_contains "$retry" "cannot reach Orca host" \
     "the retry must reach the real unreachable-host refusal, not a stale-lock refusal"
+  assert_not_contains "$retry" "no longer exists" \
+    "a present worktree on an unreachable host must not be reported as absent"
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
+}
+
+test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes() {
+  local id out status forced forced_status
+  id="orcaremotez21"
+  remote_spawn_case remote-td-absent-worktree "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf '{"ok":false,"error":{"code":"selector_not_found"}}\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/terminal-create.exit"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an absent recorded worktree must require explicit discard authority"
+  assert_contains "$out" "recorded Orca worktree" "the refusal did not name the absent recorded worktree"
+  assert_contains "$out" "no longer exists" "the refusal did not state that the worktree is gone"
+  assert_contains "$out" "rerun with --force" "the refusal did not name the remaining authorization step"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "an absent worktree was incorrectly reported as an unreachable host"
+  assert_present "$STATE/$id.meta" "the ordinary absent-worktree refusal removed task metadata"
+
+  forced=$(run_remote_teardown "$id" --force)
+  forced_status=$?
+  expect_code 0 "$forced_status" "--force must retire state after Orca already removed the worktree and terminal"$'\n'"$forced"
+  assert_contains "$forced" "already absent" "the forced path did not preserve the accurate absent-worktree diagnosis"
+  assert_not_contains "$forced" "cannot resolve Orca worktree id" \
+    "the forced absent-worktree path dead-ended on path resolution"
+  assert_not_contains "$forced" "cannot reach Orca host" \
+    "the forced absent-worktree path incorrectly claimed the host was unreachable"
+  assert_absent "$STATE/$id.meta" "--force left the local task record behind after the Orca worktree was already gone"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "--force asked Orca to remove a worktree already proven absent"
+  pass "fm-teardown.sh: distinguishes an absent Orca worktree and lets explicit --force retire the remaining local state"
 }
 
 # The forge answers for a merged PR whose head is <head>, recording the
@@ -857,15 +892,128 @@ test_remote_teardown_survives_a_slow_host_fetch() {
   # allowed; every other command still answers at once.
   out=$(FM_ORCA_FAKE_SLOW_MATCH="fetch" FM_ORCA_FAKE_SLOW_READS=6 \
     FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.05 \
-    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=60 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=60 FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS=2 \
     run_remote_teardown "$id")
   status=$?
   expect_code 0 "$status" "a slow host fetch must not be mistaken for a dead host"$'\n'"$out"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
     "a remote task whose work landed must be released even when the host's fetch is slow"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  assert_contains "$out" "task $id" "slow-network progress did not name the task"
+  assert_contains "$out" "host $FM_REMOTE_HOST" "slow-network progress did not name the Orca host"
+  assert_contains "$out" "waiting for git fetch" "slow-network progress did not name the network operation"
   rm -rf "/tmp/fm-$id"
   pass "fm-teardown.sh: releases a remote task whose landed-work fetch takes longer than an ordinary verdict check"
+}
+
+test_remote_teardown_interrupt_preserves_merge_poll_while_metadata_is_live() {
+  local id default neutral pid waited=0
+  id="orcaremotez22"
+  remote_spawn_case remote-td-interrupt "$id"
+  add_fake_gh_without_any_pr "$FB"
+  printf 'landed before interrupted teardown\n' > "$WT/landed.txt"
+  git -C "$WT" add landed.txt
+  git -C "$WT" -c user.email=t@example.com -c user.name=t commit -qm "landed change"
+  git -C "$PROJ" merge --ff-only -q "fm/$id"
+  fm_git_add_origin "$PROJ" "$CASE_DIR/origin.git"
+  default=$(git -C "$PROJ" rev-parse --abbrev-ref HEAD)
+  git -C "$PROJ" update-ref -d "refs/remotes/origin/$default" 2>/dev/null || true
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" \
+    "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/$id.check.sh"
+  printf 'trusted check\n' > "$STATE/$id.check-trust"
+  printf 'poll data\n' > "$STATE/$id.pr-poll"
+  printf 'poll registration\n' > "$STATE/$id.pr-poll-registration"
+  chmod 600 "$STATE/$id.check.sh" "$STATE/$id.check-trust" \
+    "$STATE/$id.pr-poll" "$STATE/$id.pr-poll-registration"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral-interrupt")
+
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_SLOW_MATCH=fetch FM_ORCA_FAKE_SLOW_READS=500 \
+    FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.02 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=500 FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS=2 \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" > "$CASE_DIR/interrupted.out" 2>&1 &
+  pid=$!
+  while ! grep -F "waiting for git fetch" "$CASE_DIR/interrupted.out" >/dev/null 2>&1; do
+    sleep 0.02
+    waited=$((waited + 1))
+    if [ "$waited" -ge 1500 ] || ! kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      fail "interrupted teardown never entered the observable network wait: $(cat "$CASE_DIR/interrupted.out")"
+    fi
+  done
+  kill -TERM "$pid" 2>/dev/null || true
+  sleep 0.1
+  kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+
+  assert_present "$STATE/$id.meta" "an interrupted pre-commit teardown removed task metadata"
+  assert_present "$STATE/$id.check.sh" "an interrupted pre-commit teardown removed the armed check"
+  assert_present "$STATE/$id.check-trust" "an interrupted pre-commit teardown removed check trust"
+  assert_present "$STATE/$id.pr-poll" "an interrupted pre-commit teardown removed the PR poll data"
+  assert_present "$STATE/$id.pr-poll-registration" "an interrupted pre-commit teardown removed the PR poll registration"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "the interrupted network wait reached destructive worktree removal"
+  pass "fm-teardown.sh: an interrupt before the final commit leaves task metadata and merge-poll artifacts intact"
+}
+
+test_remote_teardown_late_lock_wait_keeps_merge_poll_until_task_commit() {
+  local id neutral holder pid waited=0
+  id="orcaremotez23"
+  remote_spawn_case remote-td-late-lock "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'done: teardown may proceed\n' > "$STATE/$id.status"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/$id.check.sh"
+  printf 'trusted check\n' > "$STATE/$id.check-trust"
+  printf 'poll data\n' > "$STATE/$id.pr-poll"
+  printf 'poll registration\n' > "$STATE/$id.pr-poll-registration"
+  chmod 600 "$STATE/$id.check.sh" "$STATE/$id.check-trust" \
+    "$STATE/$id.pr-poll" "$STATE/$id.pr-poll-registration"
+  : > "$CASE_DIR/hold-status-lock"
+  FM_STATE_OVERRIDE="$STATE" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2"
+    : > "$3"
+    while [ -e "$4" ]; do sleep 0.02; done
+    fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$STATE/.status-presentation-lock" \
+    "$CASE_DIR/status-lock-ready" "$CASE_DIR/hold-status-lock" &
+  holder=$!
+  while [ ! -e "$CASE_DIR/status-lock-ready" ]; do sleep 0.02; done
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral-late-lock")
+
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" > "$CASE_DIR/late-lock.out" 2>&1 &
+  pid=$!
+  while ! grep -F $'orca\x1f''worktree'$'\x1f''rm' "$LOG" >/dev/null 2>&1; do
+    sleep 0.02
+    waited=$((waited + 1))
+    if [ "$waited" -ge 1500 ] || ! kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+      rm -f "$CASE_DIR/hold-status-lock"
+      wait "$holder" 2>/dev/null || true
+      fail "late-lock teardown never reached the post-worktree status-retirement wait"
+    fi
+  done
+  sleep 0.1
+  kill -0 "$pid" 2>/dev/null || fail "teardown did not wait on the held status-presentation lock"
+  assert_present "$STATE/$id.meta" "the late pre-commit wait removed task metadata"
+  assert_present "$STATE/$id.check.sh" "the late pre-commit wait removed the armed check"
+  assert_present "$STATE/$id.check-trust" "the late pre-commit wait removed check trust"
+  assert_present "$STATE/$id.pr-poll" "the late pre-commit wait removed PR poll data"
+  assert_present "$STATE/$id.pr-poll-registration" "the late pre-commit wait removed PR poll registration"
+  kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  rm -f "$CASE_DIR/hold-status-lock"
+  wait "$holder" 2>/dev/null || true
+  pass "fm-teardown.sh: even a late teardown wait keeps merge-poll artifacts while task metadata remains"
 }
 
 test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone() {
@@ -984,6 +1132,8 @@ test_remote_teardown_releases_a_clean_worktree() {
     "cleanup must release the recorded remote worktree through Orca"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-1' \
     "cleanup must close the recorded remote terminal"
+  assert_not_contains "$out" "is still waiting for" \
+    "ordinary short remote verdicts must not emit long-wait progress"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
   assert_absent "/tmp/fm-$id" "cleanup should sweep the task temp root it created on the host"
   rm -rf "/tmp/fm-$id"
@@ -2934,6 +3084,7 @@ test_spawn_refuses_remote_harness_the_host_cannot_resolve
 test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
+test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes
 test_remote_teardown_releases_work_already_landed_on_the_host
 test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
 test_remote_pr_discovery_names_the_task_s_own_forge_host
@@ -2941,6 +3092,8 @@ test_remote_pr_discovery_keeps_a_forge_port
 test_remote_pr_discovery_drops_an_ssh_transport_port
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_teardown_survives_a_slow_host_fetch
+test_remote_teardown_interrupt_preserves_merge_poll_while_metadata_is_live
+test_remote_teardown_late_lock_wait_keeps_merge_poll_until_task_commit
 test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_names_the_task_temp_root_it_could_not_sweep

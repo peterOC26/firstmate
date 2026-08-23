@@ -109,6 +109,9 @@
 # blocking teardown until `resolve` or `decline` closes it with the captain's word.
 # It also refuses an identity that does not carry surviving captain-hold
 # provenance, so an ordinary captain-kind task cannot be repaired into a decision.
+# Durable verification and repair also consult the markdown backend's configured
+# Done archive. A pruned closed hold still has to carry the same resolution body;
+# archival never weakens the decision gate or turns an absent record into success.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -212,6 +215,151 @@ require_tasks_axi() {
 
 task_show() {  # <id>
   tasks_axi show "$1" --full 2>/dev/null
+}
+
+# Read one string from the tiny [markdown] surface in tasks-axi's config.
+# tasks-axi itself intentionally supports only quoted scalar values here, so this
+# parser keeps the same deliberately narrow contract instead of growing a second
+# general TOML implementation.
+tasks_axi_markdown_config_value() {  # <config-path> <key>
+  local config=$1 key=$2
+  [ -f "$config" ] || return 1
+  awk -v wanted="$key" '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    {
+      line = trim($0)
+      if (line ~ /^\[[^]]+\]$/) {
+        section = line
+        gsub(/^[[:space:]]*\[|\][[:space:]]*$/, "", section)
+        in_markdown = (trim(section) == "markdown")
+        next
+      }
+      if (!in_markdown) next
+      equals = index(line, "=")
+      if (!equals) next
+      name = trim(substr(line, 1, equals - 1))
+      if (name != wanted) next
+      value = trim(substr(line, equals + 1))
+      quote = substr(value, 1, 1)
+      if (quote != "\"" && quote != "\047") next
+      value = substr(value, 2)
+      ending = index(value, quote)
+      if (!ending) next
+      print substr(value, 1, ending - 1)
+      found = 1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$config"
+}
+
+tasks_axi_archive_path() {
+  local project_config="$FM_HOME/.tasks.toml" user_config='' archive='' backlog=''
+  [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
+  archive=$(tasks_axi_markdown_config_value "$project_config" archive 2>/dev/null || true)
+  if [ -z "$archive" ] && [ -n "$user_config" ]; then
+    archive=$(tasks_axi_markdown_config_value "$user_config" archive 2>/dev/null || true)
+  fi
+  if [ -z "$archive" ]; then
+    backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
+    if [ -z "$backlog" ] && [ -n "$user_config" ]; then
+      backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
+    fi
+    if [ -z "$backlog" ]; then
+      if [ -f "$FM_HOME/backlog.md" ]; then
+        backlog=backlog.md
+      else
+        backlog=data/backlog.md
+      fi
+    fi
+    archive="$(dirname -- "$backlog")/done-archive.md"
+  fi
+  case "$archive" in
+    /*) printf '%s' "$archive" ;;
+    *) printf '%s/%s' "$FM_HOME" "$archive" ;;
+  esac
+}
+
+TASK_RECORD_SHOW=
+TASK_RECORD_FILE=
+archive_task_show() {  # <archive-path> <id>
+  # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
+  node -e '
+const fs = require("fs");
+const [archive, id] = process.argv.slice(1);
+let source;
+try { source = fs.readFileSync(archive, "utf8"); } catch (_) { process.exit(1); }
+const lines = source.split("\n");
+const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
+const matches = [];
+for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
+if (matches.length !== 1) process.exit(1);
+const start = matches[0];
+let end = start + 1;
+while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
+while (end > start + 1 && lines[end - 1] === "") end--;
+const header = lines[start];
+const checkbox = header.match(/^- \[([ x])\]/);
+const kind = header.match(/\(kind: ([^)]+)\)/);
+const holdKind = header.match(/\(hold-kind: ([^)]+)\)/);
+const body = lines.slice(start + 1, end).map((line) => line.startsWith("  ") ? line.slice(2) : line).join("\n");
+process.stdout.write(`  state: ${checkbox && checkbox[1] === "x" ? "done" : "queued"}\n`);
+process.stdout.write("  held: no\n");
+process.stdout.write(`  kind: ${kind ? kind[1] : ""}\n`);
+process.stdout.write(`  hold_kind: ${holdKind ? holdKind[1] : ""}\n`);
+process.stdout.write(`  body: ${JSON.stringify(body)}\n`);
+' "$1" "$2"
+}
+
+archive_task_update_body() {  # <archive-path> <id> <body>
+  local archive=$1 id=$2 body=$3
+  # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
+  printf '%s' "$body" | node -e '
+const fs = require("fs");
+const path = require("path");
+const [archive, id] = process.argv.slice(1);
+const body = fs.readFileSync(0, "utf8");
+let source;
+try { source = fs.readFileSync(archive, "utf8"); } catch (_) { process.exit(1); }
+const lines = source.split("\n");
+const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
+const matches = [];
+for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
+if (matches.length !== 1) process.exit(1);
+const start = matches[0];
+let end = start + 1;
+while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
+const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
+lines.splice(start + 1, end - start - 1, ...replacement);
+const next = lines.join("\n");
+try {
+  if (fs.readFileSync(archive, "utf8") !== source) process.exit(2);
+  const tmp = path.join(path.dirname(archive), `.${path.basename(archive)}.repair-${process.pid}-${Date.now()}`);
+  fs.writeFileSync(tmp, next, {encoding: "utf8", flag: "wx", mode: fs.statSync(archive).mode & 0o777});
+  try { fs.renameSync(tmp, archive); } catch (error) { try { fs.unlinkSync(tmp); } catch (_) {} throw error; }
+} catch (_) {
+  process.exit(1);
+}
+' "$archive" "$id"
+}
+
+task_record_locate() {  # <id>; sets TASK_RECORD_SHOW and TASK_RECORD_FILE
+  local id=$1 archive
+  TASK_RECORD_SHOW=
+  TASK_RECORD_FILE=
+  if TASK_RECORD_SHOW=$(task_show "$id"); then
+    return 0
+  fi
+  archive=$(tasks_axi_archive_path) || return 1
+  [ -f "$archive" ] || return 1
+  TASK_RECORD_SHOW=$(archive_task_show "$archive" "$id" 2>/dev/null) || return 1
+  TASK_RECORD_FILE=$archive
 }
 
 show_field() {  # <show-output> <field>
@@ -348,8 +496,12 @@ verify_hold_resolved() {  # <hold-id>
 }
 
 verify_hold_durable() {  # <hold-id>
-  local id=$1 show state held kind hold_kind body
-  show=$(task_show "$id") || fail "captain decision $id is absent from $FM_HOME/data/backlog.md"
+  local id=$1 show state held kind hold_kind body archive
+  if ! task_record_locate "$id"; then
+    archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+    fail "captain decision $id is absent from the active backlog and configured archive $archive"
+  fi
+  show=$TASK_RECORD_SHOW
   state=$(show_field "$show" state)
   held=$(show_field "$show" held)
   kind=$(show_field "$show" kind)
@@ -800,7 +952,7 @@ command_decline() {
 }
 
 command_repair() {
-  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body
+  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body record_file archive
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   shift 2
   decision_file=$(parse_decision_only_flags "$@") || exit 2
@@ -809,7 +961,12 @@ command_repair() {
   load_decision "$decision_file"
   require_tasks_axi
   id=$(hold_id "$origin" "$key")
-  show=$(task_show "$id") || fail "captain decision $id is absent from $FM_HOME/data/backlog.md"
+  if ! task_record_locate "$id"; then
+    archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+    fail "captain decision $id is absent from the active backlog and configured archive $archive"
+  fi
+  show=$TASK_RECORD_SHOW
+  record_file=$TASK_RECORD_FILE
   kind=$(show_field "$show" kind)
   [ "$kind" = captain ] || fail "backlog item $id is not kind captain"
   # tasks-axi keeps hold_kind after a close, so it is the surviving proof that
@@ -828,11 +985,18 @@ command_repair() {
   [ "$state" = "done" ] \
     || fail "captain hold $id is still open (state=$state); use resolve or decline to close it with the captain's decision"
   body=$(resolution_body repaired "$ROUTED_NONE")
-  tasks_axi update "$id" --body "$body" >/dev/null \
-    || fail "could not record the captain decision on $id"
-  show=$(task_show "$id") || fail "captain decision $id disappeared while recording the repair"
+  if [ -n "$record_file" ]; then
+    archive_task_update_body "$record_file" "$id" "$body" \
+      || fail "could not record the captain decision on archived hold $id"
+  else
+    tasks_axi update "$id" --body "$body" >/dev/null \
+      || fail "could not record the captain decision on $id"
+  fi
+  task_record_locate "$id" || fail "captain decision $id disappeared while recording the repair"
+  show=$TASK_RECORD_SHOW
   [ "$(show_field "$show" state)" = "done" ] || fail "repairing $id reopened a closed captain decision"
-  verify_hold_resolved "$id" || fail "captain hold $id did not retain its durable resolution record"
+  body_has_resolution_record "$(show_field "$show" body)" \
+    || fail "captain hold $id did not retain its durable resolution record"
   printf 'repaired: %s\n' "$id"
 }
 

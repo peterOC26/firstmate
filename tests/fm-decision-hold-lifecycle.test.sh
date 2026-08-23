@@ -770,6 +770,81 @@ test_out_of_band_close_is_repairable_before_teardown() {
   pass "a decision closed outside the script is repairable and then clears teardown"
 }
 
+test_archived_decisions_keep_the_scout_completion_gate_strong() {
+  local home id hold decision_key
+  home=$(make_home archived-completion-gate)
+  cat > "$home/.tasks.toml" <<'EOF'
+backend = "markdown"
+
+[markdown]
+path = "data/backlog.md"
+archive = "data/decisions/closed.md"
+done_keep = 10
+EOF
+
+  id=sample-archived-resolved-review
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Review an archived resolved choice" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Archived resolved review\n\nThe captain choice is recorded.\n' > "$home/data/$id/report.md"
+  hold=$(run_decisions "$home" hold "$id" route \
+    --title "Choose the archived route" --reason "captain archived route pending" --repo sample)
+  run_decisions "$home" complete "$id" route >/dev/null
+  printf 'Use the archived north route.\n' > "$home/resolved-decision.txt"
+  run_decisions "$home" answer "$id" route --decision-file "$home/resolved-decision.txt" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  assert_no_grep "$hold" "$home/data/backlog.md" "the resolved hold remained in the live Done window"
+  assert_grep "$hold" "$home/data/decisions/closed.md" "the configured archive did not receive the resolved hold"
+  run_decisions "$home" verify "$id" >/dev/null \
+    || fail "a durable decision in the configured archive did not satisfy verification"
+  run_teardown "$home" "$id" >/dev/null 2> "$home/resolved-teardown.err" \
+    || fail "a durable decision in the configured archive blocked teardown: $(cat "$home/resolved-teardown.err")"
+
+  id=sample-archived-unrepaired-review
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Review an archived unrepaired choice" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Archived unrepaired review\n\nThe answer still needs a durable body.\n' > "$home/data/$id/report.md"
+  hold=$(run_decisions "$home" hold "$id" submission \
+    --title "Choose the archived submission" --reason "captain archived submission pending" --repo sample)
+  run_decisions "$home" complete "$id" submission >/dev/null
+  tasks_in "$home" "done" "$hold" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  if run_decisions "$home" verify "$id" > "$home/unrepaired-verify.out" 2> "$home/unrepaired-verify.err"; then
+    fail "an archived hold without a durable captain decision satisfied verification"
+  fi
+  if run_teardown "$home" "$id" > "$home/unrepaired-teardown.out" 2> "$home/unrepaired-teardown.err"; then
+    fail "an archived hold without a durable captain decision allowed teardown"
+  fi
+  assert_present "$home/state/$id.meta" "the archived unresolved refusal removed task metadata"
+  printf 'Do not submit the archived sample.\n' > "$home/repaired-decision.txt"
+  run_decisions "$home" repair "$id" submission --decision-file "$home/repaired-decision.txt" >/dev/null \
+    || fail "repair could not update a closed hold in the configured archive"
+  assert_grep "Resolution mode: repaired" "$home/data/decisions/closed.md" \
+    "archive repair did not record its durable resolution body"
+  run_decisions "$home" verify "$id" >/dev/null \
+    || fail "the repaired archived decision did not satisfy verification"
+  run_teardown "$home" "$id" >/dev/null 2> "$home/repaired-teardown.err" \
+    || fail "the repaired archived decision still blocked teardown: $(cat "$home/repaired-teardown.err")"
+
+  id=sample-missing-archived-review
+  decision_key=missing-choice
+  mkdir -p "$home/data/$id"
+  write_origin_meta "$home" "$id"
+  printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$decision_key" >> "$home/state/$id.meta"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Missing archived review\n\nNo durable decision record exists.\n' > "$home/data/$id/report.md"
+  if run_teardown "$home" "$id" > "$home/missing-teardown.out" 2> "$home/missing-teardown.err"; then
+    fail "a decision absent from both the live backlog and configured archive allowed teardown"
+  fi
+  assert_grep "absent from the active backlog and configured archive" "$home/missing-teardown.err" \
+    "the missing decision refusal did not name both lookup locations"
+  assert_present "$home/state/$id.meta" "the absent-from-both refusal removed task metadata"
+  pass "archived durable decisions satisfy teardown, while missing or unresolved archived decisions still refuse and remain repairable"
+}
+
 # The unrouted close paths must not become a way past the gate. An unanswered
 # decision keeps blocking cleanup, and neither new path can manufacture an answer.
 test_unanswered_decision_still_blocks_completion_and_teardown() {
@@ -1165,6 +1240,7 @@ test_uninventoried_report_decision_refuses_completion
 test_scout_teardown_always_requires_inventory_verification
 test_declined_decision_closes_without_routed_work
 test_out_of_band_close_is_repairable_before_teardown
+test_archived_decisions_keep_the_scout_completion_gate_strong
 test_unanswered_decision_still_blocks_completion_and_teardown
 test_structured_holds_survive_teardown_and_route_resolution
 test_origin_slug_validation_precedes_path_construction
