@@ -356,10 +356,12 @@ fm_backend_orca_worktree_host() {
 # That third state must never be treated as absence: an unreachable runtime and
 # a malformed reply preserve work just as an unreachable task host does.
 fm_backend_orca_worktree_presence() {  # <worktree-id>
-  local worktree_id=${1:-} out code
+  local worktree_id=${1:-} out code _command_rc=0
   [ -n "$worktree_id" ] || return 2
   fm_backend_orca_tool_check || return 2
-  out=$(orca worktree show --worktree "id:$worktree_id" --json 2>/dev/null) || return 2
+  # Orca returns nonzero for structured selector errors, so retain that status
+  # separately while treating the JSON body as the authoritative verdict.
+  out=$(orca worktree show --worktree "id:$worktree_id" --json 2>/dev/null) || _command_rc=$?
   if printf '%s' "$out" | fm_backend_orca_json_get worktree-path >/dev/null 2>&1; then
     return 0
   fi

@@ -129,6 +129,7 @@ case "${1:-} ${2:-}" in
     ;;
   "worktree show")
     cat "$FIX/worktree-show.json"
+    [ ! -f "$FIX/worktree-show.exit" ] || exit "$(cat "$FIX/worktree-show.exit")"
     exit 0
     ;;
   "worktree rm")
@@ -615,6 +616,7 @@ test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes() {
   remote_spawn_case remote-td-absent-worktree "$id"
   remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
   printf '{"ok":false,"error":{"code":"selector_not_found"}}\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
   printf '1\n' > "$FIX/terminal-create.exit"
 
   out=$(run_remote_teardown "$id")
