@@ -925,6 +925,45 @@ test_live_backlog_record_outranks_its_archived_copy() {
   pass "a hold identity in both the live backlog and the archive is decided by the live record alone"
 }
 
+test_live_backlog_read_errors_never_fall_back_to_archive() {
+  local home origin key hold title reason
+  origin=sample-live-read-error
+  key=route
+  hold="$origin-decision-$key"
+  title="Choose the live error route"
+  reason="captain live error route pending"
+  home=$(make_home live-read-error)
+  seed_decision_origin "$home" "$origin" "$title"
+  run_decisions "$home" hold "$origin" "$key" --title "$title" --reason "$reason" --repo sample >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  printf 'Use the archived route from the previous incarnation.\n' > "$home/archived-decision.txt"
+  run_decisions "$home" answer "$origin" "$key" --decision-file "$home/archived-decision.txt" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  rehold_after_prune "$home" "$origin" "$key" "$title" "$reason" sample
+  tasks_in "$home" "done" "$hold" >/dev/null
+  assert_grep "$hold" "$home/data/backlog.md" "the current unresolved hold is not live"
+  assert_grep "$hold" "$home/data/done-archive.md" "the older durable hold is not archived"
+  cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = show ]; then
+  printf 'error: could not parse the live backlog configuration\ncode: CONFIG_ERROR\n' >&2
+  exit 1
+fi
+exec "${REAL_TASKS_AXI:?}" "$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  if run_decisions "$home" verify "$origin" > "$home/verify.out" 2> "$home/verify.err"; then
+    fail "a live backlog read error passed verification through an older archive record"
+  fi
+  assert_grep "could not read captain decision $hold from the active backlog" "$home/verify.err" \
+    "the live backlog error was reported as an absent record"
+  assert_grep "code: CONFIG_ERROR" "$home/verify.err" \
+    "the live backlog error details were not preserved"
+  assert_no_grep "absent from the active backlog and configured archive" "$home/verify.err" \
+    "the live backlog error was collapsed into archive absence"
+  pass "live backlog read errors refuse without consulting older archive records"
+}
+
 # The archive is append-only and hold ids are deterministic, so one identity can
 # legitimately be archived more than once. The newest occurrence is the current
 # record; the older ones are previous incarnations and must be left alone.
@@ -1082,6 +1121,89 @@ EOF
   run_decisions "$home" verify "$id" >/dev/null \
     || fail "the repaired decision did not satisfy verification after the lock round trip"
   pass "archive repair takes tasks-axi's own backlog lock, so a concurrent archive append is never lost"
+}
+
+test_archive_repair_honors_tasks_axi_file_lock_override() {
+  local home origin key hold override lock archive before
+  home=$(make_home archive-repair-file-override)
+  origin=sample-file-override-review
+  key=route
+  hold="$origin-decision-$key"
+  override="$home/data/override-backlog.md"
+  lock="$override.lock"
+  archive="$home/data/done-archive.md"
+  cp "$home/data/backlog.md" "$override"
+  TASKS_AXI_FILE="$override" seed_decision_origin "$home" "$origin" "Review the override lock"
+  TASKS_AXI_FILE="$override" run_decisions "$home" hold "$origin" "$key" \
+    --title "Choose under the override lock" --reason "captain override route pending" --repo sample >/dev/null
+  TASKS_AXI_FILE="$override" run_decisions "$home" complete "$origin" "$key" >/dev/null
+  TASKS_AXI_FILE="$override" tasks_in "$home" "done" "$hold" >/dev/null
+  TASKS_AXI_FILE="$override" tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  printf 'Repair the captain answer under the override lock.\n' > "$home/decision.txt"
+  printf 'another-tasks-axi-holder\n' > "$lock"
+  before=$(cat "$archive")
+  if TASKS_AXI_FILE="$override" run_decisions "$home" repair "$origin" "$key" \
+      --decision-file "$home/decision.txt" > "$home/repair.out" 2> "$home/repair.err"; then
+    rm -f "$lock"
+    fail "archive repair ignored the TASKS_AXI_FILE lock"
+  fi
+  [ "$(cat "$archive")" = "$before" ] \
+    || { rm -f "$lock"; fail "a refused override-lock repair modified the archive"; }
+  [ "$(cat "$lock")" = "another-tasks-axi-holder" ] \
+    || { rm -f "$lock"; fail "archive repair changed the override lock token"; }
+  printf '\n## Archived 2026-08-23T01:00:00Z\n- [x] sample-override-concurrent - Concurrent archive append\n' \
+    >> "$archive"
+  rm -f "$lock"
+  TASKS_AXI_FILE="$override" run_decisions "$home" repair "$origin" "$key" \
+    --decision-file "$home/decision.txt" >/dev/null \
+    || fail "archive repair failed after the TASKS_AXI_FILE lock was released"
+  assert_grep "sample-override-concurrent" "$archive" \
+    "archive repair discarded an append protected by the override lock"
+  [ ! -f "$lock" ] || fail "archive repair left the TASKS_AXI_FILE lock behind"
+  pass "archive repair serializes on the TASKS_AXI_FILE backlog lock"
+}
+
+test_archive_body_boundaries_preserve_column_zero_content() {
+  local home origin key hold archive raw expected_size
+  origin=sample-raw-archive
+  key=route
+  hold="$origin-decision-$key"
+  home=$(make_home archive-raw-reader)
+  write_origin_meta "$home" "$origin"
+  printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$key" >> "$home/state/$origin.meta"
+  archive="$home/data/done-archive.md"
+  cat > "$archive" <<EOF
+## Archived 2026-08-23
+- [x] $hold - Choose the raw route (repo: sample) (kind: captain) (done 2026-08-23) (hold: captain raw route pending) (hold-kind: captain)
+Resolution recorded by fm-decision-hold.
+Routed work:
+(none)
+EOF
+  if run_decisions "$home" verify "$origin" > "$home/raw-verify.out" 2> "$home/raw-verify.err"; then
+    fail "column-zero archive text was accepted as a captain decision body"
+  fi
+  assert_grep "neither actively held nor durably resolved" "$home/raw-verify.err" \
+    "column-zero archive text did not remain outside the task body"
+
+  home=$(make_home archive-raw-repair)
+  seed_decision_origin "$home" "$origin" "Review raw archive preservation"
+  run_decisions "$home" hold "$origin" "$key" --title "Choose the raw route" \
+    --reason "captain raw route pending" --repo sample >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  tasks_in "$home" "done" "$hold" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  archive="$home/data/done-archive.md"
+  raw="$home/raw.expected"
+  printf 'Operator column-zero note with trailing spaces  \nSecond raw line\t' > "$raw"
+  cat "$raw" >> "$archive"
+  printf 'Repair while preserving adjacent raw archive text.\n' > "$home/decision.txt"
+  run_decisions "$home" repair "$origin" "$key" --decision-file "$home/decision.txt" >/dev/null \
+    || fail "archive repair failed beside column-zero raw content"
+  expected_size=$(LC_ALL=C wc -c < "$raw" | tr -d ' ')
+  tail -c "$expected_size" "$archive" > "$home/raw.actual"
+  cmp -s "$raw" "$home/raw.actual" \
+    || fail "archive repair changed or deleted adjacent column-zero content"
+  pass "archive parsing and repair preserve column-zero content outside task bodies"
 }
 
 # The unrouted close paths must not become a way past the gate. An unanswered
@@ -1481,8 +1603,11 @@ test_declined_decision_closes_without_routed_work
 test_out_of_band_close_is_repairable_before_teardown
 test_archived_decisions_keep_the_scout_completion_gate_strong
 test_live_backlog_record_outranks_its_archived_copy
+test_live_backlog_read_errors_never_fall_back_to_archive
 test_newest_archived_occurrence_decides_and_repair_touches_only_it
 test_archive_repair_serializes_on_the_backlog_lock
+test_archive_repair_honors_tasks_axi_file_lock_override
+test_archive_body_boundaries_preserve_column_zero_content
 test_unanswered_decision_still_blocks_completion_and_teardown
 test_structured_holds_survive_teardown_and_route_resolution
 test_origin_slug_validation_precedes_path_construction

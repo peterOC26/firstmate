@@ -262,22 +262,25 @@ tasks_axi_markdown_config_value() {  # <config-path> <key>
 # archived block and rewrites the backlog inside one hold of <backlog>.lock.
 tasks_axi_backlog_path() {
   local project_config="$FM_HOME/.tasks.toml" user_config='' backlog=''
-  [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
-  backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
-  if [ -z "$backlog" ] && [ -n "$user_config" ]; then
-    backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
-  fi
-  if [ -z "$backlog" ]; then
-    if [ -f "$FM_HOME/backlog.md" ]; then
-      backlog=backlog.md
-    else
-      backlog=data/backlog.md
+  if [ "${TASKS_AXI_FILE+x}" = x ]; then
+    backlog=$TASKS_AXI_FILE
+  else
+    [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
+    backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
+    if [ -z "$backlog" ] && [ -n "$user_config" ]; then
+      backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
+    fi
+    if [ -z "$backlog" ]; then
+      if [ -f "$FM_HOME/backlog.md" ]; then
+        backlog=backlog.md
+      else
+        backlog=data/backlog.md
+      fi
     fi
   fi
-  case "$backlog" in
-    /*) printf '%s' "$backlog" ;;
-    *) printf '%s/%s' "$FM_HOME" "$backlog" ;;
-  esac
+  case "$backlog" in *[![:space:]]*) ;; *) return 1 ;; esac
+  node -e 'process.stdout.write(require("path").resolve(process.argv[1], process.argv[2]))' \
+    "$FM_HOME" "$backlog"
 }
 
 tasks_axi_archive_path() {
@@ -299,6 +302,7 @@ tasks_axi_archive_path() {
 TASK_RECORD_SHOW=
 TASK_RECORD_FILE=
 TASK_RECORD_AMBIGUOUS=
+TASK_RECORD_LIVE_ERROR=
 # The exit status archive readers use for "this identity is in the archive more
 # than once and no single occurrence is the newest". It is deliberately distinct
 # from 1 (absent): telling an operator a record is missing when it is present
@@ -339,8 +343,16 @@ if (newest.length !== 1) {
 }
 const start = newest[0].line;
 let end = start + 1;
-while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
-while (end > start + 1 && lines[end - 1] === "") end--;
+while (end < lines.length) {
+  const line = lines[end].endsWith("\r") ? lines[end].slice(0, -1) : lines[end];
+  if (line.trim().length === 0 || line.startsWith("  ")) end++;
+  else break;
+}
+while (end > start + 1) {
+  const line = lines[end - 1].endsWith("\r") ? lines[end - 1].slice(0, -1) : lines[end - 1];
+  if (line === "") end--;
+  else break;
+}
 const header = lines[start];
 const checkbox = header.match(/^- \[([ x])\]/);
 const kind = header.match(/\(kind: ([^)]+)\)/);
@@ -367,7 +379,8 @@ process.stdout.write(`  body: ${JSON.stringify(body)}\n`);
 # decision could not be recorded, and the archive is left untouched.
 archive_task_update_body() {  # <archive-path> <id> <body>
   local archive=$1 id=$2 body=$3 lock
-  lock="$(tasks_axi_backlog_path).lock"
+  lock=$(tasks_axi_backlog_path) || return 1
+  lock="${lock}.lock"
   # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
   printf '%s' "$body" | node -e '
 const fs = require("fs");
@@ -429,7 +442,11 @@ function rewrite() {
   if (newest.length !== 1) return 1;
   const start = newest[0].line;
   let end = start + 1;
-  while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
+  while (end < lines.length) {
+    const line = lines[end].endsWith("\r") ? lines[end].slice(0, -1) : lines[end];
+    if (line.trim().length === 0 || line.startsWith("  ")) end++;
+    else break;
+  }
   const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
   lines.splice(start + 1, end - start - 1, ...replacement);
   const next = lines.join("\n");
@@ -461,16 +478,24 @@ process.exit(status);
 # is consulted only for an identity the live backlog no longer has at all - so a
 # record that was pruned and then restored by hand is read from where it lives
 # now, not from the copy retention left behind.
-task_record_locate() {  # <id>; sets TASK_RECORD_SHOW, TASK_RECORD_FILE, TASK_RECORD_AMBIGUOUS
+task_record_locate() {  # <id>; sets TASK_RECORD_SHOW, TASK_RECORD_FILE, TASK_RECORD_AMBIGUOUS, TASK_RECORD_LIVE_ERROR
   local id=$1 archive out rc=0
   TASK_RECORD_SHOW=
   TASK_RECORD_FILE=
   TASK_RECORD_AMBIGUOUS=
-  if TASK_RECORD_SHOW=$(task_show "$id"); then
+  TASK_RECORD_LIVE_ERROR=
+  out=$(tasks_axi show "$id" --full 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    TASK_RECORD_SHOW=$out
     return 0
+  fi
+  if ! printf '%s\n' "$out" | grep -qxF 'code: NOT_FOUND'; then
+    TASK_RECORD_LIVE_ERROR=$out
+    return 1
   fi
   archive=$(tasks_axi_archive_path) || return 1
   [ -f "$archive" ] || return 1
+  rc=0
   out=$(archive_task_show "$archive" "$id" 2>/dev/null) || rc=$?
   if [ "$rc" -eq "$ARCHIVE_RECORD_AMBIGUOUS_RC" ]; then
     TASK_RECORD_AMBIGUOUS=$out
@@ -486,6 +511,15 @@ task_record_locate() {  # <id>; sets TASK_RECORD_SHOW, TASK_RECORD_FILE, TASK_RE
 # them is fixed by recording a decision.
 fail_unresolvable_archive_record() {  # <id> <archive>
   fail "captain decision $1 has $TASK_RECORD_AMBIGUOUS occurrences in the configured archive $2 with no single newest one; leave one current record for $1 there before this gate can read it"
+}
+
+fail_task_record_lookup() {  # <id>
+  local id=$1 archive
+  [ -z "$TASK_RECORD_LIVE_ERROR" ] \
+    || fail "could not read captain decision $id from the active backlog: $TASK_RECORD_LIVE_ERROR"
+  archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+  [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
+  fail "captain decision $id is absent from the active backlog and configured archive $archive"
 }
 
 show_field() {  # <show-output> <field>
@@ -622,11 +656,9 @@ verify_hold_resolved() {  # <hold-id>
 }
 
 verify_hold_durable() {  # <hold-id>
-  local id=$1 show state held kind hold_kind body archive
+  local id=$1 show state held kind hold_kind body
   if ! task_record_locate "$id"; then
-    archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
-    [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
-    fail "captain decision $id is absent from the active backlog and configured archive $archive"
+    fail_task_record_lookup "$id"
   fi
   show=$TASK_RECORD_SHOW
   state=$(show_field "$show" state)
@@ -1079,7 +1111,7 @@ command_decline() {
 }
 
 command_repair() {
-  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body record_file archive
+  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body record_file
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   shift 2
   decision_file=$(parse_decision_only_flags "$@") || exit 2
@@ -1089,9 +1121,7 @@ command_repair() {
   require_tasks_axi
   id=$(hold_id "$origin" "$key")
   if ! task_record_locate "$id"; then
-    archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
-    [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
-    fail "captain decision $id is absent from the active backlog and configured archive $archive"
+    fail_task_record_lookup "$id"
   fi
   show=$TASK_RECORD_SHOW
   record_file=$TASK_RECORD_FILE
@@ -1120,7 +1150,7 @@ command_repair() {
     tasks_axi update "$id" --body "$body" >/dev/null \
       || fail "could not record the captain decision on $id"
   fi
-  task_record_locate "$id" || fail "captain decision $id disappeared while recording the repair"
+  task_record_locate "$id" || fail_task_record_lookup "$id"
   show=$TASK_RECORD_SHOW
   [ "$(show_field "$show" state)" = "done" ] || fail "repairing $id reopened a closed captain decision"
   body_has_resolution_record "$(show_field "$show" body)" \
