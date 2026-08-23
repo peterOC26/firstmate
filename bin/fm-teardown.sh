@@ -232,6 +232,20 @@ fm_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
 [ -f "$META" ] || { echo "error: no meta for task $ID at $META" >&2; exit 1; }
 
+# Locks this teardown already owns for the whole run: forced secondmate cleanup
+# takes every descendant's lifecycle and metadata lock up front and holds them
+# until exit, so a later step that would otherwise acquire one of them must use
+# the hold it already has. Re-acquiring is not a no-op - fm_lock_try_acquire
+# reclaims a self-held lock by removing and recreating it, and the matching
+# release would then drop a hold the run still depends on.
+teardown_lock_already_held() {  # <lock-path>
+  local lock=$1 i
+  for ((i=0; i < ${#DESCENDANT_LOCK_PATHS[@]}; i++)); do
+    [ "${DESCENDANT_LOCK_PATHS[$i]}" != "$lock" ] || return 0
+  done
+  return 1
+}
+
 # Task metadata has concurrent atomic republishers - the harness session binder
 # on every completed turn, plus the PR and Relay link writers - so its removal
 # takes the same shared lock. Without it an in-flight rewrite renames a complete
@@ -247,6 +261,10 @@ remove_task_state_files() {  # <meta> <other-path>...
     rm -f -- "$meta" "$@"
     return 0
   }
+  if teardown_lock_already_held "$lock"; then
+    rm -f -- "$meta" "$@" || status=1
+    return "$status"
+  fi
   fm_lock_acquire_wait "$lock"
   rm -f -- "$meta" "$@" || status=1
   fm_lock_release "$lock"
@@ -909,33 +927,14 @@ validate_pr_poll_cleanup() {
   done
 }
 
-remove_pr_poll_artifacts() {
-  local state_dir=$1 id=$2 quarantine artifact
-  validate_pr_poll_cleanup "$state_dir" "$id" || return 1
-  fm_pr_poll_retirement_recover_one "$state_dir" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" || return 1
-  rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
-    "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
-    "$state_dir/$id.check-trust" || return 1
-  if fm_task_id_path_safe "$id"; then
-    quarantine="$state_dir/.pr-check-quarantine"
-    if [ -d "$quarantine" ] && [ ! -L "$quarantine" ]; then
-      for artifact in "$quarantine/$id."*; do
-        [ -e "$artifact" ] || [ -L "$artifact" ] || continue
-        rm -f -- "$artifact" || return 1
-      done
-      rmdir "$quarantine" 2>/dev/null || true
-    fi
-  fi
-}
-
-# The main task record and its armed check artifacts cross the final teardown
+# Every task record and its armed check artifacts cross the final teardown
 # boundary together. Every operation that can wait or refuse runs before this;
 # then one signal-deferred rm invocation retires the metadata, ordinary volatile
 # state, poll publication, trust record, and any validated quarantine entries.
 # This ordering prevents an interrupted teardown from leaving live metadata
 # behind after silently destroying the merge poll that tells Firstmate to resume.
 remove_task_record_and_pr_poll_artifacts() {  # <state> <id> <meta> <other-path>...
-  local state_dir=$1 id=$2 meta=$3 quarantine artifact status=0
+  local state_dir=$1 id=$2 meta=$3 quarantine artifact status=0 prior_signal_traps
   local -a paths
   shift 3
   validate_pr_poll_cleanup "$state_dir" "$id" || return 1
@@ -952,12 +951,14 @@ remove_task_record_and_pr_poll_artifacts() {  # <state> <id> <meta> <other-path>
       done
     fi
   fi
+  prior_signal_traps=$(trap -p INT TERM)
   trap '' INT TERM
   remove_task_state_files "$meta" "${paths[@]}" || status=1
   if [ -n "${quarantine:-}" ]; then
     rmdir "$quarantine" 2>/dev/null || true
   fi
   trap - INT TERM
+  eval "$prior_signal_traps"
   return "$status"
 }
 
@@ -2760,18 +2761,18 @@ cleanup_firstmate_home_children() {
     fi
     remove_grok_turnend_auth "$sub_state" "$child_id" || return 1
     remove_kimi_turnend_auth "$sub_state" "$child_id" || return 1
-    remove_pr_poll_artifacts "$sub_state" "$child_id" || return 1
     child_busy_gen=$(meta_value "$child_meta" busy_gen)
     if [ -z "$child_busy_gen" ]; then
       child_busy_gen=$(cat "$sub_state/$child_id.busy-gen" 2>/dev/null || true)
     fi
     retire_busy_state "$sub_state" "$child_id" "$child_busy_gen" || return 1
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
-    rm -f "$sub_state/$child_id.turn-ended" \
-      "$sub_state/$child_id.meta" "$sub_state/$child_id.pi-ext.ts" \
+    remove_task_record_and_pr_poll_artifacts "$sub_state" "$child_id" \
+      "$sub_state/$child_id.meta" "$sub_state/$child_id.turn-ended" \
+      "$sub_state/$child_id.pi-ext.ts" \
       "$sub_state/$child_id.grok-turnend-token" "$sub_state/$child_id.kimi-turnend-token" \
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
-      "$sub_state/$child_id.cursor-session"
+      "$sub_state/$child_id.cursor-session" || return 1
   done
 }
 
