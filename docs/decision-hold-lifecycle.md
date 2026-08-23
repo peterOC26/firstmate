@@ -6,7 +6,7 @@ This document records the deterministic mechanism, structured surfaces, and priv
 ## Mechanism
 
 `bin/fm-decision-hold.sh` is the only lifecycle command for an investigation or visual review's unresolved captain decisions.
-The command runs tasks-axi in the active `FM_HOME`, so the existing backlog remains the only durable work database and a secondmate-owned decision stays in the secondmate home.
+The command runs tasks-axi in the active `FM_HOME`, so the existing backlog and the archive it prunes into remain the only durable work database and a secondmate-owned decision stays in the secondmate home.
 It never reads report bodies, review artifacts, terminal output, or chat.
 
 The `hold` subcommand maps an originating work id and stable decision key to `<origin-id>-decision-<decision-key>`.
@@ -39,6 +39,14 @@ Every candidate found in the listing prefilter is confirmed against its own stru
 The `repair` subcommand records the resolution block on a hold that was already closed outside the script, such as by a direct `tasks-axi done`, so an origin whose decision was genuinely answered stops failing `verify`.
 It refuses a hold that is still actively held, never reopens a closed hold, and never clears a dependency edge, so an unanswered decision keeps blocking teardown until the captain's word closes it.
 It also requires the identity to carry the captain-hold provenance that tasks-axi preserves through a close, so an ordinary captain-kind task that was never held cannot be repaired into a resolved decision.
+
+Durable verification and `repair` read one place the other subcommands do not.
+Every `tasks-axi done` prunes past `done_keep`, so a genuinely answered decision can leave the live backlog entirely for the configured Done archive (the `[markdown] archive` value in "Backlog backend" of [`configuration.md`](configuration.md#backlog-backend-taskstoml--configbacklog-backend)), which is why `verify`, the `complete` gate it shares, and `repair` fall back to that archive.
+The live record still decides alone whenever the backlog holds the identity, and a live read that fails for any reason other than a genuine not-found refuses rather than consulting an older archived copy.
+The fallback never weakens the gate: an archived record is never read as actively held, so it passes only as a closed hold carrying the same durable resolution block, and an identity absent from both live backlog and archive still refuses.
+Hold ids are deterministic and the archive is append-only, so one identity can appear there more than once; the occurrence in the newest `## Archived` block is the current record, and two occurrences inside one block are reported as unresolvable ambiguity rather than settled by an arbitrary pick.
+`repair` on an archived hold rewrites only that newest record's body, in the archive file itself, under tasks-axi's own advisory backlog lock, because a prune's archive append and backlog rewrite happen inside that same lock and an unlocked whole-file rewrite here would silently drop concurrent archived history.
+A lock it cannot take fails closed: the decision is reported as not recorded and the archive is left untouched.
 
 ## Answer-time closure
 
@@ -105,7 +113,15 @@ The capture is left unacknowledged throughout, so the wake firstmate needs in or
 A replayed delivery closes nothing new and is not rejected as a different decision, a source with no binding closes nothing at all, and the `answer` subcommand itself refuses an empty or missing decision file, an absent hold, and a drifted retry.
 A separate regression drives the real `fm-send` over a stubbed transport to prove the chat channel reaches the same intake for a decision already transferred to its hold, which the status ledger alone can no longer close.
 
+Seven further regressions cover the configured Done archive as a lookup fallback, driven through the script and teardown rather than by inspecting source, and in a home whose `[markdown] archive` is deliberately not the default path.
+A resolved hold pruned out of the live Done window still satisfies `verify` and teardown from the archive, while an archived hold closed without a durable captain decision refuses both, keeps its task metadata, and is then repaired in place so the same origin clears.
+A decision absent from the live backlog and the archive alike refuses and names both locations.
+An identity present in both is decided by the live record alone, and a live read that fails for anything other than a genuine not-found never falls back to an older archived copy.
+Duplicated archived occurrences are decided by the newest `## Archived` block, repaired in that same occurrence, and reported as ambiguity rather than absence when one block holds two of them.
+Archive repair takes tasks-axi's own backlog lock, including the one named by `TASKS_AXI_FILE`, so a concurrent archived append is never lost, and both archive parsing and archive repair leave column-zero content outside task bodies untouched.
+
 The final verification commands and their exact summarized outputs follow.
+That transcript records the answer-time closure pass and predates the archive-fallback cases above; refresh it at the next full verification run.
 
 ```text
 $ bash tests/fm-decision-hold-lifecycle.test.sh
