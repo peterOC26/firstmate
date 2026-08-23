@@ -2944,7 +2944,8 @@ test_secondmate_force_teardown_refuses_partial_orca_child() {
 }
 
 # The numbered fake answers in call order, and a remote child's identity proof
-# asks `orca worktree show` twice (once for the path, once for the host) in each
+# asks `orca worktree show` three times (once to confirm Orca still records the
+# worktree at all, then once for the path and once for the host) in each
 # validation pass and the cleanup pass. Every one of those calls must get the
 # same answer, so the case describes the worktree once.
 write_orca_worktree_show_responses() {  # <responses> <count> <worktree-id> <path> <host>
@@ -2993,7 +2994,7 @@ test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
   remote_child_parent_home "$home" "$subhome"
   remote_child_meta "$subhome/state" "$child_id" "$childwt"
   orca_case secondmate-remote-child-mismatch
-  write_orca_worktree_show_responses "$RESP" 6 "repo-remote::$childwt" "/srv/somewhere-else" "$FM_REMOTE_HOST"
+  write_orca_worktree_show_responses "$RESP" 9 "repo-remote::$childwt" "/srv/somewhere-else" "$FM_REMOTE_HOST"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -3020,7 +3021,7 @@ test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
   remote_child_parent_home "$home" "$subhome"
   remote_child_meta "$subhome/state" "$child_id" "$childwt"
   orca_case secondmate-remote-child-match
-  write_orca_worktree_show_responses "$RESP" 6 "repo-remote::$childwt" "$childwt" "$FM_REMOTE_HOST"
+  write_orca_worktree_show_responses "$RESP" 9 "repo-remote::$childwt" "$childwt" "$FM_REMOTE_HOST"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -3066,6 +3067,77 @@ test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp() {
   assert_absent "$subhome/state/$child_id.meta" "a completed remote child cleanup should remove that child's record"
   rm -rf "/tmp/fm-$child_id"
   pass "fm-teardown.sh --force: sweeps a remote Orca child's task temp root on the host before deleting the record that names it"
+}
+
+test_secondmate_force_teardown_retires_a_remote_orca_child_whose_worktree_is_gone() {
+  local home subhome child_id childwt neutral out rc
+
+  # Orca's own answer for a worktree it no longer records: a structured
+  # selector_not_found body printed while the CLI exits nonzero. There is no
+  # path to resolve and no checkout to inspect, so the identity proof the other
+  # remote-child cases owe cannot be paid - and --force is already the strongest
+  # authority there is, so refusing here strands the child's records forever.
+  child_id="orcaremotechildz4"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-absent-parent"
+  subhome="$TMP_ROOT/orca-remote-child-absent-secondmate"
+  orca_remote_case secondmate-remote-child-absent
+  write_remote_worktree_fixtures "$FIX" "$childwt"
+  printf '{"ok":false,"error":{"code":"selector_not_found"}}\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "--force must retire a remote Orca child whose worktree Orca no longer records"$'\n'"$out"
+  assert_contains "$out" "already absent" \
+    "the forced child path did not report the absent worktree as absent"
+  assert_not_contains "$out" "cannot resolve Orca worktree id" \
+    "the forced child path dead-ended on path resolution"
+  assert_not_contains "$out" "could not reach Orca host" \
+    "the forced child path claimed host failure for a worktree that is merely gone"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "--force asked Orca to remove a child worktree already proven absent"
+  assert_absent "$subhome/state/$child_id.meta" \
+    "--force left the stranded child record behind after its worktree was already gone"
+  assert_absent "$home/state/domain.meta" \
+    "--force left the parent record behind after retiring its only child"
+
+  # The same absence, reported by a runtime that cannot answer at all. An
+  # indeterminate reply is not absence: the child's records stay, and the
+  # refusal must not borrow the absent-worktree wording.
+  child_id="orcaremotechildz5"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-unknown-parent"
+  subhome="$TMP_ROOT/orca-remote-child-unknown-secondmate"
+  orca_remote_case secondmate-remote-child-unknown
+  write_remote_worktree_fixtures "$FIX" "$childwt"
+  printf 'not json at all\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an unparseable Orca reply must never be treated as an absent child worktree"$'\n'"$out"
+  assert_not_contains "$out" "already absent" \
+    "an indeterminate Orca reply was reported as a definitely-absent worktree"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "an unproven child worktree must not be removed"
+  assert_present "$subhome/state/$child_id.meta" \
+    "an indeterminate Orca reply must preserve the child's records"
+  assert_present "$home/state/domain.meta" \
+    "an indeterminate Orca reply must preserve the parent record"
+  pass "fm-teardown.sh --force: retires a remote Orca child whose worktree is gone, and still refuses when Orca cannot say"
 }
 
 test_dispatcher_sources_orca_and_routes_primitives() {
@@ -3177,4 +3249,5 @@ test_secondmate_force_teardown_removes_orca_child_via_orca
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child
 test_secondmate_force_teardown_verifies_remote_orca_child_identity
+test_secondmate_force_teardown_retires_a_remote_orca_child_whose_worktree_is_gone
 test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp

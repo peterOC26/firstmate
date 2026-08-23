@@ -502,6 +502,7 @@ fi
 ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
 ORCA_PATH_MATCH_VERIFIED=0
 ORCA_WORKTREE_ABSENT=0
+ORCA_CHILD_WORKTREE_ABSENT=0
 ORCA_HOST_ID=$(fm_meta_get "$META" orca_host)
 ORCA_REMOTE_TASK_TMP=$(fm_meta_get "$META" orca_remote_tasktmp)
 TASK_REMOTE=0
@@ -1971,15 +1972,38 @@ child_is_remote_orca() {  # <child-meta>
 # is exactly the child's recorded one. That is the same host-independent pair
 # the task's own --force path keeps, reached through the same code, with the
 # host and remote flag read from the CHILD's metadata.
+#
+# A worktree Orca no longer records is the one case with no identity left to
+# prove: there is no path to resolve and no checkout to inspect, so demanding
+# the proof strands the child's records with no supported next step. Only
+# Orca's exact selector-not-found answer counts as that, and only once --force
+# has supplied the discard authority; an unreachable runtime or an unparseable
+# reply stays indeterminate and still owes the whole proof, so a host that
+# cannot answer can never be mistaken for a worktree that is gone.
 require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-worktree>
-  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id
+  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id presence_rc=0
   # shellcheck disable=SC2034  # Read by require_orca_worktree_path_match below.
   local TASK_REMOTE=1 TASK_REMOTE_EXEC='' ORCA_HOST_ID
+  ORCA_CHILD_WORKTREE_ABSENT=0
   child_id=$(basename "$child_meta" .meta)
   ORCA_HOST_ID=$(meta_value "$child_meta" orca_host)
   if [ -z "$ORCA_HOST_ID" ] || [ -z "$child_wt" ]; then
     echo "REFUSED: child $child_id is recorded as running on a remote Orca host but names no host or worktree; preserving that child's records." >&2
     return 1
+  fi
+  if fm_backend_source orca; then
+    fm_backend_orca_worktree_presence "$worktree_id" || presence_rc=$?
+  else
+    presence_rc=2
+  fi
+  if [ "$presence_rc" -eq 1 ]; then
+    if [ "$FORCE" != "--force" ]; then
+      echo "REFUSED: recorded Orca worktree $worktree_id for child $child_id no longer exists; its removed checkout cannot be inspected for uncommitted or unlanded work." >&2
+      echo "That child's records are preserved. Get the captain's explicit OK to discard them, then rerun with --force." >&2
+      return 1
+    fi
+    ORCA_CHILD_WORKTREE_ABSENT=1
+    return 0
   fi
   require_orca_worktree_path_match "$worktree_id" "$child_wt"
 }
@@ -2022,11 +2046,18 @@ sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label> [<open-f
 
 # sweep_orca_child_remote_task_tmp: the same sweep for a REMOTE Orca child,
 # which has no inspection shell open yet and so opens (and releases) its own.
-sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
-  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
+sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id> [<absent>]
+  local child_meta=$1 child_id=$2 worktree_id=$3 worktree_absent=${4:-0} tasktmp host handle
   tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
   [ -n "$tasktmp" ] || return 0
   host=$(meta_value "$child_meta" orca_host)
+  if [ "$worktree_absent" = 1 ]; then
+    # An already-removed worktree has no shell to open, so the only honest
+    # outcome is naming the temp root the record is about to stop naming - as
+    # what it is, not as a host that could not be reached.
+    sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id" absent-worktree
+    return 0
+  fi
   if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
     sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id"
     return 0
@@ -2679,7 +2710,7 @@ preflight_firstmate_home_herdr_children() {  # <home>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_orca_absent child_return_rc child_busy_gen
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -2695,10 +2726,14 @@ cleanup_firstmate_home_children() {
     else
       child_t=$(fm_backend_target_of_meta "$child_meta")
     fi
+    child_orca_absent=0
     if [ "$child_backend" = orca ] && [ "$child_kind" != secondmate ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
       if child_is_remote_orca "$child_meta"; then
         require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+        child_orca_absent=$ORCA_CHILD_WORKTREE_ABSENT
+        [ "$child_orca_absent" != 1 ] \
+          || echo "warning: recorded Orca worktree $child_orca_worktree_id for child $child_id is already absent; --force is retiring that child's remaining records without an on-host worktree inspection" >&2
       elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
@@ -2737,9 +2772,11 @@ cleanup_firstmate_home_children() {
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
       fi
       if child_is_remote_orca "$child_meta"; then
-        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id"
+        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id" \
+          "$child_orca_absent"
       fi
-      fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
+      [ "$child_orca_absent" = 1 ] \
+        || fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
