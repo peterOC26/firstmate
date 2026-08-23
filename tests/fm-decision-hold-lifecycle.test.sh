@@ -850,6 +850,175 @@ EOF
 # runs, and every `tasks-axi done <id>` prunes. Archive repair rewrites the whole
 # file, so it has to take that same lock or a concurrent append is read before
 # and overwritten after - losing archived history for good.
+# <home> <origin> - the origin task a captain hold hangs off, in the shape the
+# real rescue below has: a started scout with a completed decision inventory.
+seed_decision_origin() {  # <home> <origin> <title>
+  local home=$1 origin=$2 title=$3
+  mkdir -p "$home/data/$origin"
+  tasks_in "$home" add "$origin" "$title" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$home" "$origin"
+  printf 'done: report complete\n' > "$home/state/$origin.status"
+  printf '# %s\n\nThe captain choice is recorded.\n' "$title" > "$home/data/$origin/report.md"
+}
+
+# Raise the same decision key again after its previous record was pruned. This
+# is the ordinary path, not a contrivance: `hold` only consults the live
+# backlog, so a pruned identity has no live record and a fresh one is created
+# under the very same deterministic id.
+rehold_after_prune() {  # <home> <origin> <key> <title> <reason> <repo>
+  run_decisions "$1" hold "$2" "$3" --title "$4" --reason "$5" --repo "$6" >/dev/null
+}
+
+# The rescue this really takes, with the identity and record shape it takes it
+# in: retention pruned a closed captain hold out of the live backlog while a
+# scout's teardown gate still needed it, so the record was restored into the
+# backlog and the pruned copy stayed in the archive. Both files then carry the
+# same identity with different bodies, and only the live one is current.
+test_live_backlog_record_outranks_its_archived_copy() {
+  local home origin key hold title reason repo
+  origin=pv-consolidate-plan-c2
+  key=three-round-limit
+  hold="$origin-decision-$key"
+  title="Consolidation plan failed three review rounds - choose how to unblock the live update"
+  reason="Rounds 1-3 all FAILED the Codex plan gate. Captain's three-round rule reached; escalating rather than widening scope."
+  repo=PurpleVoice_Claude_GSD
+
+  # Live copy closed with no durable decision, archived copy durable. Reading
+  # the archive here would pass the gate on a body belonging to a previous
+  # incarnation of this identity, so live precedence has to refuse.
+  home=$(make_home live-outranks-archive)
+  seed_decision_origin "$home" "$origin" "$title"
+  run_decisions "$home" hold "$origin" "$key" --title "$title" --reason "$reason" --repo "$repo" >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  printf 'Take option 1 and install the missing deploy-gate unit first.\n' > "$home/archived-decision.txt"
+  run_decisions "$home" answer "$origin" "$key" --decision-file "$home/archived-decision.txt" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  assert_grep "$hold" "$home/data/done-archive.md" "the durable decision never reached the archive"
+  rehold_after_prune "$home" "$origin" "$key" "$title" "$reason" "$repo"
+  tasks_in "$home" "done" "$hold" >/dev/null
+  assert_grep "$hold" "$home/data/backlog.md" "the restored live record is not in the live backlog"
+  if run_decisions "$home" verify "$origin" > "$home/live-invalid.out" 2> "$home/live-invalid.err"; then
+    fail "a live record with no durable decision passed the gate on its archived copy's body"
+  fi
+  assert_grep "neither actively held nor durably resolved" "$home/live-invalid.err" \
+    "the refusal did not come from the live record"
+  assert_no_grep "absent from the active backlog" "$home/live-invalid.err" \
+    "a record present in both files was reported as absent"
+
+  # The mirror: the live copy carries the durable decision and the archived one
+  # does not. Preferring the archive would refuse work that is genuinely done.
+  home=$(make_home live-outranks-stale-archive)
+  seed_decision_origin "$home" "$origin" "$title"
+  run_decisions "$home" hold "$origin" "$key" --title "$title" --reason "$reason" --repo "$repo" >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  tasks_in "$home" "done" "$hold" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  assert_grep "$hold" "$home/data/done-archive.md" "the undecided copy never reached the archive"
+  rehold_after_prune "$home" "$origin" "$key" "$title" "$reason" "$repo"
+  printf 'Take option 1 and install the missing deploy-gate unit first.\n' > "$home/live-decision.txt"
+  run_decisions "$home" answer "$origin" "$key" --decision-file "$home/live-decision.txt" >/dev/null
+  assert_grep "$hold" "$home/data/backlog.md" "the durable live record is not in the live backlog"
+  run_decisions "$home" verify "$origin" >/dev/null 2> "$home/live-valid.err" \
+    || fail "a durable live record was refused because its archived copy is stale: $(cat "$home/live-valid.err")"
+  run_teardown "$home" "$origin" >/dev/null 2> "$home/live-valid-teardown.err" \
+    || fail "the durable live record still blocked teardown: $(cat "$home/live-valid-teardown.err")"
+  pass "a hold identity in both the live backlog and the archive is decided by the live record alone"
+}
+
+# The archive is append-only and hold ids are deterministic, so one identity can
+# legitimately be archived more than once. The newest occurrence is the current
+# record; the older ones are previous incarnations and must be left alone.
+test_newest_archived_occurrence_decides_and_repair_touches_only_it() {
+  local home origin key hold archive lock title reason
+  origin=sample-duplicate-archive
+  key=route
+  hold="$origin-decision-$key"
+  title="Choose the duplicated route"
+  reason="captain duplicated route pending"
+
+  home=$(make_home duplicate-archive-newest)
+  archive="$home/data/done-archive.md"
+  lock="$home/data/backlog.md.lock"
+  seed_decision_origin "$home" "$origin" "$title"
+  run_decisions "$home" hold "$origin" "$key" --title "$title" --reason "$reason" --repo sample >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  printf 'First captain answer under duplicate archive.\n' > "$home/first-decision.txt"
+  run_decisions "$home" answer "$origin" "$key" --decision-file "$home/first-decision.txt" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+
+  # A second incarnation of the same identity, closed with no captain decision,
+  # archived after the first. It is the newest, so it is the one that decides.
+  rehold_after_prune "$home" "$origin" "$key" "$title" "$reason" sample
+  tasks_in "$home" "done" "$hold" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  assert_no_grep "$hold" "$home/data/backlog.md" "both incarnations should have been pruned out of the live backlog"
+  [ "$(grep -c "^- \[x\] $hold - " "$archive")" -eq 2 ] \
+    || fail "the archive should now carry two occurrences of $hold"
+
+  if run_decisions "$home" verify "$origin" > "$home/dup.out" 2> "$home/dup.err"; then
+    fail "an older durable occurrence satisfied the gate for a newest occurrence that has no decision"
+  fi
+  assert_grep "neither actively held nor durably resolved" "$home/dup.err" \
+    "the refusal did not come from the newest archived occurrence"
+  assert_no_grep "absent from the active backlog" "$home/dup.err" \
+    "a duplicated archived identity was reported as absent"
+
+  printf 'Repaired captain answer for the newest occurrence.\n' > "$home/repair-decision.txt"
+  printf 'another-tasks-axi-holder\n' > "$lock"
+  before=$(cat "$archive")
+  if run_decisions "$home" repair "$origin" "$key" --decision-file "$home/repair-decision.txt" \
+      > "$home/dup-locked.out" 2> "$home/dup-locked.err"; then
+    rm -f "$lock"
+    fail "repair rewrote a duplicated archive while another writer held the backlog lock"
+  fi
+  [ "$(cat "$archive")" = "$before" ] \
+    || { rm -f "$lock"; fail "a refused repair still modified the duplicated archive"; }
+  rm -f "$lock"
+
+  run_decisions "$home" repair "$origin" "$key" --decision-file "$home/repair-decision.txt" >/dev/null \
+    || fail "repair could not record the captain decision on the newest archived occurrence"
+  [ "$(grep -c "Resolution mode: repaired" "$archive")" -eq 1 ] \
+    || fail "repair did not record exactly one repaired resolution"
+  [ "$(grep -c "Resolution mode: answered" "$archive")" -eq 1 ] \
+    || fail "repair changed an older archived occurrence's resolution"
+  assert_grep "First captain answer under duplicate archive." "$archive" \
+    "repair overwrote the older occurrence's captain decision"
+  assert_grep "Repaired captain answer for the newest occurrence." "$archive" \
+    "repair did not record the new captain decision"
+  [ ! -f "$lock" ] || fail "repair left the backlog lock behind"
+  run_decisions "$home" verify "$origin" >/dev/null 2> "$home/dup-verify.err" \
+    || fail "the repaired newest occurrence did not satisfy the gate: $(cat "$home/dup-verify.err")"
+
+  # Two occurrences inside ONE archived block carry no ordering between them, so
+  # there is no newest to read. That is ambiguity, not absence, and the refusal
+  # has to say which identity and how many of it.
+  home=$(make_home duplicate-archive-ambiguous)
+  archive="$home/data/done-archive.md"
+  seed_decision_origin "$home" "$origin" "$title"
+  run_decisions "$home" hold "$origin" "$key" --title "$title" --reason "$reason" --repo sample >/dev/null
+  run_decisions "$home" complete "$origin" "$key" >/dev/null
+  printf 'Only captain answer before the ambiguous archive.\n' > "$home/amb-decision.txt"
+  run_decisions "$home" answer "$origin" "$key" --decision-file "$home/amb-decision.txt" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  {
+    printf '\n## Archived 2026-08-23\n'
+    printf -- '- [x] %s - %s (repo: sample) (kind: captain) (done 2026-08-23) (hold: %s) (hold-kind: captain)\n' \
+      "$hold" "$title" "$reason"
+    printf '  Origin: %s\n' "$origin"
+    printf -- '- [x] %s - %s (repo: sample) (kind: captain) (done 2026-08-23) (hold: %s) (hold-kind: captain)\n' \
+      "$hold" "$title" "$reason"
+    printf '  Origin: %s\n' "$origin"
+  } >> "$archive"
+  if run_decisions "$home" verify "$origin" > "$home/amb.out" 2> "$home/amb.err"; then
+    fail "an archive with no single newest occurrence satisfied the gate"
+  fi
+  assert_grep "$hold" "$home/amb.err" "the ambiguity refusal did not name the identity"
+  assert_grep "3 occurrences" "$home/amb.err" "the ambiguity refusal did not name the occurrence count"
+  assert_no_grep "absent from the active backlog" "$home/amb.err" \
+    "an ambiguous archive was reported as an absent record"
+  pass "duplicated archived occurrences are decided by the newest one, repaired in place, and refused as ambiguous when there is no newest"
+}
+
 test_archive_repair_serializes_on_the_backlog_lock() {
   local home id hold lock archive before
   home=$(make_home archive-repair-lock)
@@ -1311,6 +1480,8 @@ test_scout_teardown_always_requires_inventory_verification
 test_declined_decision_closes_without_routed_work
 test_out_of_band_close_is_repairable_before_teardown
 test_archived_decisions_keep_the_scout_completion_gate_strong
+test_live_backlog_record_outranks_its_archived_copy
+test_newest_archived_occurrence_decides_and_repair_touches_only_it
 test_archive_repair_serializes_on_the_backlog_lock
 test_unanswered_decision_still_blocks_completion_and_teardown
 test_structured_holds_survive_teardown_and_route_resolution

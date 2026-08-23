@@ -298,20 +298,46 @@ tasks_axi_archive_path() {
 
 TASK_RECORD_SHOW=
 TASK_RECORD_FILE=
+TASK_RECORD_AMBIGUOUS=
+# The exit status archive readers use for "this identity is in the archive more
+# than once and no single occurrence is the newest". It is deliberately distinct
+# from 1 (absent): telling an operator a record is missing when it is present
+# twice points them at the one recovery that cannot work.
+ARCHIVE_RECORD_AMBIGUOUS_RC=3
+
+# A hold identity can appear in the archive more than once: ids are
+# deterministic, a closed-and-pruned hold leaves no live record, so raising the
+# same decision again creates a fresh record with the same id, and tasks-axi's
+# archive is append-only - it never dedupes. The NEWEST occurrence is the
+# current one. Order comes from the `## Archived <stamp>` block an occurrence
+# sits in, counted in file order rather than read from the stamp, because
+# stamps are dates and several blocks routinely share one. Two occurrences
+# inside the SAME block carry no ordering at all, so that alone is ambiguous
+# and is reported as ambiguity rather than settled by an arbitrary pick.
 archive_task_show() {  # <archive-path> <id>
   # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
   node -e '
 const fs = require("fs");
-const [archive, id] = process.argv.slice(1);
+const [archive, id, ambiguousRc] = process.argv.slice(1);
 let source;
 try { source = fs.readFileSync(archive, "utf8"); } catch (_) { process.exit(1); }
 const lines = source.split("\n");
 const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
-const matches = [];
-for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
-if (matches.length !== 1) process.exit(1);
-const start = matches[0];
+const occurrences = [];
+let block = -1;
+for (let i = 0; i < lines.length; i++) {
+  if (/^## Archived /.test(lines[i])) block++;
+  else if (task.test(lines[i])) occurrences.push({line: i, block});
+}
+if (occurrences.length === 0) process.exit(1);
+const newestBlock = occurrences[occurrences.length - 1].block;
+const newest = occurrences.filter((o) => o.block === newestBlock);
+if (newest.length !== 1) {
+  process.stdout.write(String(occurrences.length));
+  process.exit(Number(ambiguousRc));
+}
+const start = newest[0].line;
 let end = start + 1;
 while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
 while (end > start + 1 && lines[end - 1] === "") end--;
@@ -325,7 +351,7 @@ process.stdout.write("  held: no\n");
 process.stdout.write(`  kind: ${kind ? kind[1] : ""}\n`);
 process.stdout.write(`  hold_kind: ${holdKind ? holdKind[1] : ""}\n`);
 process.stdout.write(`  body: ${JSON.stringify(body)}\n`);
-' "$1" "$2"
+' "$1" "$2" "$ARCHIVE_RECORD_AMBIGUOUS_RC"
 }
 
 # Rewrite one archived record's body in place. The archive is not this writer's
@@ -388,10 +414,20 @@ function rewrite() {
   const lines = source.split("\n");
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
-  const matches = [];
-  for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
-  if (matches.length !== 1) return 1;
-  const start = matches[0];
+  // The same selection the reader uses: only the newest occurrence is the
+  // current record, so only it is ever rewritten. Older occurrences are
+  // previous incarnations of the identity and are left exactly as archived.
+  const occurrences = [];
+  let block = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^## Archived /.test(lines[i])) block++;
+    else if (task.test(lines[i])) occurrences.push({line: i, block});
+  }
+  if (occurrences.length === 0) return 1;
+  const newestBlock = occurrences[occurrences.length - 1].block;
+  const newest = occurrences.filter((o) => o.block === newestBlock);
+  if (newest.length !== 1) return 1;
+  const start = newest[0].line;
   let end = start + 1;
   while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
   const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
@@ -420,17 +456,36 @@ process.exit(status);
 ' "$archive" "$id" "$lock"
 }
 
-task_record_locate() {  # <id>; sets TASK_RECORD_SHOW and TASK_RECORD_FILE
-  local id=$1 archive
+# The live backlog decides on its own whenever it holds the identity. An
+# archived copy of the same id is a previous incarnation of it, and the archive
+# is consulted only for an identity the live backlog no longer has at all - so a
+# record that was pruned and then restored by hand is read from where it lives
+# now, not from the copy retention left behind.
+task_record_locate() {  # <id>; sets TASK_RECORD_SHOW, TASK_RECORD_FILE, TASK_RECORD_AMBIGUOUS
+  local id=$1 archive out rc=0
   TASK_RECORD_SHOW=
   TASK_RECORD_FILE=
+  TASK_RECORD_AMBIGUOUS=
   if TASK_RECORD_SHOW=$(task_show "$id"); then
     return 0
   fi
   archive=$(tasks_axi_archive_path) || return 1
   [ -f "$archive" ] || return 1
-  TASK_RECORD_SHOW=$(archive_task_show "$archive" "$id" 2>/dev/null) || return 1
+  out=$(archive_task_show "$archive" "$id" 2>/dev/null) || rc=$?
+  if [ "$rc" -eq "$ARCHIVE_RECORD_AMBIGUOUS_RC" ]; then
+    TASK_RECORD_AMBIGUOUS=$out
+    return 1
+  fi
+  [ "$rc" -eq 0 ] || return 1
+  TASK_RECORD_SHOW=$out
   TASK_RECORD_FILE=$archive
+}
+
+# The refusal a caller owes when the archive holds an identity it cannot reduce
+# to one newest record. Absence and ambiguity need different words: only one of
+# them is fixed by recording a decision.
+fail_unresolvable_archive_record() {  # <id> <archive>
+  fail "captain decision $1 has $TASK_RECORD_AMBIGUOUS occurrences in the configured archive $2 with no single newest one; leave one current record for $1 there before this gate can read it"
 }
 
 show_field() {  # <show-output> <field>
@@ -570,6 +625,7 @@ verify_hold_durable() {  # <hold-id>
   local id=$1 show state held kind hold_kind body archive
   if ! task_record_locate "$id"; then
     archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+    [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
     fail "captain decision $id is absent from the active backlog and configured archive $archive"
   fi
   show=$TASK_RECORD_SHOW
@@ -1034,6 +1090,7 @@ command_repair() {
   id=$(hold_id "$origin" "$key")
   if ! task_record_locate "$id"; then
     archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+    [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
     fail "captain decision $id is absent from the active backlog and configured archive $archive"
   fi
   show=$TASK_RECORD_SHOW

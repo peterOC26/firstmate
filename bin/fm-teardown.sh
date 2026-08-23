@@ -795,6 +795,19 @@ fi
 
 # One inspection shell for the whole teardown of a remote task, opened before
 # the first check and released on every exit. Without it none of the protective
+# orca_worktree_presence_rc: is <worktree-id> still in Orca's own inventory?
+# 0 present, 1 gone for certain, 2 cannot tell. An adapter that will not load
+# answers 2, never 1: "could not ask" and "asked, and it is gone" are the two
+# answers this whole classification exists to keep apart. Defined here, above
+# the first classification, because the caller below is reached on paths where
+# task_remote_exec_open returned before it ever sourced the adapter - and an
+# undefined presence function would answer "cannot tell" only by accident, on
+# top of a spurious command-not-found line.
+orca_worktree_presence_rc() {  # <worktree-id>
+  fm_backend_source orca || return 2
+  fm_backend_orca_worktree_presence "$1"
+}
+
 # checks below can see the task's files at all, so a normal teardown refuses
 # here; --force is the approved discard path and continues without them.
 if [ "$TASK_REMOTE" = 1 ]; then
@@ -802,7 +815,7 @@ if [ "$TASK_REMOTE" = 1 ]; then
   trap 'task_remote_exec_release' INT TERM
   if ! task_remote_exec_open; then
     ORCA_WORKTREE_PRESENCE_RC=0
-    fm_backend_orca_worktree_presence "$ORCA_WORKTREE_ID" || ORCA_WORKTREE_PRESENCE_RC=$?
+    orca_worktree_presence_rc "$ORCA_WORKTREE_ID" || ORCA_WORKTREE_PRESENCE_RC=$?
     case "$ORCA_WORKTREE_PRESENCE_RC" in
       1)
         ORCA_WORKTREE_ABSENT=1
@@ -1954,15 +1967,6 @@ require_orca_worktree_path_match_if_present() {
     [ -e "$inspected" ] || return 0
   fi
   require_orca_worktree_path_match "$worktree_id" "$inspected"
-}
-
-# orca_worktree_presence_rc: is <worktree-id> still in Orca's own inventory?
-# 0 present, 1 gone for certain, 2 cannot tell. An adapter that will not load
-# answers 2, never 1: "could not ask" and "asked, and it is gone" are the two
-# answers this whole classification exists to keep apart.
-orca_worktree_presence_rc() {  # <worktree-id>
-  fm_backend_source orca || return 2
-  fm_backend_orca_worktree_presence "$1"
 }
 
 # remove_orca_worktree_or_classify_absent: ask Orca to release a worktree, and

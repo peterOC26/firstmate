@@ -613,6 +613,30 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
 }
 
+test_remote_teardown_classifies_without_a_loaded_adapter_when_the_shell_never_opens() {
+  local id out status
+  id="orcaremotez24"
+  remote_spawn_case remote-td-no-host "$id"
+  # A remote record naming no host at all. Opening the inspection shell gives up
+  # before it ever loads the Orca adapter, so the absent-worktree classification
+  # that follows runs with nothing sourced - and must still answer "cannot tell"
+  # deliberately rather than by tripping over an undefined function.
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=" "orca_remote=1"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "a remote record naming no host must not be torn down"$'\n'"$out"
+  assert_not_contains "$out" "command not found" \
+    "the classification ran before the Orca adapter was available"
+  assert_not_contains "$out" "no longer exists" \
+    "an unaskable runtime was reported as a definitely-absent worktree"
+  assert_present "$STATE/$id.meta" "the indeterminate refusal removed task metadata"
+  pass "fm-teardown.sh: classifies an unopenable remote inspection shell without a loaded adapter, and still refuses"
+}
+
 test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes() {
   local id out status forced forced_status
   id="orcaremotez21"
@@ -3315,6 +3339,7 @@ test_spawn_refuses_remote_harness_the_host_cannot_resolve
 test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
+test_remote_teardown_classifies_without_a_loaded_adapter_when_the_shell_never_opens
 test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes
 test_remote_teardown_releases_work_already_landed_on_the_host
 test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
