@@ -1956,6 +1956,44 @@ require_orca_worktree_path_match_if_present() {
   require_orca_worktree_path_match "$worktree_id" "$inspected"
 }
 
+# orca_worktree_presence_rc: is <worktree-id> still in Orca's own inventory?
+# 0 present, 1 gone for certain, 2 cannot tell. An adapter that will not load
+# answers 2, never 1: "could not ask" and "asked, and it is gone" are the two
+# answers this whole classification exists to keep apart.
+orca_worktree_presence_rc() {  # <worktree-id>
+  fm_backend_source orca || return 2
+  fm_backend_orca_worktree_presence "$1"
+}
+
+# remove_orca_worktree_or_classify_absent: ask Orca to release a worktree, and
+# treat its one supported "there is nothing here to release" answer as a
+# finished step instead of a dead end. Orca answers a removal for a worktree it
+# no longer records with an error, which used to abort teardown after the
+# endpoint was already killed - leaving records whose only supported next step
+# was the very command that had just refused. The retry is not the fix, because
+# every retry gets the same answer.
+#
+# Only Orca's exact selector-not-found verdict counts as absence, and only once
+# --force has supplied the discard authority. Every other failure - an
+# unreachable runtime, a malformed reply, any other error code - keeps the
+# original failure and preserves every record, so a runtime that cannot answer
+# is never read as a worktree that is gone.
+remove_orca_worktree_or_classify_absent() {  # <backend> <worktree-id> <label>
+  local backend=$1 worktree_id=$2 label=$3 presence_rc=0
+  if fm_backend_remove_worktree "$backend" "$worktree_id"; then
+    return 0
+  fi
+  orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
+  [ "$presence_rc" -eq 1 ] || return 1
+  if [ "$FORCE" != "--force" ]; then
+    echo "REFUSED: recorded Orca worktree $worktree_id for $label no longer exists, so Orca has nothing left to release; its records are preserved." >&2
+    echo "Get the captain's explicit OK to discard that remaining state, then rerun with --force." >&2
+    return 1
+  fi
+  echo "warning: recorded Orca worktree $worktree_id for $label is already absent; --force is retiring the remaining records without an Orca worktree removal" >&2
+  return 0
+}
+
 # child_is_remote_orca: does this CHILD task's own record say its files live on
 # another host? The parent's record answers for the parent only, and a forced
 # secondmate teardown releases children the parent never described.
@@ -1991,11 +2029,7 @@ require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-wo
     echo "REFUSED: child $child_id is recorded as running on a remote Orca host but names no host or worktree; preserving that child's records." >&2
     return 1
   fi
-  if fm_backend_source orca; then
-    fm_backend_orca_worktree_presence "$worktree_id" || presence_rc=$?
-  else
-    presence_rc=2
-  fi
+  orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
   if [ "$presence_rc" -eq 1 ]; then
     if [ "$FORCE" != "--force" ]; then
       echo "REFUSED: recorded Orca worktree $worktree_id for child $child_id no longer exists; its removed checkout cannot be inspected for uncommitted or unlanded work." >&2
@@ -2776,7 +2810,8 @@ cleanup_firstmate_home_children() {
           "$child_orca_absent"
       fi
       [ "$child_orca_absent" = 1 ] \
-        || fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
+        || remove_orca_worktree_or_classify_absent "$child_backend" "$child_orca_worktree_id" \
+          "child $child_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
@@ -3000,7 +3035,7 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   task_remote_exec_release
   [ -z "$T_ORCA" ] || fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" 2>/dev/null || true
   [ "$ORCA_WORKTREE_ABSENT" = 1 ] \
-    || fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+    || remove_orca_worktree_or_classify_absent "$BACKEND" "$ORCA_WORKTREE_ID" "task $ID"
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
   if [ "$branch" != "HEAD" ]; then

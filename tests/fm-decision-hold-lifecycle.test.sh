@@ -845,6 +845,76 @@ EOF
   pass "archived durable decisions satisfy teardown, while missing or unresolved archived decisions still refuse and remain repairable"
 }
 
+# The archive is shared writable state: tasks-axi appends a `## Archived <stamp>`
+# block to it from inside a hold of the LIVE BACKLOG's lock every time a prune
+# runs, and every `tasks-axi done <id>` prunes. Archive repair rewrites the whole
+# file, so it has to take that same lock or a concurrent append is read before
+# and overwritten after - losing archived history for good.
+test_archive_repair_serializes_on_the_backlog_lock() {
+  local home id hold lock archive before
+  home=$(make_home archive-repair-lock)
+  cat > "$home/.tasks.toml" <<'EOF'
+backend = "markdown"
+
+[markdown]
+path = "data/backlog.md"
+archive = "data/decisions/closed.md"
+done_keep = 10
+EOF
+  archive="$home/data/decisions/closed.md"
+  lock="$home/data/backlog.md.lock"
+
+  id=sample-archive-lock-review
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Review under archive lock" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Archive lock review\n\nThe answer still needs a durable body.\n' > "$home/data/$id/report.md"
+  hold=$(run_decisions "$home" hold "$id" submission \
+    --title "Choose under the archive lock" --reason "captain archive lock pending" --repo sample)
+  run_decisions "$home" complete "$id" submission >/dev/null
+  tasks_in "$home" "done" "$hold" >/dev/null
+  tasks_in "$home" prune --state "done" --keep 0 >/dev/null
+  assert_grep "$hold" "$archive" "the configured archive did not receive the closed hold"
+  printf 'Do not submit under the lock.\n' > "$home/locked-decision.txt"
+
+  # Another tasks-axi writer holds the backlog lock, exactly as a prune does
+  # while it is appending to this archive.
+  printf 'another-tasks-axi-holder\n' > "$lock"
+  before=$(cat "$archive")
+  if run_decisions "$home" repair "$id" submission --decision-file "$home/locked-decision.txt" \
+      > "$home/locked-repair.out" 2> "$home/locked-repair.err"; then
+    rm -f "$lock"
+    fail "archive repair rewrote the archive while another writer held the backlog lock"
+  fi
+  [ "$(cat "$archive")" = "$before" ] \
+    || { rm -f "$lock"; fail "a refused archive repair still modified the archive"; }
+  assert_grep "could not record the captain decision" "$home/locked-repair.err" \
+    "the lock refusal did not report that the decision was not recorded"
+  [ -f "$lock" ] \
+    || fail "archive repair removed a lock it never acquired"
+  [ "$(cat "$lock")" = "another-tasks-axi-holder" ] \
+    || fail "archive repair overwrote another writer's lock token"
+
+  # What that other writer was doing: appending a freshly pruned block. A repair
+  # that snapshots the archive before the append and renames after it would drop
+  # this block entirely.
+  printf '\n## Archived 2026-08-23T00:00:00Z\n- [x] sample-concurrently-archived - Pruned by another agent\n' \
+    >> "$archive"
+  rm -f "$lock"
+
+  run_decisions "$home" repair "$id" submission --decision-file "$home/locked-decision.txt" >/dev/null \
+    || fail "archive repair could not proceed once the backlog lock was released"
+  assert_grep "Resolution mode: repaired" "$archive" \
+    "the unblocked archive repair did not record its durable resolution body"
+  assert_grep "sample-concurrently-archived" "$archive" \
+    "the archive repair discarded a block another writer appended while it was waiting"
+  [ ! -f "$lock" ] || fail "archive repair left the backlog lock behind"
+  run_decisions "$home" verify "$id" >/dev/null \
+    || fail "the repaired decision did not satisfy verification after the lock round trip"
+  pass "archive repair takes tasks-axi's own backlog lock, so a concurrent archive append is never lost"
+}
+
 # The unrouted close paths must not become a way past the gate. An unanswered
 # decision keeps blocking cleanup, and neither new path can manufacture an answer.
 test_unanswered_decision_still_blocks_completion_and_teardown() {
@@ -1241,6 +1311,7 @@ test_scout_teardown_always_requires_inventory_verification
 test_declined_decision_closes_without_routed_work
 test_out_of_band_close_is_repairable_before_teardown
 test_archived_decisions_keep_the_scout_completion_gate_strong
+test_archive_repair_serializes_on_the_backlog_lock
 test_unanswered_decision_still_blocks_completion_and_teardown
 test_structured_holds_survive_teardown_and_route_resolution
 test_origin_slug_validation_precedes_path_construction

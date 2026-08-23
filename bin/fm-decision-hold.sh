@@ -257,26 +257,38 @@ tasks_axi_markdown_config_value() {  # <config-path> <key>
   ' "$config"
 }
 
+# The live backlog tasks-axi would load here. It is also what names tasks-axi's
+# own advisory lock, which guards the archive as well: a prune appends the
+# archived block and rewrites the backlog inside one hold of <backlog>.lock.
+tasks_axi_backlog_path() {
+  local project_config="$FM_HOME/.tasks.toml" user_config='' backlog=''
+  [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
+  backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
+  if [ -z "$backlog" ] && [ -n "$user_config" ]; then
+    backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
+  fi
+  if [ -z "$backlog" ]; then
+    if [ -f "$FM_HOME/backlog.md" ]; then
+      backlog=backlog.md
+    else
+      backlog=data/backlog.md
+    fi
+  fi
+  case "$backlog" in
+    /*) printf '%s' "$backlog" ;;
+    *) printf '%s/%s' "$FM_HOME" "$backlog" ;;
+  esac
+}
+
 tasks_axi_archive_path() {
-  local project_config="$FM_HOME/.tasks.toml" user_config='' archive='' backlog=''
+  local project_config="$FM_HOME/.tasks.toml" user_config='' archive=''
   [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
   archive=$(tasks_axi_markdown_config_value "$project_config" archive 2>/dev/null || true)
   if [ -z "$archive" ] && [ -n "$user_config" ]; then
     archive=$(tasks_axi_markdown_config_value "$user_config" archive 2>/dev/null || true)
   fi
   if [ -z "$archive" ]; then
-    backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
-    if [ -z "$backlog" ] && [ -n "$user_config" ]; then
-      backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
-    fi
-    if [ -z "$backlog" ]; then
-      if [ -f "$FM_HOME/backlog.md" ]; then
-        backlog=backlog.md
-      else
-        backlog=data/backlog.md
-      fi
-    fi
-    archive="$(dirname -- "$backlog")/done-archive.md"
+    archive="$(dirname -- "$(tasks_axi_backlog_path)")/done-archive.md"
   fi
   case "$archive" in
     /*) printf '%s' "$archive" ;;
@@ -316,37 +328,96 @@ process.stdout.write(`  body: ${JSON.stringify(body)}\n`);
 ' "$1" "$2"
 }
 
+# Rewrite one archived record's body in place. The archive is not this writer's
+# alone: tasks-axi appends a `## Archived <stamp>` block to it whenever a prune
+# runs, and every `tasks-axi done <id>` prunes. That append and the backlog
+# rewrite that follows it happen inside one hold of tasks-axi's own advisory
+# lock, keyed on the LIVE BACKLOG path, so a whole-file read-modify-rename here
+# that does not take the same lock can silently drop a concurrent append and
+# lose archived history permanently. The lock protocol is tasks-axi's:
+# create <backlog>.lock with O_EXCL, hold a unique token in it, retry briefly
+# while another holder has it, and unlink only a lockfile still carrying this
+# token. A lock that cannot be taken fails closed - the caller reports that the
+# decision could not be recorded, and the archive is left untouched.
 archive_task_update_body() {  # <archive-path> <id> <body>
-  local archive=$1 id=$2 body=$3
+  local archive=$1 id=$2 body=$3 lock
+  lock="$(tasks_axi_backlog_path).lock"
   # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
   printf '%s' "$body" | node -e '
 const fs = require("fs");
 const path = require("path");
-const [archive, id] = process.argv.slice(1);
+const [archive, id, lockPath] = process.argv.slice(1);
 const body = fs.readFileSync(0, "utf8");
-let source;
-try { source = fs.readFileSync(archive, "utf8"); } catch (_) { process.exit(1); }
-const lines = source.split("\n");
-const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
-const matches = [];
-for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
-if (matches.length !== 1) process.exit(1);
-const start = matches[0];
-let end = start + 1;
-while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
-const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
-lines.splice(start + 1, end - start - 1, ...replacement);
-const next = lines.join("\n");
-try {
-  if (fs.readFileSync(archive, "utf8") !== source) process.exit(2);
-  const tmp = path.join(path.dirname(archive), `.${path.basename(archive)}.repair-${process.pid}-${Date.now()}`);
-  fs.writeFileSync(tmp, next, {encoding: "utf8", flag: "wx", mode: fs.statSync(archive).mode & 0o777});
-  try { fs.renameSync(tmp, archive); } catch (error) { try { fs.unlinkSync(tmp); } catch (_) {} throw error; }
-} catch (_) {
-  process.exit(1);
+
+const LOCK_TIMEOUT_MS = 2500;
+const LOCK_RETRY_MS = 25;
+function nonce() {
+  return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
 }
-' "$archive" "$id"
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function acquire() {
+  const token = `${process.pid}:${nonce()}:${Date.now()}:1\n`;
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const fd = fs.openSync(lockPath, "wx");
+      try { fs.writeSync(fd, token); } finally { fs.closeSync(fd); }
+      return token;
+    } catch (error) {
+      if (!error || error.code !== "EEXIST") return undefined;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return undefined;
+      sleepSync(Math.min(LOCK_RETRY_MS, remaining));
+    }
+  }
+}
+function release(token) {
+  let observed;
+  try { observed = fs.readFileSync(lockPath, "utf8"); } catch (_) { return; }
+  if (observed !== token) return;
+  try { fs.unlinkSync(lockPath); } catch (_) {}
+}
+
+// Every exit from here on runs through `release`, so no failure path can leave
+// the shared lock held: process.exit() would skip a finally block.
+function rewrite() {
+  let source;
+  try { source = fs.readFileSync(archive, "utf8"); } catch (_) { return 1; }
+  const lines = source.split("\n");
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
+  const matches = [];
+  for (let i = 0; i < lines.length; i++) if (task.test(lines[i])) matches.push(i);
+  if (matches.length !== 1) return 1;
+  const start = matches[0];
+  let end = start + 1;
+  while (end < lines.length && !/^(?:- \[[ x]\] |## )/.test(lines[end])) end++;
+  const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
+  lines.splice(start + 1, end - start - 1, ...replacement);
+  const next = lines.join("\n");
+  try {
+    const tmp = path.join(path.dirname(archive), `.${path.basename(archive)}.repair-${process.pid}-${Date.now()}`);
+    fs.writeFileSync(tmp, next, {encoding: "utf8", flag: "wx", mode: fs.statSync(archive).mode & 0o777});
+    try { fs.renameSync(tmp, archive); } catch (error) { try { fs.unlinkSync(tmp); } catch (_) {} throw error; }
+  } catch (_) {
+    return 1;
+  }
+  return 0;
+}
+
+const token = acquire();
+if (token === undefined) process.exit(1);
+let status;
+try {
+  status = rewrite();
+} catch (_) {
+  status = 1;
+}
+release(token);
+process.exit(status);
+' "$archive" "$id" "$lock"
 }
 
 task_record_locate() {  # <id>; sets TASK_RECORD_SHOW and TASK_RECORD_FILE
