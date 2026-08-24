@@ -151,10 +151,14 @@
 #   default-branch commit when safe; skipped syncs warn and launch unchanged.
 #   Ship/scout spawns refuse to launch unless the resolved task path is a real
 #   git worktree root distinct from the primary project checkout.
-#   Before a fresh ship or scout worker starts, its clean task worktree fetches
-#   origin, resolves the current remote default branch, and resets to its tip.
-#   An unreachable origin, unresolved default branch, or non-clean worktree
-#   refuses the spawn rather than risking a PR based on stale history.
+#   Before a fresh ship or scout worker starts in a treehouse-provided
+#   worktree, that clean task worktree fetches origin, resolves the current
+#   remote default branch, and resets to its tip. An unreachable origin,
+#   unresolved default branch, or non-clean worktree refuses the spawn rather
+#   than risking a PR based on stale history. backend=orca ship and scout
+#   spawns are outside that boundary: Orca creates the worktree and owns its
+#   freshness, and on a remote Orca host it is not on this machine for
+#   firstmate to fetch or reset at all.
 # Batch dispatch: pass one or more `id=repo` pairs instead of a single <id> <project>, e.g.
 #     fm-spawn.sh fix-a-k3=projects/foo add-b-q7=projects/bar [--scout]
 #   Each pair re-execs this script in single-task mode, so the single path stays the only
