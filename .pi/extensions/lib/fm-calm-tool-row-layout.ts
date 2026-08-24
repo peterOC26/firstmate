@@ -1,6 +1,6 @@
-// Verified against Pi 0.84.1, which exports ToolExecutionComponent with a render()
-// method and stores rendered image children in its imageComponents and imageSpacers
-// fields. installCalmToolRowLayout() probes both seams - the render method and a real
+// Verified against Pi 0.84.1 and 0.84.2, which export ToolExecutionComponent with a
+// render() method and store rendered image children in their imageComponents and
+// imageSpacers fields. installCalmToolRowLayout() probes both seams - the render method and a real
 // probe instance's image state - and throws if either is missing; fm-calm.ts catches
 // that and skips only this adapter with a diagnostic instead of blocking Calm or Pi.
 // Failing closed at install keeps a renamed image seam from silently dropping image

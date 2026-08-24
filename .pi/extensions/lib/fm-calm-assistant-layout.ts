@@ -1,5 +1,6 @@
-// Verified against Pi 0.81.1, 0.82.0, and 0.84.1, which export AssistantMessageComponent
-// with an updateContent method whose later arguments this adapter forwards unchanged.
+// Verified against Pi 0.81.1, 0.82.0, 0.84.1, and 0.84.2, which export
+// AssistantMessageComponent with an updateContent method whose later arguments this
+// adapter forwards unchanged.
 // installCalmAssistantLayout() probes that exact method and throws
 // if it is missing; fm-calm.ts catches that and skips only this adapter with a diagnostic
 // instead of blocking Calm or Pi.

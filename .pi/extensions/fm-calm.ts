@@ -1,6 +1,6 @@
 // Firstmate's home-persistent Pi transcript presentation toggle.
 //
-// Verified against Pi 0.81.1, 0.82.0, and 0.84.1, which expose built-in
+// Verified against Pi 0.81.1, 0.82.0, 0.84.1, and 0.84.2, which expose built-in
 // ToolDefinitions, per-slot renderers, renderShell: "self",
 // ToolExecutionComponent.render(), session_start replacement reasons, agent_start and agent_settled,
 // ExtensionUIContext.setToolsExpanded(), setWorkingVisible(), setWidget() with a
