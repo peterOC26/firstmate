@@ -3465,7 +3465,30 @@ test_dispatcher_sources_orca_and_routes_primitives() {
   pass "fm-backend dispatcher: accepts orca and routes capture through bin/backends/orca.sh"
 }
 
+test_spawn_skips_local_refresh_for_a_remote_orca_worktree() {
+  local id out status local_wt remote_prefix
+  id="orcaremotez0"
+  remote_spawn_case remote-spawn-no-local-refresh "$id"
+  local_wt=$WT
+  remote_prefix="$CASE_DIR/virtual-host"
+  export FM_ORCA_FAKE_HOST_PREFIX=$remote_prefix
+  export FM_ORCA_FAKE_HOST_REAL=$CASE_DIR
+  WT="$remote_prefix/wt"
+  write_remote_worktree_fixtures "$FIX" "$WT"
+  [ ! -e "$WT" ] || fail "the remote fixture path unexpectedly exists on the caller"
+
+  out=$(run_remote_spawn "$id" claude --mode local-only --yolo off --backend orca)
+  status=$?
+  unset FM_ORCA_FAKE_HOST_PREFIX FM_ORCA_FAKE_HOST_REAL
+  expect_code 0 "$status" "a remote Orca spawn must not fetch its host-owned worktree locally"$'\n'"$out"
+  assert_grep "worktree=$WT" "$STATE/$id.meta" \
+    "the remote spawn should retain the host-owned worktree path"
+  [ -e "$local_wt/.git" ] || fail "the fake remote host worktree was not used by the spawn"
+  pass "fm-spawn.sh: skips local pooled-worktree refresh for a remote Orca worktree"
+}
+
 test_spawn_places_task_on_remote_orca_host
+test_spawn_skips_local_refresh_for_a_remote_orca_worktree
 test_spawn_creates_the_remote_task_temp_root_at_owner_only_mode
 test_spawn_refuses_orca_selector_without_orca_backend
 test_spawn_refuses_remote_worktree_that_is_the_primary_checkout
