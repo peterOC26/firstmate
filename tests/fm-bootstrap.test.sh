@@ -21,6 +21,9 @@
 # one run into its local and network halves, and the one-hop tasks-axi
 # compatibility handoff that keeps a session start from paying for that verdict
 # twice.
+# Dedicated GitHub-default cases pin diagnostics for an absent resolution, a
+# mismatched remote base, and an owner/repo resolution, plus silence for matching
+# repository identities and a local phase that never invokes gh.
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -508,6 +511,73 @@ SH
   expected="MISSING: git (install: brew install git  # or the platform's package manager)"
   [ "$out" = "$expected" ] || fail "missing git should report the supported install instruction, got: $out"
   pass "bootstrap requires git with an install instruction"
+}
+
+test_gh_default_repo_mismatch_is_local_and_actionable() {
+  local case_dir repo fakebin out expected gh_log
+  case_dir="$TMP_ROOT/gh-default-repo"
+  repo="$case_dir/repo"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  git init -q -b main "$repo"
+  git -C "$repo" remote add origin git@github.com:peterOC26/firstmate.git
+  git -C "$repo" remote add upstream https://github.com/kunchenguid/firstmate.git
+  git -C "$repo" config remote.upstream.gh-resolved base
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_MISMATCH: gh default base kunchenguid/firstmate differs from origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "mismatched gh default should report the repositories and remedy, got: $out"
+
+  git -C "$repo" config --unset remote.upstream.gh-resolved
+  git -C "$repo" remote remove upstream
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_UNSET: gh default repository is not pinned to origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "an unset gh default should report the origin and remedy, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved kunchenguid/firstmate
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_MISMATCH: gh default base kunchenguid/firstmate differs from origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "an owner/repo gh resolution should be compared with origin, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved peterOC26/firstmate
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "a matching owner/repo gh resolution should be silent, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved base
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "matching gh default and origin should be silent, got: $out"
+
+  git -C "$repo" config --unset remote.origin.gh-resolved
+  git -C "$repo" remote add upstream https://github.com/peterOC26/firstmate.git
+  git -C "$repo" config remote.upstream.gh-resolved base
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "equivalent HTTPS and SSH repository URLs should be silent, got: $out"
+
+  gh_log="$case_dir/gh-invoked"
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+: > "${FM_FAKE_GH_LOG:?}"
+exit 97
+SH
+  chmod +x "$fakebin/gh"
+  PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    FM_FAKE_GH_LOG="$gh_log" "$ROOT/bin/fm-bootstrap.sh" >/dev/null
+  assert_absent "$gh_log" "the local gh-default check invoked gh and could hang while GitHub is unreachable"
+  pass "bootstrap reports a wrong gh base repository locally and keeps the matching case silent"
 }
 
 test_orca_backend_gates_orca_tool_only_when_selected() {
@@ -1155,6 +1225,7 @@ test_lavish_axi_min_version
 test_tasks_axi_min_version
 test_quota_axi_min_version
 test_git_is_required_with_supported_install_instruction
+test_gh_default_repo_mismatch_is_local_and_actionable
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux

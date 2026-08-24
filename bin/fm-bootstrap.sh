@@ -7,6 +7,8 @@
 #          Silent = all good.
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
+#                 "GH_REPO_UNSET: gh default repository is not pinned to origin <owner/repo> (fix: gh repo set-default origin)",
+#                 "GH_REPO_MISMATCH: gh default base <owner/repo> differs from origin <owner/repo> (fix: gh repo set-default origin)",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
 #                 "STARTUP_MEMORY_BUDGET: invalid config/startup-memory-budget - <reason>",
 #                 "CREW_DISPATCH: invalid config/crew-dispatch.json - <reason>",
@@ -45,6 +47,9 @@
 #          failed names whether the endpoint was missing or agent-less.
 #          Already-live and successfully relaunched secondmates are silent
 #          unless FM_BOOTSTRAP_VERBOSE_FACTS=1 requests BOOTSTRAP_INFO facts.
+#          GH_REPO_MISMATCH also covers a resolution that cannot be compared at
+#          all: "gh default repository resolution is ambiguous|invalid
+#          (fix: gh repo set-default origin)" names no repository.
 #          A TANGLE line means the firstmate primary checkout (FM_ROOT) is stranded
 #          on a feature branch instead of its default branch - a crewmate's work
 #          landed in the primary instead of its own worktree; restore it per the line.
@@ -1240,6 +1245,85 @@ detect_local_tools() {
   fi
 }
 
+git_remote_repo_identity() {  # <remote-url>
+  local url=$1 host path
+  url=${url%/}
+  url=${url%.git}
+  case "$url" in
+    *://*)
+      url=${url#*://}
+      url=${url#*@}
+      ;;
+    *@*:*)
+      url=${url#*@}
+      url=${url/:/\/}
+      ;;
+    *) return 1 ;;
+  esac
+  host=${url%%/*}
+  path=${url#*/}
+  [ -n "$host" ] && [ "$path" != "$url" ] || return 1
+  case "$path" in
+    */*/*|/*|*/|*[?#]*) return 1 ;;
+    */*) ;;
+    *) return 1 ;;
+  esac
+  printf '%s/%s\n' "$host" "$path"
+}
+
+gh_default_repo_diagnostic() {
+  local resolution_lines resolution_line resolution_key resolution resolved_remote
+  local origin_url resolved_url origin_identity resolved_identity resolved_remote_identity
+  local origin_repo resolved_repo origin_compare resolved_compare
+  # gh persists its chosen default as remote.<name>.gh-resolved=base, or as an
+  # owner/repo value when the chosen repository has no matching remote. Reading
+  # that local cache mirrors the repository its unqualified queries use without
+  # invoking gh, prompting, waiting on GitHub, or re-resolving a fork online.
+  origin_url=$(git -C "$FM_ROOT" remote get-url origin 2>/dev/null) || return 0
+  origin_identity=$(git_remote_repo_identity "$origin_url") || return 0
+  origin_repo=${origin_identity#*/}
+  resolution_lines=$(git -C "$FM_ROOT" config --get-regexp '^remote\..*\.gh-resolved$' 2>/dev/null || true)
+  if [ -z "$resolution_lines" ]; then
+    echo "GH_REPO_UNSET: gh default repository is not pinned to origin $origin_repo (fix: gh repo set-default origin)"
+    return 0
+  fi
+  if [ "${resolution_lines#*$'\n'}" != "$resolution_lines" ]; then
+    echo "GH_REPO_MISMATCH: gh default repository resolution is ambiguous (fix: gh repo set-default origin)"
+    return 0
+  fi
+  resolution_line=$resolution_lines
+  resolution_key=${resolution_line%% *}
+  resolution=${resolution_line#* }
+  resolved_remote=$(printf '%s\n' "$resolution_key" | sed -nE 's/^remote\.(.*)\.gh-resolved$/\1/p')
+  [ -n "$resolved_remote" ] || return 0
+  resolved_url=$(git -C "$FM_ROOT" remote get-url "$resolved_remote" 2>/dev/null) || return 0
+  resolved_remote_identity=$(git_remote_repo_identity "$resolved_url") || return 0
+  case "$resolution" in
+    base)
+      resolved_identity=$resolved_remote_identity
+      resolved_repo=${resolved_identity#*/}
+      ;;
+    */*)
+      case "$resolution" in
+        */*/*|/*|*/|*[?#]*)
+          echo "GH_REPO_MISMATCH: gh default repository resolution is invalid (fix: gh repo set-default origin)"
+          return 0
+          ;;
+      esac
+      resolved_repo=$resolution
+      resolved_identity="${resolved_remote_identity%%/*}/$resolved_repo"
+      ;;
+    *)
+      echo "GH_REPO_MISMATCH: gh default repository resolution is invalid (fix: gh repo set-default origin)"
+      return 0
+      ;;
+  esac
+  origin_compare=$(printf '%s\n' "$origin_identity" | tr '[:upper:]' '[:lower:]')
+  resolved_compare=$(printf '%s\n' "$resolved_identity" | tr '[:upper:]' '[:lower:]')
+  [ "$origin_compare" != "$resolved_compare" ] || return 0
+  echo "GH_REPO_MISMATCH: gh default base $resolved_repo differs from origin $origin_repo (fix: gh repo set-default origin)"
+}
+
 detect_local_config() {
   # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
   # default branch, not a feature branch (see fm-tangle-lib.sh). Scoped to the
@@ -1253,6 +1337,7 @@ detect_local_config() {
       echo "TANGLE: primary checkout on feature branch '$tangle_branch' (expected '$tangle_default'); the work is safe on that ref - restore the primary with: git -C $FM_ROOT checkout $tangle_default, then re-validate the branch in a proper worktree"
     fi
   fi
+  gh_default_repo_diagnostic
   crew=
   [ -f "$CONFIG/crew-harness" ] && crew=$(tr -d '[:space:]' < "$CONFIG/crew-harness" || true)
   if [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ] && [ -n "$crew" ] && [ "$crew" != "default" ]; then

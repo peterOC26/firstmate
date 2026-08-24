@@ -83,6 +83,7 @@ Launch it with `--trust`, or none of its project hooks load; it also has no turn
 gh auth login
 git clone https://github.com/kunchenguid/firstmate
 cd firstmate
+gh repo set-default origin
 ```
 
 Then launch one of the co-primary harnesses; AGENTS.md takes over from there:

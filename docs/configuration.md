@@ -400,6 +400,9 @@ An absent or incompatible `lavish-axi` reports `MISSING: lavish-axi (install: np
 An absent or too-old `quota-axi` reports `MISSING: quota-axi (install: npm install -g quota-axi)`; firstmate cannot resolve a profile array without a compatible binary.
 Bootstrap also reports a `TANGLE:` line when `FM_ROOT` is on a named non-default branch; follow the printed checkout remediation rather than treating it as an installable tool problem.
 In a read-only session that did not get the fleet lock, the same line is advisory and omits the checkout command.
+Bootstrap further compares this checkout's `gh` default base repository with `origin`, because in a fork checkout unqualified `gh` and `gh-axi` pull request, issue, release, and Actions queries answer for the parent repository instead.
+It reads only local git configuration and never calls `gh`, so an unreachable GitHub cannot delay or fail the check.
+A checkout with no pinned default reports `GH_REPO_UNSET:`, while a divergent, ambiguous, or invalid resolution reports `GH_REPO_MISMATCH:`; both print `gh repo set-default origin` as the remedy, and a checkout already resolving to `origin` stays silent.
 The locked session-start deferred network stage runs bootstrap's best-effort project clone refresh through `fm-fleet-sync.sh`; [`fm-bootstrap.sh`'s header](../bin/fm-bootstrap.sh) owns the exact clone-refresh overlap, liveness-before-convergence, per-mate concurrency, ordered diagnostic replay, and sequential-fallback contract.
 It emits `FLEET_SYNC:` for skipped refreshes that may matter, recovered self-heals, and `STUCK:` alarms.
 Normal completed runs keep local-only and no-origin skips silent.
