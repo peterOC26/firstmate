@@ -38,8 +38,8 @@ cleanup() {
 trap cleanup EXIT
 
 wait_for_text() {
-  local file=$1 text=$2 limit=${3:-120} i=0
-  while [ "$i" -lt "$limit" ]; do
+  local file=$1 text=$2 i=0
+  while [ "$i" -lt 120 ]; do
     # Include recent scrollback: expanding a long restored transcript can move
     # the asserted tool output above the current viewport while the footer and
     # editor remain visible.
@@ -947,7 +947,6 @@ const operationalMode = {
   // Firstmate both use today.
   getMarkdownTransformers: () => [],
   getMarkdownThemeWithSettings: () => undefined,
-  getMarkdownTransformers: () => [],
   getUserMessageText: (message) => typeof message.content === "string"
     ? message.content
     : message.content.filter((item) => item.type === "text").map((item) => item.text).join(""),
@@ -1293,8 +1292,32 @@ const assistantThinkingTool = new AssistantMessageComponent({
 if (!assistantThinkingText.render(100).join("\n").includes("Thinking...")) {
   throw new Error("stock collapsed-thinking fixture did not render before Calm was active");
 }
+// Pi's editor accepts /export while a run streams, so an assistant message_update can
+// land inside the export window. This row replays that update.
+const exportWindowUpdate = (command) => ({
+  ...assistantBase,
+  stopReason: "toolUse",
+  content: [
+    { type: "thinking", thinking: `EXPORT_WINDOW_THINKING ${command}` },
+    { type: "text", text: `EXPORT_WINDOW_WORKING_NOTE ${command}` },
+    { type: "toolCall", id: `export-window-${command}`, name: "read", arguments: { path: "sample.txt" } },
+  ],
+});
+const exportWindowAssistantRow = new AssistantMessageComponent(exportWindowUpdate("startup"), true);
+const exportWindowStockRender = exportWindowAssistantRow.render(100).join("\n");
+if (
+  !exportWindowStockRender.includes("Thinking...") ||
+  !exportWindowStockRender.includes("EXPORT_WINDOW_WORKING_NOTE startup")
+) {
+  throw new Error("export-window assistant fixture did not render before Calm was active");
+}
 
-const assistantComponents = [assistantTextOnly, assistantThinkingText, assistantThinkingTool];
+const assistantComponents = [
+  assistantTextOnly,
+  assistantThinkingText,
+  assistantThinkingTool,
+  exportWindowAssistantRow,
+];
 let expanded = true;
 let editorText = "";
 let terminalInputHandler;
@@ -1473,6 +1496,15 @@ async function assertStockHtmlRendering(command, submitData) {
       throw new Error(`${name} flashed to full height inside the ${command} window: ${JSON.stringify(rendered)}`);
     }
   }
+  // A streamed assistant update queued before the window opened rebuilds its row from
+  // the live Calm policy, and nothing re-runs that rebuild when the window closes.
+  exportWindowAssistantRow.updateContent(exportWindowUpdate(command));
+  const windowAssistantRender = exportWindowAssistantRow.render(100);
+  if (windowAssistantRender.length !== 0) {
+    throw new Error(
+      `an assistant update inside the ${command} window unhid collapsed thinking or a working note: ${JSON.stringify(windowAssistantRender)}`,
+    );
+  }
   for (const [name, row] of [["built-in read", imageRow], ["foreign", foreignImageRow]]) {
     const rendered = row.render(100).join("\n");
     if (!rendered.includes("\x1b]1337;File=")) {
@@ -1521,6 +1553,14 @@ async function assertStockHtmlRendering(command, submitData) {
   }
   if (toolsExpandedCalls.length !== toolsExpandedCallsBefore) {
     throw new Error(`${command} repainted through tool expansion, which overwrites Pi's own export status row`);
+  }
+  // The reset repaints tool rows and clears the footer status; it never re-runs an
+  // assistant row's content build, so anything unhidden inside the window would stay.
+  const settledAssistantRender = exportWindowAssistantRow.render(100);
+  if (settledAssistantRender.length !== 0) {
+    throw new Error(
+      `the ${command} reset repaint left assistant thinking or a working note on screen: ${JSON.stringify(settledAssistantRender)}`,
+    );
   }
 }
 
@@ -1638,6 +1678,15 @@ if (workingVisible !== true || hiddenThinkingLabel !== undefined || statuses.get
 if (!assistantThinkingTool.render(100).join("\n").includes("Thinking...")) {
   throw new Error("turning Calm off did not restore the collapsed thinking label");
 }
+const restoredExportWindowRender = exportWindowAssistantRow.render(100).join("\n");
+if (
+  !restoredExportWindowRender.includes("Thinking...") ||
+  !restoredExportWindowRender.includes("EXPORT_WINDOW_WORKING_NOTE /share")
+) {
+  throw new Error(
+    `turning Calm off did not restore the assistant update delivered inside the export window: ${JSON.stringify(restoredExportWindowRender)}`,
+  );
+}
 if (readFileSync(`${process.env.FM_HOME}/config/calm`, "utf8") !== "off\n") {
   throw new Error("Calm did not persist the inactive choice in the effective Firstmate home");
 }
@@ -1680,7 +1729,7 @@ JS
   out=$(cat "$output_file")
   [ "$status" -eq 0 ] || fail "Pi calm renderer and lifecycle contract failed: $out"
   [ -z "$out" ] || fail "Pi calm renderer test printed output: $out"
-  pass "Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts"
+  pass "Pi calm centralizes transcript visibility, preserves execution/export data, keeps an assistant update delivered inside the /export and /share window hidden on screen through the reset repaint, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts"
 }
 
 test_calm_mid_turn_working_notes() {

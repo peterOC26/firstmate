@@ -229,18 +229,20 @@ The installed extension API has no supported global transcript filter, user-mess
 Pi 0.81.1 through 0.84.1 export `AssistantMessageComponent`, `ToolExecutionComponent`, and `InteractiveMode`, so Calm uses separate idempotent, API-probed adapters for assistant thinking layout, generic tool-row layout, and the complete operational-user transcript row while leaving all message data and non-Calm rendering unchanged; see the [compatibility contract](calm.md#pi-compatibility) for how a future Pi lacking one of those exports is handled.
 General component replacement, ANSI cursor erasure, provider-context mutation, and installed-file patching remain rejected as unsupported or preservation-breaking workarounds.
 
-## 2026-08-10 SuperCalm Pi 0.84.1 verification
+## 2026-08-24 SuperCalm Pi 0.84.2 verification
 
-The SuperCalm revision was verified against the installed Pi 0.84.1 CLI.
+The SuperCalm revision was first verified against the installed Pi 0.84.1 CLI on 2026-08-10 and re-recorded here against the merged tree and the installed Pi 0.84.2 CLI.
 The revision adds the `ToolExecutionComponent.render` adapter, preserves image output, and forwards Pi 0.84.x widened component arguments in the existing adapters.
 The adapter probes the row's image children at install and skips itself entirely if that seam is renamed, because a hidden row whose images are silently dropped loses the parity this change exists to keep, and a render-time diagnostic would write to the screen Pi's TUI owns.
 It also replaces the old post-export expansion redraw, which repainted correctly but overwrote Pi's `/export` completion status, with a cleared extension footer status: `ExtensionUIContext.setStatus()` with an undefined text requests the render Calm needs after Pi has already painted the stock-rendered transcript, and touches only footer data.
-Both render-time adapters, the tool row and the operational-user row, read the Calm policy without the stock-export escape hatch, because Pi builds `/export` and `/share` output from tool definitions, entry renderers, and session entries rather than from on-screen rows: honoring the hatch there would only unhide those rows for the single frame Pi paints inside the export window.
+All three render-time adapters - the tool row, the operational-user row, and the assistant-message row that collapses thinking and mid-turn working notes - read the Calm policy without the stock-export escape hatch, because Pi builds `/export` and `/share` output from tool definitions, entry renderers, and session entries rather than from on-screen rows: honoring the hatch there would only unhide those rows for the single frame Pi paints inside the export window.
+For the assistant-message row that frame is not even self-correcting: an assistant update that arrives while the window is open rebuilds the row from the live policy, and the reset repaints tool rows and the footer status without rebuilding assistant content, so an unhidden thinking block or working note would stay on screen until the next streaming update or a `/calm` toggle.
 The tool-definition wrappers and the synthetic entry renderer still honor it, so exported and shared artifacts keep their complete content.
+The re-record below covers the commands rerun for this revision; the repository shell lint gate is unchanged and is recorded by its own step rather than repeated here.
 
 ```text
 $ pi --version
-0.84.1
+0.84.2
 
 $ tests/fm-calm-pi-extension.test.sh
 ok - Pi calm resolves its persistent home independently of Pi's launch directory
@@ -250,7 +252,8 @@ ok - missing Pi presentation class exports reach the independent adapter degrada
 ok - an unavailable ToolExecutionComponent image seam skips the whole tool-row adapter at install instead of dropping images mid-render
 ok - Calm registers none of its 7 built-in tool wrappers at load while config/calm is off, and all 7 synchronously at load while config/calm is on
 ok - Calm's first same-session /calm activation claims every uncontested built-in, leaves a foreign bash tool fully intact and callable, warns prominently and logs the contested name, and SuperCalm collapses and restores pre-activation rows
-ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps an assistant update delivered inside the /export and /share window hidden on screen through the reset repaint, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+ok - Pi calm on collapses mid-turn assistant working notes to zero height while Calm off keeps them, leaves streaming, truncated-final, and genuine final replies untouched, never mutates the messages, ignores every /calm argument, and restores a legacy persisted max as ordinary Calm on
 ok - Pi operational follow-up E2E processes exact user-role notifications once while Calm hides current and adjacent rows, Calm off and absent render them, and restart preserves semantics
 ok - Pi Calm native /skill:ahoy geometry keeps every collapsed thinking and tool block at zero height while preserving expansion, history, restart, and Calm-off rendering
 ok - Pi Calm working ship moves on a slow independent cadence over faster fixed-cell blue water, paints the complete boat standard yellow with balanced resets, keeps ANSI-stripped width exact, flips the directional sail on the exact bounce at both edges and every width, clamps visible and hidden resizes, falls back deterministically when narrow, freezes and resumes column/direction across settle/start without hidden-time jumps or duplicate timers, resets only on a fresh session, and installs and removes one scheduler-owning widget across starts, settle, abort, failure, shutdown, reload, replacement, and Calm toggles while leaving Calm-off visibility untouched
@@ -259,11 +262,8 @@ ok - Pi calm native E2E replaces the stock working row with a moving, resize-cla
 $ tests/fm-pi-primary-types.test.sh
 skip: tsc not found for Pi extension typecheck
 
-$ bin/fm-lint.sh
-fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
-
 $ bin/fm-doc-audience-check.sh
-fm-doc-audience-check: ok surfaces=65 local_links=216
+fm-doc-audience-check: ok surfaces=77 local_links=284
 ```
 
 ## Cross-harness verification record

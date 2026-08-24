@@ -7,9 +7,12 @@
 // classified as "assistant-working-note" from a shallow presentation copy. The message
 // itself, model context, session storage, and export rendering are never touched.
 // ./fm-calm-visibility.ts owns which classes Calm hides.
+// This adapter is screen-only: Pi builds /export and /share output from session entries
+// and never from these rows, so it reads the Calm policy without the stock-export escape
+// hatch the tool-definition wrappers and the synthetic entry renderer need.
 import type { AssistantMessageComponent as PiAssistantMessageComponent } from "@earendil-works/pi-coding-agent";
 import * as PiCodingAgent from "@earendil-works/pi-coding-agent";
-import { calmPresentationHides } from "./fm-calm-visibility.ts";
+import { calmScreenPresentationHides } from "./fm-calm-visibility.ts";
 
 type AssistantMessage = Parameters<PiAssistantMessageComponent["updateContent"]>[0];
 
@@ -48,8 +51,9 @@ export function installCalmAssistantLayout(): void {
   const registry = globalThis as typeof globalThis & {
     [key: symbol]: CalmAssistantLayoutPatch | undefined;
   };
-  const hidesThinking = (): boolean => calmPresentationHides("assistant-thinking");
-  const hidesWorkingNote = (): boolean => calmPresentationHides("assistant-working-note");
+  const hidesThinking = (): boolean => calmScreenPresentationHides("assistant-thinking");
+  const hidesWorkingNote = (): boolean =>
+    calmScreenPresentationHides("assistant-working-note");
   const installed = registry[CALM_ASSISTANT_LAYOUT_PATCH];
   if (installed) {
     installed.hidesThinking = hidesThinking;
