@@ -47,6 +47,9 @@
 #          failed names whether the endpoint was missing or agent-less.
 #          Already-live and successfully relaunched secondmates are silent
 #          unless FM_BOOTSTRAP_VERBOSE_FACTS=1 requests BOOTSTRAP_INFO facts.
+#          GH_REPO_MISMATCH also covers a resolution that cannot be compared at
+#          all: "gh default repository resolution is ambiguous|invalid
+#          (fix: gh repo set-default origin)" names no repository.
 #          A TANGLE line means the firstmate primary checkout (FM_ROOT) is stranded
 #          on a feature branch instead of its default branch - a crewmate's work
 #          landed in the primary instead of its own worktree; restore it per the line.
