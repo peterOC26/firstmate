@@ -85,6 +85,7 @@ A local checkout still present at the recorded path is never discarded that way 
 - Escape is unsupported.
 - Orca exposes no stable CLI version or protocol marker, so readiness is the compatibility gate rather than a version floor.
 - Only the verified terminal-handle and worktree result fields are accepted; speculative response shapes are rejected.
+- Firstmate never refreshes an Orca task worktree's base before launch, local host or remote: Orca creates the worktree and owns its freshness, so `backend=orca` ship and scout spawns skip the base refresh other backends' pooled worktrees get, and [architecture](architecture.md#worktrees-not-branches-in-your-checkout) owns that boundary.
 - Remote hosts carry the further limits in "Remote Orca hosts" below.
 
 ## Remote Orca hosts
