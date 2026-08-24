@@ -9,6 +9,7 @@ TMP_ROOT=$(fm_test_tmproot fm-calm-pi-extension)
 EXT="$ROOT/.pi/extensions/fm-calm.ts"
 ASSISTANT_LAYOUT="$ROOT/.pi/extensions/lib/fm-calm-assistant-layout.ts"
 OPERATIONAL_USER_LAYOUT="$ROOT/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+TOOL_ROW_LAYOUT="$ROOT/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
 VISIBILITY="$ROOT/.pi/extensions/lib/fm-calm-visibility.ts"
 WORKING_SHIP="$ROOT/.pi/extensions/lib/fm-calm-working-ship.ts"
 WATCH_EXT="$ROOT/.pi/extensions/fm-primary-pi-watch.ts"
@@ -17,8 +18,8 @@ PI_OPERATIONAL_INPUT="$ROOT/.pi/extensions/lib/fm-operational-input.ts"
 PI_PACKAGE_DIR=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
 TMUX_SOCKET="fm-calm-$$"
 TMUX_SESSION="fm-calm-e2e"
-# Verified against Pi 0.81.1 and 0.82.0 (docs/calm-mode-feasibility.md). This is
-# known-good evidence, not a support ceiling: the fixtures below run against whatever
+# Verified against Pi 0.81.1, 0.82.0, 0.84.1, and 0.84.2 (docs/calm-mode-feasibility.md).
+# This is known-good evidence, not a support ceiling: the fixtures below run against whatever
 # Pi is actually installed, and record_pi_version_evidence never rejects a newer
 # version. The tracked presentation adapters probe the exact API they patch (see
 # .pi/extensions/fm-calm.ts) instead of relying on version inference, so a version
@@ -93,6 +94,7 @@ test_home_resolution() {
   cp "$EXT" "$fixture/project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/project/.pi/extensions/lib/fm-operational-input.ts"
@@ -215,6 +217,7 @@ test_pi_compat_degraded_adapter() {
   cp "$EXT" "$fixture/project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/project/.pi/extensions/lib/fm-operational-input.ts"
@@ -230,16 +233,24 @@ test_pi_compat_degraded_adapter() {
 import { pathToFileURL } from "node:url";
 
 const packageRoot = process.env.PI_PACKAGE_DIR;
-const { AssistantMessageComponent } = await import(
-  pathToFileURL(`${packageRoot}/dist/modes/interactive/components/assistant-message.js`).href
-);
+const [{ AssistantMessageComponent }, { ToolExecutionComponent }] = await Promise.all([
+  import(pathToFileURL(`${packageRoot}/dist/modes/interactive/components/assistant-message.js`).href),
+  import(pathToFileURL(`${packageRoot}/dist/modes/interactive/components/tool-execution.js`).href),
+]);
 const originalUpdateContent = AssistantMessageComponent.prototype.updateContent;
 if (typeof originalUpdateContent !== "function") {
   throw new Error(
     "fixture precondition failed: installed Pi lacks AssistantMessageComponent.prototype.updateContent",
   );
 }
+const originalToolRender = ToolExecutionComponent.prototype.render;
+if (typeof originalToolRender !== "function") {
+  throw new Error(
+    "fixture precondition failed: installed Pi lacks ToolExecutionComponent.prototype.render",
+  );
+}
 delete AssistantMessageComponent.prototype.updateContent;
+delete ToolExecutionComponent.prototype.render;
 
 const diagnostics = [];
 const originalConsoleError = console.error;
@@ -283,6 +294,11 @@ if (typeof AssistantMessageComponent.prototype.updateContent !== "undefined") {
     "the degraded adapter path patched updateContent anyway despite the missing API, which would claim false success",
   );
 }
+if (Object.prototype.hasOwnProperty.call(ToolExecutionComponent.prototype, "render")) {
+  throw new Error(
+    "the degraded adapter path patched ToolExecutionComponent.render anyway despite the missing API, which would claim false success",
+  );
+}
 const sawClearSkipReason = diagnostics.some(
   (line) => line.includes("collapsed-thinking") && /unavailable|skip/i.test(line),
 );
@@ -291,8 +307,17 @@ if (!sawClearSkipReason) {
     `missing a clear skip reason for the degraded collapsed-thinking adapter; saw: ${JSON.stringify(diagnostics)}`,
   );
 }
+const sawToolRowSkipReason = diagnostics.some(
+  (line) => line.includes("custom-tool-row") && /unavailable|skip/i.test(line),
+);
+if (!sawToolRowSkipReason) {
+  throw new Error(
+    `missing a clear skip reason for the degraded custom-tool-row adapter; saw: ${JSON.stringify(diagnostics)}`,
+  );
+}
 
 AssistantMessageComponent.prototype.updateContent = originalUpdateContent;
+ToolExecutionComponent.prototype.render = originalToolRender;
 JS
 )
   status=$?
@@ -314,6 +339,7 @@ test_pi_compat_missing_adapter_exports() {
     "$fixture/project/node_modules/@earendil-works/pi-coding-agent"
   cp "$ASSISTANT_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/project/.pi/extensions/lib/fm-operational-input.ts"
@@ -329,10 +355,12 @@ test_pi_compat_missing_adapter_exports() {
   out=$(cd "$fixture/project" && node --input-type=module 2>&1 <<'JS'
 const assistant = await import("./.pi/extensions/lib/fm-calm-assistant-layout.ts");
 const operational = await import("./.pi/extensions/lib/fm-calm-operational-user-layout.ts");
+const toolRow = await import("./.pi/extensions/lib/fm-calm-tool-row-layout.ts");
 
 for (const [name, install, expected] of [
   ["collapsed-thinking", assistant.installCalmAssistantLayout, "AssistantMessageComponent"],
   ["operational-user-row", operational.installCalmOperationalUserLayout, "InteractiveMode"],
+  ["custom-tool-row", toolRow.installCalmToolRowLayout, "ToolExecutionComponent"],
 ]) {
   let reason;
   try {
@@ -352,6 +380,84 @@ JS
   [ "$status" -eq 0 ] || fail "Pi calm missing-adapter-export path failed: $out"
   [ -z "$out" ] || fail "Pi calm missing-adapter-export test printed output: $out"
   pass "missing Pi presentation class exports reach the independent adapter degradation path"
+}
+
+test_tool_row_image_state_probe() {
+  local fixture out status
+  if ! command -v node >/dev/null 2>&1; then
+    echo "skip: node not found for Pi calm tool-row image-state test"
+    return 0
+  fi
+
+  fixture="$TMP_ROOT/tool-row-image-state"
+  mkdir -p \
+    "$fixture/project/.pi/extensions/lib" \
+    "$fixture/project/node_modules/@earendil-works/pi-coding-agent"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
+  cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
+  printf '%s\n' '{"type":"module"}' >"$fixture/project/package.json"
+  printf '%s\n' \
+    '{"name":"@earendil-works/pi-coding-agent","type":"module","exports":"./index.js"}' \
+    >"$fixture/project/node_modules/@earendil-works/pi-coding-agent/package.json"
+  cat >"$fixture/project/node_modules/@earendil-works/pi-coding-agent/index.js" <<'MODULE'
+export function getMarkdownTheme() { return {}; }
+export class UserMessageComponent {}
+class ToolRowWithoutImageState {
+  render() { return ["ROW_TEXT"]; }
+}
+class ToolRowWithImageState {
+  imageComponents = [];
+  imageSpacers = [];
+  render() { return ["ROW_TEXT"]; }
+}
+export let ToolExecutionComponent = ToolRowWithoutImageState;
+export function useToolRowWithImageState() {
+  ToolExecutionComponent = ToolRowWithImageState;
+}
+MODULE
+
+  out=$(cd "$fixture/project" && node --input-type=module 2>&1 <<'JS'
+const pi = await import("@earendil-works/pi-coding-agent");
+const { installCalmToolRowLayout } = await import("./.pi/extensions/lib/fm-calm-tool-row-layout.ts");
+const { setCalmPresentation } = await import("./.pi/extensions/lib/fm-calm-visibility.ts");
+
+// A Pi that renames the image children must fail the whole adapter closed at install
+// rather than hide rows and silently drop every tool image at render time.
+const stockRender = pi.ToolExecutionComponent.prototype.render;
+let reason;
+try {
+  installCalmToolRowLayout();
+} catch (error) {
+  reason = error instanceof Error ? error.message : String(error);
+}
+if (!reason?.includes("image")) {
+  throw new Error(`the adapter installed over an unavailable image seam instead of failing closed: ${String(reason)}`);
+}
+if (pi.ToolExecutionComponent.prototype.render !== stockRender) {
+  throw new Error("the adapter patched render despite reporting the image seam unavailable");
+}
+setCalmPresentation(true);
+const skippedRow = new pi.ToolExecutionComponent();
+if (JSON.stringify(skippedRow.render(100)) !== JSON.stringify(["ROW_TEXT"])) {
+  throw new Error("a skipped tool-row adapter still changed Pi's own row rendering");
+}
+
+pi.useToolRowWithImageState();
+installCalmToolRowLayout();
+const row = new pi.ToolExecutionComponent();
+if (row.render(100).length !== 0) {
+  throw new Error("the installed tool-row adapter did not hide an image-free row while Calm was active");
+}
+setCalmPresentation(false);
+if (JSON.stringify(row.render(100)) !== JSON.stringify(["ROW_TEXT"])) {
+  throw new Error("Calm off did not restore the stock tool-row rendering");
+}
+JS
+)
+  status=$?
+  [ "$status" -eq 0 ] || fail "Pi calm tool-row image-state probe failed: $out"
+  [ -z "$out" ] || fail "Pi calm tool-row image-state test printed output: $out"
+  pass "an unavailable ToolExecutionComponent image seam skips the whole tool-row adapter at install instead of dropping images mid-render"
 }
 
 test_builtin_gate_load_time() {
@@ -374,6 +480,7 @@ test_builtin_gate_load_time() {
   cp "$EXT" "$fixture/project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/project/.pi/extensions/lib/fm-operational-input.ts"
@@ -460,6 +567,7 @@ test_calm_activation_collision_and_regression_bound() {
   cp "$EXT" "$fixture/project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/project/.pi/extensions/lib/fm-operational-input.ts"
@@ -553,11 +661,11 @@ if (!calmCommand || !handlers.has("session_start")) {
   throw new Error("Calm did not finish registering its command and session handler");
 }
 
-// A row constructed before Calm's first-ever activation this session: this is the
-// captain-accepted, documented bound on the gate-at-load fix (see fm-calm.ts's file
-// header and docs/calm.md) - Pi gives no way to re-point an already-constructed
-// ToolExecutionComponent at a definition registered later, so this row can never
-// retroactively collapse. Lock that in explicitly rather than let it regress further.
+// A row constructed before Calm's first-ever activation this session used to be outside
+// Calm's built-in-wrapper reach because Pi gives no way to re-point an already
+// constructed ToolExecutionComponent at a definition registered later. SuperCalm's
+// row-level adapter should now collapse and restore that already-rendered row without
+// changing the underlying registry decision.
 const renderUi = { requestRender() {} };
 const preToggleReadArgs = { path: "sample.txt" };
 const preToggleRead = new ToolExecutionComponent(
@@ -626,10 +734,8 @@ if (!sawBashDiagnostic) {
   throw new Error(`expected a console diagnostic naming the skipped built-in too; saw: ${JSON.stringify(diagnostics)}`);
 }
 
-// The documented bound itself: still non-empty after Calm is now active, because it
-// was constructed before Calm ever claimed anything.
-if (preToggleRead.render(100).length === 0) {
-  throw new Error("a pre-activation tool row retroactively hid after Calm turned on; the documented bound regressed");
+if (preToggleRead.render(100).length !== 0) {
+  throw new Error("a pre-activation tool row did not collapse after Calm turned on");
 }
 
 // A row for the same tool constructed after activation behaves normally: it does hide.
@@ -648,12 +754,20 @@ postToggleRead.updateResult({ content: [{ type: "text", text: "POST_TOGGLE_READ_
 if (postToggleRead.render(100).length !== 0) {
   throw new Error("a tool row constructed after Calm's activation did not hide");
 }
+await calmCommand.handler("", ctx);
+postToggleRead.setExpanded(false);
+if (JSON.stringify(preToggleRead.render(100)) !== JSON.stringify(preToggleRenderedBefore)) {
+  throw new Error("turning Calm off did not restore a pre-activation tool row byte-identically");
+}
+if (postToggleRead.render(100).length === 0) {
+  throw new Error("turning Calm off did not restore a post-activation tool row");
+}
 JS
   status=$?
   out=$(cat "$output_file")
   [ "$status" -eq 0 ] || fail "Pi calm activation/collision/regression-bound path failed: $out"
   [ -z "$out" ] || fail "Pi calm activation/collision/regression-bound test printed output: $out"
-  pass "Calm's first same-session /calm activation claims every uncontested built-in, leaves a foreign bash tool fully intact and callable, warns prominently and logs the contested name, and only rows constructed before that activation - the documented bound - fail to retroactively collapse"
+  pass "Calm's first same-session /calm activation claims every uncontested built-in, leaves a foreign bash tool fully intact and callable, warns prominently and logs the contested name, and SuperCalm collapses and restores pre-activation rows"
 }
 
 test_rendering_and_session_lifecycle() {
@@ -674,6 +788,7 @@ test_rendering_and_session_lifecycle() {
   cp "$EXT" "$fixture/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/lib/fm-calm-working-ship.ts"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$fixture/lib/fm-operational-input.ts"
@@ -985,6 +1100,92 @@ const customRow = new ToolExecutionComponent(
 customRow.markExecutionStarted();
 customRow.setArgsComplete();
 customRow.updateResult({ content: [{ type: "text", text: "CUSTOM_RESULT" }], details: {}, isError: false });
+const customVisibleBefore = customRow.render(100);
+if (!customVisibleBefore.join("\n").includes("CUSTOM_CALL")) {
+  throw new Error("custom-tool fixture did not render its own call renderer while Calm was off");
+}
+
+const defaultShellDefinition = {
+  name: "third_party_default_tool",
+  label: "Third party default-shell tool",
+  description: "Custom-tool default-shell probe",
+  parameters: { type: "object", properties: {} },
+  async execute() {
+    return { content: [{ type: "text", text: "DEFAULT_RESULT" }], details: {} };
+  },
+  renderCall() {
+    return new Text("DEFAULT_CALL", 0, 0);
+  },
+  renderResult() {
+    return new Text("DEFAULT_RESULT", 0, 0);
+  },
+};
+const defaultShellRow = new ToolExecutionComponent(
+  "third_party_default_tool",
+  "default-shell-row",
+  { mode: "standard-shell" },
+  { showImages: false },
+  defaultShellDefinition,
+  renderUi,
+  process.cwd(),
+);
+defaultShellRow.markExecutionStarted();
+defaultShellRow.setArgsComplete();
+defaultShellRow.updateResult({ content: [{ type: "text", text: "DEFAULT_RESULT" }], details: {}, isError: false });
+const defaultShellVisibleBefore = defaultShellRow.render(100);
+if (!defaultShellVisibleBefore.join("\n").includes("DEFAULT_CALL")) {
+  throw new Error("default-shell custom-tool fixture did not render while Calm was off");
+}
+
+const contestedBashDefinition = {
+  ...customDefinition,
+  name: "bash",
+  label: "Foreign bash",
+  renderCall() {
+    return new Text("FOREIGN_BASH_CALL", 0, 0);
+  },
+  renderResult() {
+    return new Text("FOREIGN_BASH_RESULT", 0, 0);
+  },
+};
+const contestedBashRow = new ToolExecutionComponent(
+  "bash",
+  "foreign-bash-row",
+  { command: "foreign-owned" },
+  { showImages: false },
+  contestedBashDefinition,
+  renderUi,
+  process.cwd(),
+);
+contestedBashRow.markExecutionStarted();
+contestedBashRow.setArgsComplete();
+contestedBashRow.updateResult({ content: [{ type: "text", text: "FOREIGN_BASH_RESULT" }], details: {}, isError: false });
+const contestedBashVisibleBefore = contestedBashRow.render(100);
+if (!contestedBashVisibleBefore.join("\n").includes("FOREIGN_BASH_CALL")) {
+  throw new Error("foreign-owned built-in fixture did not render while Calm was off");
+}
+
+const unregisteredRow = new ToolExecutionComponent(
+  "getMcpTools",
+  "unregistered-provider-row",
+  { server: "cursor", includeTools: ["Glob"] },
+  { showImages: false },
+  undefined,
+  renderUi,
+  process.cwd(),
+);
+unregisteredRow.markExecutionStarted();
+unregisteredRow.setArgsComplete();
+unregisteredRow.updateResult({
+  content: [{ type: "text", text: "UNREGISTERED_PROVIDER_RESULT" }],
+  details: {},
+  isError: false,
+});
+const unregisteredVisibleBefore = unregisteredRow.render(100);
+const unregisteredCalmOffText = unregisteredVisibleBefore.join("\n");
+if (!unregisteredCalmOffText.includes("getMcpTools") || !unregisteredCalmOffText.includes("includeTools")) {
+  throw new Error("unregistered provider-tool fixture did not render Pi's generic JSON shell while Calm was off");
+}
 
 setCapabilities({ images: "iterm2", trueColor: true, hyperlinks: true });
 const imageRow = new ToolExecutionComponent(
@@ -1013,6 +1214,44 @@ imageRow.setExpanded(true);
 const imageVisibleBefore = imageRow.render(100);
 if (!imageVisibleBefore.join("\n").includes("\x1b]1337;File=")) {
   throw new Error("image-capable Pi fixture did not render the built-in read image boundary");
+}
+const foreignImageDefinition = {
+  ...customDefinition,
+  name: "third_party_image_tool",
+  label: "Third party image tool",
+  renderCall() {
+    return new Text("FOREIGN_IMAGE_CALL", 0, 0);
+  },
+  renderResult() {
+    return new Text("FOREIGN_IMAGE_RESULT", 0, 0);
+  },
+};
+const foreignImageRow = new ToolExecutionComponent(
+  "third_party_image_tool",
+  "foreign-image-row",
+  { source: "camera" },
+  { showImages: true },
+  foreignImageDefinition,
+  renderUi,
+  process.cwd(),
+);
+foreignImageRow.markExecutionStarted();
+foreignImageRow.setArgsComplete();
+foreignImageRow.updateResult({
+  content: [
+    {
+      type: "image",
+      data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      mimeType: "image/png",
+    },
+  ],
+  details: {},
+  isError: false,
+});
+foreignImageRow.setExpanded(true);
+const foreignImageVisibleBefore = foreignImageRow.render(100);
+if (!foreignImageVisibleBefore.join("\n").includes("FOREIGN_IMAGE_CALL")) {
+  throw new Error("foreign image fixture did not render its call shell while Calm was off");
 }
 
 const assistantBase = {
@@ -1053,14 +1292,43 @@ const assistantThinkingTool = new AssistantMessageComponent({
 if (!assistantThinkingText.render(100).join("\n").includes("Thinking...")) {
   throw new Error("stock collapsed-thinking fixture did not render before Calm was active");
 }
+// Pi's editor accepts /export while a run streams, so an assistant message_update can
+// land inside the export window. This row replays that update.
+const exportWindowUpdate = (command) => ({
+  ...assistantBase,
+  stopReason: "toolUse",
+  content: [
+    { type: "thinking", thinking: `EXPORT_WINDOW_THINKING ${command}` },
+    { type: "text", text: `EXPORT_WINDOW_WORKING_NOTE ${command}` },
+    { type: "toolCall", id: `export-window-${command}`, name: "read", arguments: { path: "sample.txt" } },
+  ],
+});
+const exportWindowAssistantRow = new AssistantMessageComponent(exportWindowUpdate("startup"), true);
+const exportWindowStockRender = exportWindowAssistantRow.render(100).join("\n");
+if (
+  !exportWindowStockRender.includes("Thinking...") ||
+  !exportWindowStockRender.includes("EXPORT_WINDOW_WORKING_NOTE startup")
+) {
+  throw new Error("export-window assistant fixture did not render before Calm was active");
+}
 
-const assistantComponents = [assistantTextOnly, assistantThinkingText, assistantThinkingTool];
+const assistantComponents = [
+  assistantTextOnly,
+  assistantThinkingText,
+  assistantThinkingTool,
+  exportWindowAssistantRow,
+];
 let expanded = true;
 let editorText = "";
 let terminalInputHandler;
 let workingVisible;
 let hiddenThinkingLabel = "unset";
 const statuses = new Map();
+// Pi repaints only when an extension asks it to. setStatus is the redraw request Calm
+// is allowed to make around an export, since it never overwrites Pi's own status row;
+// setToolsExpanded also repaints but clobbers the export completion status.
+const statusCalls = [];
+const toolsExpandedCalls = [];
 const sessionEntries = [{ type: "message", message: { role: "toolResult", content: "kept" } }];
 const entriesBefore = JSON.stringify(sessionEntries);
 const commandContext = {
@@ -1082,13 +1350,19 @@ const commandContext = {
     },
     setStatus(key, value) {
       statuses.set(key, value);
+      statusCalls.push({ key, value });
     },
     setToolsExpanded(value) {
+      toolsExpandedCalls.push(value);
       expanded = value;
       for (const row of rows) row.actual.setExpanded(value);
       watchActual.setExpanded(value);
       customRow.setExpanded(value);
+      defaultShellRow.setExpanded(value);
+      contestedBashRow.setExpanded(value);
+      unregisteredRow.setExpanded(value);
       imageRow.setExpanded(value);
+      foreignImageRow.setExpanded(value);
     },
     setWorkingVisible(value) {
       workingVisible = value;
@@ -1201,15 +1475,56 @@ for (const { name, actual } of rows) {
 }
 async function assertStockHtmlRendering(command, submitData) {
   editorText = command;
+  const statusCallsBefore = statusCalls.length;
+  const toolsExpandedCallsBefore = toolsExpandedCalls.length;
   terminalInputHandler(submitData);
+  // Pi paints one frame inside the open export window, so any row that unhides for the
+  // stock-export pass flashes to full height and collapses again.
+  const windowRows = [
+    ...rows.map(({ name, actual }) => ({ name, row: actual })),
+    { name: "fm_watch_arm_pi", row: watchActual },
+    { name: "foreign self-shell custom tool", row: customRow },
+    { name: "foreign default-shell custom tool", row: defaultShellRow },
+    { name: "foreign-owned built-in", row: contestedBashRow },
+    { name: "unregistered provider tool", row: unregisteredRow },
+    { name: "current operational user row", row: operationalComponent },
+    { name: "legacy operational user row", row: legacyOperationalComponent },
+  ];
+  for (const { name, row } of windowRows) {
+    const rendered = row.render(100);
+    if (rendered.length !== 0) {
+      throw new Error(`${name} flashed to full height inside the ${command} window: ${JSON.stringify(rendered)}`);
+    }
+  }
+  // A streamed assistant update queued before the window opened rebuilds its row from
+  // the live Calm policy, and nothing re-runs that rebuild when the window closes.
+  exportWindowAssistantRow.updateContent(exportWindowUpdate(command));
+  const windowAssistantRender = exportWindowAssistantRow.render(100);
+  if (windowAssistantRender.length !== 0) {
+    throw new Error(
+      `an assistant update inside the ${command} window unhid collapsed thinking or a working note: ${JSON.stringify(windowAssistantRender)}`,
+    );
+  }
+  for (const [name, row] of [["built-in read", imageRow], ["foreign", foreignImageRow]]) {
+    const rendered = row.render(100).join("\n");
+    if (!rendered.includes("\x1b]1337;File=")) {
+      throw new Error(`the ${command} window dropped the disclosed ${name} tool image`);
+    }
+  }
+  const getToolDefinition = (name) =>
+    tools.find((tool) => tool.name === name) ||
+    (name === customDefinition.name ? customDefinition : undefined) ||
+    (name === defaultShellDefinition.name ? defaultShellDefinition : undefined);
   const htmlRenderer = createToolHtmlRenderer({
-    getToolDefinition: (name) => tools.find((tool) => tool.name === name),
+    getToolDefinition,
     theme,
     cwd: process.cwd(),
   });
   const exportCases = [
     ...cases.filter(([toolName]) => toolName === "grep" || toolName === "find"),
     ["fm_watch_arm_pi", watchArgs, watchResult],
+    ["third_party_tool", {}, { content: [{ type: "text", text: "CUSTOM_RESULT" }], details: {}, isError: false }],
+    ["third_party_default_tool", { mode: "standard-shell" }, { content: [{ type: "text", text: "DEFAULT_RESULT" }], details: {}, isError: false }],
   ];
   for (const [name, args, result] of exportCases) {
     const toolCallId = `${command}-${name}`;
@@ -1225,8 +1540,28 @@ async function assertStockHtmlRendering(command, submitData) {
       throw new Error(`${name} disappeared from ${command} HTML while calm mode was on`);
     }
   }
+  if (htmlRenderer.renderCall(`${command}-unregistered`, "getMcpTools", { server: "cursor" })) {
+    throw new Error(`${command} HTML unexpectedly claimed a definition for an unregistered provider tool`);
+  }
   editorText = "";
   await new Promise((resolve) => setTimeout(resolve, 0));
+  // Pi paints the stock-rendered transcript during the export window, so closing that
+  // window has to ask Pi for one more paint or the unhidden rows stay on screen.
+  const repaints = statusCalls.slice(statusCallsBefore);
+  if (!repaints.some((call) => call.key === "firstmate-calm" && call.value === undefined)) {
+    throw new Error(`${command} left the stock-rendered transcript painted without requesting a Calm repaint`);
+  }
+  if (toolsExpandedCalls.length !== toolsExpandedCallsBefore) {
+    throw new Error(`${command} repainted through tool expansion, which overwrites Pi's own export status row`);
+  }
+  // The reset repaints tool rows and clears the footer status; it never re-runs an
+  // assistant row's content build, so anything unhidden inside the window would stay.
+  const settledAssistantRender = exportWindowAssistantRow.render(100);
+  if (settledAssistantRender.length !== 0) {
+    throw new Error(
+      `the ${command} reset repaint left assistant thinking or a working note on screen: ${JSON.stringify(settledAssistantRender)}`,
+    );
+  }
 }
 
 await assertStockHtmlRendering("/export calm.html", "\r");
@@ -1256,8 +1591,24 @@ if (!calmImageOutput.includes("\x1b]1337;File=")) {
 if (calmImageOutput.includes("pixel.png")) {
   throw new Error("calm mode left the built-in read call shell beside the disclosed image output");
 }
-if (!customRow.render(100).join("\n").includes("CUSTOM_CALL")) {
-  throw new Error("calm mode incorrectly claimed or applied generic custom-tool coverage");
+const calmForeignImageOutput = foreignImageRow.render(100);
+if (JSON.stringify(calmForeignImageOutput) !== JSON.stringify(imageRow.render(100))) {
+  throw new Error("calm mode did not preserve byte-identical image parity for a foreign tool row");
+}
+if (calmForeignImageOutput.join("\n").includes("FOREIGN_IMAGE_CALL")) {
+  throw new Error("calm mode left the foreign image tool shell beside the disclosed image output");
+}
+if (customRow.render(100).length !== 0) {
+  throw new Error("calm mode left a foreign self-shell custom-tool row visible");
+}
+if (defaultShellRow.render(100).length !== 0) {
+  throw new Error("calm mode left a foreign default-shell custom-tool row visible");
+}
+if (contestedBashRow.render(100).length !== 0) {
+  throw new Error("calm mode left a foreign-owned built-in tool row visible");
+}
+if (unregisteredRow.render(100).length !== 0) {
+  throw new Error("calm mode left an unregistered provider-tool JSON row visible");
 }
 if (watchActual.render(100).length !== 0) {
   throw new Error("Calm left the fm_watch_arm_pi call/result shell visible");
@@ -1303,6 +1654,21 @@ for (const { name, baseline, actual } of rows) {
 if (JSON.stringify(imageRow.render(100)) !== JSON.stringify(imageVisibleBefore)) {
   throw new Error("built-in read image row did not restore its ordinary call shell and image output");
 }
+if (JSON.stringify(customRow.render(100)) !== JSON.stringify(customVisibleBefore)) {
+  throw new Error("foreign self-shell custom-tool row did not restore byte-identically");
+}
+if (JSON.stringify(defaultShellRow.render(100)) !== JSON.stringify(defaultShellVisibleBefore)) {
+  throw new Error("foreign default-shell custom-tool row did not restore byte-identically");
+}
+if (JSON.stringify(contestedBashRow.render(100)) !== JSON.stringify(contestedBashVisibleBefore)) {
+  throw new Error("foreign-owned built-in tool row did not restore byte-identically");
+}
+if (JSON.stringify(unregisteredRow.render(100)) !== JSON.stringify(unregisteredVisibleBefore)) {
+  throw new Error("unregistered provider-tool JSON row did not restore byte-identically");
+}
+if (JSON.stringify(foreignImageRow.render(100)) !== JSON.stringify(foreignImageVisibleBefore)) {
+  throw new Error("foreign image tool row did not restore byte-identically");
+}
 if (JSON.stringify(watchActual.render(100)) !== JSON.stringify(watchBaseline.render(100))) {
   throw new Error("fm_watch_arm_pi did not restore its stock call/result shell");
 }
@@ -1311,6 +1677,15 @@ if (workingVisible !== true || hiddenThinkingLabel !== undefined || statuses.get
 }
 if (!assistantThinkingTool.render(100).join("\n").includes("Thinking...")) {
   throw new Error("turning Calm off did not restore the collapsed thinking label");
+}
+const restoredExportWindowRender = exportWindowAssistantRow.render(100).join("\n");
+if (
+  !restoredExportWindowRender.includes("Thinking...") ||
+  !restoredExportWindowRender.includes("EXPORT_WINDOW_WORKING_NOTE /share")
+) {
+  throw new Error(
+    `turning Calm off did not restore the assistant update delivered inside the export window: ${JSON.stringify(restoredExportWindowRender)}`,
+  );
 }
 if (readFileSync(`${process.env.FM_HOME}/config/calm`, "utf8") !== "off\n") {
   throw new Error("Calm did not persist the inactive choice in the effective Firstmate home");
@@ -1354,7 +1729,7 @@ JS
   out=$(cat "$output_file")
   [ "$status" -eq 0 ] || fail "Pi calm renderer and lifecycle contract failed: $out"
   [ -z "$out" ] || fail "Pi calm renderer test printed output: $out"
-  pass "Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts"
+  pass "Pi calm centralizes transcript visibility, preserves execution/export data, keeps an assistant update delivered inside the /export and /share window hidden on screen through the reset repaint, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts"
 }
 
 test_calm_mid_turn_working_notes() {
@@ -1375,6 +1750,7 @@ test_calm_mid_turn_working_notes() {
   cp "$EXT" "$fixture/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/lib/fm-operational-input.ts"
@@ -1635,6 +2011,7 @@ test_operational_followup_turn_e2e() {
   cp "$EXT" "$project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$project/.pi/extensions/lib/fm-operational-input.ts"
@@ -1998,6 +2375,7 @@ test_hidden_block_geometry_e2e() {
   cp "$EXT" "$project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$project/.pi/extensions/lib/fm-operational-input.ts"
@@ -2230,6 +2608,7 @@ test_working_ship_geometry_and_lifecycle() {
   cp "$EXT" "$fixture/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$fixture/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$fixture/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$fixture/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$fixture/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$fixture/lib/fm-calm-working-ship.ts"
   cp "$PI_OPERATIONAL_INPUT" "$fixture/lib/fm-operational-input.ts"
@@ -3122,6 +3501,7 @@ test_interactive_terminal_e2e() {
   cp "$EXT" "$project/.pi/extensions/fm-calm.ts"
   cp "$ASSISTANT_LAYOUT" "$project/.pi/extensions/lib/fm-calm-assistant-layout.ts"
   cp "$OPERATIONAL_USER_LAYOUT" "$project/.pi/extensions/lib/fm-calm-operational-user-layout.ts"
+  cp "$TOOL_ROW_LAYOUT" "$project/.pi/extensions/lib/fm-calm-tool-row-layout.ts"
   cp "$VISIBILITY" "$project/.pi/extensions/lib/fm-calm-visibility.ts"
   cp "$WORKING_SHIP" "$project/.pi/extensions/lib/fm-calm-working-ship.ts"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$project/.pi/extensions/lib/fm-operational-input.ts"
@@ -3346,17 +3726,12 @@ JSON
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" M-s
   active_screen_wait=0
   while [ "$active_screen_wait" -lt 120 ]; do
-    # Include scrollback: the built-in tool rows this documented bound keeps visible
-    # (see below) lengthen the transcript enough to push earlier genuine content, such
-    # as the original user prompt, above the plain viewport.
+    # Include scrollback: hidden tool rows can still leave earlier genuine content above
+    # the plain viewport while the redraw settles.
     tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" -S -600 >"$hidden_snapshot"
     # Wait for the redraw this block actually asserts: the collapsed-thinking adapter
     # (unconditional, unaffected by the built-in tool gate below) hides, and the
-    # retained genuine rows are back on screen. Built-in tool rows from before this
-    # first-ever activation are a separate, documented exception (see fm-calm.ts's
-    # file header and docs/calm.md): Pi gives no way to re-point an already-rendered
-    # tool row at a definition registered later, so CALM_E2E_OUTPUT and friends stay
-    # on screen through this whole redraw rather than disappearing with it.
+    # retained genuine rows are back on screen.
     if ! grep -Fq "Thinking..." "$hidden_snapshot" &&
       ! grep -Fq "/calm" "$hidden_snapshot" &&
       ! grep -Fq "I will run one command." "$hidden_snapshot" &&
@@ -3367,20 +3742,11 @@ JSON
     sleep 0.05
     active_screen_wait=$((active_screen_wait + 1))
   done
-  # This session's built-in tool rows (bash/grep/find) were all rendered during the
-  # initial session restore, before Calm's first-ever activation in this session had
-  # claimed any built-in name; they keep their stock presentation for the rest of the
-  # session. This is the captain-accepted, documented bound on the collision fix (see
-  # fm-calm.ts's file header and docs/calm.md): the alternative was letting Calm
-  # silently disable a differently loaded extension's own bash/read/etc override. A
-  # fresh built-in tool call made after this same activation does hide correctly;
-  # that path is covered by this file's own test_calm_activation_collision_and
-  # _regression_bound against real Pi rendering components, not repeated here.
-  assert_contains "$(cat "$hidden_snapshot")" "CALM_E2E_OUTPUT" "a pre-activation built-in tool row unexpectedly hid; the documented bound regressed"
+  assert_not_contains "$(cat "$hidden_snapshot")" "CALM_E2E_OUTPUT" "/calm left a pre-activation built-in tool row visible"
   assert_not_contains "$(cat "$hidden_snapshot")" "calm transcript" "/calm added a persistent Calm status row"
   [ "$(cat "$home/config/calm")" = on ] || fail "/calm did not persist its active choice"
-  assert_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_GREP" "a pre-activation grep row unexpectedly hid; the documented bound regressed"
-  assert_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_FIND" "a pre-activation find row unexpectedly hid; the documented bound regressed"
+  assert_not_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_GREP" "/calm left a pre-activation grep row visible"
+  assert_not_contains "$(cat "$hidden_snapshot")" "CALM_EXPORT_FIND" "/calm left a pre-activation find row visible"
   assert_not_contains "$(cat "$hidden_snapshot")" "Thinking..." "/calm left collapsed thinking labels in the transcript"
   assert_not_contains "$(cat "$hidden_snapshot")" "fm_watch_arm_pi" "/calm left the Firstmate watcher tool call shell in the transcript"
   assert_not_contains "$(cat "$hidden_snapshot")" "watcher: started Pi extension arm child" "/calm left the Firstmate watcher tool result in the transcript"
@@ -3622,9 +3988,8 @@ JS
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" -l "/calm"
   tmux -L "$TMUX_SOCKET" send-keys -t "$TMUX_SESSION" M-s
   active_screen_wait=0
-  # CALM_E2E_OUTPUT is not a useful redraw signal here: it is the pre-activation
-  # bash row covered by the documented bound above, so it never leaves the screen
-  # again this session regardless of this toggle.
+  # The active-choice file is the stable redraw signal here; the visible transcript can
+  # legitimately have no tool output while Calm is active.
   while [ "$active_screen_wait" -lt 120 ]; do
     tmux -L "$TMUX_SOCKET" capture-pane -p -t "$TMUX_SESSION" >"$working_snapshot"
     if ! grep -Fq "/calm" "$working_snapshot" &&
@@ -3959,6 +4324,7 @@ test_home_resolution
 test_pi_compat_no_upper_bound
 test_pi_compat_degraded_adapter
 test_pi_compat_missing_adapter_exports
+test_tool_row_image_state_probe
 test_builtin_gate_load_time
 test_calm_activation_collision_and_regression_bound
 test_rendering_and_session_lifecycle

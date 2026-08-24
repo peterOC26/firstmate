@@ -1,15 +1,17 @@
 // Firstmate's home-persistent Pi transcript presentation toggle.
 //
-// Verified against Pi 0.81.1 and 0.82.0, which expose built-in ToolDefinitions, per-slot
-// renderers, renderShell: "self", session_start replacement reasons, agent_start and
-// agent_settled, ExtensionUIContext.setToolsExpanded(), setWorkingVisible(), setWidget()
-// with a disposable component factory, and setHiddenThinkingLabel().
+// Verified against Pi 0.81.1, 0.82.0, 0.84.1, and 0.84.2, which expose built-in
+// ToolDefinitions, per-slot renderers, renderShell: "self",
+// ToolExecutionComponent.render(), session_start replacement reasons, agent_start and agent_settled,
+// ExtensionUIContext.setToolsExpanded(), setWorkingVisible(), setWidget() with a
+// disposable component factory, and setHiddenThinkingLabel().
 // ./lib/fm-calm-working-ship.ts owns the animated working presentation this file
 // installs. The focused tests pin those assumptions but never reject a
-// newer Pi solely for its version. The collapsed-thinking and operational-user
-// presentation adapters probe the exact API they patch and degrade independently with a
-// diagnostic (see installCalmPresentationAdapter below) if a future Pi removes it; Pi
-// still exposes no global renderer for arbitrary built-in or custom rows.
+// newer Pi solely for its version. The collapsed-thinking, tool-row, and
+// operational-user presentation adapters probe the exact API they patch and degrade
+// independently with a diagnostic (see installCalmPresentationAdapter below) if a
+// future Pi removes it; Pi still exposes no global transcript filter or
+// tool-registration seam that can safely wrap arbitrary foreign tool definitions.
 // docs/configuration.md owns the home-local Calm preference contract.
 //
 // Pi has one first-registration-wins ToolDefinition per tool name, with no merge or
@@ -17,7 +19,7 @@
 // registration synchronous because restored rows capture the registry before
 // session_start; and collision-check only the later first-activation path, when
 // getAllTools() is reliable. docs/calm-mode-feasibility.md owns the Pi-source evidence
-// and docs/calm.md owns the user-facing behavior and non-retroactive first-toggle bound.
+// and docs/calm.md owns the user-facing behavior and the contested-name bound.
 import { randomUUID } from "node:crypto";
 import {
   mkdirSync,
@@ -49,6 +51,7 @@ import { Box, Container, getKeybindings, type Component } from "@earendil-works/
 import type { TSchema } from "typebox";
 import { installCalmAssistantLayout } from "./lib/fm-calm-assistant-layout.ts";
 import { installCalmOperationalUserLayout } from "./lib/fm-calm-operational-user-layout.ts";
+import { installCalmToolRowLayout } from "./lib/fm-calm-tool-row-layout.ts";
 import {
   CALM_WORKING_SHIP_WIDGET_KEY,
   createCalmWorkingShipAnimation,
@@ -122,6 +125,7 @@ function installCalmPresentationAdapter(name: string, install: () => void): void
 export default function (pi: ExtensionAPI) {
   installCalmPresentationAdapter("collapsed-thinking", installCalmAssistantLayout);
   installCalmPresentationAdapter("operational-user-row", installCalmOperationalUserLayout);
+  installCalmPresentationAdapter("custom-tool-row", installCalmToolRowLayout);
 
   let exportRendering = false;
   let removeTerminalInputHandler: (() => void) | undefined;
@@ -360,8 +364,9 @@ export default function (pi: ExtensionAPI) {
 
   // The first time Calm turns on in a session that started off, claim every
   // uncontested built-in and leave each contested tool and its owning extension
-  // untouched. Tell the user which built-in Calm could not take over, since Calm's
-  // presentation does not apply to it.
+  // untouched. Tell the user which built-in Calm could not take over: the transcript
+  // row still collapses through the tool-row adapter, but Calm does not own the
+  // renderer Pi hands to /export and /share.
   function activateBuiltInsIfNeeded(ui: ExtensionUIContext): void {
     if (builtInsRegistered) return;
     const contested = contestedBuiltIns();
@@ -374,7 +379,7 @@ export default function (pi: ExtensionAPI) {
     const names = contested.map((tool) => `"${tool.name}"`).join(", ");
     const plural = contested.length > 1;
     ui.notify(
-      `Firstmate Calm: the ${names} built-in tool${plural ? "s are" : " is"} already provided by another extension, so Calm may not fully function for ${plural ? "them" : "it"} this session.`,
+      `Firstmate Calm: the ${names} built-in tool${plural ? "s are" : " is"} already provided by another extension, so Calm left ${plural ? "them" : "it"} alone this session. Calm still collapses ${plural ? "those rows" : "that row"}, while /export and /share use the other extension's renderer.`,
       "warning",
     );
     for (const tool of contested) {
@@ -402,7 +407,7 @@ export default function (pi: ExtensionAPI) {
       const owner = registered.find((info) => info.name === tool.name)?.sourceInfo;
       if (owner && owner.source !== "builtin" && realpathOrSelf(owner.path) !== extensionRealFile) {
         console.error(
-          `Firstmate Calm: another extension (${owner.path}) also claimed the built-in "${tool.name}" tool and won; Calm's presentation for it is unavailable this session.`,
+          `Firstmate Calm: another extension (${owner.path}) also claimed the built-in "${tool.name}" tool and won; Calm still collapses its transcript row, while /export and /share use that extension's renderer this session.`,
         );
       }
     }
@@ -424,7 +429,9 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setStatus("firstmate-calm", undefined);
     removeTerminalInputHandler?.();
     removeTerminalInputHandler = ctx.ui.onTerminalInput((data) => {
-      if (!getKeybindings().matches(data, "tui.input.submit")) return;
+      // Pi's TerminalInputHandler reads the return value as an input override,
+      // so every path returns undefined to leave the keystroke untouched.
+      if (!getKeybindings().matches(data, "tui.input.submit")) return undefined;
 
       const input = ctx.ui.getEditorText().trim();
       if (
@@ -432,7 +439,7 @@ export default function (pi: ExtensionAPI) {
         input !== "/export" &&
         !input.startsWith("/export ")
       ) {
-        return;
+        return undefined;
       }
 
       exportRendering = true;
@@ -454,6 +461,7 @@ export default function (pi: ExtensionAPI) {
         repaintCalmToolRows();
         ctx.ui.setStatus("firstmate-calm", undefined);
       }, 0);
+      return undefined;
     });
   });
 
