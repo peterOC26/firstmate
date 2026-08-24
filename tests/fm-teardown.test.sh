@@ -1746,6 +1746,219 @@ SH
   pass "forced secondmate teardown preflights every Herdr child before cleanup mutation"
 }
 
+configure_secondmate_with_tmux_children() {  # <case-dir>
+  local case_dir=$1 home="$1/secondmate-home" child child_wt
+  mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
+  printf '%s\n' task-x1 > "$home/.fm-secondmate-home"
+  printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
+  for child in child-a child-b; do
+    child_wt="$case_dir/$child-wt"
+    git -C "$case_dir/project" worktree add -q -b "fm/$child" "$child_wt" main
+    fm_write_meta "$home/state/$child.meta" \
+      "window=firstmate:fm-$child" \
+      "endpoint_task_id=$child" \
+      "worktree=$child_wt" \
+      "project=$case_dir/project" \
+      "kind=ship" \
+      "mode=local-only"
+    : > "$home/state/$child.status"
+  done
+}
+
+test_forced_secondmate_teardown_holds_descendant_lifecycle_locks() {
+  local case_dir home lock ready release holder_pid rc waited=0 child
+  case_dir=$(make_case descendant-locks)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_tmux_children "$case_dir"
+  home="$case_dir/secondmate-home"
+  : > "$case_dir/kill.log"
+  : > "$case_dir/treehouse.log"
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/kill.log"
+exit 0
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+
+  lock="$home/state/.control-child-b.lock"
+  ready="$case_dir/lock-ready"
+  release="$case_dir/lock-release"
+  ROOT="$ROOT" LOCK="$lock" READY="$ready" RELEASE="$release" \
+    HOME_STATE="$home/state" OWNER_PID="$$" bash -c '
+    export FM_STATE_OVERRIDE="$HOME_STATE"
+    . "$ROOT/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$LOCK" || exit 1
+    : > "$READY"
+    while [ ! -e "$RELEASE" ] && kill -0 "$OWNER_PID" 2>/dev/null; do sleep 0.1; done
+    fm_lock_release "$LOCK"
+  ' &
+  holder_pid=$!
+  while [ ! -e "$ready" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ -e "$ready" ] || fail "descendant-locks: the contending lifecycle action never acquired its lock"
+
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    : > "$release"
+    wait "$holder_pid" 2>/dev/null || true
+    fail "descendant-locks: forced teardown ignored a descendant lifecycle lock"
+  fi
+  assert_grep "descendant task child-b has a lifecycle action in flight" "$case_dir/stderr" \
+    "descendant-locks: refusal did not name the contended descendant"
+  [ ! -e "$home/state/.control-child-a.lock" ] \
+    && [ ! -e "$home/state/.meta-child-a.lock" ] \
+    || { : > "$release"; wait "$holder_pid" 2>/dev/null || true; fail "descendant-locks: refusal leaked earlier descendant locks"; }
+  [ ! -s "$case_dir/kill.log" ] \
+    || { : > "$release"; wait "$holder_pid" 2>/dev/null || true; fail "descendant-locks: refusal killed an endpoint"; }
+  [ ! -s "$case_dir/treehouse.log" ] \
+    || { : > "$release"; wait "$holder_pid" 2>/dev/null || true; fail "descendant-locks: refusal returned a worktree"; }
+  [ -e "$case_dir/state/task-x1.meta" ] && [ -d "$home" ] \
+    || { : > "$release"; wait "$holder_pid" 2>/dev/null || true; fail "descendant-locks: refusal removed parent state"; }
+  for child in child-a child-b; do
+    [ -e "$home/state/$child.meta" ] && [ -d "$case_dir/$child-wt" ] \
+      || { : > "$release"; wait "$holder_pid" 2>/dev/null || true; fail "descendant-locks: refusal removed $child state or worktree"; }
+  done
+
+  : > "$release"
+  wait "$holder_pid" 2>/dev/null || true
+  rc=0
+  run_teardown "$case_dir" --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+  expect_code 0 "$rc" "descendant-locks: uncontended retry should complete"
+  [ ! -e "$case_dir/state/task-x1.meta" ] && [ ! -d "$home" ] \
+    || fail "descendant-locks: uncontended retry retained retired task state"
+  [ -s "$case_dir/kill.log" ] && [ -s "$case_dir/treehouse.log" ] \
+    || fail "descendant-locks: uncontended retry did not perform endpoint and worktree cleanup"
+  pass "forced secondmate teardown holds every descendant lifecycle and metadata lock"
+}
+
+# A child with an armed merge poll, a status log the presenter can contend for,
+# and an armed busy incarnation whose retirement is the observable marker that
+# forced cleanup has run past the point where it used to destroy the poll.
+configure_secondmate_with_poll_child() {  # <case-dir>
+  local case_dir=$1 home="$1/secondmate-home" child_state child_wt="$1/child-p-wt"
+  mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
+  child_state="$home/state"
+  printf '%s\n' task-x1 > "$home/.fm-secondmate-home"
+  printf '%s\n' "home=$home" >> "$case_dir/state/task-x1.meta"
+  git -C "$case_dir/project" worktree add -q -b fm/child-p "$child_wt" main
+  fm_write_meta "$child_state/child-p.meta" \
+    "window=firstmate:fm-child-p" \
+    "endpoint_task_id=child-p" \
+    "worktree=$child_wt" \
+    "project=$case_dir/project" \
+    "kind=ship" \
+    "mode=local-only"
+  : > "$child_state/child-p.status"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$child_state/child-p.check.sh"
+  printf 'trusted check\n' > "$child_state/child-p.check-trust"
+  printf 'poll data\n' > "$child_state/child-p.pr-poll"
+  printf 'poll registration\n' > "$child_state/child-p.pr-poll-registration"
+  chmod 600 "$child_state/child-p.check.sh" "$child_state/child-p.check-trust" \
+    "$child_state/child-p.pr-poll" "$child_state/child-p.pr-poll-registration"
+  "$ROOT/bin/fm-busy-event.sh" arm "$child_state" child-p >/dev/null
+}
+
+CHILD_POLL_TEARDOWN_PID=
+CHILD_POLL_HOLDER_PID=
+CHILD_POLL_RELEASE=
+# Never leave the blocked teardown or the lock holder behind when a case ends,
+# including the fail() paths, which exit the whole run.
+child_poll_case_release() {
+  if [ -n "$CHILD_POLL_TEARDOWN_PID" ]; then
+    kill -KILL "$CHILD_POLL_TEARDOWN_PID" 2>/dev/null || true
+    wait "$CHILD_POLL_TEARDOWN_PID" 2>/dev/null || true
+    CHILD_POLL_TEARDOWN_PID=
+  fi
+  [ -z "$CHILD_POLL_RELEASE" ] || : > "$CHILD_POLL_RELEASE"
+  if [ -n "$CHILD_POLL_HOLDER_PID" ]; then
+    wait "$CHILD_POLL_HOLDER_PID" 2>/dev/null || true
+    CHILD_POLL_HOLDER_PID=
+  fi
+}
+
+child_poll_assert_present() {  # <path> <msg>
+  [ -e "$1" ] || { child_poll_case_release; fail "$2"; }
+}
+
+test_forced_secondmate_child_keeps_merge_poll_until_its_record_is_removed() {
+  local case_dir home child_state lock ready rc waited=0
+  case_dir=$(make_case child-poll-ordering)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_poll_child "$case_dir"
+  home="$case_dir/secondmate-home"
+  child_state="$home/state"
+  lock="$child_state/.status-presentation-lock"
+  ready="$case_dir/status-lock-ready"
+  CHILD_POLL_RELEASE="$case_dir/status-lock-release"
+
+  # A status presenter in the child's own home holds the presentation lock, so
+  # the child's teardown blocks between its busy retirement and its record
+  # removal - the window an operator interrupt would land in.
+  ROOT="$ROOT" LOCK="$lock" READY="$ready" RELEASE="$CHILD_POLL_RELEASE" \
+    HOME_STATE="$child_state" OWNER_PID="$$" bash -c '
+    export FM_STATE_OVERRIDE="$HOME_STATE"
+    . "$ROOT/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$LOCK" || exit 1
+    : > "$READY"
+    while [ ! -e "$RELEASE" ] && kill -0 "$OWNER_PID" 2>/dev/null; do sleep 0.05; done
+    fm_lock_release "$LOCK"
+  ' &
+  CHILD_POLL_HOLDER_PID=$!
+  while [ ! -e "$ready" ] && [ "$waited" -lt 200 ]; do
+    sleep 0.05
+    waited=$((waited + 1))
+  done
+  [ -e "$ready" ] || { child_poll_case_release; fail "child-poll-ordering: the status presenter never took its lock"; }
+
+  run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  CHILD_POLL_TEARDOWN_PID=$!
+  # The child's armed busy incarnation is retired immediately before the
+  # contended presentation step, so its sidecar disappearing proves cleanup has
+  # passed the point at which the poll used to be destroyed.
+  waited=0
+  while [ -e "$child_state/child-p.busy-gen" ]; do
+    sleep 0.05
+    waited=$((waited + 1))
+    if [ "$waited" -ge 600 ] || ! kill -0 "$CHILD_POLL_TEARDOWN_PID" 2>/dev/null; then
+      break
+    fi
+  done
+  [ ! -e "$child_state/child-p.busy-gen" ] \
+    || { child_poll_case_release; fail "child-poll-ordering: forced cleanup never retired the child's busy state"; }
+  kill -0 "$CHILD_POLL_TEARDOWN_PID" 2>/dev/null \
+    || { child_poll_case_release; fail "child-poll-ordering: forced cleanup did not wait on the held presentation lock"$'\n'"$(cat "$case_dir/stderr")"; }
+
+  child_poll_assert_present "$child_state/child-p.meta" \
+    "child-poll-ordering: the blocked cleanup removed the child's task record"
+  child_poll_assert_present "$child_state/child-p.pr-poll" \
+    "child-poll-ordering: the child's merge poll was destroyed while its task record was still live"
+  child_poll_assert_present "$child_state/child-p.pr-poll-registration" \
+    "child-poll-ordering: the child's poll registration was destroyed while its task record was still live"
+  child_poll_assert_present "$child_state/child-p.check.sh" \
+    "child-poll-ordering: the child's armed check was destroyed while its task record was still live"
+  child_poll_assert_present "$child_state/child-p.check-trust" \
+    "child-poll-ordering: the child's check trust record was destroyed while its task record was still live"
+
+  : > "$CHILD_POLL_RELEASE"
+  rc=0
+  wait "$CHILD_POLL_TEARDOWN_PID" || rc=$?
+  CHILD_POLL_TEARDOWN_PID=
+  wait "$CHILD_POLL_HOLDER_PID" 2>/dev/null || true
+  CHILD_POLL_HOLDER_PID=
+  expect_code 0 "$rc" "child-poll-ordering: forced teardown should finish once the presentation lock frees"$'\n'"$(cat "$case_dir/stderr")"
+  [ ! -e "$home" ] && [ ! -e "$case_dir/state/task-x1.meta" ] \
+    || fail "child-poll-ordering: the completed forced teardown retained retired state"
+  pass "forced secondmate child cleanup keeps merge-poll and check artifacts while its task record survives"
+}
+
 test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
   local case_dir home log closed rc
   case_dir=$(make_case herdr-child-unconfirmed-close)
@@ -2592,6 +2805,8 @@ test_herdr_flat_teardown_refuses_records_on_unparseable_presence
 test_local_pr_discovery_honours_ghs_own_base_repository
 test_herdr_flat_teardown_preflight_refuses_before_changes
 test_forced_secondmate_herdr_child_preflight_refuses_before_changes
+test_forced_secondmate_teardown_holds_descendant_lifecycle_locks
+test_forced_secondmate_child_keeps_merge_poll_until_its_record_is_removed
 test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed
 test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconfirmed
 test_herdr_projection_teardown_retires_journal_only_after_confirmed_close

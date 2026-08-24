@@ -214,14 +214,16 @@ fm_git_add_origin() {
   local repo=$1 remote=$2 remote_abs
   git clone --quiet --bare "$repo" "$remote"
   remote_abs=$(cd "$remote" && pwd)
+  git -C "$repo" remote remove origin 2>/dev/null || true
   git -C "$repo" remote add origin "file://$remote_abs"
 }
 
-# fm_git_worktree <repo> <worktree> <branch>: init <repo> with one commit, then
-# add a worktree on a fresh branch.
+# fm_git_worktree <repo> <worktree> <branch>: initialize <repo> with one commit
+# and a local bare origin, then add a worktree on a fresh branch.
 fm_git_worktree() {
   local repo=$1 worktree=$2 branch=$3
   fm_git_init_commit "$repo"
+  fm_git_add_origin "$repo" "$repo.origin.git"
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
 }
 
@@ -257,6 +259,17 @@ fm_write_secondmate_meta() {
     "yolo=off" \
     "home=$home" \
     "projects=$projects"
+}
+
+# hash_text <text> - the pane-hash digest bin/fm-watch.sh writes to .hash-<key>,
+# so a fixture can seed that marker. BSD md5 on macOS, coreutils md5sum on the
+# Linux runners; both lanes must agree with hash_pane() in bin/fm-watch.sh.
+hash_text() {
+  if command -v md5 >/dev/null 2>&1; then
+    printf '%s' "$1" | md5 -q
+  else
+    printf '%s' "$1" | md5sum | cut -d' ' -f1
+  fi
 }
 
 # --- common assertions ------------------------------------------------------

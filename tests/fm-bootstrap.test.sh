@@ -21,6 +21,9 @@
 # one run into its local and network halves, and the one-hop tasks-axi
 # compatibility handoff that keeps a session start from paying for that verdict
 # twice.
+# Dedicated GitHub-default cases pin diagnostics for an absent resolution, a
+# mismatched remote base, and an owner/repo resolution, plus silence for matching
+# repository identities and a local phase that never invokes gh.
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -95,7 +98,7 @@ add_quota_axi() {
   cat > "$fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' "${FM_FAKE_QUOTA_AXI_VERSION:-0.1.17}"
+  printf '%s\n' "${FM_FAKE_QUOTA_AXI_VERSION:-0.1.29}"
   exit 0
 fi
 exit 0
@@ -473,11 +476,11 @@ test_quota_axi_min_version() {
         [ "$out" = "$missing" ] || fail "$label: expected '$missing', got: $out" ;;
     esac
   done <<'ROWS'
-minimum quota-axi version is accepted^0.1.17^empty
-newer quota-axi patch is accepted^0.1.18^empty
+minimum quota-axi version is accepted^0.1.29^empty
+newer quota-axi patch is accepted^0.1.30^empty
 newer quota-axi minor is accepted^0.2.0^empty
 newer quota-axi major is accepted^1.0.0^empty
-the patch just below the floor reports an upgrade^0.1.16^missing
+the patch just below the floor reports an upgrade^0.1.28^missing
 much older quota-axi minor reports an upgrade^0.0.9^missing
 unparseable quota-axi version reports an upgrade^quota-axi development build^missing
 ROWS
@@ -508,6 +511,73 @@ SH
   expected="MISSING: git (install: brew install git  # or the platform's package manager)"
   [ "$out" = "$expected" ] || fail "missing git should report the supported install instruction, got: $out"
   pass "bootstrap requires git with an install instruction"
+}
+
+test_gh_default_repo_mismatch_is_local_and_actionable() {
+  local case_dir repo fakebin out expected gh_log
+  case_dir="$TMP_ROOT/gh-default-repo"
+  repo="$case_dir/repo"
+  mkdir -p "$case_dir/home/config"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  git init -q -b main "$repo"
+  git -C "$repo" remote add origin git@github.com:peterOC26/firstmate.git
+  git -C "$repo" remote add upstream https://github.com/kunchenguid/firstmate.git
+  git -C "$repo" config remote.upstream.gh-resolved base
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_MISMATCH: gh default base kunchenguid/firstmate differs from origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "mismatched gh default should report the repositories and remedy, got: $out"
+
+  git -C "$repo" config --unset remote.upstream.gh-resolved
+  git -C "$repo" remote remove upstream
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_UNSET: gh default repository is not pinned to origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "an unset gh default should report the origin and remedy, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved kunchenguid/firstmate
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  expected='GH_REPO_MISMATCH: gh default base kunchenguid/firstmate differs from origin peterOC26/firstmate (fix: gh repo set-default origin)'
+  [ "$out" = "$expected" ] || fail "an owner/repo gh resolution should be compared with origin, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved peterOC26/firstmate
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "a matching owner/repo gh resolution should be silent, got: $out"
+
+  git -C "$repo" config remote.origin.gh-resolved base
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "matching gh default and origin should be silent, got: $out"
+
+  git -C "$repo" config --unset remote.origin.gh-resolved
+  git -C "$repo" remote add upstream https://github.com/peterOC26/firstmate.git
+  git -C "$repo" config remote.upstream.gh-resolved base
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "equivalent HTTPS and SSH repository URLs should be silent, got: $out"
+
+  gh_log="$case_dir/gh-invoked"
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+: > "${FM_FAKE_GH_LOG:?}"
+exit 97
+SH
+  chmod +x "$fakebin/gh"
+  PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$repo" \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    FM_FAKE_GH_LOG="$gh_log" "$ROOT/bin/fm-bootstrap.sh" >/dev/null
+  assert_absent "$gh_log" "the local gh-default check invoked gh and could hang while GitHub is unreachable"
+  pass "bootstrap reports a wrong gh base repository locally and keeps the matching case silent"
 }
 
 test_orca_backend_gates_orca_tool_only_when_selected() {
@@ -845,7 +915,7 @@ case "${1:-}" in
       *) printf '%s\n' codex ;;
     esac
     ;;
-  capture-pane) printf '\n' ;;
+  capture-pane) printf '❯\n' ;;
   list-windows) printf '%s\n' fm-sm ;;
 esac
 exit 0
@@ -1128,6 +1198,8 @@ unsupported muse ultra effort is flagged^{"rules":[{"when":"muse ultra","use":{"
 unsupported opencode effort is flagged^{"rules":[{"when":"opencode work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5","effort":"high"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: opencode:high
 kimi model profile is accepted^{"rules":[{"when":"kimi work","use":{"harness":"kimi","model":"kimi-code/k3"}}]}^empty^
 unsupported kimi effort is flagged^{"rules":[{"when":"kimi work","use":{"harness":"kimi","model":"kimi-code/k3","effort":"high"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: kimi:high
+cursor model profile is accepted^{"rules":[{"when":"cursor work","use":{"harness":"cursor","model":"cursor-grok-4.5-high"}}]}^empty^
+unsupported cursor effort is flagged^{"rules":[{"when":"cursor work","use":{"harness":"cursor","model":"cursor-grok-4.5-high","effort":"high"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: cursor:high
 array use with quota-balanced is accepted^{"rules":[{"when":"big feature","use":[{"harness":"claude","model":"claude-sonnet-5","effort":"high"},{"harness":"codex","model":"gpt-5.5","effort":"high"}],"select":"quota-balanced"}]}^empty^
 array use without select is accepted^{"rules":[{"when":"big feature","use":[{"harness":"claude"},{"harness":"codex"}]}]}^empty^
 one-element array use is accepted^{"rules":[{"when":"focused feature","use":[{"harness":"claude"}]}]}^empty^
@@ -1153,6 +1225,7 @@ test_lavish_axi_min_version
 test_tasks_axi_min_version
 test_quota_axi_min_version
 test_git_is_required_with_supported_install_instruction
+test_gh_default_repo_mismatch_is_local_and_actionable
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux

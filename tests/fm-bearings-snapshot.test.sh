@@ -12,6 +12,11 @@ set -u
 
 BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh"
 TMP_ROOT=$(fm_test_tmproot fm-bearings)
+# Keep disposable homes outside the snapshot's fixture repo boundary even when
+# TMPDIR is inside an isolated source worktree.
+FM_ROOT_OVERRIDE="$TMP_ROOT/fixture-root"
+mkdir -p "$FM_ROOT_OVERRIDE"
+export FM_ROOT_OVERRIDE
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
 
@@ -23,7 +28,15 @@ make_fakebin() {  # <dir>
   fb=$(fm_fakebin "$1")
   cat > "$fb/no-mistakes" <<'SH'
 #!/usr/bin/env bash
+# A worktree opts into an attributable run by holding a .fm-fake-run file whose
+# contents are the run status word; every other worktree gets no run at all.
 [ "${FAKE_NM_SLEEP:-0}" = 1 ] && sleep 30
+if [ "${1:-}" = axi ] && [ "${2:-}" = status ] && [ -f .fm-fake-run ]; then
+  branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0
+  head=$(git rev-parse HEAD 2>/dev/null) || exit 0
+  printf 'run:\n  id: "01FAKE"\n  branch: %s\n  status: %s\n  head: "%s"\n  pr: ""\n  findings: none\n' \
+    "$branch" "$(cat .fm-fake-run)" "$head"
+fi
 exit 0
 SH
   cat > "$fb/tmux" <<'SH'
@@ -85,6 +98,20 @@ record_claude_state() {  # <state-dir> <id> <busy|idle>
   gen=$("$ROOT/bin/fm-busy-event.sh" arm "$state" "$id")
   "$ROOT/bin/fm-busy-event.sh" apply "$state" "$id" "$semantic_state" --gen "$gen" \
     --source claude-hook --event "$event"
+}
+
+# A ship worktree on its own branch with an attributable no-mistakes run, so this
+# crew's current state comes from the run-step source instead of its status log.
+write_run_step_task() {  # <home> <id> <run-status>
+  local home=$1 id=$2 run_status=$3 wt
+  wt="$home/projects/$id-wt"
+  fm_git_init_commit "$wt"
+  git -C "$wt" checkout -q -b "fm/$id"
+  printf '%s\n' "$run_status" > "$wt/.fm-fake-run"
+  fm_write_meta "$home/state/$id.meta" \
+    "window=firstmate:fm-$id" "worktree=$wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" "$id" idle
 }
 
 fixture_mate_home() {  # <parent-home>
@@ -210,7 +237,7 @@ EOF
 }
 
 # This is the Domain Alpha failure shape exactly: the structured home says Phase 7 is Done
-# and no child is active, so the stale parent event must never become Underway.
+# and no child is active, so the stale parent event must never become Under way.
 test_domain_alpha_stale_parent_event_does_not_become_current_work() {
   local home mate fakebin json canonical
   home=$(make_home domain-alpha-parent)
@@ -394,7 +421,7 @@ EOF
         and .key == "phase8-decision-release" and .verb == "captain-hold"))
       and (.in_flight | any(.[]; .id == "domain-alpha") | not)
   ' >/dev/null || fail "structured child captain hold did not reach Captain Call: $json"
-  pass "a structured child captain hold reaches Captain's Call"
+  pass "a structured child captain hold reaches Waiting on you"
 }
 
 make_valid_secondmate_home() {  # <id> <home>
@@ -487,6 +514,13 @@ test_bad_secondmate_homes_never_revive_parent_work() {
       and (.secondmates | any(.[]; .id == "unreadable" and (.reason | test("invalid home|unreadable"))))
       and (.secondmates | any(.[]; .id == "malformed" and (.reason | contains("unstructured current backlog row"))))
       and (.secondmates | any(.[]; .id == "timedout" and (.reason | contains("timed out"))))
+      and (([.board_items[] | select(.column == "Blocked") | .id] | sort)
+        == ["invalid","malformed","missing","timedout","unreadable"])
+      and (.board_items | any(.id == "unreadable" and .column == "Blocked"
+        and .detail == "secondmate home unavailable"
+        and (.summary | test("invalid home|unreadable"))))
+      and (.board_items | any(.id == "timedout" and .column == "Blocked"
+        and (.summary | contains("timed out"))))
   ' >/dev/null || fail "bad home outcomes revived stale work or lacked provenance: $json"
   pass "missing, invalid, unreadable, malformed, and timed-out homes stay explicit unknowns"
 }
@@ -896,6 +930,487 @@ test_default_is_bounded_and_local_only() {
   pass "default output is bounded, local-only, and marks omitted surfaces"
 }
 
+test_board_columns_are_complete_and_classified() {
+  local home fakebin json toon
+  home=$(make_home board); write_fixture "$home"
+  perl -0pi -e 's/## Queued\n/## Queued\n- [ ] ready-work - Dispatchable queued work (repo: firstmate) (kind: ship)\n- [ ] held-work - Wait for scheduled rollout (repo: firstmate) (kind: scout) (hold: after release window) (hold-kind: external)\n/' "$home/data/backlog.md"
+  fm_write_meta "$home/state/stalled-task.meta" \
+    "window=firstmate:fm-stalled-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" stalled-task idle
+  printf 'blocked [key=synthetic-dependency]: firstmate can refresh the token\n' > "$home/state/stalled-task.status"
+  write_run_step_task "$home" cancelled-task cancelled
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  toon=$(run "$home" "$fakebin" --include-prs)
+  printf '%s' "$json" | jq -e '
+    . as $root
+    |
+    ([.board_columns[].column] == ["Ready","Held","Blocked","Under way","Waiting on you","Done"])
+      and (.board_columns | all(has("empty") and (.empty | length > 0)))
+      and (.board_items | any(.column == "Ready" and .id == "ready-work"))
+      and (.board_items | any(.column == "Held" and .id == "held-work" and .detail == "after release window"))
+      and (.board_items | any(.column == "Blocked" and .id == "live-gate" and (.detail | contains("ship-task"))))
+      and (.board_items | any(.column == "Under way" and .id == "ship-task"
+        and .detail == "working now" and .owner == "(main)"
+        and .artifact == "https://github.com/kunchenguid/firstmate/pull/9"))
+      and (.board_items | any(.column == "Under way" and .id == "stalled-task"
+        and .detail == "stalled, needs a look" and .owner == "(main)"
+        and .artifact == "-"))
+      and (.board_items | any(.column == "Under way" and .id == "cancelled-task"
+        and .summary == "parked after validation stop"
+        and .detail == "parked after validation stop"))
+      and (.board_items | any(.column == "Under way" and .id == "external-wait"
+        and (.detail | test("walk") | not)
+        and (.summary | contains("upstream release"))))
+      and ([.board_items[] | select(.column == "Under way") | .detail]
+        | any(. == "working" or . == "parked" or . == "done" or . == "blocked"
+              or . == "paused" or . == "failed" or . == "cancelled" or . == "unknown"
+              or . == "active_child_work") | not)
+      and ([.board_items[] | select(.column == "Under way") | .summary]
+        | any(. == "run cancelled" or . == "run failed") | not)
+      and ([.board_items[] | select(.column == "Under way") | .owner]
+        | any(. == "ship" or . == "scout" or . == "secondmate") | not)
+      and (.board_items | any(.column == "Waiting on you" and .id == "mate/mate-decision-race"
+        and .detail == "your decision needed"))
+      and (.board_items | any(.column == "Waiting on you" and .id == "kunchenguid/firstmate#9" and .detail == "ready to merge"
+        and (.summary | contains("Ship the thing")) and (.artifact | test("/pull/9"))))
+      and (.board_items | any(.column == "Done" and .id == "done-a"))
+      and (.board_items | all(.column as $c | [$root.board_columns[].column] | index($c) != null))
+      and (.board_items | all((.detail | test("captain-hold|needs-decision|^blocked$")) | not))
+  ' >/dev/null || fail "Kanban board columns were incomplete or misclassified: $json"
+  assert_contains "$toon" 'board_columns[6]' "TOON must always declare every board column"
+  assert_contains "$toon" "board_items[$(printf '%s' "$json" | jq '.board_items | length')]{" \
+    "TOON must expose every projected board item as counted tabular rows"
+  pass "Kanban board columns are complete and projected from the bounded snapshot"
+}
+
+# board_columns is the single source of the empty-state wording, so this asserts the
+# rendered sentence under each heading against the sentence that column carries in the
+# same snapshot rather than restating any wording here.
+assert_empty_sentences_follow_their_headings() {  # <render-output> <json> <mode>
+  local render=$1 json=$2 mode=$3 column empty rendered
+  while IFS=$'\t' read -r column empty; do
+    rendered=$(printf '%s\n' "$render" |
+      awk -v col="$column" 'index($0, "## ") == 1 && substr($0, length($0) - length(col) + 1) == col {getline; print; exit}')
+    [ "$rendered" = "$empty" ] \
+      || fail "$mode render did not follow the $column heading with that column's own empty sentence: got '$rendered', want '$empty'"
+  done < <(printf '%s' "$json" | jq -r '.board_columns[] | [.column, .empty] | @tsv')
+}
+
+test_board_render_uses_icons_and_verbatim_empty_sentences() {
+  local home fakebin chat file headings file_headings json
+  home=$(make_home render); fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  assert_not_contains "$json" "🟢" "structured snapshot must not carry presentation icons"
+  chat=$(run "$home" "$fakebin" --render chat)
+  headings=$(printf '%s\n' "$chat" | grep '^## ' | tr '\n' '|')
+  [ "$headings" = '## 🟢 Ready|## ⏸️ Held|## 🚧 Blocked|## ⚙️ Under way|## ❓ Waiting on you|## ✅ Done|' ] \
+    || fail "chat board headings did not use the selected leading icons: $chat"
+  assert_empty_sentences_follow_their_headings "$chat" "$json" chat
+  file=$(run "$home" "$fakebin" --render file)
+  file_headings=$(printf '%s\n' "$file" | grep '^## ' | tr '\n' '|')
+  [ "$file_headings" = "$headings" ] \
+    || fail "file board headings did not match the chat icon set: $file"
+  assert_empty_sentences_follow_their_headings "$file" "$json" file
+  pass "chat and file board renderers emit all six selected icons and preserve empty sentences"
+}
+
+# Captain chat carries no task ids or raw metadata paths (AGENTS.md section 9), so the
+# chat renderer keeps every PR URL whatever its scheme and drops the report-path and
+# local-merge-note forms; the gitignored file report is the one surface allowed to
+# carry those, and it labels each row with the owner it already holds.
+test_chat_render_hides_paths_but_keeps_pr_urls() {
+  local home fakebin chat file mate
+  home=$(make_home render-artifacts); fakebin=$(make_fakebin "$home")
+  mate=$(fixture_mate_home "$home")
+  mkdir -p "$mate/data" "$mate/state" "$mate/config" "$mate/projects" "$mate/bin"
+  printf '# Firstmate fixture\n' > "$mate/AGENTS.md"
+  printf 'mate\n' > "$mate/.fm-secondmate-home"
+  printf -- '- mate - fixture domain (home: %s; scope: fixture work; projects: firstmate; added 2026-07-11)\n' \
+    "$mate" > "$home/data/secondmates.md"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## Done
+- [x] mate-landed - Secondmate-managed fix https://github.com/kunchenguid/firstmate/pull/50 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+EOF
+  cat > "$home/data/backlog.md" <<'EOF'
+## Done
+- [x] done-pr - Landed thing https://github.com/kunchenguid/firstmate/pull/7 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-http-pr - Landed older thing http://github.com/kunchenguid/firstmate/pull/8 (repo: firstmate) (kind: ship) (merged 2026-07-11)
+- [x] done-report - Scouted the thing data/done-report/report.md (repo: firstmate) (kind: scout) (reported 2026-07-11)
+- [x] done-local - Merged locally - local main (repo: firstmate) (kind: ship) (done 2026-07-11)
+EOF
+  chat=$(run "$home" "$fakebin" --render chat)
+  file=$(run "$home" "$fakebin" --render file)
+  assert_contains "$chat" "https://github.com/kunchenguid/firstmate/pull/7" \
+    "chat render must keep the full PR URL artifact"
+  assert_contains "$chat" "http://github.com/kunchenguid/firstmate/pull/8" \
+    "chat render must keep a PR URL whatever its scheme"
+  assert_not_contains "$chat" "data/done-report/report.md" \
+    "chat render must not expose a raw report path"
+  assert_not_contains "$chat" "local main" \
+    "chat render must not expose the local-merge note"
+  assert_contains "$file" "data/done-report/report.md" \
+    "file render must keep the report-path artifact"
+  assert_contains "$file" "local main" \
+    "file render must keep the local-merge note artifact"
+  assert_contains "$file" "- Scouted the thing (main): recent completion" \
+    "file render must label a main-fleet row with its owner exactly once"
+  assert_not_contains "$file" "((main))" \
+    "file render must not double-wrap an already parenthesized owner"
+  assert_contains "$file" "- Secondmate-managed fix (mate): recent completion" \
+    "file render must parenthesize a bare secondmate owner id"
+  printf '%s\n' "$chat" | grep -q '^- Scouted the thing - recent completion$' \
+    || fail "chat Done row lost its summary and detail when the artifact was suppressed: $chat"
+  pass "chat render suppresses report paths and local notes while keeping PR URLs"
+}
+
+# Only a no-mistakes run-step stop is the deliberate park that reads calmly. A crew
+# that reported its OWN failure is a real wreck and keeps the needs-a-look cue in
+# both summary and detail - including when its free-form `failed: {why}` prose
+# happens to mention a failed run, which must never buy it the calm wording.
+test_real_worker_failure_is_not_dressed_as_a_deliberate_park() {
+  local home fakebin json
+  home=$(make_home failure-honesty); write_fixture "$home"
+  fm_write_meta "$home/state/wrecked-task.meta" \
+    "window=firstmate:fm-wrecked-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" wrecked-task idle
+  printf 'failed: worktree gone, work lost\n' > "$home/state/wrecked-task.status"
+  fm_write_meta "$home/state/masquerading-task.meta" \
+    "window=firstmate:fm-masquerading-task" "worktree=$home/projects/ship-wt" "project=firstmate" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$home/state" masquerading-task idle
+  printf 'failed: the validation run failed and the worktree is gone\n' \
+    > "$home/state/masquerading-task.status"
+  write_run_step_task "$home" parked-task failed
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.board_items | any(.column == "Under way" and .id == "wrecked-task"
+      and .summary == "worktree gone, work lost"
+      and .detail == "failed, needs a look"))
+      and (.board_items | any(.column == "Under way" and .id == "masquerading-task"
+        and .summary == "the validation run failed and the worktree is gone"
+        and .detail == "failed, needs a look"))
+      and (.board_items | any(.column == "Under way" and .id == "parked-task"
+        and .summary == "parked after validation stop"
+        and .detail == "parked after validation stop"))
+  ' >/dev/null || fail "a real worker failure was reported as a deliberate park: $json"
+  pass "a real worker failure keeps its needs-a-look cue while validation stops stay calm"
+}
+
+test_landed_blocker_frees_queued_work_to_ready() {
+  local home fakebin json
+  home=$(make_home resolved-blocker); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] task-b - Do it blocked-by: task-a - waiting on task-a (repo: firstmate) (kind: ship)
+- [ ] task-c - Do it later blocked-by: task-z - waiting on task-z (repo: firstmate) (kind: ship)
+- [ ] task-d - Wait for the window (repo: firstmate) (kind: ship) (hold: after release window) (hold-kind: external)
+
+## Done
+- [x] task-a - Prepare the way (repo: firstmate) (kind: ship) (done 2026-07-22)
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "task-b") | .column] == ["Ready"])
+      and ([.board_items[] | select(.id == "task-c") | .column] == ["Blocked"])
+      and (.board_items | any(.id == "task-c" and (.detail | contains("task-z"))))
+      and ([.board_items[] | select(.id == "task-d") | .column] == ["Held"])
+      and (.board_items | any(.id == "task-d" and .detail == "after release window"))
+      and (.gates | any(.id == "task-b" and .reason == "-"))
+      and (.gates | any(.id == "task-c" and .reason == "waiting on task-z"))
+      and (.gates | any(.id == "task-d" and .reason == "after release window"))
+  ' >/dev/null || fail "queued work whose blocker landed must board as Ready, not Held: $json"
+  pass "queued work becomes Ready once its blocker lands, and real holds stay Held"
+}
+
+test_gate_columns_keep_their_share_of_the_bound() {
+  local home fakebin json
+  home=$(make_home gate-share); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] blk-1 - Blocked one blocked-by: missing-1 (repo: firstmate) (kind: ship)
+- [ ] blk-2 - Blocked two blocked-by: missing-2 (repo: firstmate) (kind: ship)
+- [ ] blk-3 - Blocked three blocked-by: missing-3 (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-2 - Held two (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-3 - Held three (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] ready-2 - Ready two (repo: firstmate) (kind: ship)
+
+## Done
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=3 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] == ["ready-1"])
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 1
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 1
+      and (.gates | length) == 3
+      and ([.omitted[].surface] | index("gates showing 3 of 9") != null)
+      and ([.omitted[].surface] | index("board Ready showing 1 of 2") != null)
+      and ([.omitted[].surface] | index("board Held showing 1 of 4") != null)
+      and ([.omitted[].surface] | index("board Blocked showing 1 of 3") != null)
+  ' >/dev/null || fail "a shared gate bound starved a board column: $json"
+  json=$(FM_BEARINGS_GATES=3 run "$home" "$fakebin" --json --all-queued)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] | length) == 2
+      and ([.board_items[] | select(.column == "Held") | .id] | length) == 4
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) == 3
+      and ([.omitted[].surface] | any(startswith("board ")) | not)
+  ' >/dev/null || fail "--all-queued must lift every gate column bound: $json"
+  pass "Ready, Held, and Blocked each keep their share of one gate bound"
+}
+
+# The integrity gate is the one board item that says main current state is broken,
+# so a full Ready/Held queue must never crowd it out of Blocked at a low bound.
+test_integrity_gate_outranks_queued_work_at_a_full_bound() {
+  local home fakebin json
+  home=$(make_home integrity-bound)
+  : > "$home/data/secondmates.md"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] only-orphan - Structured in flight without meta (repo: firstmate) (kind: ship) (since 2026-07-11)
+
+## Queued
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] ready-2 - Ready two (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] hold-2 - Held two (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+
+## Done
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=2 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "(main-inventory)") | .column] == ["Blocked"])
+      and (.gates | length) == 2
+      and (.gates | any(.id == "(main-inventory)"))
+      and ([.omitted[].surface] | index("board Held showing 0 of 2") != null)
+  ' >/dev/null || fail "a full queue crowded the main-inventory integrity gate off the board: $json"
+  pass "the main-inventory integrity gate outranks queued work when the gate bound is full"
+}
+
+# A secondmate home held on its OWN child work carries no queued backlog row (the
+# child-state hold branch requires the absence of hold metadata), so nothing else
+# on the board represents it. It must still occupy a column rather than vanish.
+test_externally_held_secondmate_home_stays_on_the_board() {
+  local home fakebin mate wt json canonical
+  home=$(make_home mate-held)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/mate-held-home"
+  make_valid_secondmate_home held-mate "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] mate-ship - Ship the mate thing (repo: sample) (kind: ship) (since 2026-07-13)
+
+## Queued
+- [ ] mate-next - Unrelated dispatchable work (repo: sample) (kind: ship)
+
+## Done
+EOF
+  wt="$mate/projects/mate-ship"
+  fm_git_init_commit "$wt"
+  fm_write_meta "$mate/state/mate-ship.meta" \
+    "window=firstmate:fm-mate-ship" "worktree=$wt" "project=sample" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$mate/state" mate-ship idle
+  printf 'paused: waiting on the upstream vendor release\n' > "$mate/state/mate-ship.status"
+  append_secondmate_registry "$home" held-mate "$mate"
+  fakebin=$(make_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    (.secondmate_current.records[] | select(.id == "held-mate")
+      | .current.state == "externally_held"
+        and .provenance.selected == "structured-home"
+        and ([.queued[].id] == ["mate-next"])
+        and (.holds | any(.source == "child-state" and .id == "mate-ship")))
+  ' >/dev/null || fail "fixture did not produce a child-state held secondmate home: $canonical"
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "held-mate/mate-ship") | .column] == ["Held"])
+      and (.board_items | any(.id == "held-mate/mate-ship"
+        and .owner == "held-mate"
+        and (.summary | contains("Ship the mate thing"))
+        and (.detail | contains("upstream vendor release"))))
+      and (.gates | any(.id == "held-mate/mate-ship"))
+      and ([.board_items[] | select(.id == "mate-next") | .column] == ["Ready"])
+  ' >/dev/null || fail "a held secondmate ship vanished from every board column: $json"
+  pass "a secondmate ship held on its own child state stays under Held beside that home's queued work"
+}
+
+# A child's own status-log decision is not authoritative, so the home is NOT a
+# captain decision - but it is still perfectly readable. The board must never call
+# such a home unavailable; only a home the snapshot itself could not read is that.
+test_readable_home_with_status_only_child_decision_is_not_called_unavailable() {
+  local home fakebin mate wt json canonical
+  home=$(make_home mate-readable)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/mate-readable-home"
+  make_valid_secondmate_home readable-mate "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] mate-order - Choose the subscription order (repo: sample) (kind: ship) (since 2026-07-13)
+
+## Queued
+
+## Done
+EOF
+  wt="$mate/projects/mate-order"
+  fm_git_init_commit "$wt"
+  fm_write_meta "$mate/state/mate-order.meta" \
+    "window=firstmate:fm-mate-order" "worktree=$wt" "project=sample" \
+    "harness=claude" "kind=ship" "mode=no-mistakes"
+  record_claude_state "$mate/state" mate-order idle
+  printf 'needs-decision [key=k]: pick the order\n' > "$mate/state/mate-order.status"
+  append_secondmate_registry "$home" readable-mate "$mate"
+  fakebin=$(make_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    (.secondmate_current.records[] | select(.id == "readable-mate")
+      | .current.state == "captain_decision"
+        and .current.reason == null
+        and .provenance.selected == "structured-home"
+        and ([.holds[].source] == ["child-state"])
+        and ([.decisions_open[] | select(.source == "backlog")] | length) == 0)
+  ' >/dev/null || fail "fixture did not produce a readable status-only-decision home: $canonical"
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.secondmates | any(.[]; .id == "readable-mate" and .state != "unknown"))
+      and (.board_items | any(.detail == "secondmate home unavailable") | not)
+      and ([.board_items[] | .summary] | any(test("home state unavailable"; "i")) | not)
+      and ([.board_items[] | select(.id == "readable-mate/mate-order") | .column] == ["Held"])
+      and (.board_items | any(.id == "readable-mate/mate-order"
+        and (.summary | contains("Choose the subscription order"))
+        and (.detail | contains("pick the order"))))
+      and ([.decisions_open[].id] | any(test("readable-mate")) | not)
+  ' >/dev/null || fail "a readable secondmate home was boarded as unavailable: $json"
+  pass "a readable home whose child only logged a decision is never boarded as unavailable"
+}
+
+# The pinned integrity prefix must never eat the whole gate bound: many unreachable
+# homes at once still leave Ready, Held, and Blocked a share of ordinary work.
+test_many_unavailable_homes_do_not_starve_the_queued_columns() {
+  local home fakebin mate json i
+  home=$(make_home mate-flood); write_fixture "$home"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] ready-1 - Ready one (repo: firstmate) (kind: ship)
+- [ ] hold-1 - Held one (repo: firstmate) (kind: ship) (hold: awaiting window) (hold-kind: external)
+- [ ] blk-1 - Blocked one blocked-by: missing-1 (repo: firstmate) (kind: ship)
+
+## Done
+EOF
+  i=1
+  while [ "$i" -le 4 ]; do
+    mate="$TMP_ROOT/mate-flood-gone-$i"
+    append_secondmate_registry "$home" "gone-$i" "$mate"
+    i=$((i + 1))
+  done
+  fakebin=$(make_fakebin "$home")
+  json=$(FM_BEARINGS_GATES=4 run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.column == "Ready") | .id] | length) >= 1
+      and ([.board_items[] | select(.column == "Held") | .id] | length) >= 1
+      and ([.board_items[] | select(.column == "Blocked") | .id] | length) >= 1
+      and (.gates | length) == 4
+      and ([.board_items[] | select(.column == "Blocked") | .id] | any(startswith("gone-")))
+  ' >/dev/null || fail "unavailable secondmate homes starved the queued board columns: $json"
+  pass "a flood of unavailable homes still leaves each queued column its share"
+}
+
+test_open_prs_needing_the_captain_reach_waiting_on_you() {
+  local home fakebin json
+  home=$(make_home pr-columns); write_fixture "$home"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+cat <<'JSON'
+[{"number":11,"title":"Needs a look","url":"https://github.com/kunchenguid/firstmate/pull/11","headRefName":"fm/eleven","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":12,"title":"Red CI","url":"https://github.com/kunchenguid/firstmate/pull/12","headRefName":"fm/twelve","reviewDecision":"","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"FAILURE","status":"COMPLETED"}]},
+ {"number":13,"title":"Author must act","url":"https://github.com/kunchenguid/firstmate/pull/13","headRefName":"fm/thirteen","reviewDecision":"CHANGES_REQUESTED","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":14,"title":"Approved but no checks reported","url":"https://github.com/kunchenguid/firstmate/pull/14","headRefName":"fm/fourteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[]},
+ {"number":15,"title":"Green and approved","url":"https://github.com/kunchenguid/firstmate/pull/15","headRefName":"fm/fifteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]},
+ {"number":16,"title":"Approved while CI runs","url":"https://github.com/kunchenguid/firstmate/pull/16","headRefName":"fm/sixteen","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"status":"IN_PROGRESS"}]},
+ {"number":17,"title":"Approved but conflicting","url":"https://github.com/kunchenguid/firstmate/pull/17","headRefName":"fm/seventeen","reviewDecision":"APPROVED","mergeable":"CONFLICTING","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]},
+ {"number":18,"title":"Green and approved, mergeability unreported","url":"https://github.com/kunchenguid/firstmate/pull/18","headRefName":"fm/eighteen","reviewDecision":"APPROVED","mergeable":"UNKNOWN","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+JSON
+SH
+  chmod +x "$fakebin/gh"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  printf '%s' "$json" | jq -e '
+    ([.board_items[] | select(.id == "kunchenguid/firstmate#11") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "kunchenguid/firstmate#11" and .detail == "waiting for your review"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/11")))
+      and (.board_items | any(.id == "kunchenguid/firstmate#15" and .detail == "ready to merge"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/15")))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#12"
+        and .detail == "PR open - CI failing"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/12")))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#13"
+        and .detail == "PR open - changes requested"))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#14"
+        and .detail == "PR open - no checks reported"
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/14")))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#16"
+        and .detail == "PR open - checks still running"))
+      and (.board_items | any(.column == "Under way" and .id == "kunchenguid/firstmate#17"
+        and .detail == "PR open - needs author update"))
+      and ([.board_items[] | select(.id == "kunchenguid/firstmate#18") | .column] == ["Waiting on you"])
+      and (.board_items | any(.id == "kunchenguid/firstmate#18"
+        and (.detail | startswith("ready to merge"))
+        and (.artifact == "https://github.com/kunchenguid/firstmate/pull/18")))
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#")))] | length) == 3
+      and (.candidate_prs | any(.num == "12") and any(.num == "13") and any(.num == "17"))
+  ' >/dev/null || fail "open PRs needing the captain did not reach Waiting on you: $json"
+  pass "PRs awaiting captain action wait on the captain, and other open PRs stay visible under way"
+}
+
+test_board_pr_ids_stay_unique_across_repositories() {
+  local home fakebin json
+  home=$(make_home pr-ids); write_fixture "$home"
+  fm_write_meta "$home/state/other-task.meta" \
+    "window=firstmate:fm-other-task" "worktree=$home/projects/ship-wt" "project=other" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" \
+    "pr=https://github.com/kunchenguid/other/pull/3"
+  record_claude_state "$home/state" other-task busy
+  printf 'working: building the other thing\n' > "$home/state/other-task.status"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+slug=""
+while [ $# -gt 0 ]; do case "$1" in --repo) slug=$2; shift 2 ;; *) shift ;; esac; done
+cat <<JSON
+[{"number":3,"title":"Third PR in $slug","url":"https://github.com/$slug/pull/3","headRefName":"fm/three","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+JSON
+SH
+  chmod +x "$fakebin/gh"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  printf '%s' "$json" | jq -e '
+    ([.candidate_prs[] | select(.num == "3")] | length) == 2
+      and ([.board_items[] | select(.column == "Waiting on you" and (.id | test("#3$")))] | length) == 2
+      and ([.board_items[].id] | length) == ([.board_items[].id] | unique | length)
+      and (.board_items | any(.id == "kunchenguid/firstmate#3"
+        and .artifact == "https://github.com/kunchenguid/firstmate/pull/3"))
+      and (.board_items | any(.id == "kunchenguid/other#3"
+        and .artifact == "https://github.com/kunchenguid/other/pull/3"))
+  ' >/dev/null || fail "board PR ids collided across repositories: $json"
+  pass "board item ids stay unique when two repositories share a PR number"
+}
+
 test_toon_json_parity() {
   local home fakebin toon json keys k
   home=$(make_home parity); write_fixture "$home"
@@ -963,6 +1478,52 @@ test_superseded_queued_item_dropped_by_default() {
   printf '%s' "$json" | jq -e '.gates | any(.[]; .id == "dead-gate")' >/dev/null \
     || fail "--all-queued must restore the superseded item"
   pass "superseded queued items are dropped by default and restored with --all-queued"
+}
+
+# The collapsed captain-call contract: any due, unblocked captain-held task is
+# Captain's Call whatever its kind; a date-deferred hold is a dated gate until
+# due; a prose-deferred hold leaves the default views with a disclosure; and
+# Recently Landed excludes only what closed while still held for the captain.
+test_collapsed_captain_call_deferral_and_landed() {
+  local home fakebin json
+  home=$(make_home collapsed-call)
+  mkdir -p "$home/data"
+  cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+- [ ] work-gate - Captain-gated ship work (repo: firstmate) (kind: ship) (hold: captain go needed) (hold-kind: captain)
+- [ ] later-call - Deferred captain call (repo: firstmate) (kind: captain) (hold: revisit with the captain) (hold-kind: captain) (hold-until: 2026-08-01)
+- [ ] due-call - Due captain call (repo: firstmate) (kind: captain) (hold: overdue captain choice) (hold-kind: captain) (hold-until: 2026-07-11)
+- [ ] parked-call - Prose-parked captain call (repo: firstmate) (kind: ship) (hold: DEFERRED by captain revisit later) (hold-kind: captain)
+- [ ] external-gate - Externally held work (repo: firstmate) (kind: ship) (hold: upstream release pending) (hold-kind: external)
+
+## Done
+- [x] answered-call - Answered captain question (repo: firstmate) (kind: captain) (done 2026-07-10) (hold: captain choice pending) (hold-kind: captain)
+- [x] shipped-work - Ordinary landed work (repo: firstmate) (kind: ship) (merged 2026-07-10)
+EOF
+  fakebin=$(make_fakebin "$home")
+  json=$(run "$home" "$fakebin" --json)
+  printf '%s' "$json" | jq -e '
+    (.decisions_open | any(.[]; .id == "work-gate"))
+      and (.decisions_open | any(.[]; .id == "due-call"))
+      and (.decisions_open | any(.[]; .id == "later-call") | not)
+      and (.decisions_open | any(.[]; .id == "parked-call") | not)
+      and (.decisions_open | any(.[]; .id == "external-gate") | not)
+      and (.gates | any(.[]; .id == "later-call" and (.reason | startswith("until 2026-08-01"))))
+      and (.gates | any(.[]; .id == "work-gate") | not)
+      and (.gates | any(.[]; .id == "parked-call") | not)
+      and (.gates | any(.[]; .id == "external-gate"))
+      and (.landed | any(.[]; .id == "shipped-work"))
+      and (.landed | any(.[]; .id == "answered-call") | not)
+      and (.omitted | any(.[]; .surface | startswith("captain holds marked deferred")))
+  ' >/dev/null || fail "the collapsed captain-call projection is wrong: $json"
+  json=$(run "$home" "$fakebin" --json --all-decisions --all-queued)
+  printf '%s' "$json" | jq -e '
+    (.decisions_open | any(.[]; .id == "parked-call"))
+      and (.gates | any(.[]; .id == "parked-call") | not)
+  ' >/dev/null || fail "--all-decisions must reveal the prose-deferred call: $json"
+  pass "captain-held tasks of any kind reach Captain's Call, deferral is honored, and landed excludes answered calls"
 }
 
 test_include_prs_is_the_only_fetch_path() {
@@ -1159,7 +1720,7 @@ test_completed_scout_report_not_pending() {
   pass "a completed scout with decision-like report prose is a pointer, not pending"
 }
 
-# Recently Landed must include merges a secondmate managed. Those completion records
+# Done must include merges a secondmate managed. Those completion records
 # live in the secondmate home's OWN backlog, not the main one, so the projection must
 # roll them up. Local, deterministic, no GitHub call.
 test_landed_includes_secondmate_home_merges() {
@@ -1395,13 +1956,13 @@ test_live_blocker_is_not_charted_queue_work() {
       and (.decisions_open | any(.[]; .id == "ship-task") | not)
       and (.gates | any(.[]; .id == "ship-task") | not)
   ' >/dev/null || fail "live blocked work was projected as queued/deferred work: $json"
-  pass "Bearings keeps a live blocker in structured live state and never converts it to Charted Next queue work"
+  pass "Bearings keeps a live blocker in structured live state and never converts it to queued board work"
 }
 
-# Captain's Call is populated only from the durable keyed open-decision set. The
+# Waiting on you is populated only from the durable keyed open-decision set. The
 # anti-leak guard: action-free highlights - a working task, a completed scout,
 # queued/gated items, landed work - must never surface as an open decision, so they
-# cannot leak into Captain's Call. The standard fixture has exactly one genuine open
+# cannot leak into Waiting on you. The standard fixture has exactly one genuine open
 # decision (the secondmate's structured captain hold).
 test_captains_call_anti_leak() {
   local home fakebin json canonical
@@ -1421,13 +1982,13 @@ test_captains_call_anti_leak() {
       and ([$bearings.decisions_open[].id] | index("mate-landed") | not)
       and ([$bearings.decisions_open[].id] | index("live-gate") | not)
       and ([$bearings.decisions_open[].id] | index("dead-gate") | not)
-  ' >/dev/null || fail "only genuine open decisions may feed Captain's Call: $json"
-  pass "action-free items (working/done/queued/landed) do not leak into Captain's Call"
+  ' >/dev/null || fail "only genuine open decisions may feed Waiting on you: $json"
+  pass "action-free items (working/done/queued/landed) do not leak into Waiting on you"
 }
 
 # R1: main-home orphan in-flight and unstructured current rows must not vanish
 # silently. Meta remains the sole live-work inventory; disclosure is via
-# main_inventory + omitted[] + a Charted Next gate line, never fake Underway.
+# main_inventory + omitted[] + a Blocked board item, never fake Under way.
 test_main_orphan_in_flight_is_disclosed_not_invented() {
   local home fakebin json canonical
   home=$(make_home main-orphan)
@@ -1458,8 +2019,10 @@ EOF
       and (.gates | any(.id == "(main-inventory)"
         and (.title | contains("in-flight backlog item has no child metadata"))))
       and (.omitted | any(.surface == "main in-flight backlog item(s) have no child metadata: 1"))
+      and ([.board_items[] | select(.id == "(main-inventory)") | .column] == ["Blocked"])
+      and (.board_items | any(.column == "Under way") | not)
   ' >/dev/null || fail "orphan in-flight was invented or not disclosed: $json"
-  pass "main orphan in-flight stays out of Underway and is disclosed in omitted/gates"
+  pass "main orphan in-flight boards as Blocked, never Under way, and is disclosed in omitted/gates"
 }
 
 test_main_unstructured_current_is_disclosed_with_structured_sibling() {
@@ -1903,6 +2466,18 @@ test_nonprogressing_child_states_are_explicit
 test_registry_unavailability_and_bounds_are_explicit
 test_current_landed_baseline_is_repeatable_and_prior_report_independent
 test_default_is_bounded_and_local_only
+test_board_columns_are_complete_and_classified
+test_board_render_uses_icons_and_verbatim_empty_sentences
+test_chat_render_hides_paths_but_keeps_pr_urls
+test_real_worker_failure_is_not_dressed_as_a_deliberate_park
+test_landed_blocker_frees_queued_work_to_ready
+test_gate_columns_keep_their_share_of_the_bound
+test_integrity_gate_outranks_queued_work_at_a_full_bound
+test_externally_held_secondmate_home_stays_on_the_board
+test_readable_home_with_status_only_child_decision_is_not_called_unavailable
+test_many_unavailable_homes_do_not_starve_the_queued_columns
+test_open_prs_needing_the_captain_reach_waiting_on_you
+test_board_pr_ids_stay_unique_across_repositories
 test_toon_json_parity
 test_landed_includes_secondmate_home_merges
 test_landed_default_balances_dominant_and_sparse_homes
@@ -1927,6 +2502,7 @@ test_include_prs_is_the_only_fetch_path
 test_partial_github_failure_degrades
 test_perl_fallback_bounds_github_call
 test_section_caps_and_expansion_flags
+test_collapsed_captain_call_deferral_and_landed
 test_pr_repository_cap_and_expansion
 test_per_repository_pr_cap_is_disclosed
 test_projection_and_toon_fail_closed
