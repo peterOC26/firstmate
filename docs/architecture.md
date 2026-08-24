@@ -164,7 +164,7 @@ Crewmates never intentionally touch your project clone; [treehouse](https://gith
 For ship and scout work, `fm-spawn.sh` refuses to launch unless the resolved task path is a real git worktree root that is distinct from the project primary checkout.
 `fm-spawn.sh` also owns the base-freshness boundary for every fresh treehouse-provided ship and scout: no worker starts until its clean task worktree matches the fetched tip of origin's resolved default branch, and any unsafe or unverifiable base stops the spawn.
 Its header owns the exact refusal mechanics, while `tests/fm-spawn-pool-base-freshen.test.sh` owns the portable regression coverage.
-`backend=orca` ship and scout spawns are outside that boundary: Orca creates the worktree and owns its freshness, and on a remote Orca host the worktree is not on this machine for firstmate to fetch or reset at all.
+Every `backend=orca` ship and scout spawn is outside that boundary, on this machine as well as on a remote Orca host: Orca creates the worktree and owns its freshness, and on a remote host the worktree is not here for firstmate to fetch or reset at all.
 
 The firstmate repo has one extra exposure because it can dispatch crewmates to work on itself.
 Its operating checkout (`FM_ROOT`) and the disposable crewmate worktrees are all linked git worktrees of the same repository, so the valid discriminator is branch state, not whether the checkout is linked.
