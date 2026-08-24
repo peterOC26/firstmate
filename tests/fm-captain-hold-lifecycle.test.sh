@@ -1251,13 +1251,48 @@ EOF
   pass "archived durable decisions satisfy teardown, while missing or unresolved archived decisions still refuse and remain repairable"
 }
 
+# Retention prunes a section, not only closed work, so a captain call that is
+# still OPEN and unanswered can leave the live backlog for the archive as an
+# unchecked `- [ ]` row. That row keeps its `hold-kind: captain` annotation, so
+# reading it as an active hold would pass the durability gate on a question
+# nobody ever answered and let teardown erase the scout's source under it.
+test_archived_open_hold_is_never_read_as_actively_held() {
+  local home id hold
+  home=$(make_home archived-open-hold)
+  id=sample-archived-open-review
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Review an archived open choice" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# Archived open review\n\nThe captain question is still unanswered.\n' > "$home/data/$id/report.md"
+  hold=$(run_shim "$home" hold "$id" route \
+    --title "Choose the archived open route" --reason "captain archived open route pending" --repo sample)
+  run_shim "$home" complete "$id" route >/dev/null
+  tasks_in "$home" prune --state queued --keep 0 >/dev/null
+  assert_no_grep "$hold" "$home/data/backlog.md" "the unanswered open hold remained in the live backlog"
+  assert_grep "- [ ] $hold" "$home/data/done-archive.md" \
+    "the unanswered open hold did not reach the archive as an unchecked row"
+  if run_shim "$home" verify "$id" > "$home/open-verify.out" 2> "$home/open-verify.err"; then
+    fail "an archived captain call nobody answered satisfied verification"
+  fi
+  assert_grep "archived and not closed" "$home/open-verify.err" \
+    "the refusal did not distinguish an archived unanswered hold from an unfinished one"
+  assert_grep "restore it to the active backlog" "$home/open-verify.err" \
+    "the archived unanswered refusal did not name its recovery"
+  if run_teardown "$home" "$id" > "$home/open-teardown.out" 2> "$home/open-teardown.err"; then
+    fail "an archived captain call nobody answered allowed teardown"
+  fi
+  assert_present "$home/state/$id.meta" "the archived unanswered refusal removed task metadata"
+  pass "an archived captain call that was never answered refuses instead of passing as still held"
+}
+
 # The archive is shared writable state: tasks-axi appends a `## Archived <stamp>`
 # block to it from inside a hold of the LIVE BACKLOG's lock every time a prune
 # runs, and every `tasks-axi done <id>` prunes. Archive repair rewrites the whole
 # file, so it has to take that same lock or a concurrent append is read before
 # and overwritten after - losing archived history for good.
 # <home> <origin> - the origin task a captain hold hangs off, in the shape the
-# real rescue below has: a started scout with a completed decision inventory.
+# rescue below needs: a started scout with a completed decision inventory.
 seed_decision_origin() {  # <home> <origin> <title>
   local home=$1 origin=$2 title=$3
   mkdir -p "$home/data/$origin"
@@ -1275,19 +1310,19 @@ rehold_after_prune() {  # <home> <origin> <key> <title> <reason> <repo>
   run_shim "$1" hold "$2" "$3" --title "$4" --reason "$5" --repo "$6" >/dev/null
 }
 
-# The rescue this really takes, with the identity and record shape it takes it
-# in: retention pruned a closed captain hold out of the live backlog while a
-# scout's teardown gate still needed it, so the record was restored into the
-# backlog and the pruned copy stayed in the archive. Both files then carry the
-# same identity with different bodies, and only the live one is current.
+# The record shape a hand rescue leaves behind: retention pruned a closed
+# captain hold out of the live backlog while a scout's teardown gate still
+# needed it, so the record was restored into the backlog and the pruned copy
+# stayed in the archive. Both files then carry the same identity with different
+# bodies, and only the live one is current.
 test_live_backlog_record_outranks_its_archived_copy() {
   local home origin key hold title reason repo
-  origin=pv-consolidate-plan-c2
-  key=three-round-limit
+  origin=sample-consolidate-plan
+  key=sample-round-limit
   hold="$origin-decision-$key"
-  title="Consolidation plan failed three review rounds - choose how to unblock the live update"
-  reason="Rounds 1-3 all FAILED the Codex plan gate. Captain's three-round rule reached; escalating rather than widening scope."
-  repo=PurpleVoice_Claude_GSD
+  title="Choose how to unblock the sample consolidation plan"
+  reason="captain sample consolidation choice pending"
+  repo=sample
 
   # Live copy closed with no durable decision, archived copy durable. Reading
   # the archive here would pass the gate on a body belonging to a previous
@@ -1676,6 +1711,7 @@ test_origin_slug_validation_precedes_path_construction
 test_status_resolution_over_an_open_hold_is_signalled
 test_legitimate_holds_produce_no_divergence_signal
 test_archived_decisions_keep_the_scout_completion_gate_strong
+test_archived_open_hold_is_never_read_as_actively_held
 test_live_backlog_record_outranks_its_archived_copy
 test_live_backlog_read_errors_never_fall_back_to_archive
 test_newest_archived_occurrence_decides_and_repair_touches_only_it

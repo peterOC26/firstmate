@@ -697,9 +697,11 @@ verify_hold_durable() {  # <task-id>
   if body_has_resolution_record "$body"; then
     return 0
   fi
-  if [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
+  if [ "$state" != "done" ] && [ "$hold_kind" = captain ] && [ -z "$TASK_RECORD_FILE" ]; then
     return 0
   fi
+  [ -z "$TASK_RECORD_FILE" ] || [ "$state" = "done" ] \
+    || fail "captain-held task $id is archived and not closed, so it carries no recorded captain answer and cannot be read as still held; restore it to the active backlog first"
   fail "captain-held task $id is neither held for the captain nor closed with a recorded captain answer"
 }
 
