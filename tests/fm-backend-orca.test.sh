@@ -29,10 +29,13 @@ if [ "${1:-}" = status ] && [ "${FM_ORCA_STATUS_RESPONSE:-ready}" != sequence ];
 fi
 n=$next
 echo "$n" > "$COUNT_FILE"
+# The body first, then the status: the real CLI prints a structured error body
+# and still exits nonzero, so a case that describes only an exit code keeps its
+# silent failure while a case that describes both gets both.
+[ -f "$RESP/$n.out" ] && cat "$RESP/$n.out"
 if [ -f "$RESP/$n.exit" ]; then
   exit "$(cat "$RESP/$n.exit")"
 fi
-[ -f "$RESP/$n.out" ] && cat "$RESP/$n.out"
 exit 0
 SH
   chmod +x "$fb/orca"
@@ -129,6 +132,7 @@ case "${1:-} ${2:-}" in
     ;;
   "worktree show")
     cat "$FIX/worktree-show.json"
+    [ ! -f "$FIX/worktree-show.exit" ] || exit "$(cat "$FIX/worktree-show.exit")"
     exit 0
     ;;
   "worktree rm")
@@ -556,6 +560,7 @@ run_remote_teardown() {  # <id> [<extra args>...]
     FM_BACKEND_ORCA_EXEC_POLLS="${FM_BACKEND_ORCA_EXEC_POLLS:-}" \
     FM_BACKEND_ORCA_EXEC_INTERVAL="${FM_BACKEND_ORCA_EXEC_INTERVAL:-}" \
     FM_BACKEND_ORCA_EXEC_FETCH_POLLS="${FM_BACKEND_ORCA_EXEC_FETCH_POLLS:-}" \
+    FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS="${FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS:-}" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
 }
@@ -603,7 +608,66 @@ test_remote_teardown_refuses_when_the_host_is_unreachable() {
     "the retry the refusal instructs the operator to run must not be blocked by the previous run's own lock"
   assert_contains "$retry" "cannot reach Orca host" \
     "the retry must reach the real unreachable-host refusal, not a stale-lock refusal"
+  assert_not_contains "$retry" "no longer exists" \
+    "a present worktree on an unreachable host must not be reported as absent"
   pass "fm-teardown.sh: refuses a remote cleanup it cannot verify, instead of treating an unreachable host as nothing to protect"
+}
+
+test_remote_teardown_classifies_without_a_loaded_adapter_when_the_shell_never_opens() {
+  local id out status
+  id="orcaremotez24"
+  remote_spawn_case remote-td-no-host "$id"
+  # A remote record naming no host at all. Opening the inspection shell gives up
+  # before it ever loads the Orca adapter, so the absent-worktree classification
+  # that follows runs with nothing sourced - and must still answer "cannot tell"
+  # deliberately rather than by tripping over an undefined function.
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=local-only" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=" "orca_remote=1"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "a remote record naming no host must not be torn down"$'\n'"$out"
+  assert_not_contains "$out" "command not found" \
+    "the classification ran before the Orca adapter was available"
+  assert_not_contains "$out" "no longer exists" \
+    "an unaskable runtime was reported as a definitely-absent worktree"
+  assert_present "$STATE/$id.meta" "the indeterminate refusal removed task metadata"
+  pass "fm-teardown.sh: classifies an unopenable remote inspection shell without a loaded adapter, and still refuses"
+}
+
+test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes() {
+  local id out status forced forced_status
+  id="orcaremotez21"
+  remote_spawn_case remote-td-absent-worktree "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf '{"ok":false,"error":{"code":"selector_not_found"}}\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
+  printf '1\n' > "$FIX/terminal-create.exit"
+
+  out=$(run_remote_teardown "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "an absent recorded worktree must require explicit discard authority"
+  assert_contains "$out" "recorded Orca worktree" "the refusal did not name the absent recorded worktree"
+  assert_contains "$out" "no longer exists" "the refusal did not state that the worktree is gone"
+  assert_contains "$out" "rerun with --force" "the refusal did not name the remaining authorization step"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "an absent worktree was incorrectly reported as an unreachable host"
+  assert_present "$STATE/$id.meta" "the ordinary absent-worktree refusal removed task metadata"
+
+  forced=$(run_remote_teardown "$id" --force)
+  forced_status=$?
+  expect_code 0 "$forced_status" "--force must retire state after Orca already removed the worktree and terminal"$'\n'"$forced"
+  assert_contains "$forced" "already absent" "the forced path did not preserve the accurate absent-worktree diagnosis"
+  assert_not_contains "$forced" "cannot resolve Orca worktree id" \
+    "the forced absent-worktree path dead-ended on path resolution"
+  assert_not_contains "$forced" "cannot reach Orca host" \
+    "the forced absent-worktree path incorrectly claimed the host was unreachable"
+  assert_absent "$STATE/$id.meta" "--force left the local task record behind after the Orca worktree was already gone"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "--force asked Orca to remove a worktree already proven absent"
+  pass "fm-teardown.sh: distinguishes an absent Orca worktree and lets explicit --force retire the remaining local state"
 }
 
 # The forge answers for a merged PR whose head is <head>, recording the
@@ -857,15 +921,134 @@ test_remote_teardown_survives_a_slow_host_fetch() {
   # allowed; every other command still answers at once.
   out=$(FM_ORCA_FAKE_SLOW_MATCH="fetch" FM_ORCA_FAKE_SLOW_READS=6 \
     FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.05 \
-    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=60 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=60 FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS=2 \
     run_remote_teardown "$id")
   status=$?
   expect_code 0 "$status" "a slow host fetch must not be mistaken for a dead host"$'\n'"$out"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:repo-remote::'"$WT" \
     "a remote task whose work landed must be released even when the host's fetch is slow"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
+  assert_contains "$out" "task $id" "slow-network progress did not name the task"
+  assert_contains "$out" "host $FM_REMOTE_HOST" "slow-network progress did not name the Orca host"
+  assert_contains "$out" "waiting for git fetch" "slow-network progress did not name the network operation"
   rm -rf "/tmp/fm-$id"
   pass "fm-teardown.sh: releases a remote task whose landed-work fetch takes longer than an ordinary verdict check"
+}
+
+test_remote_teardown_interrupt_preserves_merge_poll_while_metadata_is_live() {
+  local id default neutral pid waited=0
+  id="orcaremotez22"
+  remote_spawn_case remote-td-interrupt "$id"
+  add_fake_gh_without_any_pr "$FB"
+  printf 'landed before interrupted teardown\n' > "$WT/landed.txt"
+  git -C "$WT" add landed.txt
+  git -C "$WT" -c user.email=t@example.com -c user.name=t commit -qm "landed change"
+  git -C "$PROJ" merge --ff-only -q "fm/$id"
+  fm_git_add_origin "$PROJ" "$CASE_DIR/origin.git"
+  default=$(git -C "$PROJ" rev-parse --abbrev-ref HEAD)
+  git -C "$PROJ" update-ref -d "refs/remotes/origin/$default" 2>/dev/null || true
+  fm_write_meta "$STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-1" \
+    "worktree=$WT" "project=$PROJ" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" "backend=orca" \
+    "orca_worktree_id=repo-remote::$WT" "orca_host=$FM_REMOTE_HOST" "orca_remote=1" \
+    "orca_remote_tasktmp=/tmp/fm-$id"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/$id.check.sh"
+  printf 'trusted check\n' > "$STATE/$id.check-trust"
+  printf 'poll data\n' > "$STATE/$id.pr-poll"
+  printf 'poll registration\n' > "$STATE/$id.pr-poll-registration"
+  chmod 600 "$STATE/$id.check.sh" "$STATE/$id.check-trust" \
+    "$STATE/$id.pr-poll" "$STATE/$id.pr-poll-registration"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral-interrupt")
+
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ORCA_FAKE_SLOW_MATCH=fetch FM_ORCA_FAKE_SLOW_READS=500 \
+    FM_BACKEND_ORCA_EXEC_POLLS=2 FM_BACKEND_ORCA_EXEC_INTERVAL=0.02 \
+    FM_BACKEND_ORCA_EXEC_FETCH_POLLS=500 FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS=2 \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" > "$CASE_DIR/interrupted.out" 2>&1 &
+  pid=$!
+  while ! grep -F "waiting for git fetch" "$CASE_DIR/interrupted.out" >/dev/null 2>&1; do
+    sleep 0.02
+    waited=$((waited + 1))
+    if [ "$waited" -ge 1500 ] || ! kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      fail "interrupted teardown never entered the observable network wait: $(cat "$CASE_DIR/interrupted.out")"
+    fi
+  done
+  kill -TERM "$pid" 2>/dev/null || true
+  sleep 0.1
+  kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+
+  assert_present "$STATE/$id.meta" "an interrupted pre-commit teardown removed task metadata"
+  assert_present "$STATE/$id.check.sh" "an interrupted pre-commit teardown removed the armed check"
+  assert_present "$STATE/$id.check-trust" "an interrupted pre-commit teardown removed check trust"
+  assert_present "$STATE/$id.pr-poll" "an interrupted pre-commit teardown removed the PR poll data"
+  assert_present "$STATE/$id.pr-poll-registration" "an interrupted pre-commit teardown removed the PR poll registration"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "the interrupted network wait reached destructive worktree removal"
+  pass "fm-teardown.sh: an interrupt before the final commit leaves task metadata and merge-poll artifacts intact"
+}
+
+test_remote_teardown_late_lock_wait_keeps_merge_poll_until_task_commit() {
+  local id neutral holder pid waited=0
+  id="orcaremotez23"
+  remote_spawn_case remote-td-late-lock "$id"
+  remote_teardown_meta "$STATE" "$id" "$WT" "$PROJ"
+  printf 'done: teardown may proceed\n' > "$STATE/$id.status"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/$id.check.sh"
+  printf 'trusted check\n' > "$STATE/$id.check-trust"
+  printf 'poll data\n' > "$STATE/$id.pr-poll"
+  printf 'poll registration\n' > "$STATE/$id.pr-poll-registration"
+  chmod 600 "$STATE/$id.check.sh" "$STATE/$id.check-trust" \
+    "$STATE/$id.pr-poll" "$STATE/$id.pr-poll-registration"
+  # The task's armed busy incarnation is retired immediately before the
+  # contended presentation step and after everything that precedes it, so its
+  # sidecar disappearing is a happens-after marker for "teardown is now inside
+  # the window where the poll used to be gone already" - no sleep to guess.
+  "$ROOT/bin/fm-busy-event.sh" arm "$STATE" "$id" >/dev/null
+  : > "$CASE_DIR/hold-status-lock"
+  FM_STATE_OVERRIDE="$STATE" bash -c '
+    . "$1"
+    fm_lock_acquire_wait "$2"
+    : > "$3"
+    while [ -e "$4" ]; do sleep 0.02; done
+    fm_lock_release "$2"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$STATE/.status-presentation-lock" \
+    "$CASE_DIR/status-lock-ready" "$CASE_DIR/hold-status-lock" &
+  holder=$!
+  while [ ! -e "$CASE_DIR/status-lock-ready" ]; do sleep 0.02; done
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral-late-lock")
+
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" > "$CASE_DIR/late-lock.out" 2>&1 &
+  pid=$!
+  while [ -e "$STATE/$id.busy-gen" ]; do
+    sleep 0.02
+    waited=$((waited + 1))
+    if [ "$waited" -ge 1500 ] || ! kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+      rm -f "$CASE_DIR/hold-status-lock"
+      wait "$holder" 2>/dev/null || true
+      fail "late-lock teardown never reached the post-worktree status-retirement wait"$'\n'"$(cat "$CASE_DIR/late-lock.out")"
+    fi
+  done
+  assert_grep $'orca\x1f''worktree'$'\x1f''rm' "$LOG" \
+    "the late-lock wait was reached without releasing the worktree first"
+  kill -0 "$pid" 2>/dev/null || fail "teardown did not wait on the held status-presentation lock"
+  assert_present "$STATE/$id.meta" "the late pre-commit wait removed task metadata"
+  assert_present "$STATE/$id.check.sh" "the late pre-commit wait removed the armed check"
+  assert_present "$STATE/$id.check-trust" "the late pre-commit wait removed check trust"
+  assert_present "$STATE/$id.pr-poll" "the late pre-commit wait removed PR poll data"
+  assert_present "$STATE/$id.pr-poll-registration" "the late pre-commit wait removed PR poll registration"
+  kill -KILL "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  rm -f "$CASE_DIR/hold-status-lock"
+  wait "$holder" 2>/dev/null || true
+  pass "fm-teardown.sh: even a late teardown wait keeps merge-poll artifacts while task metadata remains"
 }
 
 test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone() {
@@ -984,6 +1167,8 @@ test_remote_teardown_releases_a_clean_worktree() {
     "cleanup must release the recorded remote worktree through Orca"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-1' \
     "cleanup must close the recorded remote terminal"
+  assert_not_contains "$out" "is still waiting for" \
+    "ordinary short remote verdicts must not emit long-wait progress"
   assert_absent "$STATE/$id.meta" "a completed cleanup should remove the task record"
   assert_absent "/tmp/fm-$id" "cleanup should sweep the task temp root it created on the host"
   rm -rf "/tmp/fm-$id"
@@ -2433,6 +2618,196 @@ test_teardown_preserves_metadata_when_orca_remove_error_json() {
   pass "fm-teardown.sh backend=orca: preserves metadata on remove ok:false JSON"
 }
 
+# <dir-prefix> <id> - a local (not orca_remote) Orca task whose recorded
+# worktree path is not on this filesystem, so teardown reaches the Orca
+# worktree removal without a local path-identity check in the way.
+local_orca_absent_case() {  # <prefix> <id> -> sets LOCAL_ORCA_STATE LOCAL_ORCA_DATA LOCAL_ORCA_CONFIG
+  local prefix=$1 id=$2
+  LOCAL_ORCA_STATE="$TMP_ROOT/$prefix-state"
+  LOCAL_ORCA_DATA="$TMP_ROOT/$prefix-data"
+  LOCAL_ORCA_CONFIG="$TMP_ROOT/$prefix-config"
+  LOCAL_ORCA_WT="$TMP_ROOT/$prefix-wt"
+  LOCAL_ORCA_PROJECT="$TMP_ROOT/$prefix-project"
+  mkdir -p "$LOCAL_ORCA_DATA/$id" "$LOCAL_ORCA_STATE" "$LOCAL_ORCA_CONFIG"
+  printf 'report\n' > "$LOCAL_ORCA_DATA/$id/report.md"
+  touch "$LOCAL_ORCA_STATE/.last-watcher-beat"
+  fm_write_meta "$LOCAL_ORCA_STATE/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-$id" \
+    "worktree=$LOCAL_ORCA_WT" "project=$LOCAL_ORCA_PROJECT" \
+    "harness=claude" "kind=scout" "mode=no-mistakes" "yolo=off" \
+    "backend=orca" "orca_worktree_id=wt-$id" \
+    "decisions_reviewed=1" "decision_keys="
+}
+
+arm_orca_task_artifacts() {  # <state> <id>
+  local state=$1 id=$2
+  printf 'status\n' > "$state/$id.status"
+  printf 'turn ended\n' > "$state/$id.turn-ended"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$state/$id.check.sh"
+  printf 'trusted check\n' > "$state/$id.check-trust"
+  printf 'poll data\n' > "$state/$id.pr-poll"
+  printf 'poll registration\n' > "$state/$id.pr-poll-registration"
+  chmod 600 "$state/$id.check.sh" "$state/$id.check-trust" \
+    "$state/$id.pr-poll" "$state/$id.pr-poll-registration"
+}
+
+assert_orca_task_artifacts_present() {  # <state> <id> <label>
+  local state=$1 id=$2 label=$3 suffix
+  for suffix in meta status turn-ended check.sh check-trust pr-poll pr-poll-registration; do
+    assert_present "$state/$id.$suffix" "$label lost $id.$suffix"
+  done
+}
+
+assert_local_checkout_preservation_refusal() {  # <output> <worktree>
+  local out=$1 worktree=$2
+  assert_contains "$out" "recorded local checkout directory $worktree still exists" \
+    "the refusal did not name the surviving recorded checkout"
+  assert_contains "$out" "Land or discard the contents of $worktree, then remove that directory. After it is removed, rerun with --force to retire the remaining task state." \
+    "the refusal did not give the required checkout-resolution action"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "a surviving local checkout was reported as an unreachable host"
+  assert_not_contains "$out" "no longer exists" \
+    "a surviving local checkout was reported as already gone"
+  assert_not_contains "$out" "already absent" \
+    "a surviving local checkout was reported as already absent"
+  assert_not_contains "$out" "nothing left to release" \
+    "a surviving local checkout was reported as leaving nothing to release"
+}
+
+run_local_orca_teardown() {  # <id> [<extra args>...]
+  local id=$1; shift
+  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$LOCAL_ORCA_NEUTRAL" FM_STATE_OVERRIDE="$LOCAL_ORCA_STATE" \
+    FM_DATA_OVERRIDE="$LOCAL_ORCA_DATA" FM_CONFIG_OVERRIDE="$LOCAL_ORCA_CONFIG" \
+    "$ROOT/bin/fm-teardown.sh" "$id" "$@" 2>&1
+}
+
+# Orca answers a removal for a worktree it no longer records with a structured
+# selector_not_found body AND a nonzero exit. Both cases below drive exactly
+# that, so neither can pass on a fake that only sets one of the two.
+write_orca_selector_not_found() {  # <responses> <n>
+  printf '{"ok":false,"error":{"code":"selector_not_found","message":"worktree not found"}}\n' \
+    > "$1/$2.out"
+  printf '1\n' > "$1/$2.exit"
+}
+
+test_local_orca_teardown_refuses_an_absent_worktree_without_discard_authority() {
+  local id out rc
+  id="orcalocalabsentz1"
+  orca_case local-orca-absent-refuse
+  local_orca_absent_case local-orca-absent-refuse "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  write_orca_selector_not_found "$RESP" 2
+  write_orca_selector_not_found "$RESP" 3
+  set +e
+  out=$(run_local_orca_teardown "$id")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an absent local Orca worktree must still require explicit discard authority"$'\n'"$out"
+  assert_contains "$out" "no longer exists" \
+    "the refusal did not say the recorded worktree is gone"
+  assert_contains "$out" "rerun with --force" \
+    "the refusal did not name the remaining authorization step"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "an absent local worktree was reported as an unreachable host"
+  assert_present "$LOCAL_ORCA_STATE/$id.meta" \
+    "the ordinary absent-worktree refusal removed task metadata"
+  pass "fm-teardown.sh backend=orca: an absent local worktree is refused with accurate text, not a dead end"
+}
+
+test_local_orca_force_teardown_retires_an_absent_worktree_but_not_an_unproven_one() {
+  local id out rc
+  id="orcalocalabsentz2"
+  orca_case local-orca-absent-force
+  local_orca_absent_case local-orca-absent-force "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  write_orca_selector_not_found "$RESP" 2
+  write_orca_selector_not_found "$RESP" 3
+  set +e
+  out=$(run_local_orca_teardown "$id" --force)
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "--force must retire a local task whose Orca worktree is already gone"$'\n'"$out"
+  assert_contains "$out" "already absent" \
+    "the forced path did not report the absent worktree as absent"
+  assert_absent "$LOCAL_ORCA_STATE/$id.meta" \
+    "--force left the stranded local task record behind"
+
+  # Orca refused the removal but will not say the worktree is gone. That is not
+  # absence, and --force is not permission to guess: the records stay.
+  id="orcalocalabsentz3"
+  orca_case local-orca-unproven-force
+  local_orca_absent_case local-orca-unproven-force "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  printf '{"ok":false,"error":{"message":"worktree busy"}}\n' > "$RESP/2.out"
+  printf '1\n' > "$RESP/2.exit"
+  printf '{"ok":false,"error":{"message":"worktree busy"}}\n' > "$RESP/3.out"
+  printf '1\n' > "$RESP/3.exit"
+  set +e
+  out=$(run_local_orca_teardown "$id" --force)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a removal failure Orca will not attribute to absence must never retire records"$'\n'"$out"
+  assert_not_contains "$out" "already absent" \
+    "an error carrying no selector_not_found code was reported as a proven absence"
+  assert_present "$LOCAL_ORCA_STATE/$id.meta" \
+    "an unproven Orca removal failure removed task metadata"
+  pass "fm-teardown.sh backend=orca --force: retires a proven-absent local worktree and still refuses an unproven one"
+}
+
+test_local_orca_teardown_preserves_an_existing_checkout_missing_from_orca() {
+  local id out rc log_text
+  id="orcalocalcheckoutz1"
+  orca_case local-orca-checkout-refuse
+  local_orca_absent_case local-orca-checkout-refuse "$id"
+  fm_git_worktree "$LOCAL_ORCA_PROJECT" "$LOCAL_ORCA_WT" "fm/$id"
+  arm_orca_task_artifacts "$LOCAL_ORCA_STATE" "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  set +e
+  out=$(run_local_orca_teardown "$id")
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "ordinary teardown removed a checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$LOCAL_ORCA_WT"
+  assert_orca_task_artifacts_present "$LOCAL_ORCA_STATE" "$id" \
+    "ordinary local-checkout refusal"
+  assert_present "$LOCAL_ORCA_WT" "ordinary local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "ordinary local-checkout refusal closed the terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "ordinary local-checkout refusal called worktree removal"
+
+  id="orcalocalcheckoutz2"
+  orca_case local-orca-checkout-force-refuse
+  local_orca_absent_case local-orca-checkout-force-refuse "$id"
+  fm_git_worktree "$LOCAL_ORCA_PROJECT" "$LOCAL_ORCA_WT" "fm/$id"
+  arm_orca_task_artifacts "$LOCAL_ORCA_STATE" "$id"
+  LOCAL_ORCA_NEUTRAL=$(neutral_fm_root "$CASE_DIR/neutral")
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  set +e
+  out=$(run_local_orca_teardown "$id" --force)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "--force removed a checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$LOCAL_ORCA_WT"
+  assert_orca_task_artifacts_present "$LOCAL_ORCA_STATE" "$id" \
+    "forced local-checkout refusal"
+  assert_present "$LOCAL_ORCA_WT" "forced local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "forced local-checkout refusal closed the terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "forced local-checkout refusal called worktree removal"
+  pass "fm-teardown.sh backend=orca: preserves a surviving checkout missing from Orca with and without --force"
+}
+
 test_scout_teardown_refuses_orca_missing_report_when_path_missing() {
   local proj wt data state config id out rc neutral
   id="orcanoreportz4"
@@ -2711,6 +3086,98 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
   pass "fm-teardown.sh --force: removes Orca secondmate children through Orca"
 }
 
+test_secondmate_force_teardown_retires_a_local_orca_child_whose_worktree_is_gone() {
+  local home subhome child_id neutral out rc
+  child_id="orcachildabsentz1"
+  home="$TMP_ROOT/orca-local-child-absent-parent"
+  subhome="$TMP_ROOT/orca-local-child-absent-secondmate"
+  mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
+  printf 'domain\n' > "$subhome/.fm-secondmate-home"
+  fm_write_meta "$home/state/domain.meta" \
+    "window=firstmate:fm-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "home=$subhome" "projects=alpha"
+  printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
+    > "$home/data/secondmates.md"
+  # No orca_remote: this child's files were local, and its recorded worktree is
+  # no longer on this filesystem either, so cleanup reaches the Orca removal
+  # with no local path-identity check in the way.
+  fm_write_meta "$subhome/state/$child_id.meta" \
+    "window=fm-$child_id" "endpoint_task_id=$child_id" \
+    "terminal=term-$child_id" "worktree=$TMP_ROOT/orca-local-child-absent-wt" \
+    "project=$TMP_ROOT/orca-local-child-absent-project" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
+    "backend=orca" "orca_worktree_id=wt-$child_id"
+  orca_case secondmate-local-child-absent
+  printf '{"ok":true,"result":{}}\n' > "$RESP/1.out"
+  write_orca_selector_not_found "$RESP" 2
+  write_orca_selector_not_found "$RESP" 3
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "--force must retire a local Orca child whose worktree Orca no longer records"$'\n'"$out"
+  assert_contains "$out" "already absent" \
+    "the forced child path did not report the absent worktree as absent"
+  assert_not_contains "$out" "cannot reach Orca host" \
+    "an absent local child worktree was reported as an unreachable host"
+  assert_absent "$subhome/state/$child_id.meta" \
+    "--force left the stranded local child record behind"
+  assert_absent "$home/state/domain.meta" \
+    "--force left the parent record behind after retiring its only child"
+  pass "fm-teardown.sh --force: retires a local Orca child whose worktree Orca no longer records"
+}
+
+test_secondmate_force_teardown_preserves_a_local_orca_child_checkout_missing_from_orca() {
+  local home subhome childproj childwt child_id neutral out rc log_text
+  child_id="orcachildcheckoutz1"
+  home="$TMP_ROOT/orca-local-child-checkout-parent"
+  subhome="$TMP_ROOT/orca-local-child-checkout-secondmate"
+  childproj="$subhome/projects/alpha"
+  childwt="$TMP_ROOT/orca-local-child-checkout-wt"
+  mkdir -p "$home/state" "$home/data" "$subhome/state" "$subhome/projects"
+  printf 'domain\n' > "$subhome/.fm-secondmate-home"
+  fm_git_worktree "$childproj" "$childwt" "fm/$child_id"
+  fm_write_meta "$home/state/domain.meta" \
+    "window=firstmate:fm-domain" "worktree=$subhome" "project=$subhome" \
+    "harness=echo" "kind=secondmate" "mode=secondmate" "yolo=off" \
+    "home=$subhome" "projects=alpha"
+  printf '%s\n' "- domain - Orca child cleanup (home: $subhome; scope: orca cleanup; projects: alpha; added 2026-07-03)" \
+    > "$home/data/secondmates.md"
+  fm_write_meta "$subhome/state/$child_id.meta" \
+    "window=fm-$child_id" "endpoint_task_id=$child_id" \
+    "terminal=term-$child_id" "worktree=$childwt" "project=$childproj" \
+    "harness=claude" "kind=ship" "mode=no-mistakes" "yolo=off" \
+    "backend=orca" "orca_worktree_id=wt-$child_id"
+  arm_orca_task_artifacts "$subhome/state" "$child_id"
+  orca_case secondmate-local-child-checkout-refuse
+  write_orca_selector_not_found "$RESP" 1
+  write_orca_selector_not_found "$RESP" 2
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "forced secondmate teardown removed a local child checkout that Orca no longer records"$'\n'"$out"
+  assert_local_checkout_preservation_refusal "$out" "$childwt"
+  assert_orca_task_artifacts_present "$subhome/state" "$child_id" \
+    "forced child local-checkout refusal"
+  assert_present "$home/state/domain.meta" \
+    "forced child local-checkout refusal removed parent metadata"
+  assert_present "$childwt" "forced child local-checkout refusal removed the checkout"
+  log_text=$(cat "$LOG")
+  assert_not_contains "$log_text" $'orca\x1f''terminal'$'\x1f''close' \
+    "forced child local-checkout refusal closed the child terminal"
+  assert_not_contains "$log_text" $'orca\x1f''worktree'$'\x1f''rm' \
+    "forced child local-checkout refusal called child worktree removal"
+  pass "fm-teardown.sh --force: preserves a local child checkout missing from Orca"
+}
+
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
   local home subhome childproj childwt other_wt child_id neutral out rc
   home="$TMP_ROOT/orca-child-mismatch-parent"
@@ -2792,7 +3259,8 @@ test_secondmate_force_teardown_refuses_partial_orca_child() {
 }
 
 # The numbered fake answers in call order, and a remote child's identity proof
-# asks `orca worktree show` twice (once for the path, once for the host) in each
+# asks `orca worktree show` three times (once to confirm Orca still records the
+# worktree at all, then once for the path and once for the host) in each
 # validation pass and the cleanup pass. Every one of those calls must get the
 # same answer, so the case describes the worktree once.
 write_orca_worktree_show_responses() {  # <responses> <count> <worktree-id> <path> <host>
@@ -2841,7 +3309,7 @@ test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
   remote_child_parent_home "$home" "$subhome"
   remote_child_meta "$subhome/state" "$child_id" "$childwt"
   orca_case secondmate-remote-child-mismatch
-  write_orca_worktree_show_responses "$RESP" 6 "repo-remote::$childwt" "/srv/somewhere-else" "$FM_REMOTE_HOST"
+  write_orca_worktree_show_responses "$RESP" 9 "repo-remote::$childwt" "/srv/somewhere-else" "$FM_REMOTE_HOST"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -2868,7 +3336,7 @@ test_secondmate_force_teardown_verifies_remote_orca_child_identity() {
   remote_child_parent_home "$home" "$subhome"
   remote_child_meta "$subhome/state" "$child_id" "$childwt"
   orca_case secondmate-remote-child-match
-  write_orca_worktree_show_responses "$RESP" 6 "repo-remote::$childwt" "$childwt" "$FM_REMOTE_HOST"
+  write_orca_worktree_show_responses "$RESP" 9 "repo-remote::$childwt" "$childwt" "$FM_REMOTE_HOST"
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
@@ -2916,6 +3384,77 @@ test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp() {
   pass "fm-teardown.sh --force: sweeps a remote Orca child's task temp root on the host before deleting the record that names it"
 }
 
+test_secondmate_force_teardown_retires_a_remote_orca_child_whose_worktree_is_gone() {
+  local home subhome child_id childwt neutral out rc
+
+  # Orca's own answer for a worktree it no longer records: a structured
+  # selector_not_found body printed while the CLI exits nonzero. There is no
+  # path to resolve and no checkout to inspect, so the identity proof the other
+  # remote-child cases owe cannot be paid - and --force is already the strongest
+  # authority there is, so refusing here strands the child's records forever.
+  child_id="orcaremotechildz4"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-absent-parent"
+  subhome="$TMP_ROOT/orca-remote-child-absent-secondmate"
+  orca_remote_case secondmate-remote-child-absent
+  write_remote_worktree_fixtures "$FIX" "$childwt"
+  printf '{"ok":false,"error":{"code":"selector_not_found"}}\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "--force must retire a remote Orca child whose worktree Orca no longer records"$'\n'"$out"
+  assert_contains "$out" "already absent" \
+    "the forced child path did not report the absent worktree as absent"
+  assert_not_contains "$out" "cannot resolve Orca worktree id" \
+    "the forced child path dead-ended on path resolution"
+  assert_not_contains "$out" "could not reach Orca host" \
+    "the forced child path claimed host failure for a worktree that is merely gone"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "--force asked Orca to remove a child worktree already proven absent"
+  assert_absent "$subhome/state/$child_id.meta" \
+    "--force left the stranded child record behind after its worktree was already gone"
+  assert_absent "$home/state/domain.meta" \
+    "--force left the parent record behind after retiring its only child"
+
+  # The same absence, reported by a runtime that cannot answer at all. An
+  # indeterminate reply is not absence: the child's records stay, and the
+  # refusal must not borrow the absent-worktree wording.
+  child_id="orcaremotechildz5"
+  childwt="/srv/fm-$child_id"
+  home="$TMP_ROOT/orca-remote-child-unknown-parent"
+  subhome="$TMP_ROOT/orca-remote-child-unknown-secondmate"
+  orca_remote_case secondmate-remote-child-unknown
+  write_remote_worktree_fixtures "$FIX" "$childwt"
+  printf 'not json at all\n' > "$FIX/worktree-show.json"
+  printf '1\n' > "$FIX/worktree-show.exit"
+  remote_child_parent_home "$home" "$subhome"
+  remote_child_meta "$subhome/state" "$child_id" "$childwt"
+  add_tmux_fake "$FB"
+  neutral=$(neutral_fm_root "$CASE_DIR/neutral")
+  set +e
+  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_FIXTURES="$FIX" \
+    FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an unparseable Orca reply must never be treated as an absent child worktree"$'\n'"$out"
+  assert_not_contains "$out" "already absent" \
+    "an indeterminate Orca reply was reported as a definitely-absent worktree"
+  assert_not_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm' \
+    "an unproven child worktree must not be removed"
+  assert_present "$subhome/state/$child_id.meta" \
+    "an indeterminate Orca reply must preserve the child's records"
+  assert_present "$home/state/domain.meta" \
+    "an indeterminate Orca reply must preserve the parent record"
+  pass "fm-teardown.sh --force: retires a remote Orca child whose worktree is gone, and still refuses when Orca cannot say"
+}
+
 test_dispatcher_sources_orca_and_routes_primitives() {
   local out
   orca_case dispatch
@@ -2934,6 +3473,8 @@ test_spawn_refuses_remote_harness_the_host_cannot_resolve
 test_spawn_launches_a_remote_harness_installed_at_a_path_with_a_space
 test_remote_teardown_refuses_uncommitted_work_on_the_host
 test_remote_teardown_refuses_when_the_host_is_unreachable
+test_remote_teardown_classifies_without_a_loaded_adapter_when_the_shell_never_opens
+test_remote_teardown_distinguishes_an_absent_worktree_and_force_finishes
 test_remote_teardown_releases_work_already_landed_on_the_host
 test_remote_teardown_releases_a_replayed_patch_that_landed_in_the_pr
 test_remote_pr_discovery_names_the_task_s_own_forge_host
@@ -2941,6 +3482,8 @@ test_remote_pr_discovery_keeps_a_forge_port
 test_remote_pr_discovery_drops_an_ssh_transport_port
 test_remote_pr_discovery_refuses_to_guess_a_host_from_an_ssh_alias
 test_remote_teardown_survives_a_slow_host_fetch
+test_remote_teardown_interrupt_preserves_merge_poll_while_metadata_is_live
+test_remote_teardown_late_lock_wait_keeps_merge_poll_until_task_commit
 test_remote_teardown_leaves_a_local_lock_at_the_same_path_alone
 test_remote_force_teardown_completes_when_the_host_is_unreachable
 test_remote_force_teardown_names_the_task_temp_root_it_could_not_sweep
@@ -3011,6 +3554,9 @@ test_scout_teardown_removes_orca_worktree_via_helper
 test_scout_teardown_refuses_orca_id_path_mismatch
 test_teardown_removes_orca_worktree_when_path_missing
 test_teardown_preserves_metadata_when_orca_remove_error_json
+test_local_orca_teardown_refuses_an_absent_worktree_without_discard_authority
+test_local_orca_force_teardown_retires_an_absent_worktree_but_not_an_unproven_one
+test_local_orca_teardown_preserves_an_existing_checkout_missing_from_orca
 test_scout_teardown_refuses_orca_missing_report_when_path_missing
 test_ship_teardown_refuses_orca_missing_worktree_path
 test_ship_teardown_removes_orca_worktree_when_id_path_matches
@@ -3019,7 +3565,10 @@ test_ship_teardown_refuses_orca_id_path_mismatch
 test_teardown_refuses_orca_missing_worktree_id
 test_teardown_refuses_orca_worktree_without_terminal_handle
 test_secondmate_force_teardown_removes_orca_child_via_orca
+test_secondmate_force_teardown_retires_a_local_orca_child_whose_worktree_is_gone
+test_secondmate_force_teardown_preserves_a_local_orca_child_checkout_missing_from_orca
 test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch
 test_secondmate_force_teardown_refuses_partial_orca_child
 test_secondmate_force_teardown_verifies_remote_orca_child_identity
+test_secondmate_force_teardown_retires_a_remote_orca_child_whose_worktree_is_gone
 test_secondmate_force_teardown_sweeps_a_remote_orca_child_task_tmp

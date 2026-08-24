@@ -6,7 +6,7 @@ This document records the deterministic mechanism, structured surfaces, and priv
 ## Mechanism
 
 `bin/fm-decision-hold.sh` is the only lifecycle command for an investigation or visual review's unresolved captain decisions.
-The command runs tasks-axi in the active `FM_HOME`, so the existing backlog remains the only durable work database and a secondmate-owned decision stays in the secondmate home.
+The command runs tasks-axi in the active `FM_HOME`, so the existing backlog and the archive it prunes into remain the only durable work database and a secondmate-owned decision stays in the secondmate home.
 It never reads report bodies, review artifacts, terminal output, or chat.
 
 The `hold` subcommand maps an originating work id and stable decision key to `<origin-id>-decision-<decision-key>`.
@@ -39,6 +39,14 @@ Every candidate found in the listing prefilter is confirmed against its own stru
 The `repair` subcommand records the resolution block on a hold that was already closed outside the script, such as by a direct `tasks-axi done`, so an origin whose decision was genuinely answered stops failing `verify`.
 It refuses a hold that is still actively held, never reopens a closed hold, and never clears a dependency edge, so an unanswered decision keeps blocking teardown until the captain's word closes it.
 It also requires the identity to carry the captain-hold provenance that tasks-axi preserves through a close, so an ordinary captain-kind task that was never held cannot be repaired into a resolved decision.
+
+Durable verification and `repair` read one place the other subcommands do not.
+Every `tasks-axi done` prunes past `done_keep`, so a genuinely answered decision can leave the live backlog entirely for the configured Done archive (the `[markdown] archive` value in "Backlog backend" of [`configuration.md`](configuration.md#backlog-backend-taskstoml--configbacklog-backend)), which is why `verify`, the `complete` gate it shares, and `repair` fall back to that archive.
+The live record still decides alone whenever the backlog holds the identity, and a live read that fails for any reason other than a genuine not-found refuses rather than consulting an older archived copy.
+The fallback never weakens the gate: an archived record is never read as actively held, so it passes only as a closed hold carrying the same durable resolution block, and an identity absent from both live backlog and archive still refuses.
+Hold ids are deterministic and the archive is append-only, so one identity can appear there more than once; the occurrence in the newest `## Archived` block is the current record, and two occurrences inside one block are reported as unresolvable ambiguity rather than settled by an arbitrary pick.
+`repair` on an archived hold rewrites only that newest record's body, in the archive file itself, under tasks-axi's own advisory backlog lock, because a prune's archive append and backlog rewrite happen inside that same lock and an unlocked whole-file rewrite here would silently drop concurrent archived history.
+A lock it cannot take fails closed: the decision is reported as not recorded and the archive is left untouched.
 
 ## Answer-time closure
 
@@ -86,6 +94,7 @@ Additional quoted `blocked_by` regression verification date: 2026-07-17.
 Plural blocker-readiness and mixed-home projection verification date: 2026-07-22.
 Unrouted close-path verification date: 2026-08-13.
 Answer-time closure verification date: 2026-08-16.
+Configured Done archive fallback verification date: 2026-08-24.
 
 The focused end-to-end regression uses only synthetic `sample` identities and decision text.
 It begins with a completed investigation and visual review whose genuine unresolved choice exists only in the report.
@@ -105,7 +114,15 @@ The capture is left unacknowledged throughout, so the wake firstmate needs in or
 A replayed delivery closes nothing new and is not rejected as a different decision, a source with no binding closes nothing at all, and the `answer` subcommand itself refuses an empty or missing decision file, an absent hold, and a drifted retry.
 A separate regression drives the real `fm-send` over a stubbed transport to prove the chat channel reaches the same intake for a decision already transferred to its hold, which the status ledger alone can no longer close.
 
-The final verification commands and their exact summarized outputs follow.
+Seven further regressions cover the configured Done archive as a lookup fallback, driven through the script and teardown rather than by inspecting source, and in a home whose `[markdown] archive` is deliberately not the default path.
+A resolved hold pruned out of the live Done window still satisfies `verify` and teardown from the archive, while an archived hold closed without a durable captain decision refuses both, keeps its task metadata, and is then repaired in place so the same origin clears.
+A decision absent from the live backlog and the archive alike refuses and names both locations.
+An identity present in both is decided by the live record alone, and a live read that fails for anything other than a genuine not-found never falls back to an older archived copy.
+Duplicated archived occurrences are decided by the newest `## Archived` block, repaired in that same occurrence, and reported as ambiguity rather than absence when one block holds two of them.
+Archive repair takes tasks-axi's own backlog lock, including the one named by `TASKS_AXI_FILE`, so a concurrent archived append is never lost, and both archive parsing and archive repair leave column-zero content outside task bodies untouched.
+
+The final verification commands and their exact summarized outputs follow, re-observed on 2026-08-24 in a pipeline worktree.
+Each suite prints one `ok -` line per case; where a suite's full listing is not quoted, its case count is given so an excerpt is never read as the whole run.
 
 ```text
 $ bash tests/fm-decision-hold-lifecycle.test.sh
@@ -113,11 +130,19 @@ ok - report-only unresolved decision is reproduced and completion refuses before
 ok - non-forced scout teardown always requires durable inventory verification
 ok - a declined decision closes with a recorded answer and no routed work
 ok - a decision closed outside the script is repairable and then clears teardown
+ok - archived durable decisions satisfy teardown, while missing or unresolved archived decisions still refuse and remain repairable
+ok - a hold identity in both the live backlog and the archive is decided by the live record alone
+ok - live backlog read errors refuse without consulting older archive records
+ok - duplicated archived occurrences are decided by the newest one, repaired in place, and refused as ambiguous when there is no newest
+ok - archive repair takes tasks-axi's own backlog lock, so a concurrent archive append is never lost
+ok - archive repair serializes on the TASKS_AXI_FILE backlog lock
+ok - archive parsing and repair preserve column-zero content outside task bodies
 ok - an unanswered decision still blocks completion and resists both unrouted close paths
 ok - captain holds are idempotent, distinct, teardown-safe, Bearings-visible, and durably routed before close
 ok - completion and verification validate origins before constructing paths
 ok - ended visual review follows the same decision-hold completion owner
 ok - resolved findings and decision-like prose do not create false holds
+ok - the completion attestation serializes on the shared task metadata lock
 ok - terminal single-owner stale status decisions do not block empty inventory
 ok - main-home and secondmate-home captain holds remain correctly routed
 ok - resolve matches first/middle/last in quoted blocked_by and rejects a genuinely absent id
@@ -125,35 +150,44 @@ ok - a bound channel's captured answers close their captain holds at answer time
 ok - a channel source with no decision binding closes nothing
 ok - the answer path keeps every guard the unrouted close path already had
 ok - the chat channel feeds the same keyed-answer intake a captured review does
+(complete listing; 24 cases)
 
 $ bash tests/fm-fleet-snapshot-view.test.sh
 ok - backlog normalization preserves strict roles and resolves every blocker compatibly
 ok - durable captain-held transfer closes the duplicate live status decision
 ok - snapshot parses tasks-axi rows and respects operational overrides
+(15 cases total; the three above are this document's structured-read claims)
 
 $ bash tests/fm-bearings-snapshot.test.sh
-ok - a completed scout with decision-like report prose is a pointer, not pending
-ok - an authoritative captain hold surfaces end-to-end
 ok - action-free items (working/done/queued/landed) do not leak into Waiting on you
 ok - mixed secondmate roles, partial state, and captain readiness project independently
 ok - main and secondmate captain actionability use the same blocker readiness
+ok - a completed scout with decision-like report prose is a pointer, not pending
+ok - an authoritative captain hold surfaces end-to-end
+(53 cases total; the five above are this document's projection claims)
 
 $ bash tests/fm-send-resolve-key.test.sh
 ok - fm-send --resolve-key: the answer send itself closes the open decision
 ok - fm-send --resolve-key: a key that is not open refuses loudly before anything is sent
-(13 assertions total; the status-log ledger's behavior is unchanged)
+(13 cases total; the status-log ledger's behavior is unchanged)
 
 $ bash tests/fm-brief.test.sh
 ok - fm-brief.sh: investigation and visual-review completions load the shared decision policy
+(20 cases total; the line above is this document's completion-owner claim)
 
 $ bash tests/fm-teardown.test.sh
 ok - the run abort and the leaked-process reap both complete before the destructive worktree return
+(60 cases total; the line above is this document's teardown-ordering claim)
 
 $ bin/fm-lint.sh
 fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint-workflows.sh: actionlint not found; install actionlint 1.7.12 for CI parity.
+(exit 127. ShellCheck itself reported no findings over the branch's changed canonical set;
+ the workflow YAML half could not run here because actionlint is not installed in this
+ worktree, so that half is unverified from this transcript rather than passing.)
 
 $ bin/fm-doc-audience-check.sh
-fm-doc-audience-check: ok surfaces=68 local_links=253
+fm-doc-audience-check: ok surfaces=72 local_links=260
 
 $ git diff --check
 (no output)

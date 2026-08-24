@@ -109,6 +109,9 @@
 # blocking teardown until `resolve` or `decline` closes it with the captain's word.
 # It also refuses an identity that does not carry surviving captain-hold
 # provenance, so an ordinary captain-kind task cannot be repaired into a decision.
+# Durable verification and repair also consult the markdown backend's configured
+# Done archive. A pruned closed hold still has to carry the same resolution body;
+# archival never weakens the decision gate or turns an absent record into success.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -212,6 +215,311 @@ require_tasks_axi() {
 
 task_show() {  # <id>
   tasks_axi show "$1" --full 2>/dev/null
+}
+
+# Read one string from the tiny [markdown] surface in tasks-axi's config.
+# tasks-axi itself intentionally supports only quoted scalar values here, so this
+# parser keeps the same deliberately narrow contract instead of growing a second
+# general TOML implementation.
+tasks_axi_markdown_config_value() {  # <config-path> <key>
+  local config=$1 key=$2
+  [ -f "$config" ] || return 1
+  awk -v wanted="$key" '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    {
+      line = trim($0)
+      if (line ~ /^\[[^]]+\]$/) {
+        section = line
+        gsub(/^[[:space:]]*\[|\][[:space:]]*$/, "", section)
+        in_markdown = (trim(section) == "markdown")
+        next
+      }
+      if (!in_markdown) next
+      equals = index(line, "=")
+      if (!equals) next
+      name = trim(substr(line, 1, equals - 1))
+      if (name != wanted) next
+      value = trim(substr(line, equals + 1))
+      quote = substr(value, 1, 1)
+      if (quote != "\"" && quote != "\047") next
+      value = substr(value, 2)
+      ending = index(value, quote)
+      if (!ending) next
+      print substr(value, 1, ending - 1)
+      found = 1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$config"
+}
+
+# The live backlog tasks-axi would load here. It is also what names tasks-axi's
+# own advisory lock, which guards the archive as well: a prune appends the
+# archived block and rewrites the backlog inside one hold of <backlog>.lock.
+tasks_axi_backlog_path() {
+  local project_config="$FM_HOME/.tasks.toml" user_config='' backlog=''
+  if [ "${TASKS_AXI_FILE+x}" = x ]; then
+    backlog=$TASKS_AXI_FILE
+  else
+    [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
+    backlog=$(tasks_axi_markdown_config_value "$project_config" path 2>/dev/null || true)
+    if [ -z "$backlog" ] && [ -n "$user_config" ]; then
+      backlog=$(tasks_axi_markdown_config_value "$user_config" path 2>/dev/null || true)
+    fi
+    if [ -z "$backlog" ]; then
+      if [ -f "$FM_HOME/backlog.md" ]; then
+        backlog=backlog.md
+      else
+        backlog=data/backlog.md
+      fi
+    fi
+  fi
+  case "$backlog" in *[![:space:]]*) ;; *) return 1 ;; esac
+  node -e 'process.stdout.write(require("path").resolve(process.argv[1], process.argv[2]))' \
+    "$FM_HOME" "$backlog"
+}
+
+tasks_axi_archive_path() {
+  local project_config="$FM_HOME/.tasks.toml" user_config='' archive=''
+  [ -z "${HOME:-}" ] || user_config="$HOME/.tasks-axi/config.toml"
+  archive=$(tasks_axi_markdown_config_value "$project_config" archive 2>/dev/null || true)
+  if [ -z "$archive" ] && [ -n "$user_config" ]; then
+    archive=$(tasks_axi_markdown_config_value "$user_config" archive 2>/dev/null || true)
+  fi
+  if [ -z "$archive" ]; then
+    archive="$(dirname -- "$(tasks_axi_backlog_path)")/done-archive.md"
+  fi
+  case "$archive" in
+    /*) printf '%s' "$archive" ;;
+    *) printf '%s/%s' "$FM_HOME" "$archive" ;;
+  esac
+}
+
+TASK_RECORD_SHOW=
+TASK_RECORD_FILE=
+TASK_RECORD_AMBIGUOUS=
+TASK_RECORD_LIVE_ERROR=
+# The exit status archive readers use for "this identity is in the archive more
+# than once and no single occurrence is the newest". It is deliberately distinct
+# from 1 (absent): telling an operator a record is missing when it is present
+# twice points them at the one recovery that cannot work.
+ARCHIVE_RECORD_AMBIGUOUS_RC=3
+
+# A hold identity can appear in the archive more than once: ids are
+# deterministic, a closed-and-pruned hold leaves no live record, so raising the
+# same decision again creates a fresh record with the same id, and tasks-axi's
+# archive is append-only - it never dedupes. The NEWEST occurrence is the
+# current one. Order comes from the `## Archived <stamp>` block an occurrence
+# sits in, counted in file order rather than read from the stamp, because
+# stamps are dates and several blocks routinely share one. Two occurrences
+# inside the SAME block carry no ordering at all, so that alone is ambiguous
+# and is reported as ambiguity rather than settled by an arbitrary pick.
+archive_task_show() {  # <archive-path> <id>
+  # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
+  node -e '
+const fs = require("fs");
+const [archive, id, ambiguousRc] = process.argv.slice(1);
+let source;
+try { source = fs.readFileSync(archive, "utf8"); } catch (_) { process.exit(1); }
+const lines = source.split("\n");
+const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
+const occurrences = [];
+let block = -1;
+for (let i = 0; i < lines.length; i++) {
+  if (/^## Archived /.test(lines[i])) block++;
+  else if (task.test(lines[i])) occurrences.push({line: i, block});
+}
+if (occurrences.length === 0) process.exit(1);
+const newestBlock = occurrences[occurrences.length - 1].block;
+const newest = occurrences.filter((o) => o.block === newestBlock);
+if (newest.length !== 1) {
+  process.stdout.write(String(occurrences.length));
+  process.exit(Number(ambiguousRc));
+}
+const start = newest[0].line;
+let end = start + 1;
+while (end < lines.length) {
+  const line = lines[end].endsWith("\r") ? lines[end].slice(0, -1) : lines[end];
+  if (line.trim().length === 0 || line.startsWith("  ")) end++;
+  else break;
+}
+while (end > start + 1) {
+  const line = lines[end - 1].endsWith("\r") ? lines[end - 1].slice(0, -1) : lines[end - 1];
+  if (line === "") end--;
+  else break;
+}
+const header = lines[start];
+const checkbox = header.match(/^- \[([ x])\]/);
+const kind = header.match(/\(kind: ([^)]+)\)/);
+const holdKind = header.match(/\(hold-kind: ([^)]+)\)/);
+const body = lines.slice(start + 1, end).map((line) => line.startsWith("  ") ? line.slice(2) : line).join("\n");
+process.stdout.write(`  state: ${checkbox && checkbox[1] === "x" ? "done" : "queued"}\n`);
+process.stdout.write("  held: no\n");
+process.stdout.write(`  kind: ${kind ? kind[1] : ""}\n`);
+process.stdout.write(`  hold_kind: ${holdKind ? holdKind[1] : ""}\n`);
+process.stdout.write(`  body: ${JSON.stringify(body)}\n`);
+' "$1" "$2" "$ARCHIVE_RECORD_AMBIGUOUS_RC"
+}
+
+# Rewrite one archived record's body in place. The archive is not this writer's
+# alone: tasks-axi appends a `## Archived <stamp>` block to it whenever a prune
+# runs, and every `tasks-axi done <id>` prunes. That append and the backlog
+# rewrite that follows it happen inside one hold of tasks-axi's own advisory
+# lock, keyed on the LIVE BACKLOG path, so a whole-file read-modify-rename here
+# that does not take the same lock can silently drop a concurrent append and
+# lose archived history permanently. The lock protocol is tasks-axi's:
+# create <backlog>.lock with O_EXCL, hold a unique token in it, retry briefly
+# while another holder has it, and unlink only a lockfile still carrying this
+# token. A lock that cannot be taken fails closed - the caller reports that the
+# decision could not be recorded, and the archive is left untouched.
+archive_task_update_body() {  # <archive-path> <id> <body>
+  local archive=$1 id=$2 body=$3 lock
+  lock=$(tasks_axi_backlog_path) || return 1
+  lock="${lock}.lock"
+  # shellcheck disable=SC2016  # Single quotes are deliberate: ${...} belongs to JavaScript.
+  printf '%s' "$body" | node -e '
+const fs = require("fs");
+const path = require("path");
+const [archive, id, lockPath] = process.argv.slice(1);
+const body = fs.readFileSync(0, "utf8");
+
+const LOCK_TIMEOUT_MS = 2500;
+const LOCK_RETRY_MS = 25;
+function nonce() {
+  return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function acquire() {
+  const token = `${process.pid}:${nonce()}:${Date.now()}:1\n`;
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  for (;;) {
+    try {
+      const fd = fs.openSync(lockPath, "wx");
+      try { fs.writeSync(fd, token); } finally { fs.closeSync(fd); }
+      return token;
+    } catch (error) {
+      if (!error || error.code !== "EEXIST") return undefined;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return undefined;
+      sleepSync(Math.min(LOCK_RETRY_MS, remaining));
+    }
+  }
+}
+function release(token) {
+  let observed;
+  try { observed = fs.readFileSync(lockPath, "utf8"); } catch (_) { return; }
+  if (observed !== token) return;
+  try { fs.unlinkSync(lockPath); } catch (_) {}
+}
+
+// Every exit from here on runs through `release`, so no failure path can leave
+// the shared lock held: process.exit() would skip a finally block.
+function rewrite() {
+  let source;
+  try { source = fs.readFileSync(archive, "utf8"); } catch (_) { return 1; }
+  const lines = source.split("\n");
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const task = new RegExp(`^- \\[([ x])\\] ${escaped} - `);
+  // The same selection the reader uses: only the newest occurrence is the
+  // current record, so only it is ever rewritten. Older occurrences are
+  // previous incarnations of the identity and are left exactly as archived.
+  const occurrences = [];
+  let block = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^## Archived /.test(lines[i])) block++;
+    else if (task.test(lines[i])) occurrences.push({line: i, block});
+  }
+  if (occurrences.length === 0) return 1;
+  const newestBlock = occurrences[occurrences.length - 1].block;
+  const newest = occurrences.filter((o) => o.block === newestBlock);
+  if (newest.length !== 1) return 1;
+  const start = newest[0].line;
+  let end = start + 1;
+  while (end < lines.length) {
+    const line = lines[end].endsWith("\r") ? lines[end].slice(0, -1) : lines[end];
+    if (line.trim().length === 0 || line.startsWith("  ")) end++;
+    else break;
+  }
+  const replacement = body.split("\n").map((line) => line === "" ? "" : `  ${line}`);
+  lines.splice(start + 1, end - start - 1, ...replacement);
+  const next = lines.join("\n");
+  try {
+    const tmp = path.join(path.dirname(archive), `.${path.basename(archive)}.repair-${process.pid}-${Date.now()}`);
+    fs.writeFileSync(tmp, next, {encoding: "utf8", flag: "wx", mode: fs.statSync(archive).mode & 0o777});
+    try { fs.renameSync(tmp, archive); } catch (error) { try { fs.unlinkSync(tmp); } catch (_) {} throw error; }
+  } catch (_) {
+    return 1;
+  }
+  return 0;
+}
+
+const token = acquire();
+if (token === undefined) process.exit(1);
+let status;
+try {
+  status = rewrite();
+} catch (_) {
+  status = 1;
+}
+release(token);
+process.exit(status);
+' "$archive" "$id" "$lock"
+}
+
+# The live backlog decides on its own whenever it holds the identity. An
+# archived copy of the same id is a previous incarnation of it, and the archive
+# is consulted only for an identity the live backlog no longer has at all - so a
+# record that was pruned and then restored by hand is read from where it lives
+# now, not from the copy retention left behind.
+task_record_locate() {  # <id>; sets TASK_RECORD_SHOW, TASK_RECORD_FILE, TASK_RECORD_AMBIGUOUS, TASK_RECORD_LIVE_ERROR
+  local id=$1 archive out rc=0
+  TASK_RECORD_SHOW=
+  TASK_RECORD_FILE=
+  TASK_RECORD_AMBIGUOUS=
+  TASK_RECORD_LIVE_ERROR=
+  out=$(tasks_axi show "$id" --full 2>&1) || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    TASK_RECORD_SHOW=$out
+    return 0
+  fi
+  if ! printf '%s\n' "$out" | grep -qxF 'code: NOT_FOUND'; then
+    TASK_RECORD_LIVE_ERROR=$out
+    return 1
+  fi
+  archive=$(tasks_axi_archive_path) || return 1
+  [ -f "$archive" ] || return 1
+  rc=0
+  out=$(archive_task_show "$archive" "$id" 2>/dev/null) || rc=$?
+  if [ "$rc" -eq "$ARCHIVE_RECORD_AMBIGUOUS_RC" ]; then
+    TASK_RECORD_AMBIGUOUS=$out
+    return 1
+  fi
+  [ "$rc" -eq 0 ] || return 1
+  TASK_RECORD_SHOW=$out
+  TASK_RECORD_FILE=$archive
+}
+
+# The refusal a caller owes when the archive holds an identity it cannot reduce
+# to one newest record. Absence and ambiguity need different words: only one of
+# them is fixed by recording a decision.
+fail_unresolvable_archive_record() {  # <id> <archive>
+  fail "captain decision $1 has $TASK_RECORD_AMBIGUOUS occurrences in the configured archive $2 with no single newest one; leave one current record for $1 there before this gate can read it"
+}
+
+fail_task_record_lookup() {  # <id>
+  local id=$1 archive
+  [ -z "$TASK_RECORD_LIVE_ERROR" ] \
+    || fail "could not read captain decision $id from the active backlog: $TASK_RECORD_LIVE_ERROR"
+  archive=$(tasks_axi_archive_path 2>/dev/null || printf '<unavailable>')
+  [ -z "$TASK_RECORD_AMBIGUOUS" ] || fail_unresolvable_archive_record "$id" "$archive"
+  fail "captain decision $id is absent from the active backlog and configured archive $archive"
 }
 
 show_field() {  # <show-output> <field>
@@ -349,7 +657,10 @@ verify_hold_resolved() {  # <hold-id>
 
 verify_hold_durable() {  # <hold-id>
   local id=$1 show state held kind hold_kind body
-  show=$(task_show "$id") || fail "captain decision $id is absent from $FM_HOME/data/backlog.md"
+  if ! task_record_locate "$id"; then
+    fail_task_record_lookup "$id"
+  fi
+  show=$TASK_RECORD_SHOW
   state=$(show_field "$show" state)
   held=$(show_field "$show" held)
   kind=$(show_field "$show" kind)
@@ -800,7 +1111,7 @@ command_decline() {
 }
 
 command_repair() {
-  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body
+  local origin=${1:-} key=${2:-} decision_file id body show state kind hold_kind hold_body record_file
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   shift 2
   decision_file=$(parse_decision_only_flags "$@") || exit 2
@@ -809,7 +1120,11 @@ command_repair() {
   load_decision "$decision_file"
   require_tasks_axi
   id=$(hold_id "$origin" "$key")
-  show=$(task_show "$id") || fail "captain decision $id is absent from $FM_HOME/data/backlog.md"
+  if ! task_record_locate "$id"; then
+    fail_task_record_lookup "$id"
+  fi
+  show=$TASK_RECORD_SHOW
+  record_file=$TASK_RECORD_FILE
   kind=$(show_field "$show" kind)
   [ "$kind" = captain ] || fail "backlog item $id is not kind captain"
   # tasks-axi keeps hold_kind after a close, so it is the surviving proof that
@@ -828,11 +1143,18 @@ command_repair() {
   [ "$state" = "done" ] \
     || fail "captain hold $id is still open (state=$state); use resolve or decline to close it with the captain's decision"
   body=$(resolution_body repaired "$ROUTED_NONE")
-  tasks_axi update "$id" --body "$body" >/dev/null \
-    || fail "could not record the captain decision on $id"
-  show=$(task_show "$id") || fail "captain decision $id disappeared while recording the repair"
+  if [ -n "$record_file" ]; then
+    archive_task_update_body "$record_file" "$id" "$body" \
+      || fail "could not record the captain decision on archived hold $id"
+  else
+    tasks_axi update "$id" --body "$body" >/dev/null \
+      || fail "could not record the captain decision on $id"
+  fi
+  task_record_locate "$id" || fail_task_record_lookup "$id"
+  show=$TASK_RECORD_SHOW
   [ "$(show_field "$show" state)" = "done" ] || fail "repairing $id reopened a closed captain decision"
-  verify_hold_resolved "$id" || fail "captain hold $id did not retain its durable resolution record"
+  body_has_resolution_record "$(show_field "$show" body)" \
+    || fail "captain hold $id did not retain its durable resolution record"
   printf 'repaired: %s\n' "$id"
 }
 

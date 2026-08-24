@@ -72,6 +72,11 @@ A missing, unreadable, or mismatched identity preserves metadata and stops rathe
 After those checks, Firstmate closes the exact terminal and releases the exact worktree with Orca's worktree command.
 It never raw-deletes an Orca worktree.
 
+A worktree Orca no longer records at all is the one identity failure with a further step, because there is no path left to resolve and no checkout left to inspect.
+Only Orca's exact selector-not-found verdict establishes it; an unreachable runtime, an unparseable reply, or any other error stays "could not tell" and keeps the ordinary refusal, so a runtime that cannot answer is never read as a worktree that is gone.
+On its own that verdict still refuses and preserves every record, because discarding a task's remaining state is the captain's call: once `--force` supplies that authority, cleanup retires the stranded records and skips the worktree release Orca has nothing left to perform, warning on stderr that it did so without an inspection.
+A local checkout still present at the recorded path is never discarded that way - cleanup names that directory and refuses until its contents are landed or discarded and the directory itself is removed.
+
 ## Active limits
 
 - Firstmate drives Orca from macOS and selects it explicitly.
@@ -134,7 +139,7 @@ The delivered brief carries a short addendum telling the worker its status-log p
 A spawn that refuses after that copy sweeps `/tmp/fm-<id>` back off the host, reopening an inspection shell when it has already closed its own, since a refused spawn records no metadata for cleanup to work from later.
 That sweep is best effort: a host that cannot be reached is named on stderr with the path to remove by hand, and the abort still completes.
 Cleanup sweeps the same directory on the host before it deletes the record naming it, and does so independently of the worktree: a worktree already gone from the host, and an unreachable host under `--force` where its presence cannot even be determined, are exactly the cases where the brief is most likely still sitting there.
-It is best effort in the same way, so an unreachable host is one warning naming the path rather than a failed teardown.
+It is best effort in the same way, so a host it cannot reach and a worktree that is already gone each end in one warning naming the path, and saying which of the two it was, rather than in a failed teardown.
 A leftover `/tmp/fm-<id>` is never adopted: the next spawn under that same task id refuses to create the root and names the leftover as the likely cause.
 
 The harness is resolved to an absolute path on the host and launched by that path, never by bare name.
@@ -159,9 +164,13 @@ A line beginning with `/` only nominates a candidate: each one is proven on the 
   Verdict checks use `FM_BACKEND_ORCA_EXEC_POLLS` (120) x `FM_BACKEND_ORCA_EXEC_INTERVAL` (0.5s), which is also how quickly a genuinely dead host is noticed, so it is deliberately short.
   Network-bound git commands (`fetch`, `pull`, `push`, `clone`, `ls-remote`) get their own budget instead, `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` (1200 polls, about 10 minutes), because they are bounded by the host's link to its forge rather than by the host being alive.
   Raise `FM_BACKEND_ORCA_EXEC_FETCH_POLLS` when a slow host fetch makes cleanup refuse a task whose work has landed; raising `FM_BACKEND_ORCA_EXEC_POLLS` is not the knob for that and only slows dead-host detection.
+  A fetch-class wait that has not answered yet also prints a bounded stderr progress line every `FM_BACKEND_ORCA_EXEC_PROGRESS_POLLS` polls (20, about ten seconds), naming the task, the host, the git operation, and the poll count against the budget, so a slow network is distinguishable from a wedged cleanup while it is still running.
+  That line is reporting only: it never extends a budget and never turns an exceeded one into a pass, and verdict checks never emit it at all, so an ordinary fast answer stays silent.
   The best-effort sweep that takes a staged reply back off the host keeps its own short bound, `FM_BACKEND_ORCA_EXEC_SWEEP_POLLS` (20), rather than the budget of the call it is cleaning up after: it runs only once that call has already given up, so waiting a network-sized budget again would just delay the refusal that is already decided.
 - `--force` on a host that is genuinely gone still completes: Orca's own records answer from here, so the recorded host and the exact recorded path are still proven, and only the on-host path canonicalization is skipped, with a line saying so.
   A worktree Orca reports at a different path than the task recorded is still refused, `--force` or not.
+  An inspection shell that will not open is not by itself a dead host: cleanup then asks Orca whether the recorded worktree is still in its inventory, and an absent worktree, an unreachable host, and an answer it could not obtain each refuse in their own words instead of all claiming the host failed.
+  The absent case follows the release rule in "Current lifecycle and safety" above, so `--force` retires the stranded records rather than dead-ending on a path that no longer resolves.
 
 ## Regression entry points
 

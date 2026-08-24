@@ -232,6 +232,20 @@ fm_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
 [ -f "$META" ] || { echo "error: no meta for task $ID at $META" >&2; exit 1; }
 
+# Locks this teardown already owns for the whole run: forced secondmate cleanup
+# takes every descendant's lifecycle and metadata lock up front and holds them
+# until exit, so a later step that would otherwise acquire one of them must use
+# the hold it already has. Re-acquiring is not a no-op - fm_lock_try_acquire
+# reclaims a self-held lock by removing and recreating it, and the matching
+# release would then drop a hold the run still depends on.
+teardown_lock_already_held() {  # <lock-path>
+  local lock=$1 i
+  for ((i=0; i < ${#DESCENDANT_LOCK_PATHS[@]}; i++)); do
+    [ "${DESCENDANT_LOCK_PATHS[$i]}" != "$lock" ] || return 0
+  done
+  return 1
+}
+
 # Task metadata has concurrent atomic republishers - the harness session binder
 # on every completed turn, plus the PR and Relay link writers - so its removal
 # takes the same shared lock. Without it an in-flight rewrite renames a complete
@@ -247,6 +261,10 @@ remove_task_state_files() {  # <meta> <other-path>...
     rm -f -- "$meta" "$@"
     return 0
   }
+  if teardown_lock_already_held "$lock"; then
+    rm -f -- "$meta" "$@" || status=1
+    return "$status"
+  fi
   fm_lock_acquire_wait "$lock"
   rm -f -- "$meta" "$@" || status=1
   fm_lock_release "$lock"
@@ -483,11 +501,14 @@ if [ -z "$BUSY_GEN" ]; then
 fi
 ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
 ORCA_PATH_MATCH_VERIFIED=0
+ORCA_WORKTREE_ABSENT=0
+ORCA_CHILD_WORKTREE_ABSENT=0
 ORCA_HOST_ID=$(fm_meta_get "$META" orca_host)
 ORCA_REMOTE_TASK_TMP=$(fm_meta_get "$META" orca_remote_tasktmp)
 TASK_REMOTE=0
 [ "$(fm_meta_get "$META" orca_remote)" != 1 ] || TASK_REMOTE=1
 TASK_REMOTE_EXEC=
+TASK_REMOTE_PROGRESS_FD_OPEN=0
 
 KIND=$(grep '^kind=' "$META" | cut -d= -f2- || true)
 [ -n "$KIND" ] || KIND=ship
@@ -653,14 +674,29 @@ task_remote_exec_open() {
     return 1
   fi
   fm_backend_source orca || return 1
+  if [ "$TASK_REMOTE_PROGRESS_FD_OPEN" != 1 ]; then
+    exec 9>&2
+    TASK_REMOTE_PROGRESS_FD_OPEN=1
+  fi
+  # shellcheck disable=SC2034  # Read dynamically by the sourced Orca adapter.
+  FM_BACKEND_ORCA_EXEC_TASK_ID=$ID
+  # shellcheck disable=SC2034  # Read dynamically by the sourced Orca adapter.
+  FM_BACKEND_ORCA_EXEC_HOST=$ORCA_HOST_ID
+  # shellcheck disable=SC2034  # Read dynamically by the sourced Orca adapter.
+  FM_BACKEND_ORCA_EXEC_PROGRESS_FD=9
   TASK_REMOTE_EXEC=$(fm_backend_orca_exec_open "$ORCA_WORKTREE_ID" "fm-$ID-teardown" "$ORCA_HOST_ID") || return 1
   return 0
 }
 
 task_remote_exec_release() {
-  [ -n "$TASK_REMOTE_EXEC" ] || return 0
-  fm_backend_orca_exec_close "$TASK_REMOTE_EXEC" 2>/dev/null || true
-  TASK_REMOTE_EXEC=
+  if [ -n "$TASK_REMOTE_EXEC" ]; then
+    fm_backend_orca_exec_close "$TASK_REMOTE_EXEC" 2>/dev/null || true
+    TASK_REMOTE_EXEC=
+  fi
+  if [ "$TASK_REMOTE_PROGRESS_FD_OPEN" = 1 ]; then
+    exec 9>&-
+    TASK_REMOTE_PROGRESS_FD_OPEN=0
+  fi
 }
 
 # task_git: `git -C <dir>` for this task, wherever its files are. Remote git
@@ -757,19 +793,59 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   [ -z "$T_ORCA" ] || T=$T_ORCA
 fi
 
+# orca_worktree_presence_rc: is <worktree-id> still in Orca's own inventory?
+# 0 present, 1 gone for certain, 2 cannot tell. An adapter that will not load
+# answers 2, never 1: "could not ask" and "asked, and it is gone" are the two
+# answers this whole classification exists to keep apart. Defined here, above
+# the first classification, because the caller below is reached on paths where
+# task_remote_exec_open returned before it ever sourced the adapter - and an
+# undefined presence function would answer "cannot tell" only by accident, on
+# top of a spurious command-not-found line.
+orca_worktree_presence_rc() {  # <worktree-id>
+  fm_backend_source orca || return 2
+  fm_backend_orca_worktree_presence "$1"
+}
+
 # One inspection shell for the whole teardown of a remote task, opened before
 # the first check and released on every exit. Without it none of the protective
 # checks below can see the task's files at all, so a normal teardown refuses
 # here; --force is the approved discard path and continues without them.
 if [ "$TASK_REMOTE" = 1 ]; then
+  ORCA_OPEN_FAILURE_KIND=
   trap 'task_remote_exec_release' INT TERM
   if ! task_remote_exec_open; then
+    ORCA_WORKTREE_PRESENCE_RC=0
+    orca_worktree_presence_rc "$ORCA_WORKTREE_ID" || ORCA_WORKTREE_PRESENCE_RC=$?
+    case "$ORCA_WORKTREE_PRESENCE_RC" in
+      1)
+        ORCA_WORKTREE_ABSENT=1
+        ORCA_OPEN_FAILURE_KIND=absent-worktree
+        ;;
+      0) ORCA_OPEN_FAILURE_KIND=unreachable-host ;;
+      *) ORCA_OPEN_FAILURE_KIND=indeterminate ;;
+    esac
     if [ "$FORCE" != "--force" ]; then
-      echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to inspect $ID for uncommitted or unlanded work; preserving task state." >&2
-      echo "Restore access to that host, or get the captain's explicit OK to discard, then --force." >&2
+      case "$ORCA_OPEN_FAILURE_KIND" in
+        absent-worktree)
+          echo "REFUSED: recorded Orca worktree $ORCA_WORKTREE_ID for task $ID no longer exists; its removed checkout cannot be inspected for uncommitted or unlanded work." >&2
+          echo "Task state is preserved. Get the captain's explicit OK to discard that remaining state, then rerun with --force." >&2
+          ;;
+        unreachable-host)
+          echo "REFUSED: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} to inspect $ID for uncommitted or unlanded work; preserving task state." >&2
+          echo "Restore access to that host, or get the captain's explicit OK to discard, then --force." >&2
+          ;;
+        *)
+          echo "REFUSED: could not open an inspection shell for $ID or determine whether Orca still records worktree $ORCA_WORKTREE_ID; preserving task state." >&2
+          echo "Restore reliable Orca inspection, or get the captain's explicit OK to discard, then --force." >&2
+          ;;
+      esac
       exit 1
     fi
-    echo "warning: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} for $ID; --force is discarding without inspecting its worktree there" >&2
+    if [ "$ORCA_OPEN_FAILURE_KIND" = absent-worktree ]; then
+      echo "warning: recorded Orca worktree $ORCA_WORKTREE_ID for $ID is already absent; --force is retiring the remaining local task state without an on-host worktree inspection" >&2
+    else
+      echo "warning: cannot reach Orca host ${ORCA_HOST_ID:-<unrecorded>} for $ID; --force is discarding without inspecting its worktree there" >&2
+    fi
   fi
 fi
 remove_grok_turnend_auth() {
@@ -865,23 +941,39 @@ validate_pr_poll_cleanup() {
   done
 }
 
-remove_pr_poll_artifacts() {
-  local state_dir=$1 id=$2 quarantine artifact
+# Every task record and its armed check artifacts cross the final teardown
+# boundary together. Every operation that can wait or refuse runs before this;
+# then one signal-deferred rm invocation retires the metadata, ordinary volatile
+# state, poll publication, trust record, and any validated quarantine entries.
+# This ordering prevents an interrupted teardown from leaving live metadata
+# behind after silently destroying the merge poll that tells Firstmate to resume.
+remove_task_record_and_pr_poll_artifacts() {  # <state> <id> <meta> <other-path>...
+  local state_dir=$1 id=$2 meta=$3 quarantine artifact status=0 prior_signal_traps
+  local -a paths
+  shift 3
   validate_pr_poll_cleanup "$state_dir" "$id" || return 1
-  fm_pr_poll_retirement_recover_one "$state_dir" "$id" "$SCRIPT_DIR/fm-pr-poll.sh" || return 1
-  rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
-    "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
-    "$state_dir/$id.check-trust" || return 1
+  paths=("$@"
+    "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll"
+    "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement"
+    "$state_dir/$id.check-trust")
   if fm_task_id_path_safe "$id"; then
     quarantine="$state_dir/.pr-check-quarantine"
     if [ -d "$quarantine" ] && [ ! -L "$quarantine" ]; then
       for artifact in "$quarantine/$id."*; do
         [ -e "$artifact" ] || [ -L "$artifact" ] || continue
-        rm -f -- "$artifact" || return 1
+        paths+=("$artifact")
       done
-      rmdir "$quarantine" 2>/dev/null || true
     fi
   fi
+  prior_signal_traps=$(trap -p INT TERM)
+  trap '' INT TERM
+  remove_task_state_files "$meta" "${paths[@]}" || status=1
+  if [ -n "${quarantine:-}" ]; then
+    rmdir "$quarantine" 2>/dev/null || true
+  fi
+  trap - INT TERM
+  eval "$prior_signal_traps"
+  return "$status"
 }
 
 # The repository a REMOTE task's forge lookups are about, as gh's own
@@ -1773,8 +1865,17 @@ EOF
 }
 
 require_orca_worktree_path_match() {
-  local worktree_id=$1 inspected=$2 resolved inspected_abs resolved_abs
+  local worktree_id=$1 inspected=$2 label=${3:-task $ID} resolved inspected_abs resolved_abs presence_rc
   resolved=$(fm_backend_worktree_path orca "$worktree_id") || {
+    presence_rc=0
+    if [ "$TASK_REMOTE" != 1 ] && [ -n "$inspected" ] && [ -e "$inspected" ]; then
+      orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
+      if [ "$presence_rc" -eq 1 ]; then
+        echo "REFUSED: Orca no longer records worktree $worktree_id for $label, but the recorded local checkout directory $inspected still exists; preserving every task artifact." >&2
+        echo "Land or discard the contents of $inspected, then remove that directory. After it is removed, rerun with --force to retire the remaining task state." >&2
+        return 1
+      fi
+    fi
     echo "REFUSED: cannot resolve Orca worktree id $worktree_id to a path; preserving metadata." >&2
     return 1
   }
@@ -1864,6 +1965,7 @@ require_orca_remote_worktree_identity() {  # <worktree-id> <inspected> <orca-res
 require_orca_worktree_path_match_if_present() {
   local worktree_id=$1 inspected=$2 exists_rc
   [ -n "$inspected" ] || return 0
+  [ "$ORCA_WORKTREE_ABSENT" != 1 ] || return 0
   if [ "$TASK_REMOTE" = 1 ]; then
     # Only a definite "absent" skips. An indeterminate answer still checks, so
     # an unreachable host can never look like an already-removed worktree.
@@ -1874,6 +1976,35 @@ require_orca_worktree_path_match_if_present() {
     [ -e "$inspected" ] || return 0
   fi
   require_orca_worktree_path_match "$worktree_id" "$inspected"
+}
+
+# remove_orca_worktree_or_classify_absent: ask Orca to release a worktree, and
+# treat its one supported "there is nothing here to release" answer as a
+# finished step instead of a dead end. Orca answers a removal for a worktree it
+# no longer records with an error, which used to abort teardown after the
+# endpoint was already killed - leaving records whose only supported next step
+# was the very command that had just refused. The retry is not the fix, because
+# every retry gets the same answer.
+#
+# Only Orca's exact selector-not-found verdict counts as absence, and only once
+# --force has supplied the discard authority. Every other failure - an
+# unreachable runtime, a malformed reply, any other error code - keeps the
+# original failure and preserves every record, so a runtime that cannot answer
+# is never read as a worktree that is gone.
+remove_orca_worktree_or_classify_absent() {  # <backend> <worktree-id> <label>
+  local backend=$1 worktree_id=$2 label=$3 presence_rc=0
+  if fm_backend_remove_worktree "$backend" "$worktree_id"; then
+    return 0
+  fi
+  orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
+  [ "$presence_rc" -eq 1 ] || return 1
+  if [ "$FORCE" != "--force" ]; then
+    echo "REFUSED: recorded Orca worktree $worktree_id for $label no longer exists, so Orca has nothing left to release; its records are preserved." >&2
+    echo "Get the captain's explicit OK to discard that remaining state, then rerun with --force." >&2
+    return 1
+  fi
+  echo "warning: recorded Orca worktree $worktree_id for $label is already absent; --force is retiring the remaining records without an Orca worktree removal" >&2
+  return 0
 }
 
 # child_is_remote_orca: does this CHILD task's own record say its files live on
@@ -1892,15 +2023,34 @@ child_is_remote_orca() {  # <child-meta>
 # is exactly the child's recorded one. That is the same host-independent pair
 # the task's own --force path keeps, reached through the same code, with the
 # host and remote flag read from the CHILD's metadata.
+#
+# A worktree Orca no longer records is the one case with no identity left to
+# prove: there is no path to resolve and no checkout to inspect, so demanding
+# the proof strands the child's records with no supported next step. Only
+# Orca's exact selector-not-found answer counts as that, and only once --force
+# has supplied the discard authority; an unreachable runtime or an unparseable
+# reply stays indeterminate and still owes the whole proof, so a host that
+# cannot answer can never be mistaken for a worktree that is gone.
 require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-worktree>
-  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id
+  local child_meta=$1 worktree_id=$2 child_wt=$3 child_id presence_rc=0
   # shellcheck disable=SC2034  # Read by require_orca_worktree_path_match below.
   local TASK_REMOTE=1 TASK_REMOTE_EXEC='' ORCA_HOST_ID
+  ORCA_CHILD_WORKTREE_ABSENT=0
   child_id=$(basename "$child_meta" .meta)
   ORCA_HOST_ID=$(meta_value "$child_meta" orca_host)
   if [ -z "$ORCA_HOST_ID" ] || [ -z "$child_wt" ]; then
     echo "REFUSED: child $child_id is recorded as running on a remote Orca host but names no host or worktree; preserving that child's records." >&2
     return 1
+  fi
+  orca_worktree_presence_rc "$worktree_id" || presence_rc=$?
+  if [ "$presence_rc" -eq 1 ]; then
+    if [ "$FORCE" != "--force" ]; then
+      echo "REFUSED: recorded Orca worktree $worktree_id for child $child_id no longer exists; its removed checkout cannot be inspected for uncommitted or unlanded work." >&2
+      echo "That child's records are preserved. Get the captain's explicit OK to discard them, then rerun with --force." >&2
+      return 1
+    fi
+    ORCA_CHILD_WORKTREE_ABSENT=1
+    return 0
   fi
   require_orca_worktree_path_match "$worktree_id" "$child_wt"
 }
@@ -1913,8 +2063,8 @@ require_orca_child_worktree_identity() {  # <child-meta> <worktree-id> <child-wo
 # naming the path to remove by hand, never a failed cleanup, because the record
 # that knows the path is deleted moments later and the warning is then the only
 # thing that can lead an operator (or the next spawn's refusal) back to it.
-sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label>
-  local handle=$1 tasktmp=$2 host=$3 label=$4
+sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label> [<open-failure-kind>]
+  local handle=$1 tasktmp=$2 host=$3 label=$4 failure_kind=${5:-}
   [ -n "$tasktmp" ] || return 0
   [ -n "$host" ] || host='<unrecorded>'
   case "$tasktmp" in
@@ -1925,7 +2075,11 @@ sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label>
       ;;
   esac
   if [ -z "$handle" ]; then
-    echo "warning: could not reach Orca host $host to remove $tasktmp for $label; remove it on that host by hand" >&2
+    if [ "$failure_kind" = absent-worktree ]; then
+      echo "warning: Orca worktree for $label is already absent, so no inspection shell is available to remove $tasktmp on host $host; remove that temp root on the host by hand if it remains" >&2
+    else
+      echo "warning: could not reach Orca host $host to remove $tasktmp for $label; remove it on that host by hand" >&2
+    fi
     return 0
   fi
   # Quoted through the adapter's own quoter: this value comes from a metadata
@@ -1939,11 +2093,18 @@ sweep_remote_task_tmp() {  # <handle-or-empty> <tasktmp> <host> <label>
 
 # sweep_orca_child_remote_task_tmp: the same sweep for a REMOTE Orca child,
 # which has no inspection shell open yet and so opens (and releases) its own.
-sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id>
-  local child_meta=$1 child_id=$2 worktree_id=$3 tasktmp host handle
+sweep_orca_child_remote_task_tmp() {  # <child-meta> <child-id> <worktree-id> [<absent>]
+  local child_meta=$1 child_id=$2 worktree_id=$3 worktree_absent=${4:-0} tasktmp host handle
   tasktmp=$(meta_value "$child_meta" orca_remote_tasktmp)
   [ -n "$tasktmp" ] || return 0
   host=$(meta_value "$child_meta" orca_host)
+  if [ "$worktree_absent" = 1 ]; then
+    # An already-removed worktree has no shell to open, so the only honest
+    # outcome is naming the temp root the record is about to stop naming - as
+    # what it is, not as a host that could not be reached.
+    sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id" absent-worktree
+    return 0
+  fi
   if [ -z "$worktree_id" ] || [ -z "$host" ] || ! fm_backend_source orca; then
     sweep_remote_task_tmp "" "$tasktmp" "$host" "child $child_id"
     return 0
@@ -2444,7 +2605,7 @@ validate_firstmate_home_children_removal() {
       elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
-        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" || return 1
+        require_orca_worktree_path_match "$child_orca_worktree_id" "$child_wt" "child $child_id" || return 1
       fi
     elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
       child_proj=$(meta_value "$child_meta" project)
@@ -2596,7 +2757,7 @@ preflight_firstmate_home_herdr_children() {  # <home>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_orca_absent child_return_rc child_busy_gen
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -2612,10 +2773,14 @@ cleanup_firstmate_home_children() {
     else
       child_t=$(fm_backend_target_of_meta "$child_meta")
     fi
+    child_orca_absent=0
     if [ "$child_backend" = orca ] && [ "$child_kind" != secondmate ]; then
       child_orca_worktree_id=$(require_orca_worktree_id "$child_meta") || return 1
       if child_is_remote_orca "$child_meta"; then
         require_orca_child_worktree_identity "$child_meta" "$child_orca_worktree_id" "$child_wt" || return 1
+        child_orca_absent=$ORCA_CHILD_WORKTREE_ABSENT
+        [ "$child_orca_absent" != 1 ] \
+          || echo "warning: recorded Orca worktree $child_orca_worktree_id for child $child_id is already absent; --force is retiring that child's remaining records without an on-host worktree inspection" >&2
       elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
@@ -2654,9 +2819,12 @@ cleanup_firstmate_home_children() {
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
       fi
       if child_is_remote_orca "$child_meta"; then
-        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id"
+        sweep_orca_child_remote_task_tmp "$child_meta" "$child_id" "$child_orca_worktree_id" \
+          "$child_orca_absent"
       fi
-      fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
+      [ "$child_orca_absent" = 1 ] \
+        || remove_orca_worktree_or_classify_absent "$child_backend" "$child_orca_worktree_id" \
+          "child $child_id" || return 1
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
@@ -2678,18 +2846,18 @@ cleanup_firstmate_home_children() {
     fi
     remove_grok_turnend_auth "$sub_state" "$child_id" || return 1
     remove_kimi_turnend_auth "$sub_state" "$child_id" || return 1
-    remove_pr_poll_artifacts "$sub_state" "$child_id" || return 1
     child_busy_gen=$(meta_value "$child_meta" busy_gen)
     if [ -z "$child_busy_gen" ]; then
       child_busy_gen=$(cat "$sub_state/$child_id.busy-gen" 2>/dev/null || true)
     fi
     retire_busy_state "$sub_state" "$child_id" "$child_busy_gen" || return 1
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
-    rm -f "$sub_state/$child_id.turn-ended" \
-      "$sub_state/$child_id.meta" "$sub_state/$child_id.pi-ext.ts" \
+    remove_task_record_and_pr_poll_artifacts "$sub_state" "$child_id" \
+      "$sub_state/$child_id.meta" "$sub_state/$child_id.turn-ended" \
+      "$sub_state/$child_id.pi-ext.ts" \
       "$sub_state/$child_id.grok-turnend-token" "$sub_state/$child_id.kimi-turnend-token" \
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
-      "$sub_state/$child_id.cursor-session"
+      "$sub_state/$child_id.cursor-session" || return 1
   done
 }
 
@@ -2874,12 +3042,13 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   # two cases where the brief is most likely still sitting there. Both used to
   # skip this entirely and then delete the record naming it.
   [ "$TASK_REMOTE" != 1 ] \
-    || sweep_remote_task_tmp "$TASK_REMOTE_EXEC" "$ORCA_REMOTE_TASK_TMP" "$ORCA_HOST_ID" "$ID"
+    || sweep_remote_task_tmp "$TASK_REMOTE_EXEC" "$ORCA_REMOTE_TASK_TMP" "$ORCA_HOST_ID" "$ID" "$ORCA_OPEN_FAILURE_KIND"
   # The inspection shell is itself a terminal in this worktree, so it is released
   # before Orca is asked to remove the worktree, not after.
   task_remote_exec_release
   [ -z "$T_ORCA" ] || fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" 2>/dev/null || true
-  fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
+  [ "$ORCA_WORKTREE_ABSENT" = 1 ] \
+    || remove_orca_worktree_or_classify_absent "$BACKEND" "$ORCA_WORKTREE_ID" "task $ID"
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
   if [ "$branch" != "HEAD" ]; then
@@ -2993,10 +3162,9 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 # absolute path on THIS machine - a task recorded before tasktmp= stopped naming
 # a local root for remote tasks still reaches this line.
 [ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
-remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 status_retire_presentation_task "$STATE" "$ID" || exit 1
-remove_task_state_files "$STATE/$ID.meta" \
+remove_task_record_and_pr_poll_artifacts "$STATE" "$ID" "$STATE/$ID.meta" \
   "$STATE/$ID.status" "$STATE/$ID.turn-ended" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
