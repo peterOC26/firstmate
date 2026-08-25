@@ -17,6 +17,8 @@ Pi 0.81.1 was installed when Calm was first built, Pi 0.82.0 was the first rever
 The inspected Pi CHANGELOG shows no relevant presentation API introduced at those versions, so they remain verification evidence rather than compatibility bounds.
 The exported classes used by the adapters (`AssistantMessageComponent`, `ToolExecutionComponent`, and `InteractiveMode`) are undocumented internals with no stated version guarantee.
 `tests/fm-calm-pi-extension.test.sh` records the installed Pi version as evidence without gating on it and covers both newer synthetic versions and an unavailable adapter seam.
+The Cursor-provider chrome adapter uses the same `AssistantMessageComponent.updateContent` seam and version evidence as the existing assistant-text layout adapter.
+It changes only the shallow live presentation copy and does not alter the assistant message passed to storage, context, or export.
 
 ### Built-in tool override constraints
 

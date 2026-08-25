@@ -26,7 +26,70 @@ type AssistantMessagePresentationState = {
 type CalmAssistantLayoutPatch = {
   hidesThinking: () => boolean;
   hidesWorkingNote: () => boolean;
+  hidesSyntheticToolChrome: () => boolean;
 };
+
+type JsonEnd = { lineOffset: number; endOffset: number } | undefined;
+
+function findJsonEnd(value: string): JsonEnd {
+  const first = value[0];
+  if (first !== "{" && first !== "[") return undefined;
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let characterOffset = 0; characterOffset < value.length; characterOffset += 1) {
+    const character = value[characterOffset];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') quoted = false;
+      continue;
+    }
+    if (character === '"') {
+      quoted = true;
+      continue;
+    }
+    if (character === "{" || character === "[") depth += 1;
+    else if (character === "}" || character === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        const linesBefore = value.slice(0, characterOffset + 1).split("\n").length - 1;
+        return { lineOffset: linesBefore, endOffset: characterOffset + 1 };
+      }
+    }
+  }
+  return undefined;
+}
+
+function stripSyntheticToolChrome(text: string): string {
+  const lines = text.split("\n");
+  const kept: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^\s*⏳\s+\[[^\]\r\n]+\]\s*(.*)$/.exec(lines[index]);
+    if (!match) {
+      kept.push(lines[index]);
+      continue;
+    }
+    const inlineArgument = match[1].trimStart();
+    const argumentIsInline = inlineArgument.startsWith("{") || inlineArgument.startsWith("[");
+    const nextLineArgument = lines.slice(index + 1).join("\n").trimStart();
+    const argument = argumentIsInline
+      ? [inlineArgument, ...lines.slice(index + 1)].join("\n")
+      : nextLineArgument;
+    if (argument.startsWith("{") || argument.startsWith("[")) {
+      const end = findJsonEnd(argument);
+      if (end) {
+        try {
+          JSON.parse(argument.slice(0, end.endOffset));
+          index += end.lineOffset + (argumentIsInline ? 0 : 1);
+        } catch {
+          // A balanced non-JSON suffix is ordinary text, so leave it visible.
+        }
+      }
+    }
+  }
+  return kept.join("\n");
+}
 
 // A mid-turn assistant message is one the model did not end its response with: Pi's
 // agent loop runs its tool calls and then issues another assistant message. stopReason
@@ -55,14 +118,21 @@ export function installCalmAssistantLayout(): void {
   const hidesThinking = (): boolean => calmScreenPresentationHides("assistant-thinking");
   const hidesWorkingNote = (): boolean =>
     calmScreenPresentationHides("assistant-working-note");
+  const hidesSyntheticToolChrome = (): boolean =>
+    calmScreenPresentationHides("assistant-synthetic-tool-chrome");
   const installed = registry[CALM_ASSISTANT_LAYOUT_PATCH];
   if (installed) {
     installed.hidesThinking = hidesThinking;
     installed.hidesWorkingNote = hidesWorkingNote;
+    installed.hidesSyntheticToolChrome = hidesSyntheticToolChrome;
     return;
   }
 
-  const patch: CalmAssistantLayoutPatch = { hidesThinking, hidesWorkingNote };
+  const patch: CalmAssistantLayoutPatch = {
+    hidesThinking,
+    hidesWorkingNote,
+    hidesSyntheticToolChrome,
+  };
   const AssistantMessageComponent = PiCodingAgent.AssistantMessageComponent;
   if (typeof AssistantMessageComponent !== "function") {
     throw new Error("Firstmate Calm requires Pi AssistantMessageComponent");
@@ -83,14 +153,19 @@ export function installCalmAssistantLayout(): void {
       patch.hidesThinking();
     const hideWorkingNote =
       patch.hidesWorkingNote() && isMidTurnAssistantMessage(message);
+    const hideSyntheticToolChrome = patch.hidesSyntheticToolChrome();
     const presentationMessage =
-      hideThinking || hideWorkingNote
+      hideThinking || hideWorkingNote || hideSyntheticToolChrome
         ? {
             ...message,
             content: message.content.filter(
               (block) =>
                 !(hideThinking && block.type === "thinking") &&
                 !(hideWorkingNote && block.type === "text"),
+            ).map((block) =>
+              hideSyntheticToolChrome && block.type === "text"
+                ? { ...block, text: stripSyntheticToolChrome(block.text) }
+                : block,
             ),
           }
         : message;
