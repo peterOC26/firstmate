@@ -7,6 +7,7 @@ export const CALM_TRANSCRIPT_CLASSES = [
   "genuine-user-prompt",
   "genuine-agent-response",
   "assistant-working-note",
+  "assistant-synthetic-tool-chrome",
   "assistant-thinking",
   "assistant-tool-call",
   "tool-result",

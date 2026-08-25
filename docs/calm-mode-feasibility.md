@@ -17,6 +17,8 @@ Pi 0.81.1 was installed when Calm was first built, Pi 0.82.0 was the first rever
 The inspected Pi CHANGELOG shows no relevant presentation API introduced at those versions, so they remain verification evidence rather than compatibility bounds.
 The exported classes used by the adapters (`AssistantMessageComponent`, `ToolExecutionComponent`, and `InteractiveMode`) are undocumented internals with no stated version guarantee.
 `tests/fm-calm-pi-extension.test.sh` records the installed Pi version as evidence without gating on it and covers both newer synthetic versions and an unavailable adapter seam.
+The Cursor-provider chrome adapter uses the same `AssistantMessageComponent.updateContent` seam and version evidence as the existing assistant-text layout adapter.
+It changes only the shallow live presentation copy and does not alter the assistant message passed to storage, context, or export.
 
 ### Built-in tool override constraints
 
@@ -206,6 +208,7 @@ The test fixture enumerates every class below through the centralized policy, an
 | `genuine-user-prompt` | `UserMessageComponent` | Visible, including every tested operational near miss. |
 | `genuine-agent-response` | Assistant text in `AssistantMessageComponent` | Visible. |
 | `assistant-working-note` | Assistant text in an `AssistantMessageComponent` message the model did not end its response with, identified by its own `stopReason` of `toolUse`, or of `length` with tool calls present | The text blocks are removed from the shallow presentation copy before layout, so a `toolUse` message carrying only narration occupies zero rows (verified on Pi 0.84.1); a still-streaming `pending` message is never filtered, so narration is briefly visible before the marker flips. |
+| `assistant-synthetic-tool-chrome` | Cursor-provider `⏳ [tool-name]` lines and their attached JSON argument blobs inside assistant text in `AssistantMessageComponent` | Matching lines and their parsed JSON blobs are stripped from the shallow presentation copy before layout while surrounding prose in the same text block stays visible; the line-scoped strip also applies to still-streaming text, and the Cursor-chrome cases in `tests/fm-calm-pi-extension.test.sh` pin it. |
 | `assistant-thinking` | Thinking content in `AssistantMessageComponent` | Collapsed reasoning is removed from the shallow presentation copy before layout and occupies zero rows; explicit expansion renders the original reasoning. |
 | `assistant-tool-call` | `ToolExecutionComponent` | Text shells for built-in, Firstmate, foreign extension, contested built-in, and unregistered provider-side tool rows render at zero height while Calm is active; the generic row adapter that covers the foreign, contested, and unregistered cases is verified on Pi 0.84.1 and 0.84.2. |
 | `tool-result` | `ToolExecutionComponent` | Text results for built-in, Firstmate, foreign extension, contested built-in, and unregistered provider-side tool rows render at zero height while Calm is active, on the same Pi 0.84.1 and 0.84.2 adapter evidence. |

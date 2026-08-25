@@ -1869,6 +1869,39 @@ const messages = {
     stopReason: "length",
     content: [{ type: "text", text: "TRUNCATED_FINAL_TEXT" }],
   },
+  cursorChrome: {
+    ...assistantBase,
+    stopReason: "stop",
+    content: [{ type: "text", text: [
+      "Before synthetic work.",
+      "⏳ [Shell] {\"command\":\"printf 'hidden'\"}",
+      "⏳ [Read] {",
+      "  \"path\": \"secret.txt\"",
+      "}",
+      "⏳ [Grep]",
+      "{\"pattern\":\"secret\",\"path\":\".\"}",
+      "⏳ [Shell]",
+      "",
+      "{\"command\":\"printf 'blank-gap-hidden'\"}",
+      "⏳ [Read]",
+      "",
+      "",
+      "{",
+      "  \"path\": \"blank-gap.txt\"",
+      "}",
+      "The word Shell and the literal tool name `Read` are ordinary prose here.",
+      "After synthetic work.",
+    ].join("\n") }],
+  },
+  cursorChromeStreaming: {
+    ...assistantBase,
+    stopReason: "pending",
+    content: [{ type: "text", text: [
+      "STREAMING_REPLY_BEFORE",
+      "⏳ [getMcpTools] {\"server\":\"cursor\"}",
+      "STREAMING_REPLY_AFTER",
+    ].join("\n") }],
+  },
 };
 const messagesBefore = JSON.stringify(messages);
 const rows = {};
@@ -1904,6 +1937,11 @@ for (const name of Object.keys(rows)) {
   if (rendered(name).length === 0) throw new Error(`Calm-off rendering hid ${name}`);
 }
 requireVisible("midTurn", "MIDTURN_WORKING_NOTE", "Calm off");
+requireVisible("cursorChrome", "⏳ [Shell]", "Calm off");
+requireVisible("cursorChrome", "blank-gap-hidden", "Calm off");
+requireVisible("cursorChrome", "blank-gap.txt", "Calm off");
+requireVisible("cursorChrome", "After synthetic work.", "Calm off");
+requireVisible("cursorChromeStreaming", "⏳ [getMcpTools]", "Calm off");
 
 await calm.calmCommand.handler("", context);
 if (readFileSync(calmPreferencePath, "utf8") !== "on\n") {
@@ -1921,6 +1959,19 @@ if (rendered("truncatedMidTurn").length === 0) {
 requireVisible("streaming", "STREAMING_NOTE_TEXT", "Calm on");
 requireVisible("truncatedFinal", "TRUNCATED_FINAL_TEXT", "Calm on");
 requireVisible("finalReply", "FINAL_REPLY_TEXT", "Calm on");
+requireHidden("cursorChrome", "⏳ [Shell]", "Calm on");
+  requireHidden("cursorChrome", "⏳ [Read]", "Calm on");
+  requireHidden("cursorChrome", "⏳ [Grep]", "Calm on");
+requireHidden("cursorChrome", "secret.txt", "Calm on");
+requireHidden("cursorChrome", "blank-gap-hidden", "Calm on");
+requireHidden("cursorChrome", "blank-gap.txt", "Calm on");
+requireVisible("cursorChrome", "Before synthetic work.", "Calm on");
+requireVisible("cursorChrome", "The word Shell", "Calm on");
+  requireVisible("cursorChrome", "the literal tool name", "Calm on");
+requireVisible("cursorChrome", "After synthetic work.", "Calm on");
+requireHidden("cursorChromeStreaming", "⏳ [getMcpTools]", "Calm on streaming");
+requireVisible("cursorChromeStreaming", "STREAMING_REPLY_BEFORE", "Calm on streaming");
+requireVisible("cursorChromeStreaming", "STREAMING_REPLY_AFTER", "Calm on streaming");
 if (JSON.stringify(rendered("finalReply")) !== stockRows.finalReply) {
   throw new Error("Calm on changed the genuine final reply row");
 }
