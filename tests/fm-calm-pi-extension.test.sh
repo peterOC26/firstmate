@@ -1880,6 +1880,15 @@ const messages = {
       "}",
       "⏳ [Grep]",
       "{\"pattern\":\"secret\",\"path\":\".\"}",
+      "⏳ [Shell]",
+      "",
+      "{\"command\":\"printf 'blank-gap-hidden'\"}",
+      "⏳ [Read]",
+      "",
+      "",
+      "{",
+      "  \"path\": \"blank-gap.txt\"",
+      "}",
       "The word Shell and the literal tool name `Read` are ordinary prose here.",
       "After synthetic work.",
     ].join("\n") }],
@@ -1929,6 +1938,8 @@ for (const name of Object.keys(rows)) {
 }
 requireVisible("midTurn", "MIDTURN_WORKING_NOTE", "Calm off");
 requireVisible("cursorChrome", "⏳ [Shell]", "Calm off");
+requireVisible("cursorChrome", "blank-gap-hidden", "Calm off");
+requireVisible("cursorChrome", "blank-gap.txt", "Calm off");
 requireVisible("cursorChrome", "After synthetic work.", "Calm off");
 requireVisible("cursorChromeStreaming", "⏳ [getMcpTools]", "Calm off");
 
@@ -1952,6 +1963,8 @@ requireHidden("cursorChrome", "⏳ [Shell]", "Calm on");
   requireHidden("cursorChrome", "⏳ [Read]", "Calm on");
   requireHidden("cursorChrome", "⏳ [Grep]", "Calm on");
 requireHidden("cursorChrome", "secret.txt", "Calm on");
+requireHidden("cursorChrome", "blank-gap-hidden", "Calm on");
+requireHidden("cursorChrome", "blank-gap.txt", "Calm on");
 requireVisible("cursorChrome", "Before synthetic work.", "Calm on");
 requireVisible("cursorChrome", "The word Shell", "Calm on");
   requireVisible("cursorChrome", "the literal tool name", "Calm on");

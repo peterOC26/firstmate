@@ -72,7 +72,11 @@ function stripSyntheticToolChrome(text: string): string {
     }
     const inlineArgument = match[1].trimStart();
     const argumentIsInline = inlineArgument.startsWith("{") || inlineArgument.startsWith("[");
-    const nextLineArgument = lines.slice(index + 1).join("\n").trimStart();
+    const followingText = lines.slice(index + 1).join("\n");
+    const nextLineArgument = followingText.trimStart();
+    const blankLinesBeforeArgument =
+      followingText.slice(0, followingText.length - nextLineArgument.length).split("\n").length -
+      1;
     const argument = argumentIsInline
       ? [inlineArgument, ...lines.slice(index + 1)].join("\n")
       : nextLineArgument;
@@ -81,7 +85,7 @@ function stripSyntheticToolChrome(text: string): string {
       if (end) {
         try {
           JSON.parse(argument.slice(0, end.endOffset));
-          index += end.lineOffset + (argumentIsInline ? 0 : 1);
+          index += end.lineOffset + (argumentIsInline ? 0 : 1 + blankLinesBeforeArgument);
         } catch {
           // A balanced non-JSON suffix is ordinary text, so leave it visible.
         }
