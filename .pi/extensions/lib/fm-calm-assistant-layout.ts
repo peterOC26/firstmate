@@ -4,9 +4,10 @@
 // installCalmAssistantLayout() probes that exact method and throws
 // if it is missing; fm-calm.ts catches that and skips only this adapter with a diagnostic
 // instead of blocking Calm or Pi.
-// This layout removes collapsed thinking and the mid-turn assistant text blocks
-// classified as "assistant-working-note" from a shallow presentation copy. The message
-// itself, model context, session storage, and export rendering are never touched.
+// This layout removes collapsed thinking, mid-turn assistant text blocks classified as
+// "assistant-working-note", and Cursor-provider "assistant-synthetic-tool-chrome" lines
+// from a shallow presentation copy. The message itself, model context, session storage,
+// and export rendering are never touched.
 // ./fm-calm-visibility.ts owns which classes Calm hides.
 // This adapter is screen-only: Pi builds /export and /share output from session entries
 // and never from these rows, so it reads the Calm policy without the stock-export escape
