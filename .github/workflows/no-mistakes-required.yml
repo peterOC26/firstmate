@@ -113,7 +113,7 @@ jobs:
             incomplete=''
             for required in review test document; do
               status=$(printf '%s' "$json" | jq -r --arg step "$required" \
-                '([(.steps | arrays | .[]) | select(.step == $step) | .status] | first // empty | select(. != "")) // "missing"')
+                '([(.steps | arrays | .[]) | select(.step == $step) | .status] | last // empty | select(. != "")) // "missing"')
               if [ "$status" != "completed" ]; then
                 if [ -n "$incomplete" ]; then
                   incomplete="${incomplete}, "

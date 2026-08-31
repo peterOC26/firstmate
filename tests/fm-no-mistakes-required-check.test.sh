@@ -150,6 +150,15 @@ test_attested_skip_is_refused() {
   pass "an attested quota or agent skip is still refused"
 }
 
+test_attested_later_duplicate_skip_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"},{"step":"review","status":"skipped"}]}')") || rc=$?
+  expect_code 1 "$rc" "a later duplicate skipped status must override completed"
+  assert_contains "$out" "review=skipped" \
+    "refusal did not use the later duplicate review status"
+  pass "the last duplicate status controls attestation compliance"
+}
+
 test_attested_missing_step_is_refused() {
   local out rc=0
   out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"}]}')") || rc=$?
@@ -177,5 +186,6 @@ test_attested_completed_steps_pass
 test_attested_stale_head_is_refused
 test_attested_missing_head_is_refused
 test_attested_skip_is_refused
+test_attested_later_duplicate_skip_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused
