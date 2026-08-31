@@ -1725,20 +1725,23 @@ EOF
         case "$context_warned" in
           *" $(signal_task_id "$f") "*)
             fm_wake_append signal "$(basename "$f")" "$context_reason" || exit 1
-            printf '%s' "$sig" > "$sf"
-            # mark_surfaced now commits a classified POSITION, not a status
-            # line, so hand it the same span endpoint every other surfacing
-            # path records; without it this task's log would be re-surfaced by
-            # the heartbeat backstop it was just delivered through.
-            context_record=$(status_span_first_actionable_record "$f" \
-              "$(hb_surfaced_offset "$(signal_task_id "$f")")")
-            case $? in
-              0|1)
-                context_end=${context_record%%$'\t'*}
-                context_ident=${context_record#*$'\t'}
-                context_ident=${context_ident%%$'\t'*}
-                mark_surfaced "$f" "$context_end" "$context_ident"
+            case "$f" in
+              *.status)
+                fm_wake_status_reported_commit "$STATE" "$f" "$sig" || true
+                mark_surface_reported "$f" "$sig" || true
+                context_record=$(status_span_first_actionable_record "$f" \
+                  "$(hb_surfaced_offset "$(signal_task_id "$f")")")
+                case $? in
+                  0|1)
+                    context_end=${context_record%%$'\t'*}
+                    context_ident=${context_record#*$'\t'}
+                    context_ident=${context_ident%%$'\t'*}
+                    fm_wake_status_seen_commit "$STATE" "$f" "$context_end" "$context_ident" || true
+                    mark_surfaced "$f" "$context_end" "$context_ident" || true
+                    ;;
+                esac
                 ;;
+              *) printf '%s' "$sig" > "$sf" ;;
             esac
             ;;
           *) context_rest="$context_rest$sf"$'\t'"$sig"$'\t'"$f"$'\n' ;;

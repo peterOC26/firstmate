@@ -1526,7 +1526,7 @@ test_actionable_signal_surfaced() {
 # names without dragging an unrelated, provably-working worker's benign signal
 # through the same forced wake - that worker keeps its normal absorb triage.
 test_context_warning_surfaces_only_the_warned_task() {
-  local dir state fakebin out out2 drain_out config sessions sid second_sid epoch pid rc
+  local dir state fakebin out out2 drain_out config sessions sid second_sid epoch pid rc seen_size
   dir=$(make_case context-warning-scope)
   dir=$(cd "$dir" && pwd -P)
   state="$dir/state"; fakebin="$dir/fakebin"
@@ -1553,6 +1553,7 @@ test_context_warning_surfaces_only_the_warned_task() {
     "harness_session_root=$dir/codex-home" "harness_session_id=$second_sid" \
     "harness_session_cwd=$dir/worktree"
   : > "$state/warned.turn-ended"
+  printf 'working: context threshold crossed\n' > "$state/warned.status"
   printf 'working: compiling step 2\n' > "$state/quiet.status"
   # The unrelated worker is provably working, so without scoping its benign
   # signal would be absorbed - the regression forced it out as an actionable wake.
@@ -1569,6 +1570,15 @@ test_context_warning_surfaces_only_the_warned_task() {
     || fail "watcher did not print the context usage warning: $(cat "$out")"
   grep "$(printf '\tsignal\t')" "$state/.wake-queue" | grep -F warned.turn-ended >/dev/null \
     || fail "the warned task's own turn-end was not surfaced with its warning"
+  grep "$(printf '\tsignal\t')" "$state/.wake-queue" | grep -F warned.status >/dev/null \
+    || fail "the warned task's same-turn status update was not surfaced with its warning"
+  bash -c '. "$1"; fm_wake_signal_seen_current "$2" "$3"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$state" "$state/warned.status" \
+    || fail "the warned task's surfaced status snapshot was not durably reported"
+  seen_size=$(bash -c '. "$1"; fm_wake_signal_seen_size "$2" "$3"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$state" "$state/warned.status")
+  [ "$seen_size" = "$(size_of "$state/warned.status")" ] \
+    || fail "the warned task's surfaced status snapshot was not durably classified"
   grep "$(printf '\tsignal\t')" "$state/.wake-queue" | grep -F quiet.status >/dev/null \
     && fail "an unrelated provably-working signal was forced past triage by another task's warning"
   [ -s "$state/.seen-quiet_status" ] || fail "the absorbed unrelated signal did not advance its suppressor"
