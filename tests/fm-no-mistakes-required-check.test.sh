@@ -159,6 +159,15 @@ test_attested_later_duplicate_skip_is_refused() {
   pass "the last duplicate status controls attestation compliance"
 }
 
+test_attested_malformed_extra_step_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"},{}]}')") || rc=$?
+  expect_code 1 "$rc" "a malformed extra step record must invalidate the attestation"
+  assert_contains "$out" "malformed step records" \
+    "refusal did not identify the malformed extra step record"
+  pass "a malformed unrelated step invalidates the attestation"
+}
+
 test_attested_missing_step_is_refused() {
   local out rc=0
   out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"}]}')") || rc=$?
@@ -187,5 +196,6 @@ test_attested_stale_head_is_refused
 test_attested_missing_head_is_refused
 test_attested_skip_is_refused
 test_attested_later_duplicate_skip_is_refused
+test_attested_malformed_extra_step_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused

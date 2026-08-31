@@ -10,8 +10,9 @@ We require this to reduce the maintainer's burden of reviewing and merging contr
 Pushing through it runs an AI-driven review/test/lint pipeline in an isolated worktree, forwards the push upstream only after every check passes, and opens a clean PR automatically.
 
 A GitHub Actions check (`Require no-mistakes`) runs on PRs targeting `main` and fails if the body is missing the deterministic signature that no-mistakes writes.
-no-mistakes 1.46.0 and later also write a structured `no-mistakes-pipeline-attestation:v1` comment, and when that comment is present the check additionally requires the review, test, and document steps to each be `completed`, so a quota skip or an agent skip fails.
-A body carrying only the signature still passes, because this fork's own pipeline has not reached that release yet.
+no-mistakes 1.46.0 and later also write a structured `no-mistakes-pipeline-attestation:v1` comment.
+When that comment is present, the check requires well-formed step records bound to the current PR head and uses the last recorded status for each step; review, test, and document must each be `completed`, so a quota skip or an agent skip fails.
+This inline compatibility gate is intentionally weaker than the upstream shared verifier because a body carrying only the signature still passes while this fork's own pipeline remains below that release.
 It evaluates every PR opening and body edit independently, reruns after head synchronization or reopening, and prevents a later edit from replacing an earlier pending compliance check.
 GitHub Actions and Dependabot are exempt so their automation keeps working, but other contributor PRs that do not satisfy the check will not be reviewed or merged.
 
