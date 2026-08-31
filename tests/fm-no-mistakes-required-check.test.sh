@@ -90,6 +90,11 @@ truncated_attested_body() {
     "$MARKER" "$1"
 }
 
+attested_body_with_trailing_prefix() {
+  printf '## Pipeline\n\n%s\n\n<!-- no-mistakes-pipeline-attestation:v1 %s -->\n<!-- no-mistakes-pipeline-attestation:v1 %s\n' \
+    "$MARKER" "$1" "$2"
+}
+
 extract_check_script || fail "could not lift the check script out of $WORKFLOW"
 
 test_body_without_signature_is_refused() {
@@ -203,6 +208,15 @@ test_truncated_attestation_is_refused() {
   pass "a truncated attestation is refused rather than ignored"
 }
 
+test_attestation_with_trailing_truncated_prefix_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body_with_trailing_prefix '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}' '{"head_sha":"sample-sha"}')") || rc=$?
+  expect_code 1 "$rc" "a valid attestation followed by a truncated one must be refused"
+  assert_contains "$out" "Multiple no-mistakes pipeline attestation prefixes" \
+    "trailing truncated attestation was not identified"
+  pass "a trailing truncated attestation invalidates the body"
+}
+
 test_body_without_signature_is_refused
 test_signature_without_attestation_passes
 test_attested_completed_steps_pass
@@ -214,3 +228,4 @@ test_attested_malformed_extra_step_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused
 test_truncated_attestation_is_refused
+test_attestation_with_trailing_truncated_prefix_is_refused

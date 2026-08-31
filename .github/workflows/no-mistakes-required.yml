@@ -51,6 +51,7 @@ jobs:
             body="${PR_BODY:-}"
             json=''
             attested=0
+            attestation_conflict=0
             case "$body" in
               *"$prefix"*)
                 attested=1
@@ -58,6 +59,12 @@ jobs:
                 case "$rest" in
                   *"$suffix"*)
                     json="${rest%%"$suffix"*}"
+                    trailing="${rest#*"$suffix"}"
+                    case "$trailing" in
+                      *"$prefix"*)
+                        attestation_conflict=1
+                        ;;
+                    esac
                     ;;
                 esac
                 ;;
@@ -70,6 +77,19 @@ jobs:
               echo "Once the pipeline reaches >= 1.46.0, the attestation comment appears and"
               echo "this same job begins requiring review, test, and document to be completed."
               exit 0
+            fi
+            if [ "$attestation_conflict" -eq 1 ]; then
+              {
+                echo "::error::Multiple no-mistakes pipeline attestation prefixes are not accepted."
+                echo
+                echo "The PR body must contain at most one structured pipeline attestation."
+                echo "Remove duplicate or truncated trailing attestations, then re-run the pipeline."
+                echo
+                echo "See CONTRIBUTING.md for setup and the full workflow."
+                echo
+                echo "PR author: ${PR_AUTHOR}"
+              } >&2
+              exit 1
             fi
             if ! command -v jq >/dev/null 2>&1; then
               echo "::error::This check requires jq to parse no-mistakes pipeline step attestation, but jq was not found on the runner." >&2
