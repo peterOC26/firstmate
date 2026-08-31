@@ -66,10 +66,11 @@ PY
 }
 
 # Run the lifted script exactly as the runner does: `bash -e <file>` with the
-# step's three environment values bound.
+# step's four environment values bound.
 run_check() {
-  local body=$1 out rc=0
+  local body=$1 head=${2:-sample-sha} out rc=0
   out=$(PR_BODY="$body" PR_AUTHOR=sample-author PR_NUMBER=4242 \
+    PR_HEAD_SHA="$head" \
     bash -e "$CHECK" 2>&1) || rc=$?
   printf '%s\n' "$out"
   return "$rc"
@@ -121,6 +122,24 @@ test_attested_completed_steps_pass() {
   pass "an attestation with review, test, and document completed passes"
 }
 
+test_attested_stale_head_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"old-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}')" current-sha) || rc=$?
+  expect_code 1 "$rc" "an attestation from an older PR head must be refused"
+  assert_contains "$out" "old-sha" "refusal did not name the attested head"
+  assert_contains "$out" "current-sha" "refusal did not name the current PR head"
+  pass "an attestation from an older PR head is refused"
+}
+
+test_attested_missing_head_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}')") || rc=$?
+  expect_code 1 "$rc" "an attestation without head_sha must be refused"
+  assert_contains "$out" "Attested head: <missing>" \
+    "refusal did not identify the missing attested head"
+  pass "an attestation without head_sha is refused"
+}
+
 test_attested_skip_is_refused() {
   # Upstream's substantive control has to survive the relaxation above: when a
   # pipeline does attest, a skipped required step still fails the check.
@@ -155,6 +174,8 @@ test_unparseable_attestation_is_refused() {
 test_body_without_signature_is_refused
 test_signature_without_attestation_passes
 test_attested_completed_steps_pass
+test_attested_stale_head_is_refused
+test_attested_missing_head_is_refused
 test_attested_skip_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused
