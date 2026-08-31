@@ -185,7 +185,7 @@ SH
 }
 
 write_real_terminal_watch_fixture() {
-  local dir=$1 delivered=$2 key hash sig
+  local dir=$1 delivered=$2 key hash
   mkdir -p "$dir/fakebin"
   cat > "$dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -205,14 +205,30 @@ SH
   printf 'window=test:fm-footer\nkind=ship\n' > "$dir/state/footer.meta"
   printf 'done: PR https://example.test/pr/footer\n' > "$dir/state/footer.status"
   printf 'finished, awaiting review\n⏱  15m | 12%% context\n' > "$dir/state/pane.txt"
-  sig=$(FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$dir/state/footer.status")
-  printf '%s' "$sig" > "$dir/state/.seen-footer_status"
+  # The signal-seen marker records a classified size plus file identity, the same
+  # commit fm-wake-lib.sh makes for a genuinely presented status log; a bare
+  # signature byte-string is the pre-2026-08 shape and no longer absorbs.
+  FM_STATE_OVERRIDE="$dir/state" bash -c '
+    . "$1"
+    fm_wake_status_mark_current "$2" "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$dir/state" "$dir/state/footer.status" \
+    || fail "could not prime the terminal status signal"
   key=test_fm-footer
   hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
   printf '%s' "$hash" > "$dir/state/.hash-$key"
   printf '1\n' > "$dir/state/.count-$key"
   if [ "$delivered" = 1 ]; then
-    printf 'done: PR https://example.test/pr/footer' > "$dir/state/.hb-surfaced-footer"
+    # The delivered marker records a CLASSIFIED POSITION plus file identity
+    # (fm-classify-lib.sh owns that format), which is what the watcher commits
+    # through mark_surfaced - not the bare status line it once stored.
+    FM_STATE_OVERRIDE="$dir/state" bash -c '
+      . "$1"
+      ident=$(_fm_open_decisions_file_ident "$2") || exit 1
+      status_presentation_marker_commit "$3" "$2" \
+        "$(LC_ALL=C wc -c < "$2" | tr -d "[:space:]")" "$ident"
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$dir/state/footer.status" \
+      "$dir/state/.hb-surfaced-footer" \
+      || fail "could not seed the delivered terminal marker"
   fi
   cat > "$dir/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash

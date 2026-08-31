@@ -685,7 +685,7 @@ done
 printf '%s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$log"
 case "\${1:-} \${2:-}" in
   "pr list") printf '%s\n' 7 ; exit 0 ;;
-  "pr view") printf '%s\t%s\n' 'MERGED' '$head' ; exit 0 ;;
+  "pr view") printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
 esac
 echo "error: pull request not found" >&2
 exit 1

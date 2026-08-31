@@ -337,9 +337,17 @@ teardown_lock_already_held() {  # <lock-path>
 # (bin/fm-backlog-transition-lib.sh), which refuses a symlinked or non-regular
 # record and any path resolving outside its authorized state directory; the
 # remaining volatile files are ordinary removals under the same held lock.
-remove_task_state_files() {  # <state> <meta> <other-path>...
+# An EMPTY <meta> retires only the volatile files: the caller then owns the task
+# record itself. The main teardown path uses that form because the record must be
+# retired LAST, by the same guarded close/remove branch that reports a failure to
+# retire it - removing it here would make that branch a silent no-op.
+remove_task_state_files() {  # <state> <meta-or-empty> <other-path>...
   local state_dir=$1 meta=$2 lock status=0
   shift 2
+  if [ -z "$meta" ]; then
+    rm -f -- "$@" || status=1
+    return "$status"
+  fi
   if [ "${META_LOCK_HELD:-0}" = 1 ] && [ "${META:-}" = "$meta" ]; then
     fm_backlog_atomic_transition remove "$meta" "task record" "$state_dir" || status=1
     rm -f -- "$@" || status=1
@@ -3519,7 +3527,7 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 [ "$TASK_REMOTE" != 1 ] && [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 status_retire_presentation_task "$STATE" "$ID" || exit 1
-remove_task_record_and_pr_poll_artifacts "$STATE" "$ID" "$STATE/$ID.meta" \
+remove_task_record_and_pr_poll_artifacts "$STATE" "$ID" "" \
   "$STATE/$ID.status" "$STATE/$ID.turn-ended" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
