@@ -53,11 +53,11 @@ jobs:
             attested=0
             case "$body" in
               *"$prefix"*)
+                attested=1
                 rest="${body#*"$prefix"}"
                 case "$rest" in
                   *"$suffix"*)
                     json="${rest%%"$suffix"*}"
-                    attested=1
                     ;;
                 esac
                 ;;

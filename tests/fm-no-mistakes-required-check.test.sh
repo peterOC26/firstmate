@@ -85,6 +85,11 @@ attested_body() {
     "$MARKER" "$1"
 }
 
+truncated_attested_body() {
+  printf '## Pipeline\n\n%s\n\n<!-- no-mistakes-pipeline-attestation:v1 %s\n' \
+    "$MARKER" "$1"
+}
+
 extract_check_script || fail "could not lift the check script out of $WORKFLOW"
 
 test_body_without_signature_is_refused() {
@@ -189,6 +194,15 @@ test_unparseable_attestation_is_refused() {
   pass "a present but malformed attestation is refused rather than ignored"
 }
 
+test_truncated_attestation_is_refused() {
+  local out rc=0
+  out=$(run_check "$(truncated_attested_body '{"head_sha":"sample-sha","steps":[]}')") || rc=$?
+  expect_code 1 "$rc" "an attestation without its closing suffix must be refused"
+  assert_contains "$out" "present but unparseable" \
+    "truncated attestation fell through to signature-only compliance"
+  pass "a truncated attestation is refused rather than ignored"
+}
+
 test_body_without_signature_is_refused
 test_signature_without_attestation_passes
 test_attested_completed_steps_pass
@@ -199,3 +213,4 @@ test_attested_later_duplicate_skip_is_refused
 test_attested_malformed_extra_step_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused
+test_truncated_attestation_is_refused
