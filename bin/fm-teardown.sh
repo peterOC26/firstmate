@@ -1217,14 +1217,14 @@ validate_pr_poll_cleanup() {
   fi
 }
 
-# Every task record and its armed check artifacts cross the final teardown
-# boundary together. Every operation that can wait or refuse runs before this -
-# including the merge-poll retirement and merge-notified cleanup that must settle
-# a genuinely merged result before its poll is destroyed; then one
-# signal-deferred invocation retires the metadata, ordinary volatile state, poll
-# publication, trust record, and any validated quarantine entries.
-# This ordering prevents an interrupted teardown from leaving live metadata
-# behind after silently destroying the merge poll that tells Firstmate to resume.
+# Every operation that can wait or refuse runs before the final teardown
+# boundary, including the merge-poll retirement and merge-notified cleanup that
+# must settle a genuinely merged result before its poll is destroyed.
+# The main path then retires ordinary volatile state, poll publication, trust
+# state, and validated quarantine entries before the guarded backlog close or
+# task-record removal retires metadata last and can report its own failure.
+# This ordering prevents poll loss from hiding a merged result and preserves a
+# visible retry path if the final record retirement fails.
 remove_task_record_and_pr_poll_artifacts() {  # <state> <id> <meta> <other-path>...
   local state_dir=$1 id=$2 meta=$3 quarantine artifact status=0 prior_signal_traps
   local -a paths

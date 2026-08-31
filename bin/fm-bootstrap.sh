@@ -58,7 +58,8 @@
 #          treehouse is also MISSING when its installed version lacks
 #          "treehouse get --lease" support.
 #          no-mistakes is also MISSING when its installed version is older than
-#          1.46.0 (structured pipeline attestation floor; see CONTRIBUTING.md).
+#          the NO_MISTAKES_MIN floor below. CONTRIBUTING.md separately owns the
+#          PR gate's broader signature-only compatibility.
 #          The AXI-family floor policy is owned beside GH_AXI_MIN and
 #          LAVISH_AXI_MIN below; the per-tool owners point there. An installed
 #          build below its floor reports MISSING like no-mistakes, so the operator
