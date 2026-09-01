@@ -425,12 +425,12 @@ read_board() {
       }')
     fi
     page_items=$(printf '%s' "$page" | jq '.data.user.projectV2.items.nodes')
-    pages=$(jq -n --argjson old "$pages" --argjson new "$page_items" '$old + $new')
+    pages=$(printf '%s\n' "$pages" "$page_items" | jq -n '[inputs] as [$old, $new] | $old + $new')
     [ "$(printf '%s' "$page" | jq -r '.data.user.projectV2.items.pageInfo.hasNextPage')" = true ] || break
     cursor=$(printf '%s' "$page" | jq -er '.data.user.projectV2.items.pageInfo.endCursor // empty') \
       || die "GitHub project pagination cursor is unavailable"
   done
-  jq -n --argjson project "$project" --argjson items "$pages" '{project:$project,items:$items}'
+  printf '%s\n' "$project" "$pages" | jq -n '[inputs] as [$project, $items] | {project:$project,items:$items}'
 }
 
 validate_columns() {
@@ -453,8 +453,11 @@ fleet_metadata_snapshot() {
 
 desired_items() {
   local snapshot=$1 metadata=$2 salt=$3 exclusions=$4 base task_id label item
-  base=$(jq -n --argjson root "$snapshot" --argjson metadata "$metadata" '
-    def valid_pr_url:
+  # Large JSON travels via stdin: Linux caps a single exec argument at 128KB
+  # (MAX_ARG_STRLEN), which a real snapshot exceeds as --argjson.
+  base=$(printf '%s\n' "$snapshot" "$metadata" | jq -n '
+    [inputs] as [$root, $metadata]
+    | def valid_pr_url:
       type == "string"
       and test("^https://github[.]com/[^/@?#[:space:]]+/[^/@?#[:space:]]+/pull/[1-9][0-9]*$");
     ([$root.board_items[]
@@ -522,8 +525,9 @@ find_live_item() {
 # they state what is true now and claim nothing about who made it true.
 board_notes() {
   local state=$1 board=$2 desired=$3
-  jq -n --argjson state "$state" --argjson board "$board" --argjson desired "$desired" '
-    def owned_item($mapping):
+  printf '%s\n' "$state" "$board" "$desired" | jq -n '
+    [inputs] as [$state, $board, $desired]
+    | def owned_item($mapping):
       [ $board.items[]
         | select((.id == ($mapping.item_id // "") and ($mapping.item_id // "") != "")
                  or (.content.__typename == "Issue"
@@ -585,7 +589,7 @@ store_seen_signature() {
 
 append_operation() {
   local operations=$1 operation=$2
-  jq -n --argjson operations "$operations" --argjson operation "$operation" '$operations + [$operation]'
+  printf '%s\n' "$operations" "$operation" | jq -n '[inputs] as [$operations, $operation] | $operations + [$operation]'
 }
 
 append_note() {
@@ -827,16 +831,18 @@ reconcile() {
       .project = $project | .synced_at = $now')
     write_json_atomic "$STATE_FILE" "$updated_state"
     post_notes=$(board_notes "$updated_state" "$post_board" "$desired")
-    residual=$(jq -n --argjson post "$post_notes" --argjson reported "$escalations" '
-      [ $post[] | select(. as $note | $reported | index($note) != null) ]') \
+    residual=$(printf '%s\n' "$post_notes" "$escalations" | jq -n '
+      [inputs] as [$post, $reported]
+      | [ $post[] | select(. as $note | $reported | index($note) != null) ]') \
       || die "cannot reconcile poll signature against reported notes"
     store_seen_signature "$residual"
   fi
 
-  jq -n --argjson dry_run "$([ "$dry_run" = 1 ] && printf true || printf false)" \
-    --arg repo "$repo" --argjson project "$(printf '%s' "$board" | jq '.project')" \
-    --argjson operations "$operations" --argjson escalations "$escalations" \
-    --argjson excluded "$excluded" '{
+  printf '%s\n' "$(printf '%s' "$board" | jq '.project')" "$operations" "$escalations" "$excluded" \
+    | jq -n --argjson dry_run "$([ "$dry_run" = 1 ] && printf true || printf false)" \
+    --arg repo "$repo" \
+    '[inputs] as [$project, $operations, $escalations, $excluded]
+    | {
       schema:"fm-board-sync-plan.v1",
       dry_run:$dry_run,
       repository:$repo,
@@ -924,7 +930,9 @@ status_cmd() {
   if fm_custom_check_registered "$STATE_DIR" "$CHECK_ID"; then
     armed=true
   fi
-  jq -n --argjson config "$config" --argjson state "$state" --argjson armed "$armed" '{
+  printf '%s\n' "$config" "$state" | jq -n --argjson armed "$armed" '
+    [inputs] as [$config, $state]
+    | {
     schema:"fm-board-sync-status.v1",
     configured:true,
     armed:$armed,
