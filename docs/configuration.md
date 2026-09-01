@@ -25,6 +25,41 @@ Wake, watcher, away-mode, and Relay-specific state mechanics remain with their n
 `AGENTS.md` retains the run-once and read-once operator rules, lock-refusal safety, installation consent, and direct-report recovery boundaries because those facts apply at every session start.
 Ordinary dead-direct-report recovery is owned by `stuck-crewmate-recovery`, while persistent-secondmate recovery is owned by `secondmate-provisioning`.
 
+## GitHub fleet board (config/board-sync.json / config/board-exclude)
+
+`bin/fm-board-sync.sh` is the single owner of the GitHub Projects v2 fleet-board data formats, sync mechanics, private-repository gate, allowlisted card profile, board-note wording, and custom-check lifecycle.
+The sync is one-directional plus notifications: fleet state is pushed onto the board, and board state is only ever reported back as informational notes.
+The local gitignored `config/board-sync.json` object contains exactly `owner`, positive integer `project_number`, and `repo`, where `repo` is an `owner/name` issue repository under the same owner.
+The local gitignored `config/board-exclude` file contains one task id per line, with blank lines and `#` comments ignored.
+That captain-owned local file is the only source of excluded ids, and no excluded id is ever named in tracked source.
+Reconcile and poll both refuse every GitHub call unless `config/board-exclude` is a readable regular file that yields at least one task id.
+An excluded task is never pushed and never gets a card, and a card this sync has already mapped for it is never written to and never reported as unmanaged.
+A hand-filed card for a task that was excluded before the sync ever mapped it has no mapping, so it is still reported as an ordinary unmanaged card and still left completely untouched.
+A single reconcile runs at a time, guarded by an atomically published identity-owned claim under `state/.board-sync.lock` that is released only by its own owner and reclaimed only once the recorded owner is confirmed dead or its process identity no longer matches, while an unreadable ownership record makes the second run refuse rather than reclaim, so overlapping runs cannot mint duplicate issues for one task.
+Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `state/board-sync.json`, install `state/board-watch.check.sh`, and bind that byte-static check through the existing custom-check registration path.
+`reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or local state.
+A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
+
+The push is everything under `operations`: a canonical Firstmate-managed issue and card for every fleet task the sync owns, a card put back on the board when it is missing, an allowlisted title and body kept in step, the card's column set to its own task's fleet column, and the issue closed once that task reaches Done.
+Every fleet task receives its own canonical card, regardless of a manual card's title, repository, or item type, and the sync never adopts an existing issue.
+`state/board-sync.json` therefore holds only the task-to-issue mapping that push needs, and the sync stores no board history, no agreed column, and no record of captain-made state.
+Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card removed and re-added by hand cannot wedge later runs against a stale item id.
+A mapped task is reached only through its own recorded mapping, so every write for it targets the repository that mapping records, and `repo` in `config/board-sync.json` is used only to create a new canonical issue for a task that has no mapping yet.
+A mapping recording a repository other than the configured one is confirmed private and reachable before that task is written to, and a failed confirmation skips only that one task, which gets no write and no operation and is reported as a one-line note while the rest of the run proceeds normally.
+A run interrupted between creating an issue and recording its mapping leaves that issue behind; the next run creates the canonical card again and reports the leftover as an unmanaged card rather than adopting it.
+
+Board facts that do not match fleet state become one-line informational notes under `escalations`, each a plain `board changed: ...` observation of what that run saw when it read the board.
+A note is a report and never an action: the sync neither owns, retires, nor reconciles board or issue state from one, and it never deletes, archives, or unarchives a card.
+Notes carry no attribution, because a board read cannot establish who made a change.
+An archived card, an issue closed while the fleet holds a non-Done column, and a card the sync does not manage are each reported and then left exactly as they are; a card off its fleet column and a card missing from the board are reported by the same run that pushes them back.
+Every run reports what it observes, so a note repeats while its board fact persists and stops as soon as that fact is gone.
+`poll` performs the same read, derives the same notes, and emits a compact pointer instead of a lossy payload, so the existing watcher can wake firstmate.
+The pointer's signature comes from the note text alone and never from a GitHub timestamp, so a bare touch on a card stays quiet.
+Reconcile records in `state/board-sync.seen` only the notes it both reported and still observed after its writes, so an unchanged board fact stops waking every sweep while a change that landed inside the reconcile window still wakes firstmate on the next poll.
+The check runs only while the ordinary supervision watcher is live, so a fully idle home may not notice a board edit until the next firstmate session or supervision cycle.
+GitHub's five built-in workflows that write Status must be disabled manually on the project, while its auto-add workflow stays enabled.
+Current safety and behavior evidence lives in [`verification/board-sync.md`](verification/board-sync.md).
+
 ## Pi Calm preference (config/calm)
 
 The Pi Calm extension stores the captain's home-local presentation choice in gitignored `config/calm` under the effective Firstmate home, resolved from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root derived from the extension path, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present.
@@ -88,7 +123,7 @@ Both choices are local to each Firstmate home and are not part of secondmate inh
 
 ## Backlog backend (.tasks.toml / config/backlog-backend)
 
-The tracked `.tasks.toml` pins the default `tasks-axi` markdown backend to `data/backlog.md`, with `done_keep = 10` and an archive at `data/done-archive.md`.
+The tracked `.tasks.toml` pins the default `tasks-axi` markdown backend to `data/backlog.md`, with `done_keep = 30` and an archive at `data/done-archive.md`.
 When the default backend is selected and compatible `tasks-axi` is on `PATH`, firstmate uses its verbs for routine backlog mutations.
 When the automatic transition gate applies, dispatch and completion are not separate operator actions: each moves its work item inside the same run that creates or removes the task's record, so the ordinary successful path cannot leave the backlog and live task set out of sync ([`bin/fm-backlog-transition-lib.sh`](../bin/fm-backlog-transition-lib.sh)).
 Under that gate, dispatch accepts only an unheld, unblocked Queued or In flight item in this home; a missing, Done, held, or dependency-blocked item is refused before any endpoint or local copy is created.
@@ -131,7 +166,7 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 Every new task records `endpoint_task_id=` as the cleanup binding between the metadata filename and its opaque runtime endpoint.
 A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
 A zellij task additionally records `zellij_session=`, `zellij_tab_id=`, and `zellij_pane_id=`.
-An Orca task additionally records `orca_worktree_id=` and `terminal=`, with `window=fm-<id>` kept as the shared firstmate alias.
+An Orca task additionally records `orca_worktree_id=` and `terminal=`, with `window=fm-<id>` kept as the shared firstmate alias; a task targeted through an `orca:` project selector also records `orca_host=` and `orca_project_host_setup=`, and one placed on a remote Orca host also records `orca_remote=1` and `orca_remote_tasktmp=` (see [`docs/orca-backend.md`](orca-backend.md#remote-orca-hosts)).
 A cmux task additionally records `cmux_workspace_id=` and `cmux_surface_id=`.
 Task selectors for `fm-peek.sh`, `fm-send.sh`, and `fm-crew-state.sh` resolve centrally through `fm_backend_resolve_selector`.
 A selector containing `:` is passed through as an explicit backend endpoint escape hatch.
@@ -397,6 +432,9 @@ An absent or incompatible `lavish-axi` reports `MISSING: lavish-axi (install: np
 An absent or too-old `quota-axi` reports `MISSING: quota-axi (install: npm install -g quota-axi)`; firstmate cannot resolve a profile array without a compatible binary.
 Bootstrap also reports a `TANGLE:` line when `FM_ROOT` is on a named non-default branch; follow the printed checkout remediation rather than treating it as an installable tool problem.
 In a read-only session that did not get the fleet lock, the same line is advisory and omits the checkout command.
+Bootstrap further compares this checkout's `gh` default base repository with `origin`, because in a fork checkout unqualified `gh` and `gh-axi` pull request, issue, release, and Actions queries answer for the parent repository instead.
+It reads only local git configuration and never calls `gh`, so an unreachable GitHub cannot delay or fail the check.
+A checkout with no pinned default reports `GH_REPO_UNSET:`, while a divergent, ambiguous, or invalid resolution reports `GH_REPO_MISMATCH:`; both print `gh repo set-default origin` as the remedy, and a checkout already resolving to `origin` stays silent.
 The locked session-start deferred network stage runs bootstrap's best-effort project clone refresh through `fm-fleet-sync.sh`; [`fm-bootstrap.sh`'s header](../bin/fm-bootstrap.sh) owns the exact clone-refresh overlap, liveness-before-convergence, per-mate concurrency, ordered diagnostic replay, and sequential-fallback contract.
 It emits `FLEET_SYNC:` for skipped refreshes that may matter, recovered self-heals, and `STUCK:` alarms.
 Normal completed runs keep local-only and no-origin skips silent.
@@ -849,7 +887,7 @@ FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
 FM_CAPTAIN_RE='done:|needs-decision:|blocked:|failed:|PR ready|checks green|ready in branch|merged'   # captain-relevant status regex; nonterminal progress verbs remain excluded even when their prose matches
 FM_CLASSIFY_PAUSED_VERB=paused     # leading status verb for a declared external wait; excluded from FM_CAPTAIN_RE and distinct from blocked
-FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates; stale panes whose crew is not provably working surface immediately unless they declare the pause verb
+FM_STALE_ESCALATE_SECS=240         # idle seconds before a provably-working stale pane escalates; stale panes whose crew is not provably working surface immediately unless they declare a recognized wait or have no actionable status past the surfaced position
 FM_BUSY_TURN_MAX_SECS=3600         # maximum age of a busy pane's latest state/<id>.turn-ended marker, or its state/<id>.meta spawn record before any turn completes, before the same wedge escalation used for a provably-working non-busy stale takes over; inspection-only, never an automatic interrupt or restart; a declared external wait or verified captain-held transfer takes the FM_PAUSE_RESURFACE_SECS recheck below instead
 FM_PAUSE_RESURFACE_SECS=3600       # seconds before the watcher re-surfaces a declared external wait or verified captain-held transfer for a recheck, including a live busy pane past FM_BUSY_TURN_MAX_SECS; the away-mode daemon uses the same setting for a declared external wait or verified captain-held transfer, ageing its window against the crew's own latest status line rather than pane busy state
 FM_SECONDMATE_WAKE_STALL_SECS=60   # minimum age of the oldest valid foreign wake-queue row before an endpoint-recorded local secondmate produces one durable parent wake-loop-stall notification; zero or invalid values use 60
