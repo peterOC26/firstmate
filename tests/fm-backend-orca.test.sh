@@ -685,7 +685,7 @@ done
 printf '%s %s %s\n' "\${1:-}" "\${2:-}" "\$repo" >> "$log"
 case "\${1:-} \${2:-}" in
   "pr list") printf '%s\n' 7 ; exit 0 ;;
-  "pr view") printf '%s\t%s\n' 'MERGED' '$head' ; exit 0 ;;
+  "pr view") printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
 esac
 echo "error: pull request not found" >&2
 exit 1
@@ -2393,7 +2393,8 @@ test_spawn_releases_orca_resources_when_metadata_write_fails() {
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "Orca spawn should fail when metadata cannot be written"
-  assert_contains "$out" "Is a directory" "spawn should fail at metadata publication"
+  assert_contains "$out" "task record for $id could not be published" \
+    "spawn should report metadata publication failure without relying on platform-specific mv output"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-meta-fail'$'\x1f''--json' \
     "Orca spawn should close the recorded terminal when a later abort occurs"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''rm'$'\x1f''--worktree'$'\x1f''id:wt-meta-fail'$'\x1f''--force'$'\x1f''--json' \

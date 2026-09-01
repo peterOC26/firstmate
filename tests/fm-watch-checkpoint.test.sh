@@ -16,7 +16,7 @@ make_home() {
 }
 
 write_terminal_footer_case() {
-  local home=$1 delivered=$2 fakebin key sig hash
+  local home=$1 delivered=$2 fakebin key hash
   fakebin="$home/fakebin"
   mkdir -p "$fakebin"
   cat > "$fakebin/tmux" <<'SH'
@@ -35,15 +35,31 @@ SH
   chmod +x "$fakebin/tmux"
   printf 'window=test:fm-footer\nkind=ship\n' > "$home/state/footer.meta"
   printf 'done: PR https://example.test/pr/footer\n' > "$home/state/footer.status"
-  sig=$(FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_wake_signal_sig "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/footer.status")
-  printf '%s' "$sig" > "$home/state/.seen-footer_status"
+  # The signal-seen marker records a classified size plus file identity, the
+  # same commit fm-wake-lib.sh makes for a genuinely presented status log; a
+  # bare signature byte-string is the pre-2026-08 shape and no longer absorbs.
+  FM_STATE_OVERRIDE="$home/state" bash -c '
+    . "$1"
+    fm_wake_status_mark_current "$2" "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state" "$home/state/footer.status" \
+    || fail "could not prime the terminal status signal"
   printf 'finished, awaiting review\n⏱  16m | 12%% context\n' > "$home/state/pane.txt"
   key=test_fm-footer
   hash=$(hash_text $'finished, awaiting review\n⏱  15m | 12% context')
   printf '%s' "$hash" > "$home/state/.hash-$key"
   printf '1\n' > "$home/state/.count-$key"
   if [ "$delivered" = 1 ]; then
-    printf 'done: PR https://example.test/pr/footer' > "$home/state/.hb-surfaced-footer"
+    # The delivered marker records a CLASSIFIED POSITION plus file identity
+    # (fm-classify-lib.sh owns that format), which is exactly what the watcher
+    # commits through mark_surfaced - not the bare status line it once stored.
+    FM_STATE_OVERRIDE="$home/state" bash -c '
+      . "$1"
+      ident=$(_fm_open_decisions_file_ident "$2") || exit 1
+      status_presentation_marker_commit "$3" "$2" \
+        "$(LC_ALL=C wc -c < "$2" | tr -d "[:space:]")" "$ident"
+    ' _ "$ROOT/bin/fm-classify-lib.sh" "$home/state/footer.status" \
+      "$home/state/.hb-surfaced-footer" \
+      || fail "could not seed the delivered terminal marker"
   fi
 }
 
@@ -96,9 +112,6 @@ test_registered_check_uses_preserved_watcher_environment() {
   home=$(make_home check-env)
   out="$home/out.txt"
   err="$home/err.txt"
-  printf '%s\n' fm-pr-check-migration-scan-v1 > "$home/state/.pr-check-migration-scan-v1"
-  printf '%s\n' fm-pr-check-migration-v1 > "$home/state/.pr-check-migration-v1"
-  chmod 0600 "$home/state/.pr-check-migration-scan-v1" "$home/state/.pr-check-migration-v1"
   cat > "$home/state/env-check.check.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'env check fired with FM_CHECK_INTERVAL=%s\n' "${FM_CHECK_INTERVAL:-missing}"
@@ -119,9 +132,6 @@ test_existing_singleton_watcher_is_not_success() {
   home=$(make_home singleton)
   out="$home/out.txt"
   err="$home/err.txt"
-  printf '%s\n' fm-pr-check-migration-scan-v1 > "$home/state/.pr-check-migration-scan-v1"
-  printf '%s\n' fm-pr-check-migration-v1 > "$home/state/.pr-check-migration-v1"
-  chmod 0600 "$home/state/.pr-check-migration-scan-v1" "$home/state/.pr-check-migration-v1"
   mkdir "$home/state/.watch.lock"
   printf '%s\n' "$$" > "$home/state/.watch.lock/pid"
   status=0

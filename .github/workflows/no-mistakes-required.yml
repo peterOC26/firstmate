@@ -31,6 +31,7 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -eu
           marker='Updates from [git push no-mistakes](https://github.com/kunchenguid/no-mistakes)'
@@ -40,22 +41,30 @@ jobs:
             # which pins every contributor to no-mistakes >= 1.46.0. This fork's own
             # pipeline still runs 1.45.x, which emits the signature line and no
             # attestation, so an unconditional requirement fails every PR this fork
-            # is able to raise. Enforce the attested step statuses whenever the
-            # comment is present, and accept signature-only compliance when it is
-            # absent. Raising the fork's pipeline to >= 1.46.0 turns the stricter
-            # gate on by itself, with no edit needed here.
+            # is able to raise. This compatibility gate accepts signature-only
+            # compliance when the comment is absent. When it is present, require
+            # well-formed step records, bind it to the current head, and use the
+            # last recorded status for each required step. This is intentionally
+            # narrower than the upstream shared verifier.
             prefix='<!-- no-mistakes-pipeline-attestation:v1 '
             suffix=' -->'
             body="${PR_BODY:-}"
             json=''
             attested=0
+            attestation_conflict=0
             case "$body" in
               *"$prefix"*)
+                attested=1
                 rest="${body#*"$prefix"}"
                 case "$rest" in
                   *"$suffix"*)
                     json="${rest%%"$suffix"*}"
-                    attested=1
+                    trailing="${rest#*"$suffix"}"
+                    case "$trailing" in
+                      *"$prefix"*)
+                        attestation_conflict=1
+                        ;;
+                    esac
                     ;;
                 esac
                 ;;
@@ -68,6 +77,19 @@ jobs:
               echo "Once the pipeline reaches >= 1.46.0, the attestation comment appears and"
               echo "this same job begins requiring review, test, and document to be completed."
               exit 0
+            fi
+            if [ "$attestation_conflict" -eq 1 ]; then
+              {
+                echo "::error::Multiple no-mistakes pipeline attestation prefixes are not accepted."
+                echo
+                echo "The PR body must contain at most one structured pipeline attestation."
+                echo "Remove duplicate or truncated trailing attestations, then re-run the pipeline."
+                echo
+                echo "See CONTRIBUTING.md for setup and the full workflow."
+                echo
+                echo "PR author: ${PR_AUTHOR}"
+              } >&2
+              exit 1
             fi
             if ! command -v jq >/dev/null 2>&1; then
               echo "::error::This check requires jq to parse no-mistakes pipeline step attestation, but jq was not found on the runner." >&2
@@ -93,10 +115,46 @@ jobs:
               } >&2
               exit 1
             fi
+            if ! printf '%s' "$json" | jq -e '
+              .steps as $steps
+              | ($steps | type == "array")
+                and all($steps[];
+                  type == "object"
+                  and (.step | type == "string" and length > 0)
+                  and (.status | type == "string"))
+            ' >/dev/null 2>&1; then
+              {
+                echo "::error::The no-mistakes pipeline step attestation contains malformed step records."
+                echo
+                echo "Every step must be an object with a non-empty string 'step' and a string 'status'."
+                echo
+                echo "Re-run the pipeline with 'git push no-mistakes' using no-mistakes >= 1.46.0."
+                echo "See CONTRIBUTING.md for setup and the full workflow."
+                echo
+                echo "PR author: ${PR_AUTHOR}"
+              } >&2
+              exit 1
+            fi
+            attested_head=$(printf '%s' "$json" | jq -r \
+              '(.head_sha | strings | select(length > 0)) // empty')
+            if [ -z "$attested_head" ] || [ "$attested_head" != "${PR_HEAD_SHA:-}" ]; then
+              {
+                echo "::error::The no-mistakes pipeline attestation does not match the current PR head."
+                echo
+                echo "Attested head: ${attested_head:-<missing>}"
+                echo "Current PR head: ${PR_HEAD_SHA:-<missing>}"
+                echo
+                echo "Re-run the pipeline with 'git push no-mistakes' at the current PR head."
+                echo "See CONTRIBUTING.md for setup and the full workflow."
+                echo
+                echo "PR author: ${PR_AUTHOR}"
+              } >&2
+              exit 1
+            fi
             incomplete=''
             for required in review test document; do
               status=$(printf '%s' "$json" | jq -r --arg step "$required" \
-                '([(.steps | arrays | .[]) | select(.step == $step) | .status] | first // empty | select(. != "")) // "missing"')
+                '([(.steps | arrays | .[]) | select(.step == $step) | .status] | last // empty | select(. != "")) // "missing"')
               if [ "$status" != "completed" ]; then
                 if [ -n "$incomplete" ]; then
                   incomplete="${incomplete}, "

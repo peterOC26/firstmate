@@ -143,6 +143,7 @@ their presentation icons; it leaves the structured snapshot unchanged.
 Default fields: schema, home, generated, prs, board_columns{column,empty},
   board_items{column,id,summary,owner,detail,artifact}, in_flight{id,kind,state,doing},
   secondmates{id,state,doing,provenance,freshness,age_seconds,contradiction,reason},
+  secondmate_reconcile{id,spawn_gen,host,kind,ids},
   decisions_open{id,key,verb,summary,owner}, landed{id,what,artifact,owner},
   gates{id,title,blocked_by,reason,owner}, reports{id,path}, recorded_prs{id,url},
   unhealthy_endpoints{...} (only when non-empty), omitted{surface,reveal}.
@@ -629,6 +630,9 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       board_items: $board_items,
       in_flight: ($in_flight | map(del(.source, .pr))),
       secondmates: $secondmates,
+      secondmate_reconcile: [ (.secondmate_current.records // [])[]
+        | select(.reconcile_inventory != null)
+        | {id, spawn_gen:(.spawn_gen // null), host:(.host // null), kind:(.reconcile_inventory.kind // null), ids:((.reconcile_inventory.ids // []) | map(select(type == "string")) | sort)} ],
       decisions_open: $decisions,
       landed: $landed,
       gates: ($gates | map(del(.gate))),

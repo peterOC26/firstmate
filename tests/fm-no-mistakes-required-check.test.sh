@@ -66,10 +66,11 @@ PY
 }
 
 # Run the lifted script exactly as the runner does: `bash -e <file>` with the
-# step's three environment values bound.
+# step's four environment values bound.
 run_check() {
-  local body=$1 out rc=0
+  local body=$1 head=${2:-sample-sha} out rc=0
   out=$(PR_BODY="$body" PR_AUTHOR=sample-author PR_NUMBER=4242 \
+    PR_HEAD_SHA="$head" \
     bash -e "$CHECK" 2>&1) || rc=$?
   printf '%s\n' "$out"
   return "$rc"
@@ -82,6 +83,16 @@ signature_body() {
 attested_body() {
   printf '## Pipeline\n\n%s\n\n<!-- no-mistakes-pipeline-attestation:v1 %s -->\n' \
     "$MARKER" "$1"
+}
+
+truncated_attested_body() {
+  printf '## Pipeline\n\n%s\n\n<!-- no-mistakes-pipeline-attestation:v1 %s\n' \
+    "$MARKER" "$1"
+}
+
+attested_body_with_trailing_prefix() {
+  printf '## Pipeline\n\n%s\n\n<!-- no-mistakes-pipeline-attestation:v1 %s -->\n<!-- no-mistakes-pipeline-attestation:v1 %s\n' \
+    "$MARKER" "$1" "$2"
 }
 
 extract_check_script || fail "could not lift the check script out of $WORKFLOW"
@@ -121,6 +132,24 @@ test_attested_completed_steps_pass() {
   pass "an attestation with review, test, and document completed passes"
 }
 
+test_attested_stale_head_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"old-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}')" current-sha) || rc=$?
+  expect_code 1 "$rc" "an attestation from an older PR head must be refused"
+  assert_contains "$out" "old-sha" "refusal did not name the attested head"
+  assert_contains "$out" "current-sha" "refusal did not name the current PR head"
+  pass "an attestation from an older PR head is refused"
+}
+
+test_attested_missing_head_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}')") || rc=$?
+  expect_code 1 "$rc" "an attestation without head_sha must be refused"
+  assert_contains "$out" "Attested head: <missing>" \
+    "refusal did not identify the missing attested head"
+  pass "an attestation without head_sha is refused"
+}
+
 test_attested_skip_is_refused() {
   # Upstream's substantive control has to survive the relaxation above: when a
   # pipeline does attest, a skipped required step still fails the check.
@@ -129,6 +158,24 @@ test_attested_skip_is_refused() {
   expect_code 1 "$rc" "an attested but skipped required step must be refused"
   assert_contains "$out" "review=skipped" "refusal did not name the skipped step"
   pass "an attested quota or agent skip is still refused"
+}
+
+test_attested_later_duplicate_skip_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"},{"step":"review","status":"skipped"}]}')") || rc=$?
+  expect_code 1 "$rc" "a later duplicate skipped status must override completed"
+  assert_contains "$out" "review=skipped" \
+    "refusal did not use the later duplicate review status"
+  pass "the last duplicate status controls attestation compliance"
+}
+
+test_attested_malformed_extra_step_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"},{}]}')") || rc=$?
+  expect_code 1 "$rc" "a malformed extra step record must invalidate the attestation"
+  assert_contains "$out" "malformed step records" \
+    "refusal did not identify the malformed extra step record"
+  pass "a malformed unrelated step invalidates the attestation"
 }
 
 test_attested_missing_step_is_refused() {
@@ -152,9 +199,33 @@ test_unparseable_attestation_is_refused() {
   pass "a present but malformed attestation is refused rather than ignored"
 }
 
+test_truncated_attestation_is_refused() {
+  local out rc=0
+  out=$(run_check "$(truncated_attested_body '{"head_sha":"sample-sha","steps":[]}')") || rc=$?
+  expect_code 1 "$rc" "an attestation without its closing suffix must be refused"
+  assert_contains "$out" "present but unparseable" \
+    "truncated attestation fell through to signature-only compliance"
+  pass "a truncated attestation is refused rather than ignored"
+}
+
+test_attestation_with_trailing_truncated_prefix_is_refused() {
+  local out rc=0
+  out=$(run_check "$(attested_body_with_trailing_prefix '{"head_sha":"sample-sha","steps":[{"step":"review","status":"completed"},{"step":"test","status":"completed"},{"step":"document","status":"completed"}]}' '{"head_sha":"sample-sha"}')") || rc=$?
+  expect_code 1 "$rc" "a valid attestation followed by a truncated one must be refused"
+  assert_contains "$out" "Multiple no-mistakes pipeline attestation prefixes" \
+    "trailing truncated attestation was not identified"
+  pass "a trailing truncated attestation invalidates the body"
+}
+
 test_body_without_signature_is_refused
 test_signature_without_attestation_passes
 test_attested_completed_steps_pass
+test_attested_stale_head_is_refused
+test_attested_missing_head_is_refused
 test_attested_skip_is_refused
+test_attested_later_duplicate_skip_is_refused
+test_attested_malformed_extra_step_is_refused
 test_attested_missing_step_is_refused
 test_unparseable_attestation_is_refused
+test_truncated_attestation_is_refused
+test_attestation_with_trailing_truncated_prefix_is_refused

@@ -14,7 +14,7 @@ A fresh Pi session or new Calm extension lifetime starts at the normal initial p
 Very narrow terminals fall back to a smaller deterministic sprite.
 While Calm is off, Pi's stock working row is left exactly as Pi renders it.
 Calm hides collapsed thinking labels, mid-turn assistant working notes, Cursor-provider synthetic tool chrome in assistant text, Pi tool-call and text-result shells, and canonically classified Firstmate operational user rows.
-Those tool shells include the built-in tools Calm owns, `fm_watch_arm_pi`, foreign extension tools, provider-side tool names Pi has no local definition for, and built-in names another extension owns.
+Those tool shells include the built-in tools Calm owns, `fm_watch_arm_pi`, `fm_branch_outcomes`, foreign extension tools, provider-side tool names Pi has no local definition for, and built-in names another extension owns.
 A mid-turn working note is assistant text in a message the model did not end its response with, identified by that message's own `stopReason` of `toolUse`, or of `length` with tool calls present.
 Hiding it removes the narration a model emits alongside its tool calls, while the genuine reply that ends a response stays visible.
 A text block that is still streaming is never hidden as a working note, because suppressing it would also stop a genuine reply from streaming, so a working note is briefly visible before its row collapses.
@@ -22,7 +22,7 @@ Cursor-provider synthetic tool chrome is recognized only as a line beginning wit
 Calm removes that chrome from the live assistant-text presentation while retaining surrounding prose, including ordinary prose that mentions tools or their names.
 The chrome strip removes matching lines rather than suppressing the text block, so it applies even while that text is still streaming.
 The narration is hidden only from the live transcript presentation, and remains in the message, model context, session storage, and `/export` artifacts.
-The operational inputs remain ordinary user-role messages, while Pi's transcript layout renders their complete rows at zero height.
+The operational inputs Calm classifies remain ordinary user-role messages, while Pi's transcript layout renders their complete rows at zero height.
 The session-start nudge remains on its existing non-displayed custom-message path.
 
 Outside Pi's same-name built-in override collision described below, Calm changes presentation only.
@@ -58,6 +58,7 @@ Regression entry points:
 
 ```sh
 tests/fm-calm-pi-extension.test.sh
+tests/fm-pi-branch-extension.test.sh
 tests/fm-pi-primary-types.test.sh
 FM_PI_LIVE_E2E=1 tests/fm-pi-primary-live-e2e.test.sh
 ```
