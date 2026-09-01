@@ -934,11 +934,8 @@ task_json_lines() {
 # Meta inventory remains the sole source of live workers; this object only
 # discloses backlog↔task inconsistency for renderers (Bearings omitted/gates).
 main_inventory_json() {  # <backlog-json-file> <tasks-json-file>
-  jq -n \
-    --slurpfile backlog "$1" \
-    --slurpfile tasks "$2" '
-    ($backlog[0]) as $backlog
-    | ($tasks[0]) as $tasks
+  cat "$1" "$2" | jq -n '
+    [inputs] as [$backlog, $tasks]
     | ([ $backlog.records[]?
        | select((.state == "in_flight" or .state == "queued") and (.structured | not)) ]) as $unstructured_current
     | ([ $backlog.records[]?
@@ -964,7 +961,7 @@ main_inventory_json() {  # <backlog-json-file> <tasks-json-file>
 # This mode never reads parent events or terminal text and never aggregates
 # nested secondmates.
 secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
-  jq -n \
+  cat "$1" "$2" | jq -n \
     --arg generated "$SNAPSHOT_NOW" \
     --argjson generated_epoch "$SNAPSHOT_EPOCH" \
     --arg home "$FM_HOME" \
@@ -972,10 +969,8 @@ secondmate_home_summary_json() {  # <backlog-json-file> <tasks-json-file>
     --argjson queued_n "$FM_SNAPSHOT_SECONDMATE_QUEUED" \
     --argjson decisions_n "$FM_SNAPSHOT_SECONDMATE_DECISIONS" \
     --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
-    --slurpfile backlog "$1" \
-    --slurpfile tasks "$2" --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" "$FM_LANDED_JQ_DEFS"'
-    ($backlog[0]) as $backlog
-    | ($tasks[0]) as $tasks
+    --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" "$FM_LANDED_JQ_DEFS"'
+    [inputs] as [$backlog, $tasks]
     | def trunc($n):
       tostring | gsub("\\s+"; " ")
       | if length > $n then .[:$n] + "…" else . end;
@@ -2033,7 +2028,9 @@ secondmate_current_json "$TASKS_JSON_FILE" "$SECONDMATE_CURRENT_JSON_FILE" \
 secondmate_landed_from_current_json "$SECONDMATE_CURRENT_JSON_FILE" "$SECONDMATE_LANDED_JSON_FILE" \
   || { echo "fm-fleet-snapshot: secondmate landed projection failed" >&2; exit 1; }
 
-jq -n \
+cat "$BACKLOG_JSON_FILE" "$TASKS_JSON_FILE" "$MAIN_INVENTORY_JSON_FILE" \
+    "$SCOUT_REPORTS_JSON_FILE" "$SECONDMATE_CURRENT_JSON_FILE" "$SECONDMATE_LANDED_JSON_FILE" \
+  | jq -n \
   --arg generated "$SNAPSHOT_NOW" \
   --arg fm_home "$FM_HOME" \
   --arg fm_root "$FM_ROOT" \
@@ -2041,20 +2038,9 @@ jq -n \
   --arg data "$DATA" \
   --arg config "$CONFIG" \
   --arg projects "$PROJECTS" \
-  --slurpfile backlog "$BACKLOG_JSON_FILE" \
-  --slurpfile tasks "$TASKS_JSON_FILE" \
-  --slurpfile main_inventory "$MAIN_INVENTORY_JSON_FILE" \
   --slurpfile contributions "$CONTRIBUTIONS_JSON_FILE" \
-  --slurpfile scout_reports "$SCOUT_REPORTS_JSON_FILE" \
-  --slurpfile secondmate_current "$SECONDMATE_CURRENT_JSON_FILE" \
-  --slurpfile secondmate_landed "$SECONDMATE_LANDED_JSON_FILE" \
-  '($backlog[0]) as $backlog
-   | ($tasks[0]) as $tasks
-   | ($main_inventory[0]) as $main_inventory
-   | ($scout_reports[0]) as $scout_reports
-   | ($secondmate_current[0]) as $secondmate_current
-   | ($secondmate_landed[0]) as $secondmate_landed
-   | def backlog_by_id($id): ($backlog.records[]? | select(.structured == true and .id == $id) | .) // null;
+  '[inputs] as [$backlog, $tasks, $main_inventory, $scout_reports, $secondmate_current, $secondmate_landed]
+    | def backlog_by_id($id): ($backlog.records[]? | select(.structured == true and .id == $id) | .) // null;
    def task_by_id($id): ($tasks[]? | select(.id == $id) | .) // null;
    def report_kind($id): (task_by_id($id).kind // backlog_by_id($id).kind // "scout");
    {
