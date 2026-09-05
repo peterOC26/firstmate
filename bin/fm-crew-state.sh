@@ -407,8 +407,10 @@ nm_runs_status_for_branch() {  # <branch>
   return 0
 }
 
-# CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
-# scratch worktree); with no branch there is no run to attribute to this crew.
+# CREW_BRANCH is empty at detached HEAD, a state fm-spawn.sh no longer leaves a
+# fresh ship or scout crew in (it puts the worktree on fm/<id> before the
+# worker starts) but that a stale pre-fix or manually detached worktree can
+# still reach; with no branch there is no run to attribute to this crew.
 CREW_BRANCH=$(git -C "$WT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
 
 # 0 if the active axi-status run's head field matches this worktree's code

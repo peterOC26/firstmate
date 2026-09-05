@@ -138,6 +138,11 @@
 #   origin, resolves the current remote default branch, and resets to its tip.
 #   An unreachable origin, unresolved default branch, or non-clean worktree
 #   refuses the spawn rather than risking a PR based on stale history.
+#   Every ship or scout spawn (fresh or relaunch) then puts that worktree on
+#   branch fm/<id> before the worker starts, so a session list keyed on
+#   project:branch reads the task id instead of a bare detached HEAD; already
+#   sitting on that branch is a no-op, and uncommitted work blocks the switch
+#   rather than being discarded (ensure_spawn_task_branch).
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -1938,6 +1943,35 @@ freshen_spawn_worktree_base() {  # <worktree>
   fi
 }
 
+# Give the worktree its readable fm/<id> name before the worker ever starts
+# (ccmux and similar lists render project:branch, and a detached HEAD reads as
+# an unhelpful "HEAD+"). Idempotent: already sitting on the branch is a no-op.
+# Never pushes, never forces. Creating the branch from the current HEAD never
+# touches a tracked file (the new branch names the exact commit already
+# checked out), so it is always safe even over a dirty tree - including the
+# benign stale-submodule-pin residue freshen_spawn_worktree_base can leave
+# right before this runs. Switching to an already-existing same-name branch is
+# the one case that could discard something, and git's own checkout refusal on
+# local changes it would overwrite is the guard: no separate cleanliness check
+# is layered on top of it.
+ensure_spawn_task_branch() {  # <worktree> <id>
+  local worktree=$1 id=$2 branch current
+  branch="fm/$id"
+  current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  [ "$current" != "$branch" ] || return 0
+  if git -C "$worktree" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$worktree" checkout --quiet "$branch" || {
+      echo "error: could not switch worktree '$worktree' to existing branch '$branch'; refusing to discard uncommitted work" >&2
+      return 1
+    }
+  else
+    git -C "$worktree" checkout --quiet -b "$branch" || {
+      echo "error: could not create task branch '$branch' in worktree '$worktree'" >&2
+      return 1
+    }
+  fi
+}
+
 herdr_projection_meta_field_exact() {  # <meta> <key>
   local meta=$1 key=$2 count
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
@@ -2471,6 +2505,9 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" || exit 1
+fi
+if [ "$KIND" != secondmate ]; then
+  ensure_spawn_task_branch "$WT" "$ID" || exit 1
 fi
 
 # Per-task temp root: /tmp/fm-<id>/ with Go's build temp nested at gotmp/. Go won't
