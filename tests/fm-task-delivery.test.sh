@@ -297,7 +297,7 @@ test_promote_refuses_a_symlinked_task_record() {
 # prints against a capturing fm-send.sh, and asserts on the message the worker would
 # actually receive - for every supported mode.
 test_promotion_delivers_the_real_definition_of_done() {
-  local home meta out sendroot payload mode id brief_dod delivered_dod
+  local home meta out sendroot payload mode id brief_dod delivered_dod step3
   home="$TMP_ROOT/promote-dod/home"
   sendroot="$TMP_ROOT/promote-dod/sendroot"
   mkdir -p "$home/state" "$sendroot/bin"
@@ -340,6 +340,11 @@ STUB
       "$mode: promoted worker was not given the self-healing branch step a scout spawned before fm-spawn named worktrees needs"
     assert_grep "git reset --hard origin/" "$payload" \
       "$mode: promoted worker was not told how to return its branch to the default-branch base"
+    step3=$(grep -F "git reset --hard origin/" "$payload" | head -n 1)
+    case "${step3%%git reset --hard origin/*}" in
+      *"git add -A && git commit -m scratch"*"git rev-parse HEAD"*"git checkout fm/$id"*) : ;;
+      *) fail "$mode: promoted worker's reset step does not commit uncommitted scratch, note the tip, and land on fm/$id before the reset --hard" ;;
+    esac
 
     # Compare the public outputs of both real generation paths. The promoted
     # payload ends at its Definition of done, as does an ordinary generated
