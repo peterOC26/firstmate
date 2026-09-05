@@ -864,6 +864,43 @@ test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch() {
   pass "fm-spawn --relaunch: a clean detached worktree is put back on its own fm/<id>, not refused as a stale leftover"
 }
 
+test_spawn_relaunch_refuses_to_strand_commits_not_on_the_task_branch() {
+  local dir wt out rc branch_tip detached_tip
+  dir=$(new_case relaunch-strand rl42)
+  add_ship_task "$dir" rl42 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl42
+  printf 'on the branch\n' > "$wt/branch.txt"
+  git -C "$wt" add branch.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'branch work'
+  branch_tip=$(git -C "$wt" rev-parse HEAD)
+  # The previous agent detached HEAD, committed a fix there, and was stopped:
+  # that commit is on no branch, so a quiet switch back onto fm/rl42 would
+  # leave it reachable only from the reflog.
+  git -C "$wt" checkout -q --detach
+  printf 'only on the detached head\n' > "$wt/detached.txt"
+  git -C "$wt" add detached.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'detached fix'
+  detached_tip=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl42 --relaunch); rc=$?
+  [ "$rc" -ne 0 ] || fail "relaunch switched onto fm/rl42 and stranded a detached commit"$'\n'"$out"
+  assert_not_contains "$out" "spawned rl42" "the relaunch launched a replacement despite refusing the switch"
+  assert_contains "$out" "holding 1 commit(s) that task branch 'fm/rl42'" \
+    "the refusal did not count the commits the switch would leave behind"
+  assert_contains "$out" "refusing to switch and leave them behind" \
+    "the refusal did not say why the worktree was left untouched"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$detached_tip" ] \
+    || fail "the refusal moved HEAD off the detached commit"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal attached the worktree to a branch"
+  [ "$(git -C "$wt" rev-parse fm/rl42)" = "$branch_tip" ] \
+    || fail "the refusal moved fm/rl42 (it must not fast-forward, merge, or rebase the detached work)"
+  assert_grep 'only on the detached head' "$wt/detached.txt" "the detached commit's file is gone from the worktree"
+  pass "fm-spawn --relaunch: a detached HEAD holding commits fm/<id> lacks is refused, never quietly left behind"
+}
+
 test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched() {
   local dir wt out rc head_before tip_before gitdir
   dir=$(new_case relaunch-rebase rl41)
@@ -1578,6 +1615,7 @@ test_explicit_secondmate_harness_ignores_configured_profile_axes
 test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch
+test_spawn_relaunch_refuses_to_strand_commits_not_on_the_task_branch
 test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch

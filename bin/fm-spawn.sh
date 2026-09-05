@@ -146,9 +146,11 @@
 #   spawn rather than silently moving the worktree off its freshened base. A
 #   relaunch owns no base-freshness invariant, so there the same step is
 #   best-effort: it switches back onto the task's own fm/<id> (or creates it)
-#   when git can do so cleanly, leaves a worktree with a rebase, bisect, merge,
-#   cherry-pick, or revert in progress exactly as the previous agent left it,
-#   and never refuses the relaunch (ensure_spawn_task_branch).
+#   when git can do so cleanly and the current HEAD is already contained in
+#   that branch, leaves a worktree with a rebase, bisect, merge, cherry-pick,
+#   or revert in progress exactly as the previous agent left it, and refuses
+#   only when switching would leave commits behind that fm/<id> does not hold
+#   (ensure_spawn_task_branch).
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -1991,15 +1993,19 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
 #
 # Relaunch (relaunch=1): fm/<id> is the task's own work branch, not a
 # leftover, and there is no freshened base to defend; the recorded worktree is
-# reused exactly as the previous agent left it. So this step is best-effort
-# and never refuses the relaunch: a worktree mid-rebase, mid-bisect, or
-# otherwise inside a git operation is left alone (git would happily move a
-# clean mid-rebase HEAD onto the branch and orphan the rebase state), a
-# detached or differently-named worktree is switched back onto fm/<id> when
-# git can do so without overwriting local changes, and any decline from git
-# is reported as a notice with the worktree untouched.
+# reused exactly as the previous agent left it. So this step is best-effort:
+# a worktree mid-rebase, mid-bisect, or otherwise inside a git operation is
+# left alone (git would happily move a clean mid-rebase HEAD onto the branch
+# and orphan the rebase state), a detached or differently-named worktree is
+# switched back onto fm/<id> only when its HEAD is already an ancestor of (or
+# equal to) that branch's tip, and any decline from git is reported as a
+# notice with the worktree untouched. The one refusal on this path is a HEAD
+# holding commits fm/<id> lacks: a quiet checkout would strand them with no
+# warning (only the reflog would still know them), so the relaunch stops and
+# names them instead of fast-forwarding, merging, or rebasing on the agent's
+# behalf.
 ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
-  local worktree=$1 id=$2 relaunch=$3 branch current head tip err op
+  local worktree=$1 id=$2 relaunch=$3 branch current head tip err op where behind
   branch="fm/$id"
   current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   [ "$current" != "$branch" ] || return 0
@@ -2008,15 +2014,21 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
     return 0
   fi
   if tip=$(git -C "$worktree" rev-parse --verify --quiet "refs/heads/$branch^{commit}" 2>/dev/null); then
-    if [ "$relaunch" != 1 ]; then
-      head=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
-        echo "error: could not read HEAD of worktree '$worktree' before switching to existing branch '$branch'" >&2
-        return 1
-      }
-      if [ "$tip" != "$head" ]; then
-        echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
+    head=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
+      echo "error: could not read HEAD of worktree '$worktree' before switching to existing branch '$branch'" >&2
+      return 1
+    }
+    if [ "$relaunch" = 1 ]; then
+      if ! git -C "$worktree" merge-base --is-ancestor "$head" "$tip" 2>/dev/null; then
+        behind=$(git -C "$worktree" rev-list --count "$tip..$head" 2>/dev/null || echo unknown)
+        where=detached
+        [ -z "$current" ] || where="on branch '$current'"
+        echo "error: worktree '$worktree' is $where at $head, holding $behind commit(s) that task branch '$branch' (at $tip) does not; refusing to switch and leave them behind - bring them onto '$branch' (or move HEAD back onto it deliberately) before relaunching" >&2
         return 1
       fi
+    elif [ "$tip" != "$head" ]; then
+      echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
+      return 1
     fi
     if ! err=$(git -C "$worktree" checkout --quiet "$branch" 2>&1); then
       if [ "$relaunch" = 1 ]; then
