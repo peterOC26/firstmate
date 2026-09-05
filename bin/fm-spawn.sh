@@ -138,13 +138,17 @@
 #   origin, resolves the current remote default branch, and resets to its tip.
 #   An unreachable origin, unresolved default branch, or non-clean worktree
 #   refuses the spawn rather than risking a PR based on stale history.
-#   Every ship or scout spawn (fresh or relaunch) then puts that worktree on
-#   branch fm/<id> before the worker starts, so a session list keyed on
-#   project:branch reads the task id instead of a bare detached HEAD; already
-#   sitting on that branch is a no-op, an existing fm/<id> is reused only when
-#   it points at the worktree's current HEAD, and a leftover fm/<id> at any
-#   other commit refuses the spawn rather than silently moving the worktree
-#   off its freshened base (ensure_spawn_task_branch).
+#   Every fresh ship or scout spawn then puts that worktree on branch fm/<id>
+#   before the worker starts, so a session list keyed on project:branch reads
+#   the task id instead of a bare detached HEAD; already sitting on that branch
+#   is a no-op, an existing fm/<id> is reused only when it points at the
+#   just-freshened HEAD, and a leftover fm/<id> at any other commit refuses the
+#   spawn rather than silently moving the worktree off its freshened base. A
+#   relaunch owns no base-freshness invariant, so there the same step is
+#   best-effort: it switches back onto the task's own fm/<id> (or creates it)
+#   when git can do so cleanly, leaves a worktree with a rebase, bisect, merge,
+#   cherry-pick, or revert in progress exactly as the previous agent left it,
+#   and never refuses the relaunch (ensure_spawn_task_branch).
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -1945,6 +1949,27 @@ freshen_spawn_worktree_base() {  # <worktree>
   fi
 }
 
+# Name the git operation a worktree is in the middle of (rebase, bisect,
+# merge, cherry-pick, revert) on stdout and return 0, or return 1 when none
+# is in progress. These markers live in the worktree's own git dir, which
+# --absolute-git-dir resolves for linked worktrees too.
+spawn_worktree_git_operation_in_progress() {  # <worktree>
+  local worktree=$1 gitdir marker
+  gitdir=$(git -C "$worktree" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  for marker in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG; do
+    [ -e "$gitdir/$marker" ] || continue
+    case $marker in
+      rebase-merge|rebase-apply) echo rebase ;;
+      MERGE_HEAD) echo merge ;;
+      CHERRY_PICK_HEAD) echo cherry-pick ;;
+      REVERT_HEAD) echo revert ;;
+      BISECT_LOG) echo bisect ;;
+    esac
+    return 0
+  done
+  return 1
+}
+
 # Give the worktree its readable fm/<id> name before the worker ever starts
 # (ccmux and similar lists render project:branch, and a detached HEAD reads as
 # an unhelpful "HEAD+"). Idempotent: already sitting on the branch is a no-op.
@@ -1952,9 +1977,10 @@ freshen_spawn_worktree_base() {  # <worktree>
 # touches a tracked file (the new branch names the exact commit already
 # checked out), so it is always safe even over a dirty tree - including the
 # benign stale-submodule-pin residue freshen_spawn_worktree_base can leave
-# right before this runs. An fm/<id> that already exists is reused only when
-# it points at the current HEAD (the just-freshened base on a fresh spawn, the
-# recorded worktree head on a relaunch), where switching onto it moves no
+# right before this runs.
+#
+# Fresh spawn (relaunch=0): an fm/<id> that already exists is reused only when
+# it points at the just-freshened HEAD, where switching onto it moves no
 # tracked file either. Any other tip is a leftover from an earlier spawn of
 # the same id, and quietly switching onto it would walk the worktree off the
 # base freshen_spawn_worktree_base just established, so the spawn is refused
@@ -1962,26 +1988,50 @@ freshen_spawn_worktree_base() {  # <worktree>
 # at that point (the branch is checked out in another worktree, a stale
 # index.lock) is reported with git's own error rather than blamed on
 # uncommitted work.
-ensure_spawn_task_branch() {  # <worktree> <id>
-  local worktree=$1 id=$2 branch current head tip err
+#
+# Relaunch (relaunch=1): fm/<id> is the task's own work branch, not a
+# leftover, and there is no freshened base to defend; the recorded worktree is
+# reused exactly as the previous agent left it. So this step is best-effort
+# and never refuses the relaunch: a worktree mid-rebase, mid-bisect, or
+# otherwise inside a git operation is left alone (git would happily move a
+# clean mid-rebase HEAD onto the branch and orphan the rebase state), a
+# detached or differently-named worktree is switched back onto fm/<id> when
+# git can do so without overwriting local changes, and any decline from git
+# is reported as a notice with the worktree untouched.
+ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
+  local worktree=$1 id=$2 relaunch=$3 branch current head tip err op
   branch="fm/$id"
   current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   [ "$current" != "$branch" ] || return 0
+  if [ "$relaunch" = 1 ] && op=$(spawn_worktree_git_operation_in_progress "$worktree"); then
+    echo "notice: worktree '$worktree' has a $op in progress; leaving it exactly as the previous agent left it rather than switching to task branch '$branch'" >&2
+    return 0
+  fi
   if tip=$(git -C "$worktree" rev-parse --verify --quiet "refs/heads/$branch^{commit}" 2>/dev/null); then
-    head=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
-      echo "error: could not read HEAD of worktree '$worktree' before switching to existing branch '$branch'" >&2
-      return 1
-    }
-    if [ "$tip" != "$head" ]; then
-      echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
-      return 1
+    if [ "$relaunch" != 1 ]; then
+      head=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
+        echo "error: could not read HEAD of worktree '$worktree' before switching to existing branch '$branch'" >&2
+        return 1
+      }
+      if [ "$tip" != "$head" ]; then
+        echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
+        return 1
+      fi
     fi
     if ! err=$(git -C "$worktree" checkout --quiet "$branch" 2>&1); then
+      if [ "$relaunch" = 1 ]; then
+        echo "notice: leaving worktree '$worktree' as the previous agent left it; git declined to switch it back onto task branch '$branch' (${err:-no details from git})" >&2
+        return 0
+      fi
       echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${err:-no details from git})" >&2
       return 1
     fi
   else
     if ! err=$(git -C "$worktree" checkout --quiet -b "$branch" 2>&1); then
+      if [ "$relaunch" = 1 ]; then
+        echo "notice: leaving worktree '$worktree' as the previous agent left it; git declined to create task branch '$branch' there (${err:-no details from git})" >&2
+        return 0
+      fi
       echo "error: could not create task branch '$branch' in worktree '$worktree' (${err:-no details from git})" >&2
       return 1
     fi
@@ -2523,7 +2573,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   freshen_spawn_worktree_base "$WT" || exit 1
 fi
 if [ "$KIND" != secondmate ]; then
-  ensure_spawn_task_branch "$WT" "$ID" || exit 1
+  ensure_spawn_task_branch "$WT" "$ID" "$RELAUNCH" || exit 1
 fi
 
 # Per-task temp root: /tmp/fm-<id>/ with Go's build temp nested at gotmp/. Go won't

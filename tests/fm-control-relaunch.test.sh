@@ -832,6 +832,84 @@ test_spawn_relaunch_without_a_harness_reuses_the_recorded_one() {
   pass "fm-spawn --relaunch: with no explicit harness it reuses the task's recorded one, never the crew default"
 }
 
+# A relaunch reuses the task's own worktree exactly as the previous agent left
+# it. The fm/<id> naming step fm-spawn runs for fresh spawns applies a strict
+# leftover-branch guard against the just-freshened base; on relaunch there is
+# no freshened base and fm/<id> is the task's real work branch, so that guard
+# must not fire, and a worktree git is mid-operation on must not be touched.
+test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch() {
+  local dir wt out rc tip
+  dir=$(new_case relaunch-detached rl40)
+  add_ship_task "$dir" rl40 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl40
+  printf 'task work\n' > "$wt/work.txt"
+  git -C "$wt" add work.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'task work'
+  tip=$(git -C "$wt" rev-parse HEAD)
+  # The previous agent checked out an older commit to test something, then was stopped.
+  git -C "$wt" checkout -q --detach HEAD~1
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl40 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse the task's own fm/<id> as a leftover branch"$'\n'"$out"
+  assert_contains "$out" "spawned rl40" "the relaunch should have launched the replacement"
+  assert_not_contains "$out" "already exists at" \
+    "the fresh-spawn leftover-branch refusal fired on a relaunch"
+  [ "$(git -C "$wt" symbolic-ref --quiet --short HEAD)" = fm/rl40 ] \
+    || fail "the relaunched worktree was not switched back onto fm/rl40"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$tip" ] \
+    || fail "switching back onto fm/rl40 did not land on the task's own tip"
+  assert_grep 'task work' "$wt/work.txt" "the task's committed work is not present after the switch"
+  pass "fm-spawn --relaunch: a clean detached worktree is put back on its own fm/<id>, not refused as a stale leftover"
+}
+
+test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched() {
+  local dir wt out rc head_before tip_before gitdir
+  dir=$(new_case relaunch-rebase rl41)
+  add_ship_task "$dir" rl41 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl41
+  printf 'one\n' > "$wt/one.txt"
+  git -C "$wt" add one.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm one
+  printf 'two\n' > "$wt/two.txt"
+  git -C "$wt" add two.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm two
+  tip_before=$(git -C "$wt" rev-parse fm/rl41)
+  # Stop an interactive rebase at an `edit` step: HEAD is detached with a clean
+  # tree and the rebase state is live, the state git would let a plain
+  # `git checkout fm/rl41` walk away from.
+  cat > "$dir/edit-first" <<'SH'
+#!/usr/bin/env bash
+awk 'NR==1 { sub(/^pick/, "edit") } { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+SH
+  chmod +x "$dir/edit-first"
+  GIT_SEQUENCE_EDITOR="$dir/edit-first" git -C "$wt" \
+    -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    rebase -q -i HEAD~2 >/dev/null 2>&1 || true
+  gitdir=$(git -C "$wt" rev-parse --absolute-git-dir)
+  [ -d "$gitdir/rebase-merge" ] || fail "fixture did not leave a rebase in progress"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "fixture did not leave HEAD detached mid-rebase"
+  head_before=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl41 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse a worktree that is mid-rebase"$'\n'"$out"
+  assert_contains "$out" "spawned rl41" "the relaunch should have launched the replacement"
+  assert_contains "$out" "has a rebase in progress; leaving it exactly as the previous agent left it" \
+    "the relaunch did not explain why it left the worktree alone"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] \
+    || fail "the relaunch moved a mid-rebase HEAD"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the relaunch attached a mid-rebase worktree to a branch"
+  [ -d "$gitdir/rebase-merge" ] || fail "the relaunch disturbed the in-progress rebase state"
+  [ "$(git -C "$wt" rev-parse fm/rl41)" = "$tip_before" ] \
+    || fail "the relaunch moved the task's fm/rl41 tip"
+  pass "fm-spawn --relaunch: a worktree mid-rebase is left exactly as the previous agent left it"
+}
+
 # fm-spawn arms per-task wiring on harness PREFIXES, because a task launched
 # from a raw command records that command's basename rather than the exact
 # adapter name. Retirement must resolve the same way, or a task recorded as
@@ -1499,6 +1577,8 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes
 test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
+test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch
+test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch
 test_cursor_session_binding_is_retired_on_a_harness_switch
