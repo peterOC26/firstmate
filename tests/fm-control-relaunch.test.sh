@@ -348,7 +348,12 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     FM_FAKE_TRACE_RELEASE="$launch_release" \
     run_control "$dir" rl28 relaunch --note "continue after publication" > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$prepare" ] && [ "$i" -lt 200 ]; do
+  # fm-spawn refreshes the home summary before it sends launch text.  On a
+  # busy host that normal read-only refresh can exceed the former two-second
+  # observation window, even though the relaunch is healthy; keep the race
+  # assertion bounded but give it a practical ten seconds to reach the
+  # deliberately blocked GOTMPDIR delivery point.
+  while [ ! -e "$prepare" ] && [ "$i" -lt 1000 ]; do
     /bin/sleep 0.01
     i=$((i + 1))
   done
