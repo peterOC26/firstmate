@@ -1986,10 +1986,12 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
 # tracked file either. Any other tip is a leftover from an earlier spawn of
 # the same id, and quietly switching onto it would walk the worktree off the
 # base freshen_spawn_worktree_base just established, so the spawn is refused
-# and the branch left untouched for inspection. A checkout git still declines
-# at that point (the branch is checked out in another worktree, a stale
-# index.lock) is reported with git's own error rather than blamed on
-# uncommitted work.
+# and the branch left untouched for inspection. A checkout that Git declines
+# because another worktree already has the branch checked out is retried with
+# git's narrow --ignore-other-worktrees opt-in; both copies then
+# name the same commit without moving files or history. Any other checkout
+# failure (such as a stale index.lock) is reported with git's own error rather
+# than blamed on uncommitted work.
 #
 # Relaunch (relaunch=1): fm/<id> is the task's own work branch, not a
 # leftover, and there is no freshened base to defend; the recorded worktree is
@@ -2005,7 +2007,7 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
 # names them instead of fast-forwarding, merging, or rebasing on the agent's
 # behalf.
 ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
-  local worktree=$1 id=$2 relaunch=$3 branch current head tip err op where behind
+  local worktree=$1 id=$2 relaunch=$3 branch current head tip err retry_err op where behind
   branch="fm/$id"
   current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   [ "$current" != "$branch" ] || return 0
@@ -2035,8 +2037,10 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         echo "notice: leaving worktree '$worktree' as the previous agent left it; git declined to switch it back onto task branch '$branch' (${err:-no details from git})" >&2
         return 0
       fi
-      echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${err:-no details from git})" >&2
-      return 1
+      if ! retry_err=$(git -C "$worktree" checkout --quiet --ignore-other-worktrees "$branch" 2>&1); then
+        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${retry_err:-${err:-no details from git}})" >&2
+        return 1
+      fi
     fi
   else
     if ! err=$(git -C "$worktree" checkout --quiet -b "$branch" 2>&1); then

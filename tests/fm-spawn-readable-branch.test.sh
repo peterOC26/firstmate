@@ -256,6 +256,39 @@ test_leftover_branch_at_freshened_base_is_reused() {
   pass "fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created"
 }
 
+test_fresh_spawn_reuses_branch_checked_out_in_another_worktree() {
+  local rec id out status tip other retry_line gotmp_line
+  id='readable-branch-other-worktree-r8'
+  rec=$(make_case reuse-other-worktree "$id")
+  read_case_record "$rec"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/other-worktree"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "fresh spawn should reuse fm/$id when another worktree already has it checked out"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "fresh spawn did not attach its worktree to fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] \
+    || fail "fresh spawn moved the shared branch away from the freshened base"
+  [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "fresh spawn disturbed the existing worktree using fm/$id"
+  [ "$(git -C "$other" rev-parse HEAD)" = "$tip" ] \
+    || fail "fresh spawn changed the existing worktree's checked-out commit"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not retry the same-tip branch checkout for a branch held by another worktree"
+  retry_line=$(grep -n -F "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" | head -1 | cut -d: -f1)
+  gotmp_line=$(grep -n -F "TMUX export GOTMPDIR=/tmp/fm-$id/gotmp" "$CASE_DIR/events.log" | head -1 | cut -d: -f1)
+  [ -n "$retry_line" ] && [ -n "$gotmp_line" ] \
+    || fail "could not locate both the shared-branch retry and the pre-launch GOTMPDIR export"
+  [ "$retry_line" -lt "$gotmp_line" ] \
+    || fail "shared-branch retry happened at line $retry_line, not before pre-launch export at line $gotmp_line"
+  pass "fm-spawn: a fresh reclaim can share its same-tip fm/<id> branch with an inactive prior worktree"
+}
+
 test_scout_brief_includes_the_branch_step() {
   local home id brief
   home="$TMP_ROOT/scout-brief-home"
@@ -293,6 +326,7 @@ test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
+test_fresh_spawn_reuses_branch_checked_out_in_another_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent
 
