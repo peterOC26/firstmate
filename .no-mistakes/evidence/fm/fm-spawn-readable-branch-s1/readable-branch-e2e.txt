@@ -1,0 +1,11 @@
+# observed order: checkout at line 13, GOTMPDIR export (pre-launch) at line 19
+ok - fm-spawn: a fresh ship worktree is put on fm/<id> before the worker's launch text is sent
+ok - fm-spawn: a fresh scout worktree also lands on fm/<id>, not a detached HEAD
+ok - fm-spawn: a worktree already on fm/<id> is left alone, not re-checked-out
+# observed stale-leftover refusal: error: branch 'fm/readable-branch-stale-r6' already exists at 2f32138197dedc73e95a821bdef9c0e6ed524af9, but worktree '/tmp/fm-spawn-readable-branch.TF7P1q/stale-leftover/pool' is at 16da66eb507173f3e9fe0778c989aaf861871678; refusing to move the worktree off its current base onto a leftover branch (inspect or delete 'fm/readable-branch-stale-r6' before retrying)
+ok - fm-spawn: a leftover fm/<id> behind the freshened base refuses the spawn instead of silently reusing it
+ok - fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created
+ok - fm-spawn: a fresh reclaim can share its same-tip fm/<id> branch with an inactive prior worktree
+ok - fm-brief.sh: a scout brief now carries the same first-action branch step as a ship brief
+ok - fm-brief.sh: a ship brief's first action is a no-op when fm-spawn already created the branch
+# all fm-spawn-readable-branch tests passed
