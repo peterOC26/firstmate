@@ -144,7 +144,7 @@ Your scout task has been promoted to a ship task, mode=$MODE. Your window, workt
 # Ship instructions
 1. **Verify isolation before anything else.** Run \`pwd -P\` and \`git rev-parse --show-toplevel\`; both must resolve to the disposable task worktree you were launched in, such as a treehouse pool path or an Orca-managed worktree, not the primary checkout firstmate operates from. If either does not resolve to the worktree you were launched in, stop and escalate to firstmate.
 2. Inventory this worktree's scratch state with \`git status\` and \`git log\` before changing anything.
-3. Return to a clean default-branch base on your branch \`fm/$ID\` - fm-spawn already created it, so reset that branch there rather than creating a new one.
+3. Note the scratch tip first (\`git rev-parse HEAD\`) so its commits stay reachable, then make sure you are on your branch \`fm/$ID\` (a no-op if fm-spawn already created it): \`git checkout fm/$ID 2>/dev/null || git checkout -b fm/$ID\`. Then return that branch to a clean default-branch base: \`git fetch origin && git reset --hard origin/<default-branch>\` (\`git symbolic-ref --short refs/remotes/origin/HEAD\` names it).
 4. Carry over only the intended fix changes. Leave scratch commits, debug edits, and experiment files behind.
 5. If you reproduced a bug, turn that reproduction into a regression test.
 6. These ship instructions supersede the scout delivery rules and report-based Definition of done. Everything else in your original instructions carries over unchanged: the status protocol; the instruction inbox and its acknowledgement; the escalation rules, including ask-user; and every safety rule.

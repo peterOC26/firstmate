@@ -336,6 +336,10 @@ STUB
       "$mode: promoted worker was not told to stop for any wrong worktree"
     assert_grep "on your branch \`fm/$id\`" "$payload" \
       "$mode: promoted worker was not told to leave the scratch base for its ship branch"
+    assert_grep "git checkout fm/$id 2>/dev/null || git checkout -b fm/$id" "$payload" \
+      "$mode: promoted worker was not given the self-healing branch step a scout spawned before fm-spawn named worktrees needs"
+    assert_grep "git reset --hard origin/" "$payload" \
+      "$mode: promoted worker was not told how to return its branch to the default-branch base"
 
     # Compare the public outputs of both real generation paths. The promoted
     # payload ends at its Definition of done, as does an ordinary generated

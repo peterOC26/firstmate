@@ -179,6 +179,83 @@ test_already_named_worktree_is_left_alone() {
   pass "fm-spawn: a worktree already on fm/<id> is left alone, not re-checked-out"
 }
 
+# advance_origin <case_dir> <default>: publish one more commit to origin's
+# default branch from a separate clone, so the base freshen_spawn_worktree_base
+# establishes moves past whatever the pool (and any leftover branch) points at.
+advance_origin() {
+  local case_dir=$1 default=$2 publisher
+  publisher="$case_dir/publisher"
+  git clone --quiet "file://$case_dir/origin.git" "$publisher"
+  printf 'origin moved on\n' > "$publisher/advanced.txt"
+  git -C "$publisher" add advanced.txt
+  git -C "$publisher" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm advance
+  git -C "$publisher" push --quiet origin "$default"
+}
+
+test_stale_leftover_branch_is_refused_not_reused() {
+  local rec id out status stale_tip fresh_tip
+  id='readable-branch-stale-r6'
+  rec=$(make_case stale-leftover "$id")
+  read_case_record "$rec"
+  # A leftover fm/<id> from an earlier spawn of the same id that died after
+  # naming its slot: not checked out anywhere, pointing at a base origin has
+  # since moved past. Reusing it would walk the worker back onto stale history.
+  stale_tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  git -C "$PROJECT_DIR" branch "fm/$id" "$stale_tip"
+  advance_origin "$CASE_DIR" main
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn succeeded by silently reusing a stale leftover fm/$id"
+  assert_contains "$out" "branch 'fm/$id' already exists at $stale_tip" \
+    "spawn did not name the leftover branch and tip it refused"
+  assert_contains "$out" "refusing to move the worktree off its current base" \
+    "spawn did not clearly refuse the stale leftover branch"
+  fresh_tip=$(git -C "$POOL_DIR" rev-parse origin/main)
+  [ "$fresh_tip" != "$stale_tip" ] || fail "fixture did not prove origin/main advanced past the leftover branch"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$fresh_tip" ] \
+    || fail "spawn moved the worktree off its freshened base while refusing"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "spawn attached the worktree to a branch despite refusing"
+  [ "$(git -C "$POOL_DIR" rev-parse "refs/heads/fm/$id")" = "$stale_tip" ] \
+    || fail "spawn moved or deleted the leftover fm/$id instead of leaving it for inspection"
+  assert_no_grep "checkout" "$CASE_DIR/events.log" \
+    "spawn ran a git checkout while refusing the stale leftover branch"
+  assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
+    "spawn sent launch text to the pane despite refusing the branch"
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf '# observed stale-leftover refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "already exists at" | head -n 1)"
+  fi
+  pass "fm-spawn: a leftover fm/<id> behind the freshened base refuses the spawn instead of silently reusing it"
+}
+
+test_leftover_branch_at_freshened_base_is_reused() {
+  local rec id out status tip
+  id='readable-branch-reuse-r7'
+  rec=$(make_case reuse-leftover "$id")
+  read_case_record "$rec"
+  # The same leftover, but origin never moved: fm/<id> already points at the
+  # freshened base, so switching onto it changes no history and is allowed.
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  git -C "$PROJECT_DIR" branch "fm/$id" "$tip"
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "spawn should reuse an fm/$id that already sits at the freshened base"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn did not switch the worktree onto the existing fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] \
+    || fail "switching onto the existing fm/$id changed the worktree's history"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not switch onto the existing branch"
+  assert_no_grep "checkout --quiet -b fm/$id" "$CASE_DIR/events.log" \
+    "spawn tried to re-create a branch that already existed"
+  pass "fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created"
+}
+
 test_scout_brief_includes_the_branch_step() {
   local home id brief
   home="$TMP_ROOT/scout-brief-home"
@@ -214,6 +291,8 @@ test_ship_brief_branch_step_is_idempotent() {
 test_ship_spawn_creates_branch_before_launch
 test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
+test_stale_leftover_branch_is_refused_not_reused
+test_leftover_branch_at_freshened_base_is_reused
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent
 
