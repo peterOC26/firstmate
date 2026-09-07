@@ -6,9 +6,10 @@
 # provably stale iff ALL of the following hold -
 #   1. the lock file still exists;
 #   2. no live process holds the lock file open, and none holds a companion
-#      directory (the worktree, or the repo's .git dir) open as cwd or an fd -
-#      a live git process keeps its own lock open for the whole operation, so an
-#      empty lsof result means the file was abandoned, not that no one held it;
+#      directory (the worktree, or the repo's .git dir) open as an fd, or has
+#      its cwd in that directory or any of its descendants - a live git process
+#      keeps its own lock open for the whole operation, so an empty lsof result
+#      means the file was abandoned, not that no one held it;
 #   3. its mtime age is at least a caller-supplied threshold - a freshly created
 #      lock might belong to a process lsof has not yet reflected.
 # ANY uncertainty - lsof missing, an lsof error, an unreadable mtime - returns
@@ -31,23 +32,28 @@ fm_lock_path_mtime() {
 }
 
 # fm_lock_lsof_holder <target>: 0 a process holds it, 1 provably none, 2 lsof
-# errored (cannot tell). Diagnostics print on the error path only.
+# errored (cannot tell). A directory target is held when a process has it open
+# as an fd or cwd, or has its cwd anywhere under it: the descendant check is one
+# bounded system-wide `lsof -a -d cwd` scan filtered by path prefix (the same
+# shape bin/fm-teardown.sh uses), never the recursive +D file-tree walk that
+# lsof documents as slow. Diagnostics print on the error path only.
 fm_lock_lsof_holder() {
   local target=$1 output status
-  if [ -d "$target" ]; then
-    if output=$(lsof +D "$target" 2>&1); then
-      return 0
-    else
-      status=$?
-    fi
-  elif output=$(lsof -- "$target" 2>&1); then
+  if output=$(lsof -- "$target" 2>&1); then
     return 0
   else
     status=$?
   fi
-  if [ "$status" -eq 1 ] && [ -z "$output" ]; then
-    return 1
+  if [ "$status" -ne 1 ] || [ -n "$output" ]; then
+    fm_lock_report_lsof_failure "$target" "$status" "$output"
+    return 2
   fi
+  [ -d "$target" ] || return 1
+  fm_lock_lsof_cwd_under "$target"
+}
+
+fm_lock_report_lsof_failure() {  # <target> <status> <output>
+  local target=$1 status=$2 output=$3 line
   if [ -n "$output" ]; then
     while IFS= read -r line; do
       fm_lock_log "lsof check failed: $line"
@@ -55,7 +61,52 @@ fm_lock_lsof_holder() {
   else
     fm_lock_log "lsof check failed for $target with exit $status"
   fi
-  return 2
+}
+
+# fm_lock_lsof_cwd_under <dir>: 0 a process has its cwd at or under <dir>, 1
+# provably none, 2 the scan could not establish a safe result (cannot tell).
+# Parses lsof's -F field output exactly like fm-teardown.sh pids_with_cwd_under;
+# any line the parser does not recognize means cannot tell, never "nobody".
+fm_lock_lsof_cwd_under() {
+  local dir=$1 real out status pid path line
+  real=$(cd "$dir" 2>/dev/null && pwd -P) || {
+    fm_lock_log "cannot resolve $dir for the lsof cwd scan"
+    return 2
+  }
+  if out=$(lsof -a -d cwd -Fpn 2>/dev/null); then
+    status=0
+  else
+    status=$?
+  fi
+  if [ "$status" -ne 0 ]; then
+    if [ "$status" -eq 1 ] && [ -z "$out" ]; then
+      return 1
+    fi
+    fm_lock_log "lsof cwd scan failed for $dir with exit $status"
+    return 2
+  fi
+  pid=
+  while IFS= read -r line; do
+    case "$line" in
+      p*)
+        pid=${line#p}
+        case "$pid" in ''|*[!0-9]*) fm_lock_log "lsof cwd scan returned an unexpected pid line: $line"; return 2 ;; esac
+        ;;
+      fcwd) [ -n "$pid" ] || { fm_lock_log "lsof cwd scan returned an fd before any pid"; return 2; } ;;
+      n*)
+        [ -n "$pid" ] || { fm_lock_log "lsof cwd scan returned a path before any pid"; return 2; }
+        path=${line#n}
+        case "$path" in
+          "$dir"|"$dir"/*|"$real"|"$real"/*) return 0 ;;
+        esac
+        ;;
+      '') ;;
+      *) fm_lock_log "lsof cwd scan returned an unexpected line: $line"; return 2 ;;
+    esac
+  done <<EOF
+$out
+EOF
+  return 1
 }
 
 # fm_lock_has_live_holder <lock> <dir>: 0 if a live process holds $lock or the

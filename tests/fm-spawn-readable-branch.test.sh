@@ -64,36 +64,43 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
-  # Deterministic stand-in for the one lsof query fm_lock_has_live_holder makes
-  # ("does any process hold this path open?"), so a case states which holders
-  # are busy instead of inheriting the host's lsof and whatever else is running
-  # on it. Empty output plus exit 1 is lsof's "provably nobody"; exit 0 with a
-  # listing is a live holder. FM_FAKE_LSOF_HOLDERS carries the busy paths, one
-  # per line, and defaults to none.
+  # Deterministic stand-in for the two lsof queries fm_lock_has_live_holder
+  # makes ("does any process hold this exact path open?" and the bounded
+  # `-a -d cwd -Fpn` scan of every process's cwd), so a case states which
+  # holders are busy instead of inheriting the host's lsof and whatever else is
+  # running on it. Empty output plus exit 1 is lsof's "provably nobody"; exit 0
+  # with a listing is a live holder. FM_FAKE_LSOF_HOLDERS carries the busy
+  # paths, one per line, and defaults to none.
   cat > "$fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 set -u
 target=""
-recursive=0
+cwd_scan=0
 for arg in "$@"; do
   case "$arg" in
-    +D) recursive=1 ;;
-    -*) ;;
+    -Fpn) cwd_scan=1 ;;
+    -*|cwd) ;;
     *) target=$arg ;;
   esac
 done
+found=0
+pid=4242
 while IFS= read -r held; do
   [ -n "$held" ] || continue
-  if [ "$held" != "$target" ]; then
-    [ "$recursive" -eq 1 ] || continue
-    case "$held" in "$target"/*) ;; *) continue ;; esac
+  if [ "$cwd_scan" -eq 1 ]; then
+    printf 'p%s\nfcwd\nn%s\n' "$pid" "$held"
+    pid=$((pid + 1))
+    found=1
+    continue
   fi
+  [ "$held" = "$target" ] || continue
   printf 'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\n'
   printf 'sleep 4242 tester cwd DIR 0,1 64 1 %s\n' "$target"
   exit 0
 done <<HOLDERS
 ${FM_FAKE_LSOF_HOLDERS:-}
 HOLDERS
+[ "$found" -eq 1 ] && exit 0
 exit 1
 SH
   chmod +x "$fakebin/lsof"
@@ -241,6 +248,70 @@ test_freshen_preserves_named_branch_commits() {
   assert_grep 'keep this committed work' "$POOL_DIR/preserved.txt" \
     "freshening discarded committed work on the named task branch"
   pass "fm-spawn: freshening preserves committed work on a clean named fm/<id> branch"
+}
+
+test_freshen_fast_forwards_named_branch_behind_origin() {
+  local rec id out status before origin_tip
+  id='readable-branch-behind-r15'
+  rec=$(make_case behind-named-branch "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b "fm/$id"
+  before=$(git -C "$POOL_DIR" rev-parse "fm/$id")
+  advance_origin "$CASE_DIR" main
+  origin_tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  [ "$origin_tip" != "$before" ] || fail "fixture did not move origin past the named task branch"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "spawn should fast-forward a clean named task branch that is behind origin"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn left the named task branch while fast-forwarding it"
+  [ "$(git -C "$POOL_DIR" rev-parse "fm/$id")" = "$origin_tip" ] \
+    || fail "freshening did not fast-forward the named task branch to origin's tip"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$origin_tip" ] \
+    || fail "the worktree did not land on origin's tip after the fast-forward"
+  git -C "$POOL_DIR" merge-base --is-ancestor "$before" "$origin_tip" \
+    || fail "the fast-forward moved the named task branch somewhere other than forward"
+  assert_grep 'origin moved on' "$POOL_DIR/advanced.txt" \
+    "the fast-forward did not bring origin's new commit into the worktree"
+  pass "fm-spawn: a clean named fm/<id> behind origin is fast-forwarded, moving the ref only forward"
+}
+
+test_freshen_refuses_diverged_named_branch() {
+  local rec id out status before origin_tip
+  id='readable-branch-diverged-r16'
+  rec=$(make_case diverged-named-branch "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b "fm/$id"
+  printf 'local task work\n' > "$POOL_DIR/diverged.txt"
+  git -C "$POOL_DIR" add diverged.txt
+  git -C "$POOL_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm diverged
+  before=$(git -C "$POOL_DIR" rev-parse "fm/$id")
+  advance_origin "$CASE_DIR" main
+  origin_tip=$(git -C "$CASE_DIR/publisher" rev-parse HEAD)
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched on a named task branch that diverges from origin"
+  assert_contains "$out" "named task branch 'fm/$id' diverges from 'origin/main'" \
+    "spawn did not name the diverging task branch it refused"
+  assert_contains "$out" "refusing to rewind it" \
+    "spawn did not say it refused to rewind the diverging branch"
+  [ "$(git -C "$POOL_DIR" rev-parse "fm/$id")" = "$before" ] \
+    || fail "the refusal moved the diverging task branch ref"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] \
+    || fail "the refusal moved the worktree off the diverging task branch"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal detached the worktree from its task branch"
+  [ "$(git -C "$POOL_DIR" rev-parse origin/main)" = "$origin_tip" ] \
+    || fail "fixture did not fetch the advanced origin before the divergence check"
+  assert_grep 'local task work' "$POOL_DIR/diverged.txt" \
+    "the refusal discarded committed work on the diverging task branch"
+  assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
+    "spawn sent launch text to the pane despite refusing the diverging branch"
+  pass "fm-spawn: a named fm/<id> that diverges from origin is refused with its ref untouched"
 }
 
 test_freshen_does_not_seed_from_unrelated_named_branch() {
@@ -592,6 +663,8 @@ test_ship_spawn_creates_branch_before_launch
 test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
 test_freshen_preserves_named_branch_commits
+test_freshen_fast_forwards_named_branch_behind_origin
+test_freshen_refuses_diverged_named_branch
 test_freshen_does_not_seed_from_unrelated_named_branch
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
