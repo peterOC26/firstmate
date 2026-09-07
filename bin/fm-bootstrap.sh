@@ -1415,8 +1415,9 @@ detect_local_tools() {
 
 detect_local_config() {
   # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
-  # default branch, not a feature branch (see fm-tangle-lib.sh). Scoped to the
-  # primary only; detached-HEAD worktrees and secondmate homes never trip it.
+  # default branch, not a feature branch (see fm-tangle-lib.sh). Scoped to
+  # FM_ROOT only; named fm/<id> branches in linked ship and scout worktrees, and
+  # secondmate homes, never reach this check.
   tangle_branch=$(fm_primary_tangle_branch "$FM_ROOT" 2>/dev/null || true)
   if [ -n "$tangle_branch" ]; then
     tangle_default=$(fm_default_branch "$FM_ROOT" 2>/dev/null || echo main)

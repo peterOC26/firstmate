@@ -256,11 +256,14 @@ test_leftover_branch_at_freshened_base_is_reused() {
   pass "fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created"
 }
 
-test_fresh_spawn_reuses_branch_checked_out_in_another_worktree() {
-  local rec id out status tip other retry_line gotmp_line
+test_fresh_spawn_refuses_a_branch_a_live_worktree_still_holds() {
+  local rec id out status tip other
   id='readable-branch-other-worktree-r8'
-  rec=$(make_case reuse-other-worktree "$id")
+  rec=$(make_case refuse-other-worktree "$id")
   read_case_record "$rec"
+  # Another copy of the repo is still on disk with fm/<id> checked out. Sharing
+  # the ref would let both copies commit onto it, and whichever committed second
+  # would publish a tree that silently reverts the other's work.
   tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
   other="$CASE_DIR/other-worktree"
   git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
@@ -268,25 +271,56 @@ test_fresh_spawn_reuses_branch_checked_out_in_another_worktree() {
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  expect_code 0 "$status" "fresh spawn should reuse fm/$id when another worktree already has it checked out"
+  [ "$status" -ne 0 ] || fail "fresh spawn attached a second live copy to fm/$id"
+  assert_contains "$out" "already checked out in worktree '$other'" \
+    "the refusal did not name the worktree already holding the branch"
+  assert_contains "$out" "two live copies committing on one branch" \
+    "the refusal did not say why sharing the branch is unsafe"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal still attached the pooled worktree to a branch"
+  [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal disturbed the worktree that already held fm/$id"
+  [ "$(git -C "$other" rev-parse HEAD)" = "$tip" ] \
+    || fail "the refusal changed the existing worktree's checked-out commit"
+  assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
+    "spawn sent launch text to the pane despite refusing the shared branch"
+  if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+    printf '# observed shared-branch refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "already checked out in worktree" | head -n 1)"
+  fi
+  pass "fm-spawn: a fresh spawn refuses fm/<id> while another on-disk worktree still has it checked out"
+}
+
+test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
+  local rec id out status tip other retry_line gotmp_line
+  id='readable-branch-missing-worktree-r9'
+  rec=$(make_case reclaim-missing-worktree "$id")
+  read_case_record "$rec"
+  # The same registration, but the copy it names is gone from disk, so no agent
+  # can be working in it and there is nothing to race.
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/missing-worktree"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  rm -rf "$other"
+  [ ! -e "$other" ] || fail "fixture did not remove the abandoned worktree directory"
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "fresh spawn should reclaim fm/$id from a worktree that no longer exists"
   assert_contains "$out" "spawned $id" "spawn did not report success"
   [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
-    || fail "fresh spawn did not attach its worktree to fm/$id"
+    || fail "fresh spawn did not attach its worktree to the reclaimed fm/$id"
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] \
-    || fail "fresh spawn moved the shared branch away from the freshened base"
-  [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
-    || fail "fresh spawn disturbed the existing worktree using fm/$id"
-  [ "$(git -C "$other" rev-parse HEAD)" = "$tip" ] \
-    || fail "fresh spawn changed the existing worktree's checked-out commit"
+    || fail "reclaiming the branch moved the worktree off the freshened base"
   assert_grep "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" \
-    "spawn did not retry the same-tip branch checkout for a branch held by another worktree"
+    "spawn did not reclaim the branch from the missing worktree registration"
   retry_line=$(grep -n -F "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" | head -1 | cut -d: -f1)
   gotmp_line=$(grep -n -F "TMUX export GOTMPDIR=/tmp/fm-$id/gotmp" "$CASE_DIR/events.log" | head -1 | cut -d: -f1)
   [ -n "$retry_line" ] && [ -n "$gotmp_line" ] \
-    || fail "could not locate both the shared-branch retry and the pre-launch GOTMPDIR export"
+    || fail "could not locate both the reclaim checkout and the pre-launch GOTMPDIR export"
   [ "$retry_line" -lt "$gotmp_line" ] \
-    || fail "shared-branch retry happened at line $retry_line, not before pre-launch export at line $gotmp_line"
-  pass "fm-spawn: a fresh reclaim can share its same-tip fm/<id> branch with an inactive prior worktree"
+    || fail "the reclaim happened at line $retry_line, not before pre-launch export at line $gotmp_line"
+  pass "fm-spawn: a fresh spawn reclaims fm/<id> when the only worktree holding it is gone from disk"
 }
 
 test_scout_brief_includes_the_branch_step() {
@@ -302,6 +336,10 @@ test_scout_brief_includes_the_branch_step() {
     "scout brief is missing the idempotent branch-confirmation step ships already have"
   assert_grep "a no-op if fm-spawn already created it" "$brief" \
     "scout brief does not say the branch step is a no-op when fm-spawn already ran it"
+  assert_grep "an operation in progress (rebase, merge, cherry-pick, revert, or bisect)" "$brief" \
+    "scout brief's branch step does not tell the worker to leave an in-progress git operation alone"
+  assert_grep "leave HEAD exactly where it is" "$brief" \
+    "scout brief's branch step does not tell the worker to leave the spawn-preserved HEAD alone"
   pass "fm-brief.sh: a scout brief now carries the same first-action branch step as a ship brief"
 }
 
@@ -318,6 +356,15 @@ test_ship_brief_branch_step_is_idempotent() {
     "ship brief's first action is no longer worded to be a no-op when fm-spawn already created the branch"
   assert_no_grep "at a detached HEAD" "$brief" \
     "ship brief still claims the worker starts detached, but fm-spawn now puts it on fm/<id> first"
+  # fm-spawn leaves a mid-rebase (or extra-commit) worktree exactly as the
+  # previous agent left it on relaunch; the same brief is the replacement's
+  # launch prompt, so its first action must not undo that.
+  assert_grep "an operation in progress (rebase, merge, cherry-pick, revert, or bisect)" "$brief" \
+    "ship brief's branch step does not tell the worker to leave an in-progress git operation alone"
+  assert_grep "holds commits \`fm/$id\` does not" "$brief" \
+    "ship brief's branch step does not tell the worker to leave commits fm/<id> lacks where they are"
+  assert_grep "leave HEAD exactly where it is" "$brief" \
+    "ship brief's branch step does not tell the worker to leave the spawn-preserved HEAD alone"
   pass "fm-brief.sh: a ship brief's first action is a no-op when fm-spawn already created the branch"
 }
 
@@ -326,7 +373,8 @@ test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
-test_fresh_spawn_reuses_branch_checked_out_in_another_worktree
+test_fresh_spawn_refuses_a_branch_a_live_worktree_still_holds
+test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent
 

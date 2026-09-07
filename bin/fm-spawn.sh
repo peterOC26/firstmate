@@ -143,14 +143,16 @@
 #   the task id instead of a bare detached HEAD; already sitting on that branch
 #   is a no-op, an existing fm/<id> is reused only when it points at the
 #   just-freshened HEAD, and a leftover fm/<id> at any other commit refuses the
-#   spawn rather than silently moving the worktree off its freshened base. A
-#   relaunch owns no base-freshness invariant, so there the same step is
-#   best-effort: it switches back onto the task's own fm/<id> (or creates it)
-#   when git can do so cleanly and the current HEAD is already contained in
-#   that branch, leaves a worktree with a rebase, bisect, merge, cherry-pick,
-#   or revert in progress exactly as the previous agent left it, and refuses
-#   only when switching would leave commits behind that fm/<id> does not hold
-#   (ensure_spawn_task_branch).
+#   spawn rather than silently moving the worktree off its freshened base, as
+#   does a branch a still-present second worktree already has checked out. A
+#   relaunch owns no base-freshness invariant and its old agent is already
+#   stopped by the time this runs, so there the same step is best-effort and
+#   never fails the launch: it switches back onto the task's own fm/<id> (or
+#   creates it) when git can do so cleanly and the current HEAD is already
+#   contained in that branch, and otherwise - a rebase, bisect, merge,
+#   cherry-pick, or revert in progress, a HEAD holding commits fm/<id> lacks,
+#   or any decline from git - leaves the worktree exactly as the previous agent
+#   left it and says so (ensure_spawn_task_branch).
 #   A slot whose only deviation is a stale submodule gitlink is refused by that
 #   same clean check, but is reported as a stale checkout naming each submodule
 #   and both pins; nothing is converged or removed, and no remedy is suggested.
@@ -1972,6 +1974,26 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
   return 1
 }
 
+# Echo the path of the worktree that currently has <branch> checked out, or
+# return 1 when no registered worktree holds it. Used to tell an abandoned
+# registration (directory gone) from a live copy still sitting on the branch.
+spawn_worktree_holding_branch() {  # <worktree> <branch>
+  local worktree=$1 branch=$2 line path=""
+  while IFS= read -r line; do
+    case $line in
+      "worktree "*) path=${line#worktree } ;;
+      "branch refs/heads/$branch")
+        [ -n "$path" ] || continue
+        printf '%s\n' "$path"
+        return 0
+        ;;
+    esac
+  done <<EOF
+$(git -C "$worktree" worktree list --porcelain 2>/dev/null || true)
+EOF
+  return 1
+}
+
 # Give the worktree its readable fm/<id> name before the worker ever starts
 # (ccmux and similar lists render project:branch, and a detached HEAD reads as
 # an unhelpful "HEAD+"). Idempotent: already sitting on the branch is a no-op.
@@ -1986,28 +2008,33 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
 # tracked file either. Any other tip is a leftover from an earlier spawn of
 # the same id, and quietly switching onto it would walk the worktree off the
 # base freshen_spawn_worktree_base just established, so the spawn is refused
-# and the branch left untouched for inspection. A checkout that Git declines
-# because another worktree already has the branch checked out is retried with
-# git's narrow --ignore-other-worktrees opt-in; both copies then
-# name the same commit without moving files or history. Any other checkout
-# failure (such as a stale index.lock) is reported with git's own error rather
-# than blamed on uncommitted work.
+# and the branch left untouched for inspection. When Git declines the checkout
+# because another worktree already has the branch checked out, that other copy
+# decides the outcome: a worktree still present on disk is a live copy, and
+# attaching a second one would let two agents commit on one ref and silently
+# overwrite each other, so the spawn is refused and names the holder. Only a
+# registration whose directory is gone - no copy can be working in it - is
+# passed over with git's narrow --ignore-other-worktrees opt-in. Any other
+# checkout failure (such as a stale index.lock) is reported with git's own
+# error rather than blamed on uncommitted work.
 #
 # Relaunch (relaunch=1): fm/<id> is the task's own work branch, not a
 # leftover, and there is no freshened base to defend; the recorded worktree is
-# reused exactly as the previous agent left it. So this step is best-effort:
-# a worktree mid-rebase, mid-bisect, or otherwise inside a git operation is
-# left alone (git would happily move a clean mid-rebase HEAD onto the branch
-# and orphan the rebase state), a detached or differently-named worktree is
-# switched back onto fm/<id> only when its HEAD is already an ancestor of (or
-# equal to) that branch's tip, and any decline from git is reported as a
-# notice with the worktree untouched. The one refusal on this path is a HEAD
-# holding commits fm/<id> lacks: a quiet checkout would strand them with no
-# warning (only the reflog would still know them), so the relaunch stops and
-# names them instead of fast-forwarding, merging, or rebasing on the agent's
-# behalf.
+# reused exactly as the previous agent left it. So this step is best-effort
+# and never fails the relaunch: bin/fm-control.sh stops the old agent before it
+# calls this, so a refusal here would leave the task with no agent at all,
+# while simply not switching strands nothing - every commit stays exactly where
+# the previous agent left it. A worktree mid-rebase, mid-bisect, or otherwise
+# inside a git operation is left alone (git would happily move a clean
+# mid-rebase HEAD onto the branch and orphan the rebase state), a detached or
+# differently-named worktree is switched back onto fm/<id> only when its HEAD
+# is already an ancestor of (or equal to) that branch's tip, and a HEAD holding
+# commits fm/<id> lacks is left where it is and named in a notice rather than
+# fast-forwarded, merged, or rebased on the agent's behalf. The brief's own
+# first-action branch step carries the same conditions, so the replacement
+# agent does not undo any of this with its first command.
 ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
-  local worktree=$1 id=$2 relaunch=$3 branch current head tip err retry_err op where behind
+  local worktree=$1 id=$2 relaunch=$3 branch current head tip err retry_err op where behind holder
   branch="fm/$id"
   current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   [ "$current" != "$branch" ] || return 0
@@ -2025,8 +2052,8 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         behind=$(git -C "$worktree" rev-list --count "$tip..$head" 2>/dev/null || echo unknown)
         where=detached
         [ -z "$current" ] || where="on branch '$current'"
-        echo "error: worktree '$worktree' is $where at $head, holding $behind commit(s) that task branch '$branch' (at $tip) does not; refusing to switch and leave them behind - bring them onto '$branch' (or move HEAD back onto it deliberately) before relaunching" >&2
-        return 1
+        echo "notice: leaving worktree '$worktree' as the previous agent left it: it is $where at $head, holding $behind commit(s) that task branch '$branch' (at $tip) does not, and switching would leave them behind - bring them onto '$branch' (or move HEAD back onto it deliberately) once the replacement agent is up" >&2
+        return 0
       fi
     elif [ "$tip" != "$head" ]; then
       echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
@@ -2037,8 +2064,17 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         echo "notice: leaving worktree '$worktree' as the previous agent left it; git declined to switch it back onto task branch '$branch' (${err:-no details from git})" >&2
         return 0
       fi
+      holder=$(spawn_worktree_holding_branch "$worktree" "$branch" || true)
+      if [ -z "$holder" ]; then
+        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${err:-no details from git})" >&2
+        return 1
+      fi
+      if [ -e "$holder" ]; then
+        echo "error: task branch '$branch' is already checked out in worktree '$holder'; refusing to attach '$worktree' to it as well, because two live copies committing on one branch overwrite each other's work (retire '$holder' first, or remove its registration with git worktree remove)" >&2
+        return 1
+      fi
       if ! retry_err=$(git -C "$worktree" checkout --quiet --ignore-other-worktrees "$branch" 2>&1); then
-        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${retry_err:-${err:-no details from git}})" >&2
+        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch', held only by the missing worktree registration '$holder' (${retry_err:-${err:-no details from git}})" >&2
         return 1
       fi
     fi

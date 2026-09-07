@@ -336,7 +336,7 @@ This is a SCOUT task: the deliverable is a written report, not a PR.
 The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
 The report is the only thing that survives, so anything worth keeping must be in it.
 
-1. First action: confirm you're on your branch (a no-op if fm-spawn already created it): \`git checkout fm/$ID 2>/dev/null || git checkout -b fm/$ID\`
+1. First action: confirm you're on your branch (a no-op if fm-spawn already created it). Check \`git status\` first: if it reports an operation in progress (rebase, merge, cherry-pick, revert, or bisect), or your current HEAD holds commits \`fm/$ID\` does not, fm-spawn deliberately left it that way - leave HEAD exactly where it is, finish or land that work first, and skip the rest of this step. Otherwise: \`git checkout fm/$ID 2>/dev/null || git checkout -b fm/$ID\`
 
 # Rules
 1. Never push to any remote and never open a PR.
@@ -412,7 +412,7 @@ You are in a disposable git worktree of $REPO, already on your task branch \`fm/
 The path check is authoritative: \`git rev-parse --git-dir\` and \`git rev-parse --git-common-dir\` can help inspect the repo, but they do not prove you are outside the primary checkout.
 If the top-level path is the primary checkout or not the worktree you were launched in, STOP - do not branch or commit here - append \`blocked: launched in primary checkout, not an isolated worktree\` to the status file and stop.
 
-1. First action: confirm you're on your branch (a no-op if fm-spawn already created it): \`git checkout fm/$ID 2>/dev/null || git checkout -b fm/$ID\`$SETUP2
+1. First action: confirm you're on your branch (a no-op if fm-spawn already created it). Check \`git status\` first: if it reports an operation in progress (rebase, merge, cherry-pick, revert, or bisect), or your current HEAD holds commits \`fm/$ID\` does not, fm-spawn deliberately left it that way - leave HEAD exactly where it is, finish or land that work first, and skip the rest of this step. Otherwise: \`git checkout fm/$ID 2>/dev/null || git checkout -b fm/$ID\`$SETUP2
 
 # Rules
 $RULE1
