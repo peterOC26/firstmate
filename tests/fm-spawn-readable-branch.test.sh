@@ -64,6 +64,31 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
+  # Deterministic stand-in for the one lsof query fm_lock_has_live_holder makes
+  # ("does any process hold this path open?"), so a case states which holders
+  # are busy instead of inheriting the host's lsof and whatever else is running
+  # on it. Empty output plus exit 1 is lsof's "provably nobody"; exit 0 with a
+  # listing is a live holder. FM_FAKE_LSOF_HOLDERS carries the busy paths, one
+  # per line, and defaults to none.
+  cat > "$fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+set -u
+target=""
+for arg in "$@"; do
+  case "$arg" in -*) ;; *) target=$arg ;; esac
+done
+while IFS= read -r held; do
+  [ -n "$held" ] || continue
+  [ "$held" = "$target" ] || continue
+  printf 'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\n'
+  printf 'sleep 4242 tester cwd DIR 0,1 64 1 %s\n' "$target"
+  exit 0
+done <<HOLDERS
+${FM_FAKE_LSOF_HOLDERS:-}
+HOLDERS
+exit 1
+SH
+  chmod +x "$fakebin/lsof"
   printf '%s\n' "$fakebin"
 }
 
@@ -268,17 +293,15 @@ test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree() {
   read_case_record "$rec"
   # A slot leaked by an earlier spawn of this id that named its branch and then
   # failed before publishing a record: the directory is still on disk with
-  # fm/<id> checked out, no record claims it, and no process is working in it.
-  # Nothing returns such a slot automatically, so refusing it would make the id
-  # unspawnable until a human removed the worktree by hand.
-  command -v lsof >/dev/null 2>&1 \
-    || fail "this case needs lsof: reclaiming a slot requires proving no process holds it"
+  # fm/<id> checked out, no record claims it, and - with no holder declared to
+  # the lsof stub - no process is working in it. Nothing returns such a slot
+  # automatically, so refusing it would make the id unspawnable until a human
+  # removed the worktree by hand.
   tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
   other="$CASE_DIR/leaked-slot"
   git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
   [ -d "$other" ] || fail "fixture did not leave the abandoned slot on disk"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "fixture left a task record claiming the abandoned slot"
-  ! lsof -- "$other" >/dev/null 2>&1 || fail "fixture left a process holding the abandoned slot"
   : > "$CASE_DIR/events.log"
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
@@ -374,35 +397,20 @@ test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds() {
 }
 
 test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in() {
-  local rec id out status tip other probe_pid i
+  local rec id out status tip other
   id='readable-branch-busy-worktree-r11'
   rec=$(make_case refuse-busy-worktree "$id")
   read_case_record "$rec"
-  command -v lsof >/dev/null 2>&1 \
-    || fail "this case needs lsof: it proves a busy holder is not reclaimed"
   tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
   other="$CASE_DIR/busy-worktree"
   git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
   # An operator's own ad-hoc worktree on fm/<id> is named by no task record
   # either; the only thing separating it from a leaked slot is that somebody is
-  # working in it right now.
-  ( cd "$other" && exec sleep 120 ) &
-  probe_pid=$!
-  i=0
-  while [ "$i" -lt 100 ] && ! lsof -- "$other" >/dev/null 2>&1; do
-    /bin/sleep 0.05
-    i=$((i + 1))
-  done
-  lsof -- "$other" >/dev/null 2>&1 || {
-    kill "$probe_pid" 2>/dev/null || true
-    fail "fixture could not establish a live process inside the holder"
-  }
+  # working in it right now, which the lsof stub reports for this path alone.
   : > "$CASE_DIR/events.log"
 
-  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  out=$(FM_FAKE_LSOF_HOLDERS="$other" run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  kill "$probe_pid" 2>/dev/null || true
-  wait "$probe_pid" 2>/dev/null || true
   [ "$status" -ne 0 ] || fail "fresh spawn reclaimed fm/$id from a worktree somebody is working in"
   assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
     "the refusal did not say the holder could not be proven abandoned"
