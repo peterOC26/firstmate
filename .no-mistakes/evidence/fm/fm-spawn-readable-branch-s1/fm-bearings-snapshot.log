@@ -1,0 +1,238 @@
+ok - Domain Alpha structured state overrides a stale parent Phase 7 event
+ok - GNU stat file reads select -c without BSD filesystem-report pollution
+ok - parent activity evidence is bounded and disclosed
+ok - Bearings excludes a status-only child decision
+ok - a structured child captain hold reaches Waiting on you
+not ok - bad home outcomes revived stale work or lacked provenance: {
+  "schema": "fm-bearings.v1",
+  "home": "fm-bearings.BU009s/bad-homes",
+  "generated": "2026-07-11T18:00:00Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "board_columns": [
+    {
+      "column": "Ready",
+      "empty": "No dispatchable queued work."
+    },
+    {
+      "column": "Held",
+      "empty": "No captain- or time-gated work."
+    },
+    {
+      "column": "Blocked",
+      "empty": "No queued work is waiting on another item."
+    },
+    {
+      "column": "Under way",
+      "empty": "No live workers are under way."
+    },
+    {
+      "column": "Waiting on you",
+      "empty": "Nothing needs your action right now, captain."
+    },
+    {
+      "column": "Done",
+      "empty": "No recent completions are in the current baseline."
+    }
+  ],
+  "board_items": [
+    {
+      "column": "Blocked",
+      "id": "invalid",
+      "summary": "invalid home: marked for secondmate someone-else, expected i…",
+      "owner": "invalid",
+      "detail": "secondmate home unavailable",
+      "artifact": "-"
+    },
+    {
+      "column": "Blocked",
+      "id": "malformed",
+      "summary": "structured home state invalid: unstructured current backlog …",
+      "owner": "malformed",
+      "detail": "secondmate home unavailable",
+      "artifact": "-"
+    },
+    {
+      "column": "Blocked",
+      "id": "missing",
+      "summary": "invalid home: not a directory",
+      "owner": "missing",
+      "detail": "secondmate home unavailable",
+      "artifact": "-"
+    },
+    {
+      "column": "Blocked",
+      "id": "timedout",
+      "summary": "structured home snapshot timed out",
+      "owner": "timedout",
+      "detail": "secondmate home unavailable",
+      "artifact": "-"
+    }
+  ],
+  "in_flight": [],
+  "secondmates": [
+    {
+      "id": "invalid",
+      "state": "unknown",
+      "doing": "invalid home: marked for secondmate someone-else, expected invalid",
+      "provenance": "parent-event-fallback",
+      "freshness": "historical-event",
+      "age_seconds": 0,
+      "contradiction": false,
+      "reason": "invalid home: marked for secondmate someone-else, expected invalid"
+    },
+    {
+      "id": "malformed",
+      "state": "unknown",
+      "doing": "structured home state invalid: unstructured current backlog row",
+      "provenance": "parent-event-fallback",
+      "freshness": "historical-event",
+      "age_seconds": 0,
+      "contradiction": false,
+      "reason": "structured home state invalid: unstructured current backlog row"
+    },
+    {
+      "id": "missing",
+      "state": "unknown",
+      "doing": "invalid home: not a directory",
+      "provenance": "unknown",
+      "freshness": "unknown",
+      "age_seconds": null,
+      "contradiction": false,
+      "reason": "invalid home: not a directory"
+    },
+    {
+      "id": "timedout",
+      "state": "unknown",
+      "doing": "structured home snapshot timed out",
+      "provenance": "parent-event-fallback",
+      "freshness": "historical-event",
+      "age_seconds": 0,
+      "contradiction": false,
+      "reason": "structured home snapshot timed out"
+    },
+    {
+      "id": "unreadable",
+      "state": "no_active_work",
+      "doing": "No active child work",
+      "provenance": "structured-home",
+      "freshness": "fresh",
+      "age_seconds": 0,
+      "contradiction": true,
+      "reason": "-"
+    }
+  ],
+  "secondmate_reconcile": [
+    {
+      "id": "malformed",
+      "spawn_gen": null,
+      "host": null,
+      "kind": "unstructured_current",
+      "ids": []
+    },
+    {
+      "id": "unreadable",
+      "spawn_gen": null,
+      "host": null,
+      "kind": null,
+      "ids": []
+    }
+  ],
+  "decisions_open": [],
+  "landed": [],
+  "gates": [
+    {
+      "id": "invalid",
+      "title": "invalid home: marked for secondmate someone-else, expected i…",
+      "blocked_by": "-",
+      "reason": "secondmate home unavailable",
+      "owner": "invalid"
+    },
+    {
+      "id": "malformed",
+      "title": "structured home state invalid: unstructured current backlog …",
+      "blocked_by": "-",
+      "reason": "secondmate home unavailable",
+      "owner": "malformed"
+    },
+    {
+      "id": "missing",
+      "title": "invalid home: not a directory",
+      "blocked_by": "-",
+      "reason": "secondmate home unavailable",
+      "owner": "missing"
+    },
+    {
+      "id": "timedout",
+      "title": "structured home snapshot timed out",
+      "blocked_by": "-",
+      "reason": "secondmate home unavailable",
+      "owner": "timedout"
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "unhealthy_endpoints": [
+    {
+      "id": "invalid",
+      "backend": "tmux",
+      "target": "firstmate:fm-invalid",
+      "exists": true,
+      "agent": "dead"
+    },
+    {
+      "id": "malformed",
+      "backend": "tmux",
+      "target": "firstmate:fm-malformed",
+      "exists": true,
+      "agent": "dead"
+    },
+    {
+      "id": "timedout",
+      "backend": "tmux",
+      "target": "firstmate:fm-timedout",
+      "exists": true,
+      "agent": "dead"
+    },
+    {
+      "id": "unreadable",
+      "backend": "tmux",
+      "target": "firstmate:fm-unreadable",
+      "exists": true,
+      "agent": "dead"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "superseded or prose-deferred queued items",
+      "reveal": "--all-queued"
+    },
+    {
+      "surface": "secondmate home(s) with unreadable backlog: 4",
+      "reveal": "inspect the listed secondmate home backlogs"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

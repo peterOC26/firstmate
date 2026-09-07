@@ -1,0 +1,84 @@
+=== 1. Fresh SHIP spawn: pooled worktree starts detached, ends on fm/<id> before launch text is sent ===
+
+$ git state of pool worktree BEFORE fm-spawn.sh
+  branch: (detached HEAD)
+  HEAD:   a8a292e
+  status: 
+
+$ fm-spawn.sh evidence-ship-1 --mode no-mistakes --yolo off
+  warning: /tmp/fm-spawn-readable-branch.EA8UED/ev-ship/home/data/evidence-ship-1/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  spawned evidence-ship-1 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-evidence-ship-1 worktree=/tmp/fm-spawn-readable-branch.EA8UED/ev-ship/pool
+
+$ git state of pool worktree AFTER fm-spawn.sh
+  branch: fm/evidence-ship-1
+  HEAD:   a8a292e
+  status: 
+
+$ event order (git calls vs first launch text sent to the pane)
+  14:GIT -C <pool> checkout --quiet -b fm/evidence-ship-1
+  20:TMUX export GOTMPDIR=/tmp/fm-evidence-ship-1/gotmp
+
+$ git branch -a in origin: fm/<id> must NOT be pushed
+  * main
+
+=== 2. Fresh SCOUT spawn lands on fm/<id> too; origin still has no fm/ branch ===
+
+$ BEFORE
+  branch: (detached HEAD)
+  HEAD:   3522243
+  status: 
+
+$ fm-spawn.sh evidence-scout-1 --scout
+  spawned evidence-scout-1 harness=codex kind=scout window=firstmate:fm-evidence-scout-1 worktree=/tmp/fm-spawn-readable-branch.EA8UED/ev-scout/pool
+
+$ AFTER
+  branch: fm/evidence-scout-1
+  HEAD:   3522243
+  status: 
+
+$ origin branches
+  * main
+
+=== 3. Already-named worktree (fm/<id> with a commit ahead of origin) is left alone, never rewound ===
+
+$ BEFORE
+  branch: fm/evidence-named-1
+  HEAD:   6f2e83c
+  status: 
+
+$ fm-spawn.sh evidence-named-1 --mode no-mistakes --yolo off
+  warning: /tmp/fm-spawn-readable-branch.EA8UED/ev-named/home/data/evidence-named-1/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  notice: preserving clean named task branch 'fm/evidence-named-1' at 6f2e83c7c8ec18b080050d8d62b1d3bffdcf2c72 while refreshing pooled worktree '/tmp/fm-spawn-readable-branch.EA8UED/ev-named/pool'; it contains 'origin/main' at e41993c2388f59d461a14e6a13f3710e8a4bd342
+  spawned evidence-named-1 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-evidence-named-1 worktree=/tmp/fm-spawn-readable-branch.EA8UED/ev-named/pool
+
+$ AFTER
+  branch: fm/evidence-named-1
+  HEAD:   6f2e83c
+  status: 
+  => HEAD unchanged (6f2e83c); branch ref preserved
+
+$ git calls containing checkout/reset (none expected)
+
+=== 4. Uncommitted work is refused safely, not destroyed ===
+
+$ BEFORE
+  branch: (detached HEAD)
+  HEAD:   9d99588
+  status:  M README.md
+
+$ fm-spawn.sh evidence-dirty-1 --mode no-mistakes --yolo off
+  warning: /tmp/fm-spawn-readable-branch.EA8UED/ev-dirty/home/data/evidence-dirty-1/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  error: pooled worktree '/tmp/fm-spawn-readable-branch.EA8UED/ev-dirty/pool' is not clean; refusing to discard uncommitted work while refreshing its base
+  fm-spawn exit=1
+
+$ AFTER
+  branch: (detached HEAD)
+  HEAD:   9d99588
+  status:  M README.md
+  README.md content: unsaved
+
+=== 5. Scout brief: first-action branch step (generated data/<id>/brief.md) ===
+  12:You are in a disposable git worktree of alpha, already on your task branch `fm/evidence-scout-brief` (fm-spawn puts you there before you start).
+  14:The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
+  17:1. First action: confirm you're on your branch (a no-op if fm-spawn already created it). Check `git status` first: if it reports an operation in progress (rebase, merge, cherry-pick, revert, or bisect), or your current HEAD holds commits `fm/evidence-scout-brief` does not, fm-spawn deliberately left it that way - leave HEAD exactly where it is, finish or land that work first, and skip the rest of this step. Otherwise: `git checkout fm/evidence-scout-brief 2>/dev/null || git checkout -b fm/evidence-scout-brief`
+  20:1. Never push to any remote and never open a PR.
