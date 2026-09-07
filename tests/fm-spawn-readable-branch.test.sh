@@ -43,10 +43,15 @@ SH
 set -u
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *"#{pane_current_command}"*) printf '%s\n' "${FM_FAKE_PANE_COMMAND:-}"; exit 0 ;;
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
-  list-windows|has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
+  list-windows)
+    [ -z "${FM_FAKE_LIST_WINDOWS:-}" ] || printf '%s\n' "$FM_FAKE_LIST_WINDOWS"
+    exit 0
+    ;;
+  has-session|new-session|new-window|kill-window|set-window-option) exit 0 ;;
   send-keys)
     shift
     if [ "${1:-}" = "-t" ]; then shift 2; fi
@@ -256,38 +261,77 @@ test_leftover_branch_at_freshened_base_is_reused() {
   pass "fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created"
 }
 
-test_fresh_spawn_refuses_a_branch_a_live_worktree_still_holds() {
+test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree() {
   local rec id out status tip other
-  id='readable-branch-other-worktree-r8'
-  rec=$(make_case refuse-other-worktree "$id")
+  id='readable-branch-abandoned-worktree-r8'
+  rec=$(make_case reclaim-abandoned-worktree "$id")
   read_case_record "$rec"
-  # Another copy of the repo is still on disk with fm/<id> checked out. Sharing
-  # the ref would let both copies commit onto it, and whichever committed second
-  # would publish a tree that silently reverts the other's work.
+  # A slot leaked by an earlier spawn of this id that named its branch and then
+  # failed before publishing a record: the directory is still on disk with
+  # fm/<id> checked out, but nothing live claims it. Nothing returns such a slot
+  # automatically, so refusing on its mere existence would make the id
+  # unspawnable until a human removed the worktree by hand.
   tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
-  other="$CASE_DIR/other-worktree"
+  other="$CASE_DIR/leaked-slot"
   git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  [ -d "$other" ] || fail "fixture did not leave the abandoned slot on disk"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "fixture left a task record claiming the abandoned slot"
   : > "$CASE_DIR/events.log"
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
-  [ "$status" -ne 0 ] || fail "fresh spawn attached a second live copy to fm/$id"
-  assert_contains "$out" "already checked out in worktree '$other'" \
-    "the refusal did not name the worktree already holding the branch"
+  expect_code 0 "$status" "an abandoned slot no live record claims must not block a fresh spawn"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "fresh spawn did not attach its worktree to the reclaimed fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$tip" ] \
+    || fail "reclaiming the branch moved the worktree off the freshened base"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not reclaim the branch from the abandoned slot"
+  pass "fm-spawn: an on-disk slot no live record claims is reclaimed, not mistaken for a live copy"
+}
+
+test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy() {
+  local rec id out status tip other
+  id='readable-branch-live-worktree-r9'
+  rec=$(make_case refuse-live-worktree "$id")
+  read_case_record "$rec"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/live-copy"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  # The same on-disk holder, but this home's durable record names it and its
+  # recorded endpoint still runs an agent. Sharing the ref would let two agents
+  # commit onto one branch and silently overwrite each other.
+  {
+    echo "window=firstmate:fm-$id-prev"
+    echo "endpoint_task_id=$id"
+    echo "worktree=$other"
+    echo "project=$PROJECT_DIR"
+    echo "harness=claude"
+    echo "kind=ship"
+  } > "$HOME_DIR/state/$id.meta"
+  : > "$CASE_DIR/events.log"
+
+  out=$(FM_FAKE_LIST_WINDOWS="fm-$id-prev" FM_FAKE_PANE_COMMAND=claude \
+    run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "fresh spawn attached a second copy to a branch a live copy holds"
+  assert_contains "$out" "already checked out in the live copy of $id at '$other'" \
+    "the refusal did not name the live copy holding the branch"
   assert_contains "$out" "two live copies committing on one branch" \
     "the refusal did not say why sharing the branch is unsafe"
   [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
     || fail "the refusal still attached the pooled worktree to a branch"
   [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
-    || fail "the refusal disturbed the worktree that already held fm/$id"
+    || fail "the refusal disturbed the live copy that already held fm/$id"
   [ "$(git -C "$other" rev-parse HEAD)" = "$tip" ] \
-    || fail "the refusal changed the existing worktree's checked-out commit"
+    || fail "the refusal changed the live copy's checked-out commit"
   assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
     "spawn sent launch text to the pane despite refusing the shared branch"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
-    printf '# observed shared-branch refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "already checked out in worktree" | head -n 1)"
+    printf '# observed live-copy refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "already checked out in the live copy" | head -n 1)"
   fi
-  pass "fm-spawn: a fresh spawn refuses fm/<id> while another on-disk worktree still has it checked out"
+  pass "fm-spawn: a fresh spawn refuses fm/<id> while a live copy of the same task still has it checked out"
 }
 
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
@@ -373,7 +417,8 @@ test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
-test_fresh_spawn_refuses_a_branch_a_live_worktree_still_holds
+test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree
+test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent

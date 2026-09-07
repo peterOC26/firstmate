@@ -70,7 +70,8 @@ It is not deterministic across the verified adapters: codex and grok resume only
    A secondmate relaunch does not require one and never rewrites its standing charter.
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which adopts the recorded endpoint and worktree instead of creating either, clears the previous harness's per-task wiring, and arms a fresh busy generation.
-   Its `fm/<id>` naming step is best-effort here and never fails the launch: the old agent is already stopped, and declining to switch strands nothing, so a worktree mid-operation, holding commits `fm/<id>` lacks, or that git otherwise declines is left exactly as the previous agent left it and reported as a notice.
+   Its `fm/<id>` naming step is best-effort here and never fails the launch: the old agent is already stopped, and declining to switch strands nothing, so a worktree mid-operation, holding commits `fm/<id>` lacks, sitting at a HEAD that resolves to no commit, or that git otherwise declines is left exactly as the previous agent left it and reported as a notice.
+   That guarantee is enforced at the call site, not by each individual branch of the step, so no naming failure can ever be why a stopped task gets no replacement.
 
 Switching harness is therefore one ordinary relaunch rather than a separate mechanism.
 

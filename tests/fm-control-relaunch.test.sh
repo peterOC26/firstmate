@@ -912,6 +912,38 @@ test_spawn_relaunch_keeps_commits_off_the_task_branch_and_still_launches() {
   pass "fm-spawn --relaunch: a detached HEAD holding commits fm/<id> lacks is left alone, and the replacement still launches"
 }
 
+# The branch step must never be why a relaunch fails, because fm-control has
+# already stopped the old agent by the time it runs. An unborn HEAD (a fresh
+# orphan branch) still resolves through symbolic-ref while naming no commit at
+# all, so the containment comparison cannot be made - and there is nothing to
+# strand either, since HEAD stays exactly where the previous agent left it.
+test_spawn_relaunch_survives_a_head_that_names_no_commit() {
+  local dir wt out rc branch_tip
+  dir=$(new_case relaunch-unborn rl43)
+  add_ship_task "$dir" rl43 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl43
+  printf 'on the branch\n' > "$wt/branch.txt"
+  git -C "$wt" add branch.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'branch work'
+  branch_tip=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" checkout -q --orphan scratch
+  git -C "$wt" rev-parse --verify --quiet 'HEAD^{commit}' >/dev/null 2>&1 \
+    && fail "fixture did not leave a HEAD that resolves to no commit"
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl43 --relaunch); rc=$?
+  expect_code 0 "$rc" "an unresolvable HEAD must not withhold the replacement agent"$'\n'"$out"
+  assert_contains "$out" "spawned rl43" "the relaunch left the task with no agent at all"
+  assert_contains "$out" "resolves to no commit" \
+    "the notice did not say why the branch switch could not be evaluated"
+  [ "$(git -C "$wt" symbolic-ref --quiet --short HEAD)" = scratch ] \
+    || fail "the relaunch moved HEAD off the orphan branch"
+  [ "$(git -C "$wt" rev-parse fm/rl43)" = "$branch_tip" ] \
+    || fail "the relaunch moved the task's fm/rl43 tip"
+  pass "fm-spawn --relaunch: a HEAD that resolves to no commit is left alone, and the replacement still launches"
+}
+
 test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched() {
   local dir wt out rc head_before tip_before gitdir
   dir=$(new_case relaunch-rebase rl41)
@@ -1628,6 +1660,7 @@ test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch
 test_spawn_relaunch_keeps_commits_off_the_task_branch_and_still_launches
 test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched
+test_spawn_relaunch_survives_a_head_that_names_no_commit
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch
 test_cursor_session_binding_is_retired_on_a_harness_switch
