@@ -135,7 +135,10 @@
 #   Ship/scout spawns refuse to launch unless the resolved task path is a real
 #   git worktree root distinct from the primary project checkout.
 #   Before a fresh ship or scout worker starts, its clean task worktree fetches
-#   origin, resolves the current remote default branch, and resets to its tip.
+#   origin and resolves the current remote default branch. Detached worktrees
+#   and branches other than fm/<id> reset to that tip; a clean fm/<id> branch
+#   that already contains commits ahead of origin is preserved, a behind one
+#   fast-forwards, and a diverged one refuses rather than rewinding its ref.
 #   An unreachable origin, unresolved default branch, or non-clean worktree
 #   refuses the spawn rather than risking a PR based on stale history.
 #   Every fresh ship or scout spawn then puts that worktree on branch fm/<id>
@@ -1913,7 +1916,7 @@ EOF
 }
 
 freshen_spawn_worktree_base() {  # <worktree>
-  local worktree=$1 default target expected actual status
+  local worktree=$1 default target expected actual status current_branch current_tip
   if ! git -C "$worktree" fetch --quiet origin; then
     echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
@@ -1945,6 +1948,26 @@ freshen_spawn_worktree_base() {  # <worktree>
     else
       echo "error: pooled worktree '$worktree' is not clean; refusing to discard uncommitted work while refreshing its base" >&2
     fi
+    return 1
+  fi
+  current_branch=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  if [[ "$current_branch" == fm/* && "$current_branch" != "$default" ]]; then
+    current_tip=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
+      echo "error: could not read HEAD of named task branch '$current_branch' while refreshing pooled worktree '$worktree'; refusing to launch" >&2
+      return 1
+    }
+    if git -C "$worktree" merge-base --is-ancestor "$expected" "$current_tip" 2>/dev/null; then
+      echo "notice: preserving clean named task branch '$current_branch' at $current_tip while refreshing pooled worktree '$worktree'; it contains '$target' at $expected" >&2
+      return 0
+    fi
+    if git -C "$worktree" merge-base --is-ancestor "$current_tip" "$expected" 2>/dev/null; then
+      if ! git -C "$worktree" merge --ff-only "$target" >/dev/null 2>&1; then
+        echo "error: could not fast-forward named task branch '$current_branch' to '$target' while refreshing pooled worktree '$worktree'; refusing to launch" >&2
+        return 1
+      fi
+      return 0
+    fi
+    echo "error: named task branch '$current_branch' diverges from '$target'; refusing to rewind it while refreshing pooled worktree '$worktree'" >&2
     return 1
   fi
   if ! git -C "$worktree" reset --hard "$target" >/dev/null; then

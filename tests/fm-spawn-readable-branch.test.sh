@@ -74,12 +74,20 @@ SH
 #!/usr/bin/env bash
 set -u
 target=""
+recursive=0
 for arg in "$@"; do
-  case "$arg" in -*) ;; *) target=$arg ;; esac
+  case "$arg" in
+    +D) recursive=1 ;;
+    -*) ;;
+    *) target=$arg ;;
+  esac
 done
 while IFS= read -r held; do
   [ -n "$held" ] || continue
-  [ "$held" = "$target" ] || continue
+  if [ "$held" != "$target" ]; then
+    [ "$recursive" -eq 1 ] || continue
+    case "$held" in "$target"/*) ;; *) continue ;; esac
+  fi
   printf 'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\n'
   printf 'sleep 4242 tester cwd DIR 0,1 64 1 %s\n' "$target"
   exit 0
@@ -207,6 +215,32 @@ test_already_named_worktree_is_left_alone() {
   assert_no_grep "checkout --quiet fm/$id" "$CASE_DIR/events.log" \
     "spawn switched branches on a worktree that was already on the right one"
   pass "fm-spawn: a worktree already on fm/<id> is left alone, not re-checked-out"
+}
+
+test_freshen_preserves_named_branch_commits() {
+  local rec id out status before after branch_tip
+  id='readable-branch-preserve-r12'
+  rec=$(make_case preserve-named-branch "$id")
+  read_case_record "$rec"
+  git -C "$POOL_DIR" checkout --quiet -b "fm/$id"
+  printf 'keep this committed work\n' > "$POOL_DIR/preserved.txt"
+  git -C "$POOL_DIR" add preserved.txt
+  git -C "$POOL_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm preserved
+  before=$(git -C "$POOL_DIR" rev-parse HEAD)
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "spawn should preserve a clean named task branch"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  after=$(git -C "$POOL_DIR" rev-parse HEAD)
+  branch_tip=$(git -C "$POOL_DIR" rev-parse "fm/$id")
+  [ "$after" = "$before" ] || fail "freshening rewound the named task branch"
+  [ "$branch_tip" = "$before" ] || fail "freshening moved the named task branch ref"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn left the preserved task branch"
+  assert_grep 'keep this committed work' "$POOL_DIR/preserved.txt" \
+    "freshening discarded committed work on the named task branch"
+  pass "fm-spawn: freshening preserves committed work on a clean named fm/<id> branch"
 }
 
 # advance_origin <case_dir> <default>: publish one more commit to origin's
@@ -423,6 +457,29 @@ test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in() {
   pass "fm-spawn: a holder with a live process in it is refused, not reclaimed as abandoned"
 }
 
+test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process() {
+  local rec id out status tip other subdir
+  id='readable-branch-subdir-holder-r13'
+  rec=$(make_case refuse-subdir-holder "$id")
+  read_case_record "$rec"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/subdir-holder"
+  subdir="$other/src"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  mkdir -p "$subdir"
+
+  out=$(FM_FAKE_LSOF_HOLDERS="$subdir" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "fresh spawn reclaimed fm/$id while a process held a subdirectory"
+  assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
+    "the refusal did not account for a process in a holder subdirectory"
+  assert_no_grep "checkout --quiet --ignore-other-worktrees" "$CASE_DIR/events.log" \
+    "spawn overrode git's own refusal for a process in a holder subdirectory"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal attached the pooled worktree to the shared branch"
+  pass "fm-spawn: a process in a holder subdirectory prevents branch reclamation"
+}
+
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
   local rec id out status tip other retry_line gotmp_line
   id='readable-branch-missing-worktree-r9'
@@ -504,12 +561,14 @@ test_ship_brief_branch_step_is_idempotent() {
 test_ship_spawn_creates_branch_before_launch
 test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
+test_freshen_preserves_named_branch_commits
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
 test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree
 test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy
 test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
 test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in
+test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent

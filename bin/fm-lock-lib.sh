@@ -34,7 +34,13 @@ fm_lock_path_mtime() {
 # errored (cannot tell). Diagnostics print on the error path only.
 fm_lock_lsof_holder() {
   local target=$1 output status
-  if output=$(lsof -- "$target" 2>&1); then
+  if [ -d "$target" ]; then
+    if output=$(lsof +D "$target" 2>&1); then
+      return 0
+    else
+      status=$?
+    fi
+  elif output=$(lsof -- "$target" 2>&1); then
     return 0
   else
     status=$?
