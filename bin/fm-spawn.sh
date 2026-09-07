@@ -145,9 +145,11 @@
 #   Every fresh ship or scout spawn then puts that worktree on branch fm/<id>
 #   before the worker starts, so a session list keyed on project:branch reads
 #   the task id instead of a bare detached HEAD; already sitting on that branch
-#   is a no-op, an existing fm/<id> is reused only when it points at the
-#   just-freshened HEAD, and a leftover fm/<id> at any other commit refuses the
-#   spawn rather than silently moving the worktree off its freshened base, as
+#   is a no-op, an existing fm/<id> is switched onto when it points at the
+#   just-freshened HEAD or carries the task's own committed work ahead of it
+#   (the same preserve rule freshening applies to a slot already on fm/<id>),
+#   and a leftover fm/<id> behind or diverged from that base refuses the spawn
+#   rather than moving the worktree off its freshened base or its ref, as
 #   does a branch another worktree already has checked out, unless that holder is
 #   provably abandoned - never the primary checkout, and never a copy holding a
 #   live agent or a live process - so a leaked pool slot does not make an id
@@ -2099,12 +2101,17 @@ spawn_worktree_is_abandoned_holder() {  # <holder> <worktree> <state> <id>
 # has already been refused by freshen_spawn_worktree_base if its slot was dirty
 # at all.
 #
-# Fresh spawn (relaunch=0): an fm/<id> that already exists is reused only when
-# it points at the just-freshened HEAD, where switching onto it moves no
-# tracked file either. Any other tip is a leftover from an earlier spawn of
-# the same id, and quietly switching onto it would walk the worktree off the
-# base freshen_spawn_worktree_base just established, so the spawn is refused
-# and the branch left untouched for inspection. When Git declines the checkout
+# Fresh spawn (relaunch=0): an fm/<id> that already exists is switched onto
+# when it points at the just-freshened HEAD, where switching moves no tracked
+# file, or when it contains that HEAD - the task's own committed work from an
+# earlier spawn of the same id, ahead of the fetched base - which is the same
+# preserve rule freshen_spawn_worktree_base applies to a slot already sitting
+# on fm/<id>: the slot is clean by then, so the switch discards nothing and
+# only carries the worktree forward onto work that would otherwise strand in
+# a leaked slot. A tip behind the freshened base, or one that diverges from
+# it, is a stale leftover, and quietly switching onto it would walk the
+# worktree off the base just established, so the spawn is refused and the
+# branch left untouched (never rewound) for inspection. When Git declines the checkout
 # because another worktree already has the branch checked out, git's refusal
 # stands unless that holder is PROVABLY abandoned
 # (spawn_worktree_is_abandoned_holder): a registration whose directory is gone,
@@ -2163,8 +2170,15 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         return 0
       fi
     elif [ "$tip" != "$head" ]; then
-      echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
-      return 1
+      if git -C "$worktree" merge-base --is-ancestor "$head" "$tip" 2>/dev/null; then
+        echo "notice: switching worktree '$worktree' onto existing task branch '$branch' at $tip, which carries committed work ahead of the freshened base $head" >&2
+      elif git -C "$worktree" merge-base --is-ancestor "$tip" "$head" 2>/dev/null; then
+        echo "error: branch '$branch' already exists at $tip, but worktree '$worktree' is at $head; refusing to move the worktree off its current base onto a leftover branch (inspect or delete '$branch' before retrying)" >&2
+        return 1
+      else
+        echo "error: branch '$branch' already exists at $tip and diverges from the freshened base $head of worktree '$worktree'; refusing to move the worktree onto it or rewind its ref (inspect or delete '$branch' before retrying)" >&2
+        return 1
+      fi
     fi
     if ! err=$(git -C "$worktree" checkout --quiet "$branch" 2>&1); then
       if [ "$relaunch" = 1 ]; then

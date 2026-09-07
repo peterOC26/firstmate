@@ -421,6 +421,117 @@ test_leftover_branch_at_freshened_base_is_reused() {
   pass "fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created"
 }
 
+# leave_leftover_branch_with_commit <id> <file>: an fm/<id> nobody has checked
+# out that carries one commit of the task's own work on top of the current
+# base - what an earlier spawn of the same id leaves behind after its slot
+# was returned or its worktree registration pruned.
+leave_leftover_branch_with_commit() {
+  local id=$1 file=$2
+  git -C "$PROJECT_DIR" checkout --quiet -b "fm/$id"
+  printf 'committed task work\n' > "$PROJECT_DIR/$file"
+  git -C "$PROJECT_DIR" add "$file"
+  git -C "$PROJECT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm leftover-work
+  git -C "$PROJECT_DIR" checkout --quiet main
+  git -C "$PROJECT_DIR" rev-parse "fm/$id"
+}
+
+test_leftover_branch_ahead_of_freshened_base_is_recovered() {
+  local rec id out status base_tip leftover_tip
+  id='readable-branch-ahead-r17'
+  rec=$(make_case ahead-leftover "$id")
+  read_case_record "$rec"
+  # The leftover carries the task's committed work ahead of a base origin never
+  # moved past; the pooled slot is clean at that base. This is the cross-slot
+  # twin of freshening's preserve rule: switching onto the branch discards
+  # nothing and only carries the worktree forward onto the task's own commits.
+  base_tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  leftover_tip=$(leave_leftover_branch_with_commit "$id" ahead.txt)
+  [ "$leftover_tip" != "$base_tip" ] || fail "fixture did not put the leftover branch ahead of the base"
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "a leftover fm/$id ahead of the freshened base must not block recovery"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn did not switch the worktree onto the existing fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$leftover_tip" ] \
+    || fail "the worktree did not land on the leftover branch's committed work"
+  [ "$(git -C "$POOL_DIR" rev-parse "refs/heads/fm/$id")" = "$leftover_tip" ] \
+    || fail "recovering the leftover branch moved its ref"
+  assert_grep 'committed task work' "$POOL_DIR/ahead.txt" \
+    "the recovered worktree does not carry the branch's committed work"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not switch onto the existing branch"
+  assert_no_grep "checkout --quiet -b fm/$id" "$CASE_DIR/events.log" \
+    "spawn tried to re-create a branch that already existed"
+  pass "fm-spawn: a leftover fm/<id> carrying committed work ahead of the freshened base is switched onto, not refused"
+}
+
+test_leftover_branch_ahead_held_by_abandoned_slot_is_reclaimed() {
+  local rec id out status leftover_tip other
+  id='readable-branch-ahead-abandoned-r18'
+  rec=$(make_case ahead-abandoned-slot "$id")
+  read_case_record "$rec"
+  # The same committed work, but still checked out in a leaked slot no record
+  # claims and no process holds: the holder proof clears it, and the branch's
+  # commits come along rather than stranding in the leaked directory.
+  other="$CASE_DIR/leaked-slot"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other"
+  printf 'committed task work\n' > "$other/ahead.txt"
+  git -C "$other" add ahead.txt
+  git -C "$other" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm leftover-work
+  leftover_tip=$(git -C "$other" rev-parse HEAD)
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "fixture left a task record claiming the abandoned slot"
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "an abandoned slot holding fm/$id with commits must not block recovery"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "fresh spawn did not attach its worktree to the reclaimed fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$leftover_tip" ] \
+    || fail "reclaiming the branch did not carry its committed work into the worktree"
+  [ "$(git -C "$POOL_DIR" rev-parse "refs/heads/fm/$id")" = "$leftover_tip" ] \
+    || fail "reclaiming the branch moved its ref"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not reclaim the branch from the abandoned slot"
+  pass "fm-spawn: a leaked slot holding fm/<id> with committed work is reclaimed across slots"
+}
+
+test_diverged_leftover_branch_is_refused_without_moving_its_ref() {
+  local rec id out status leftover_tip fresh_tip
+  id='readable-branch-diverged-leftover-r19'
+  rec=$(make_case diverged-leftover "$id")
+  read_case_record "$rec"
+  # The leftover holds committed work on a base origin has since moved past:
+  # neither side contains the other, so there is no safe direction to move.
+  leftover_tip=$(leave_leftover_branch_with_commit "$id" diverged.txt)
+  advance_origin "$CASE_DIR" main
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn launched onto a leftover fm/$id that diverges from the freshened base"
+  assert_contains "$out" "branch 'fm/$id' already exists at $leftover_tip and diverges from the freshened base" \
+    "spawn did not name the diverging leftover branch it refused"
+  assert_contains "$out" "refusing to move the worktree onto it or rewind its ref" \
+    "spawn did not say it refused both the switch and the rewind"
+  fresh_tip=$(git -C "$POOL_DIR" rev-parse origin/main)
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$fresh_tip" ] \
+    || fail "spawn moved the worktree off its freshened base while refusing"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "spawn attached the worktree to a branch despite refusing"
+  [ "$(git -C "$POOL_DIR" rev-parse "refs/heads/fm/$id")" = "$leftover_tip" ] \
+    || fail "spawn moved or deleted the diverging fm/$id instead of leaving it for inspection"
+  assert_no_grep "checkout" "$CASE_DIR/events.log" \
+    "spawn ran a git checkout while refusing the diverging leftover branch"
+  assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
+    "spawn sent launch text to the pane despite refusing the branch"
+  pass "fm-spawn: a leftover fm/<id> that diverges from the freshened base is refused with its ref untouched"
+}
+
 test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree() {
   local rec id out status tip other
   id='readable-branch-abandoned-worktree-r8'
@@ -668,6 +779,9 @@ test_freshen_refuses_diverged_named_branch
 test_freshen_does_not_seed_from_unrelated_named_branch
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
+test_leftover_branch_ahead_of_freshened_base_is_recovered
+test_leftover_branch_ahead_held_by_abandoned_slot_is_reclaimed
+test_diverged_leftover_branch_is_refused_without_moving_its_ref
 test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree
 test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy
 test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
