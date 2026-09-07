@@ -268,14 +268,17 @@ test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree() {
   read_case_record "$rec"
   # A slot leaked by an earlier spawn of this id that named its branch and then
   # failed before publishing a record: the directory is still on disk with
-  # fm/<id> checked out, but nothing live claims it. Nothing returns such a slot
-  # automatically, so refusing on its mere existence would make the id
+  # fm/<id> checked out, no record claims it, and no process is working in it.
+  # Nothing returns such a slot automatically, so refusing it would make the id
   # unspawnable until a human removed the worktree by hand.
+  command -v lsof >/dev/null 2>&1 \
+    || fail "this case needs lsof: reclaiming a slot requires proving no process holds it"
   tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
   other="$CASE_DIR/leaked-slot"
   git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
   [ -d "$other" ] || fail "fixture did not leave the abandoned slot on disk"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "fixture left a task record claiming the abandoned slot"
+  ! lsof -- "$other" >/dev/null 2>&1 || fail "fixture left a process holding the abandoned slot"
   : > "$CASE_DIR/events.log"
 
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
@@ -316,9 +319,11 @@ test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy() {
     run_spawn "$id" --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "fresh spawn attached a second copy to a branch a live copy holds"
-  assert_contains "$out" "already checked out in the live copy of $id at '$other'" \
-    "the refusal did not name the live copy holding the branch"
-  assert_contains "$out" "two live copies committing on one branch" \
+  assert_contains "$out" "already checked out in '$other'" \
+    "the refusal did not name the copy holding the branch"
+  assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
+    "the refusal did not say the holder could not be proven abandoned"
+  assert_contains "$out" "two copies committing on one branch" \
     "the refusal did not say why sharing the branch is unsafe"
   [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
     || fail "the refusal still attached the pooled worktree to a branch"
@@ -329,9 +334,85 @@ test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy() {
   assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
     "spawn sent launch text to the pane despite refusing the shared branch"
   if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
-    printf '# observed live-copy refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "already checked out in the live copy" | head -n 1)"
+    printf '# observed live-copy refusal: %s\n' "$(printf '%s\n' "$out" | grep -F "cannot be proven to be an abandoned worker copy" | head -n 1)"
   fi
   pass "fm-spawn: a fresh spawn refuses fm/<id> while a live copy of the same task still has it checked out"
+}
+
+test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds() {
+  local rec id out status tip primary
+  id='readable-branch-primary-holder-r10'
+  rec=$(make_case refuse-primary-holder "$id")
+  read_case_record "$rec"
+  # A crewmate ignored its brief's isolation check and branched inside the
+  # project's own checkout - the worktree tangle fm-guard.sh exists to surface.
+  # No task record names the primary, so it is exactly the holder a
+  # record-only rule reads as abandoned; it must be refused on identity.
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  git -C "$PROJECT_DIR" checkout --quiet -b "fm/$id"
+  primary=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel)
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "fresh spawn shared fm/$id with the project's primary checkout"
+  assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
+    "the refusal did not say the holder could not be proven abandoned"
+  assert_contains "$out" "already checked out in '$primary'" \
+    "the refusal did not name the primary checkout as the holder"
+  assert_no_grep "checkout --quiet --ignore-other-worktrees" "$CASE_DIR/events.log" \
+    "spawn overrode git's own refusal to share the primary checkout's branch"
+  [ "$(git -C "$PROJECT_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal moved the primary checkout off its branch"
+  [ "$(git -C "$PROJECT_DIR" rev-parse HEAD)" = "$tip" ] \
+    || fail "the refusal changed the primary checkout's commit"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal still attached the pooled worktree to a branch"
+  assert_no_grep "TMUX export GOTMPDIR" "$CASE_DIR/events.log" \
+    "spawn sent launch text to the pane despite refusing the shared branch"
+  pass "fm-spawn: a fresh spawn never overrides git to share fm/<id> with the project's primary checkout"
+}
+
+test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in() {
+  local rec id out status tip other probe_pid i
+  id='readable-branch-busy-worktree-r11'
+  rec=$(make_case refuse-busy-worktree "$id")
+  read_case_record "$rec"
+  command -v lsof >/dev/null 2>&1 \
+    || fail "this case needs lsof: it proves a busy holder is not reclaimed"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/busy-worktree"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  # An operator's own ad-hoc worktree on fm/<id> is named by no task record
+  # either; the only thing separating it from a leaked slot is that somebody is
+  # working in it right now.
+  ( cd "$other" && exec sleep 120 ) &
+  probe_pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && ! lsof -- "$other" >/dev/null 2>&1; do
+    /bin/sleep 0.05
+    i=$((i + 1))
+  done
+  lsof -- "$other" >/dev/null 2>&1 || {
+    kill "$probe_pid" 2>/dev/null || true
+    fail "fixture could not establish a live process inside the holder"
+  }
+  : > "$CASE_DIR/events.log"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  kill "$probe_pid" 2>/dev/null || true
+  wait "$probe_pid" 2>/dev/null || true
+  [ "$status" -ne 0 ] || fail "fresh spawn reclaimed fm/$id from a worktree somebody is working in"
+  assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
+    "the refusal did not say the holder could not be proven abandoned"
+  assert_no_grep "checkout --quiet --ignore-other-worktrees" "$CASE_DIR/events.log" \
+    "spawn overrode git's own refusal for a worktree with a live process in it"
+  [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal disturbed the worktree that already held fm/$id"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal still attached the pooled worktree to a branch"
+  pass "fm-spawn: a holder with a live process in it is refused, not reclaimed as abandoned"
 }
 
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
@@ -419,6 +500,8 @@ test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
 test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree
 test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy
+test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
+test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent

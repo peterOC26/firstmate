@@ -144,9 +144,10 @@
 #   is a no-op, an existing fm/<id> is reused only when it points at the
 #   just-freshened HEAD, and a leftover fm/<id> at any other commit refuses the
 #   spawn rather than silently moving the worktree off its freshened base, as
-#   does a branch a second LIVE copy of the same task already has checked out;
-#   an abandoned copy no live record claims is reclaimed instead, so a leaked
-#   slot never makes an id unspawnable.
+#   does a branch another worktree already has checked out, unless that holder is
+#   provably abandoned - never the primary checkout, and never a copy holding a
+#   live agent or a live process - so a leaked pool slot does not make an id
+#   unspawnable while a real second copy is still refused.
 #   A relaunch owns no base-freshness invariant and its old agent is already
 #   stopped by the time this runs, so there the same step is best-effort and its
 #   call site never lets it fail the launch: it switches back onto the task's own
@@ -320,6 +321,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-trace-context-lib.sh"
 # shellcheck source=bin/fm-remote-readiness-lib.sh
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
+# shellcheck source=bin/fm-lock-lib.sh
+. "$SCRIPT_DIR/fm-lock-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -1996,28 +1999,63 @@ EOF
   return 1
 }
 
-# True only when <holder> is a LIVE copy of task <id>: this home's durable
-# record names that exact directory AND its recorded endpoint is not positively
-# agent-free. Directory existence alone proves nothing - a spawn that failed
-# after naming its slot, or a task whose slot was never returned, leaves a real
-# directory on the branch with nobody working in it, and blocking on that would
-# make the id unspawnable until a human intervened. An endpoint whose backend
-# has no recovery-grade classifier reads as neither alive nor dead, so it counts
-# as live rather than being reclaimed on a guess.
-spawn_worktree_holder_is_live() {  # <holder> <state> <id>
-  local holder=$1 state=$2 id=$3 meta recorded backend target
-  meta="$state/$id.meta"
+# Echo the repository's MAIN worktree - always the first entry git reports - or
+# return 1 when it cannot be read. The main worktree is somebody's operating
+# checkout, never a disposable worker copy.
+spawn_repo_main_worktree() {  # <worktree>
+  local worktree=$1 line
+  while IFS= read -r line; do
+    case $line in
+      "worktree "*) printf '%s\n' "${line#worktree }"; return 0 ;;
+    esac
+  done <<EOF
+$(git -C "$worktree" worktree list --porcelain 2>/dev/null || true)
+EOF
+  return 1
+}
+
+# True only when <holder> is PROVABLY an abandoned copy, which is the sole
+# condition under which git's own refusal to share a branch may be overridden.
+# Proof, not absence of evidence: a holder that merely has no task record is not
+# thereby abandoned - the repository's main worktree and the project checkout
+# this spawn was dispatched against are named by no record either, and a live
+# operator sitting on fm/<id> there is exactly the worktree tangle fm-guard.sh
+# exists to surface. So both are excluded outright, and every remaining on-disk
+# holder must clear two independent proofs: this home's record for <id>, when it
+# names the holder, must read positively agent-free (an endpoint whose backend
+# has no recovery-grade classifier reads as neither alive nor dead and therefore
+# never qualifies), and no live process may hold the directory - the same
+# fail-safe lsof proof bin/fm-lock-lib.sh owns, where a missing lsof or any lsof
+# error means "cannot tell", not "nobody there". A registration whose directory
+# is gone needs neither proof: nothing can be working inside a directory that
+# does not exist.
+spawn_worktree_is_abandoned_holder() {  # <holder> <worktree> <state> <id>
+  local holder=$1 worktree=$2 state=$3 id=$4 meta main recorded backend target holder_real
+  [ -n "$holder" ] || return 1
+  [ -e "$holder" ] || return 0
   [ -d "$holder" ] || return 1
-  [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
-  recorded=$(fm_meta_get "$meta" worktree)
-  [ -n "$recorded" ] || return 1
-  [ "$(real_path_or_raw "$recorded")" = "$(real_path_or_raw "$holder")" ] || return 1
-  backend=$(fm_backend_of_meta "$meta")
-  target=$(fm_backend_target_of_meta "$meta")
-  [ -n "$target" ] || return 0
-  case "$(fm_backend_agent_alive "$backend" "$target")" in
-    dead) return 1 ;;
-  esac
+  holder_real=$(real_path_or_raw "$holder")
+  main=$(spawn_repo_main_worktree "$worktree" || true)
+  if [ -n "$main" ] && [ "$(real_path_or_raw "$main")" = "$holder_real" ]; then
+    return 1
+  fi
+  [ "${PROJ_ABS_REAL:-}" != "$holder_real" ] || return 1
+  meta="$state/$id.meta"
+  if [ -f "$meta" ] && [ ! -L "$meta" ]; then
+    recorded=$(fm_meta_get "$meta" worktree)
+    if [ -n "$recorded" ] && [ "$(real_path_or_raw "$recorded")" = "$holder_real" ]; then
+      backend=$(fm_backend_of_meta "$meta")
+      target=$(fm_backend_target_of_meta "$meta")
+      [ -n "$target" ] || return 1
+      case "$(fm_backend_agent_alive "$backend" "$target")" in
+        dead) ;;
+        *) return 1 ;;
+      esac
+    fi
+  fi
+  if fm_lock_has_live_holder "" "$holder"; then
+    return 1
+  fi
   return 0
 }
 
@@ -2026,9 +2064,10 @@ spawn_worktree_holder_is_live() {  # <holder> <state> <id>
 # an unhelpful "HEAD+"). Idempotent: already sitting on the branch is a no-op.
 # Never pushes, never forces. Creating the branch from the current HEAD never
 # touches a tracked file (the new branch names the exact commit already
-# checked out), so it is always safe even over a dirty tree - including the
-# benign stale-submodule-pin residue freshen_spawn_worktree_base can leave
-# right before this runs.
+# checked out), so it is always safe even over a dirty tree - which on a
+# relaunch is whatever the previous agent left uncommitted, since a fresh spawn
+# has already been refused by freshen_spawn_worktree_base if its slot was dirty
+# at all.
 #
 # Fresh spawn (relaunch=0): an fm/<id> that already exists is reused only when
 # it points at the just-freshened HEAD, where switching onto it moves no
@@ -2036,17 +2075,16 @@ spawn_worktree_holder_is_live() {  # <holder> <state> <id>
 # the same id, and quietly switching onto it would walk the worktree off the
 # base freshen_spawn_worktree_base just established, so the spawn is refused
 # and the branch left untouched for inspection. When Git declines the checkout
-# because another worktree already has the branch checked out, that other copy's
-# LIVENESS decides the outcome (spawn_worktree_holder_is_live), not whether its
-# directory happens to still exist: a copy this home's durable record names and
-# whose endpoint is not positively agent-free is refused, because two agents
-# committing on one ref silently overwrite each other. A holder no live record
-# claims - a slot leaked by a spawn that failed after naming it, a crashed task
-# whose slot was never returned, or a registration whose directory is gone - is
-# abandoned, and reclaiming it is what keeps the id spawnable; that case is
-# passed over with git's narrow --ignore-other-worktrees opt-in. Any other
-# checkout failure (such as a stale index.lock) is reported with git's own
-# error rather than blamed on uncommitted work.
+# because another worktree already has the branch checked out, git's refusal
+# stands unless that holder is PROVABLY abandoned
+# (spawn_worktree_is_abandoned_holder): a registration whose directory is gone,
+# or a copy that is neither the repository's main worktree nor this project's
+# checkout, is claimed by no live agent record, and holds no live process. Only
+# then is the checkout retried with git's narrow --ignore-other-worktrees opt-in,
+# which is what keeps a leaked pool slot from making the id unspawnable; every
+# other holder is refused, because two copies committing on one ref silently
+# overwrite each other. Any other checkout failure (such as a stale index.lock)
+# is reported with git's own error rather than blamed on uncommitted work.
 #
 # Relaunch (relaunch=1): fm/<id> is the task's own work branch, not a
 # leftover, and there is no freshened base to defend; the recorded worktree is
@@ -2108,8 +2146,8 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${err:-no details from git})" >&2
         return 1
       fi
-      if spawn_worktree_holder_is_live "$holder" "$STATE" "$id"; then
-        echo "error: task branch '$branch' is already checked out in the live copy of $id at '$holder'; refusing to attach '$worktree' to it as well, because two live copies committing on one branch overwrite each other's work (stop or tear that task down first)" >&2
+      if ! spawn_worktree_is_abandoned_holder "$holder" "$worktree" "$STATE" "$id"; then
+        echo "error: task branch '$branch' is already checked out in '$holder', which cannot be proven to be an abandoned worker copy; refusing to attach '$worktree' to it as well, because two copies committing on one branch overwrite each other's work (finish or retire whatever holds '$holder' first)" >&2
         return 1
       fi
       if ! retry_err=$(git -C "$worktree" checkout --quiet --ignore-other-worktrees "$branch" 2>&1); then
