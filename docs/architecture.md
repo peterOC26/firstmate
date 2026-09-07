@@ -201,7 +201,7 @@ Its header owns the exact branch and refusal mechanics, while `tests/fm-spawn-po
 
 The firstmate repo has one extra exposure because it can dispatch crewmates to work on itself.
 Its operating checkout (`FM_ROOT`) and the disposable crewmate worktrees are all linked git worktrees of the same repository, so the valid discriminator is branch state, not whether the checkout is linked.
-The primary checkout is healthy on its default branch, and ship or scout task worktrees are healthy on their `fm/<id>` branches.
+The primary checkout is healthy on its default branch, ship or scout task worktrees are healthy on their `fm/<id>` branches, and secondmate homes, which the branch step skips, stay healthy at detached HEAD.
 Only a named non-default branch checked out in `FM_ROOT` is a worktree tangle.
 
 `fm-tangle-lib.sh` resolves the default branch from `origin/HEAD`, then local `main` or `master`, and classifies that named non-default primary branch as the tangle.
