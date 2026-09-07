@@ -136,9 +136,10 @@
 #   git worktree root distinct from the primary project checkout.
 #   Before a fresh ship or scout worker starts, its clean task worktree fetches
 #   origin and resolves the current remote default branch. Detached worktrees
-#   and branches other than fm/<id> reset to that tip; a clean fm/<id> branch
-#   that already contains commits ahead of origin is preserved, a behind one
-#   fast-forwards, and a diverged one refuses rather than rewinding its ref.
+#   and unrelated named branches return to that tip without moving their refs;
+#   a clean fm/<id> branch that already contains commits ahead of origin is
+#   preserved, a behind one fast-forwards, and a diverged one refuses rather
+#   than rewinding its ref.
 #   An unreachable origin, unresolved default branch, or non-clean worktree
 #   refuses the spawn rather than risking a PR based on stale history.
 #   Every fresh ship or scout spawn then puts that worktree on branch fm/<id>
@@ -1915,8 +1916,8 @@ EOF
   printf '%s' "$lines" >&2
 }
 
-freshen_spawn_worktree_base() {  # <worktree>
-  local worktree=$1 default target expected actual status current_branch current_tip
+freshen_spawn_worktree_base() {  # <worktree> <id>
+  local worktree=$1 task_id=$2 default target expected actual status current_branch current_tip
   if ! git -C "$worktree" fetch --quiet origin; then
     echo "error: could not fetch origin for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
     return 1
@@ -1951,7 +1952,7 @@ freshen_spawn_worktree_base() {  # <worktree>
     return 1
   fi
   current_branch=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
-  if [[ "$current_branch" == fm/* && "$current_branch" != "$default" ]]; then
+  if [ "$current_branch" = "fm/$task_id" ]; then
     current_tip=$(git -C "$worktree" rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null) || {
       echo "error: could not read HEAD of named task branch '$current_branch' while refreshing pooled worktree '$worktree'; refusing to launch" >&2
       return 1
@@ -1969,6 +1970,12 @@ freshen_spawn_worktree_base() {  # <worktree>
     fi
     echo "error: named task branch '$current_branch' diverges from '$target'; refusing to rewind it while refreshing pooled worktree '$worktree'" >&2
     return 1
+  fi
+  if [ -n "$current_branch" ] && [ "$current_branch" != "$default" ]; then
+    if ! git -C "$worktree" checkout --quiet --detach; then
+      echo "error: could not detach pooled worktree '$worktree' from unrelated branch '$current_branch' before refreshing it; refusing to launch" >&2
+      return 1
+    fi
   fi
   if ! git -C "$worktree" reset --hard "$target" >/dev/null; then
     echo "error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
@@ -2722,7 +2729,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   validate_spawn_worktree "treehouse get" "$T"
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
-  freshen_spawn_worktree_base "$WT" || exit 1
+  freshen_spawn_worktree_base "$WT" "$ID" || exit 1
 fi
 if [ "$KIND" != secondmate ]; then
   if [ "$RELAUNCH" -eq 1 ]; then

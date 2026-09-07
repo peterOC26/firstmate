@@ -243,6 +243,36 @@ test_freshen_preserves_named_branch_commits() {
   pass "fm-spawn: freshening preserves committed work on a clean named fm/<id> branch"
 }
 
+test_freshen_does_not_seed_from_unrelated_named_branch() {
+  local rec old_id new_id out status old_tip origin_tip
+  old_id='readable-branch-old-r14'
+  new_id='readable-branch-new-r14'
+  rec=$(make_case cross-id-branch "$old_id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/data/$new_id"
+  printf 'brief for %s\n' "$new_id" > "$HOME_DIR/data/$new_id/brief.md"
+  git -C "$POOL_DIR" checkout --quiet -b "fm/$old_id"
+  printf 'old task history\n' > "$POOL_DIR/old-task.txt"
+  git -C "$POOL_DIR" add old-task.txt
+  git -C "$POOL_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm old-task
+  old_tip=$(git -C "$POOL_DIR" rev-parse "fm/$old_id")
+  origin_tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+
+  out=$(run_spawn "$new_id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "spawn should refresh from origin when a pooled slot is on another task branch"
+  assert_contains "$out" "spawned $new_id" "cross-id spawn did not report success"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$new_id" ] \
+    || fail "cross-id spawn did not create the new task branch"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$origin_tip" ] \
+    || fail "cross-id spawn seeded the new task from the unrelated branch"
+  [ "$(git -C "$POOL_DIR" rev-parse "fm/$old_id")" = "$old_tip" ] \
+    || fail "cross-id freshening moved the unrelated task branch ref"
+  [ ! -e "$POOL_DIR/old-task.txt" ] \
+    || fail "cross-id spawn carried the unrelated task's committed file into the new worktree"
+  pass "fm-spawn: a pooled slot on another fm/<id> returns to origin without moving that branch"
+}
+
 # advance_origin <case_dir> <default>: publish one more commit to origin's
 # default branch from a separate clone, so the base freshen_spawn_worktree_base
 # establishes moves past whatever the pool (and any leftover branch) points at.
@@ -562,6 +592,7 @@ test_ship_spawn_creates_branch_before_launch
 test_scout_spawn_creates_branch_before_launch
 test_already_named_worktree_is_left_alone
 test_freshen_preserves_named_branch_commits
+test_freshen_does_not_seed_from_unrelated_named_branch
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
 test_fresh_spawn_reclaims_a_branch_held_by_an_abandoned_worktree
