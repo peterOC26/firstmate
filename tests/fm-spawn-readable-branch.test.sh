@@ -66,7 +66,7 @@ SH
   chmod +x "$fakebin/tmux"
   # Deterministic stand-in for the two lsof queries fm_lock_has_live_holder
   # makes ("does any process hold this exact path open?" and the system-wide
-  # `-Fpn` listing of every process's open paths), so a case states which
+  # `-n -P -l -Fpn` listing of every process's open paths), so a case states which
   # holders are busy instead of inheriting the host's lsof and whatever else is
   # running on it. Empty output plus exit 1 is lsof's "provably nobody"; exit 0
   # with a listing is a live holder. FM_FAKE_LSOF_HOLDERS carries paths held as

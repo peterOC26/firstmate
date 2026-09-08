@@ -35,10 +35,11 @@ fm_lock_path_mtime() {
 # fm_lock_lsof_holder <target>: 0 a process holds it, 1 provably none, 2 lsof
 # errored (cannot tell). A directory target is held when a process has it open
 # as an fd or cwd, or has its cwd or any open file anywhere under it: the
-# descendant check is one system-wide `lsof -Fpn` listing of every process's
-# open paths filtered by path prefix - bounded by what is open, never the
-# recursive +D file-tree walk that lsof documents as slow. Diagnostics print on
-# the error path only.
+# descendant check is one system-wide `lsof -n -P -l -Fpn` listing of every
+# process's open paths filtered by path prefix - bounded by what is open, never
+# the recursive +D file-tree walk that lsof documents as slow, and with host,
+# port, and user-name lookups disabled so a slow resolver cannot stall the
+# proof on a host with many sockets. Diagnostics print on the error path only.
 fm_lock_lsof_holder() {
   local target=$1 output status
   if output=$(lsof -- "$target" 2>&1); then
@@ -77,7 +78,7 @@ fm_lock_lsof_path_under() {
     fm_lock_log "cannot resolve $dir for the lsof open-path scan"
     return 2
   }
-  if out=$(lsof -Fpn 2>/dev/null); then
+  if out=$(lsof -n -P -l -Fpn 2>/dev/null); then
     status=0
   else
     status=$?
