@@ -990,6 +990,55 @@ SH
   pass "fm-spawn --relaunch: a worktree mid-rebase is left exactly as the previous agent left it"
 }
 
+test_spawn_relaunch_leaves_a_cherry_pick_sequence_untouched() {
+  local dir wt out rc head_before tip_before gitdir
+  dir=$(new_case relaunch-sequencer rl44)
+  add_ship_task "$dir" rl44 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl44
+  printf 'a\n' > "$wt/f.txt"
+  git -C "$wt" add f.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm a
+  tip_before=$(git -C "$wt" rev-parse fm/rl44)
+  git -C "$wt" checkout -q -b side HEAD~1
+  printf 'b\n' > "$wt/f.txt"
+  git -C "$wt" add f.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm b1
+  printf 'c\n' > "$wt/g.txt"
+  git -C "$wt" add g.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm b2
+  # A two-commit cherry-pick onto a detached HEAD at the task's tip conflicts
+  # on its first step; the agent resets that step away, which drops
+  # CHERRY_PICK_HEAD but leaves the sequencer with the remaining step, so git
+  # still reports the cherry-pick in progress and a plain checkout would walk
+  # away from it.
+  git -C "$wt" checkout -q --detach fm/rl44
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    cherry-pick side~1 side >/dev/null 2>&1 || true
+  git -C "$wt" reset -q --hard HEAD
+  gitdir=$(git -C "$wt" rev-parse --absolute-git-dir)
+  [ -d "$gitdir/sequencer" ] || fail "fixture did not leave a cherry-pick sequence in progress"
+  [ ! -e "$gitdir/CHERRY_PICK_HEAD" ] || fail "fixture left the per-step marker, so it does not isolate the sequencer case"
+  git -C "$wt" status | grep -q 'Cherry-pick currently in progress' \
+    || fail "fixture's git status does not report the cherry-pick as in progress"
+  head_before=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl44 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse a worktree mid cherry-pick sequence"$'\n'"$out"
+  assert_contains "$out" "spawned rl44" "the relaunch should have launched the replacement"
+  assert_contains "$out" "has a cherry-pick in progress; leaving it exactly as the previous agent left it" \
+    "the relaunch did not recognise the sequencer-only cherry-pick as in progress"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] \
+    || fail "the relaunch moved HEAD during a cherry-pick sequence"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the relaunch attached a worktree mid cherry-pick sequence to a branch"
+  [ -d "$gitdir/sequencer" ] || fail "the relaunch disturbed the in-progress cherry-pick sequence"
+  [ "$(git -C "$wt" rev-parse fm/rl44)" = "$tip_before" ] \
+    || fail "the relaunch moved the task's fm/rl44 tip"
+  pass "fm-spawn --relaunch: a sequencer-only cherry-pick in progress is left exactly as the previous agent left it"
+}
+
 # fm-spawn arms per-task wiring on harness PREFIXES, because a task launched
 # from a raw command records that command's basename rather than the exact
 # adapter name. Retirement must resolve the same way, or a task recorded as
@@ -1660,6 +1709,7 @@ test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch
 test_spawn_relaunch_keeps_commits_off_the_task_branch_and_still_launches
 test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched
+test_spawn_relaunch_leaves_a_cherry_pick_sequence_untouched
 test_spawn_relaunch_survives_a_head_that_names_no_commit
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch

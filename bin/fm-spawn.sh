@@ -1993,9 +1993,13 @@ freshen_spawn_worktree_base() {  # <worktree> <id>
 # Name the git operation a worktree is in the middle of (rebase, bisect,
 # merge, cherry-pick, revert) on stdout and return 0, or return 1 when none
 # is in progress. These markers live in the worktree's own git dir, which
-# --absolute-git-dir resolves for linked worktrees too.
+# --absolute-git-dir resolves for linked worktrees too. A multi-commit
+# cherry-pick or revert keeps its remaining steps in a sequencer directory
+# that outlives the per-step CHERRY_PICK_HEAD/REVERT_HEAD marker (git status
+# still reports the sequence in progress once a conflicted step is committed
+# or reset away), so that directory counts as the operation too.
 spawn_worktree_git_operation_in_progress() {  # <worktree>
-  local worktree=$1 gitdir marker
+  local worktree=$1 gitdir marker step
   gitdir=$(git -C "$worktree" rev-parse --absolute-git-dir 2>/dev/null) || return 1
   for marker in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG; do
     [ -e "$gitdir/$marker" ] || continue
@@ -2008,27 +2012,38 @@ spawn_worktree_git_operation_in_progress() {  # <worktree>
     esac
     return 0
   done
+  if [ -d "$gitdir/sequencer" ]; then
+    step=$(head -n 1 "$gitdir/sequencer/todo" 2>/dev/null || true)
+    case $step in
+      revert*) echo revert ;;
+      *) echo cherry-pick ;;
+    esac
+    return 0
+  fi
   return 1
 }
 
-# Echo the path of the worktree that currently has <branch> checked out, or
-# return 1 when no registered worktree holds it. Used to tell an abandoned
-# checkout from a live copy still sitting on the branch.
-spawn_worktree_holding_branch() {  # <worktree> <branch>
-  local worktree=$1 branch=$2 line path=""
+# Echo the path of every registered worktree that currently has <branch>
+# checked out, one per line, or return 1 when none holds it. More than one is
+# possible - a --ignore-other-worktrees checkout, including this script's own
+# reclaim of an abandoned slot, is exactly what produces it - so callers must
+# judge every holder, never just the first. Used to tell abandoned checkouts
+# from a live copy still sitting on the branch.
+spawn_worktrees_holding_branch() {  # <worktree> <branch>
+  local worktree=$1 branch=$2 line path="" found=1
   while IFS= read -r line; do
     case $line in
       "worktree "*) path=${line#worktree } ;;
       "branch refs/heads/$branch")
         [ -n "$path" ] || continue
         printf '%s\n' "$path"
-        return 0
+        found=0
         ;;
     esac
   done <<EOF
 $(git -C "$worktree" worktree list --porcelain 2>/dev/null || true)
 EOF
-  return 1
+  return $found
 }
 
 # Echo the repository's MAIN worktree - always the first entry git reports - or
@@ -2114,7 +2129,7 @@ spawn_worktree_is_abandoned_holder() {  # <holder> <worktree> <state> <id>
 # worktree off the base just established, so the spawn is refused and the
 # branch left untouched (never rewound) for inspection. When Git declines the checkout
 # because another worktree already has the branch checked out, git's refusal
-# stands unless that holder is PROVABLY abandoned
+# stands unless EVERY worktree holding the branch is PROVABLY abandoned
 # (spawn_worktree_is_abandoned_holder): a registration whose directory is gone,
 # or a copy that is neither the repository's main worktree nor this project's
 # checkout, is claimed by no live agent record, and holds no live process. Only
@@ -2143,7 +2158,7 @@ spawn_worktree_is_abandoned_holder() {  # <holder> <worktree> <state> <id>
 # first-action branch step carries the same conditions, so the replacement
 # agent does not undo any of this with its first command.
 ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
-  local worktree=$1 id=$2 relaunch=$3 branch current head tip err retry_err op where behind holder
+  local worktree=$1 id=$2 relaunch=$3 branch current head tip err retry_err op where behind holder holders
   branch="fm/$id"
   current=$(git -C "$worktree" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   [ "$current" != "$branch" ] || return 0
@@ -2186,17 +2201,22 @@ ensure_spawn_task_branch() {  # <worktree> <id> <relaunch:0|1>
         echo "notice: leaving worktree '$worktree' as the previous agent left it; git declined to switch it back onto task branch '$branch' (${err:-no details from git})" >&2
         return 0
       fi
-      holder=$(spawn_worktree_holding_branch "$worktree" "$branch" || true)
-      if [ -z "$holder" ]; then
+      holders=$(spawn_worktrees_holding_branch "$worktree" "$branch" || true)
+      if [ -z "$holders" ]; then
         echo "error: git refused to switch worktree '$worktree' to existing branch '$branch' (${err:-no details from git})" >&2
         return 1
       fi
-      if ! spawn_worktree_is_abandoned_holder "$holder" "$worktree" "$STATE" "$id"; then
-        echo "error: task branch '$branch' is already checked out in '$holder', which cannot be proven to be an abandoned worker copy; refusing to attach '$worktree' to it as well, because two copies committing on one branch overwrite each other's work (finish or retire whatever holds '$holder' first)" >&2
-        return 1
-      fi
+      while IFS= read -r holder; do
+        [ -n "$holder" ] || continue
+        if ! spawn_worktree_is_abandoned_holder "$holder" "$worktree" "$STATE" "$id"; then
+          echo "error: task branch '$branch' is already checked out in '$holder', which cannot be proven to be an abandoned worker copy; refusing to attach '$worktree' to it as well, because two copies committing on one branch overwrite each other's work (finish or retire whatever holds '$holder' first)" >&2
+          return 1
+        fi
+      done <<EOF
+$holders
+EOF
       if ! retry_err=$(git -C "$worktree" checkout --quiet --ignore-other-worktrees "$branch" 2>&1); then
-        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch', held only by the abandoned worktree '$holder' (${retry_err:-${err:-no details from git}})" >&2
+        echo "error: git refused to switch worktree '$worktree' to existing branch '$branch', held only by abandoned worktree(s) $(printf '%s\n' "$holders" | tr '\n' ' ')(${retry_err:-${err:-no details from git}})" >&2
         return 1
       fi
     fi

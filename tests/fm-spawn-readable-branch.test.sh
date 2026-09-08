@@ -745,6 +745,50 @@ test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it() 
   pass "fm-spawn: a file held open under a holder by a process whose cwd is elsewhere prevents branch reclamation"
 }
 
+test_fresh_spawn_refuses_when_any_of_several_holders_is_live() {
+  local rec id out status tip first second live abandoned line
+  id='readable-branch-two-holders-r21'
+  rec=$(make_case refuse-two-holders "$id")
+  read_case_record "$rec"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  # Two slots hold fm/<id> at once - what an earlier reclaim of an abandoned
+  # slot (this script's own --ignore-other-worktrees retry) leaves behind once
+  # the reclaiming copy goes live. The holder git lists first is abandoned;
+  # the one it lists second has a live process. A proof that stops at the
+  # first holder would hand a third copy the branch the live one is on.
+  first="$CASE_DIR/holder-one"
+  second="$CASE_DIR/holder-two"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$first" "$tip"
+  git -C "$PROJECT_DIR" worktree add --quiet --detach "$second" "$tip"
+  git -C "$second" checkout --quiet --ignore-other-worktrees "fm/$id"
+  abandoned=""; live=""
+  while IFS= read -r line; do
+    case $line in
+      "worktree $first"|"worktree $second")
+        if [ -z "$abandoned" ]; then abandoned=${line#worktree }; else live=${line#worktree }; fi
+        ;;
+    esac
+  done <<EOF
+$(git -C "$PROJECT_DIR" worktree list --porcelain)
+EOF
+  [ -n "$abandoned" ] && [ -n "$live" ] || fail "fixture could not find both holders in git worktree list"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "fixture left a task record claiming a holder"
+  : > "$CASE_DIR/events.log"
+
+  out=$(FM_FAKE_LSOF_HOLDERS="$live" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "fresh spawn reclaimed fm/$id although a second holder ('$live') still had a live process"
+  assert_contains "$out" "already checked out in '$live', which cannot be proven to be an abandoned worker copy" \
+    "the refusal did not name the live holder that git listed after the abandoned one"
+  assert_no_grep "checkout --quiet --ignore-other-worktrees" "$CASE_DIR/events.log" \
+    "spawn overrode git's own refusal while one of two holders was live"
+  [ "$(git -C "$live" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal disturbed the live holder"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal attached the pooled worktree to the shared branch"
+  pass "fm-spawn: every worktree holding fm/<id> must be provably abandoned, not just the first git lists"
+}
+
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
   local rec id out status tip other retry_line gotmp_line
   id='readable-branch-missing-worktree-r9'
@@ -841,6 +885,7 @@ test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
 test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in
 test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process
 test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it
+test_fresh_spawn_refuses_when_any_of_several_holders_is_live
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent
