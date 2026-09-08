@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Behavior tests for the worktree-tangle guards.
 #
-# Firstmate is a treehouse-pooled git repo of itself: linked worktrees and
-# secondmate homes all sit at a detached HEAD on the default branch, while the
-# PRIMARY checkout (FM_ROOT) is a normal checkout on a real branch. The "tangle"
+# Firstmate is a treehouse-pooled git repo of itself: ship and scout worktrees
+# sit on fm/<id>, secondmate homes sit at a detached HEAD on the default branch,
+# and the PRIMARY checkout (FM_ROOT) is a normal checkout on a real branch. The "tangle"
 # is a crewmate branching/committing in the primary instead of its own worktree,
 # stranding the primary on a feature branch. Two guards cover it:
-#   GUARD 1 (prevention) - the brief asserts isolation before its branch step, and
-#            fm-spawn refuses to launch unless the resolved worktree is isolated.
+#   GUARD 1 (prevention) - the ship brief asserts isolation before its branch
+#            step, and fm-spawn refuses to launch unless the resolved worktree
+#            is isolated.
 #   GUARD 2 (detection)  - fm-guard and fm-bootstrap alarm when the primary is on
 #            a feature branch, and stay silent on the default branch or detached.
 # These cases pin: the shared lib's branch classification, the fm-guard banner,

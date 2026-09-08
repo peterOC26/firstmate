@@ -12,10 +12,10 @@
 #
 # fm_primary_tangle_branch detects exactly that and nothing else: a NAMED,
 # non-default branch checked out in the given root. It is deliberately silent for
-# every legitimate state - the primary on its default branch, and detached HEAD,
-# which is how every linked worktree and secondmate home legitimately sits on the
-# default branch. Detached HEAD on the default is fine; a feature branch in a
-# primary checkout is the alarm.
+# every legitimate primary state - the default branch or detached HEAD. Ship and
+# scout worktrees now use named fm/<id> branches, but callers scope this check to
+# FM_ROOT, so those task branches are not tangles. A feature branch in the primary
+# checkout is the alarm.
 
 # Resolve the default branch name of the git repo at <dir>: prefer origin/HEAD,
 # then fall back to a local main/master. Echoes the name, or returns 1.
@@ -38,9 +38,9 @@ fm_default_branch() {
 # If the git checkout at <root> is tangled - on a NAMED branch that is not its
 # default branch - echo the offending branch name and return 0. For every healthy
 # state (not a git work tree, detached HEAD, or already on the default branch)
-# echo nothing and return 1. Detached HEAD is how linked worktrees and secondmate
-# homes legitimately sit, so they never trip this; only a feature branch checked
-# out in a primary checkout does.
+# echo nothing and return 1. Callers pass the primary checkout only, so named
+# fm/<id> branches in linked ship and scout worktrees never reach this check;
+# only a feature branch checked out in the primary checkout does.
 fm_primary_tangle_branch() {
   local root=$1 cur default
   git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1

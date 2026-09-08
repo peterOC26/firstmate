@@ -193,18 +193,21 @@ Codex App support is recorded in `docs/codex-app-backend.md`; it is not selectab
 
 Crewmates never intentionally touch your project clone; [treehouse](https://github.com/kunchenguid/treehouse) pools clean worktrees for tmux, herdr, zellij, and cmux tasks, while Orca creates its own worktrees for `backend=orca`.
 For ship and scout work, `fm-spawn.sh` refuses to launch unless the resolved task path is a real git worktree root that is distinct from the project primary checkout.
-`fm-spawn.sh` also owns the base-freshness boundary for every fresh ship and scout: no worker starts until its clean task worktree matches the fetched tip of origin's resolved default branch, and any unsafe or unverifiable base stops the spawn.
-Its header owns the exact refusal mechanics, while `tests/fm-spawn-pool-base-freshen.test.sh` owns the portable regression coverage.
+`fm-spawn.sh` also owns the base-freshness boundary for every fresh ship and scout: no worker starts until its clean task worktree matches the fetched tip of origin's resolved default branch, except that a clean `fm/<id>` branch containing commits ahead of that tip is preserved, a behind branch is fast-forwarded, and a diverged branch stops the spawn rather than being rewound; any other named branch the slot sits on, the local default branch included, is detached before the refresh so its ref is never force-moved.
+After that freshen and before the worker starts, it puts each ship and scout worktree on `fm/<id>`, leaving an already-correct branch alone, switching onto an existing `fm/<id>` that already carries the task's committed work ahead of the freshened base, and refusing a behind or diverged leftover branch rather than moving or discarding work or rewinding its ref.
+When another worktree already holds that branch, git's refusal stands unless every worktree holding it is provably abandoned: a registration whose directory is gone, or a copy that is neither the primary checkout nor the project checkout, whose task record, when one names it, reads positively agent-free, and that holds no live process.
+Every other holder, including one whose liveness cannot be told, is refused, so a leaked pool slot stays recoverable while a second live copy never shares the branch; the shared `lsof` proof counts any process whose cwd or open file is anywhere under the holder directory, and reads a missing or failing `lsof` as "cannot tell".
+Its header owns the exact branch and refusal mechanics, while `tests/fm-spawn-pool-base-freshen.test.sh` and `tests/fm-spawn-readable-branch.test.sh` own portable regression coverage.
 
 The firstmate repo has one extra exposure because it can dispatch crewmates to work on itself.
 Its operating checkout (`FM_ROOT`) and the disposable crewmate worktrees are all linked git worktrees of the same repository, so the valid discriminator is branch state, not whether the checkout is linked.
-The primary checkout is healthy on its default branch, and linked worktrees or secondmate homes are healthy at detached HEAD.
+The primary checkout is healthy on its default branch, ship or scout task worktrees are healthy on their `fm/<id>` branches, and secondmate homes, which the branch step skips, stay healthy at detached HEAD.
 Only a named non-default branch checked out in `FM_ROOT` is a worktree tangle.
 
 `fm-tangle-lib.sh` resolves the default branch from `origin/HEAD`, then local `main` or `master`, and classifies that named non-default primary branch as the tangle.
 `fm-guard.sh` prints the repair command on the next mutable fleet action, while `bin/fm-session-start.sh` reports the same condition through bootstrap as a `TANGLE:` line at session start.
 If another live session holds the fleet lock, both surfaces keep the alarm but switch to read-only wording with no repair command.
-Ship briefs also tell the crewmate to verify `pwd -P` and `git rev-parse --show-toplevel` before creating `fm/<id>`, then stop with a blocked status if it landed in the primary checkout.
+Ship briefs also tell the crewmate to verify `pwd -P` and `git rev-parse --show-toplevel`, then confirm `fm/<id>` with an idempotent checkout step and stop with a blocked status if it landed in the primary checkout.
 
 ## No-mistakes gate authority boundary
 

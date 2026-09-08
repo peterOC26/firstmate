@@ -88,11 +88,12 @@ test_stale_pool_base_refreshes_before_branching() {
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$current" ] \
     || fail "an idempotent repeat moved the pool away from current origin/main"
 
-  git -C "$POOL_DIR" checkout --quiet -b "fm/$id"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn did not leave the pooled worktree on its fm/$id branch"
   git -C "$POOL_DIR" diff --exit-code origin/main...HEAD >/dev/null \
-    || fail "a branch created after spawn differs from current origin/main"
+    || fail "the branch spawn created differs from current origin/main"
   assert_grep 'must survive a newly spawned branch' "$POOL_DIR/advanced-main.txt" \
-    "the branch created after spawn omitted advanced-main content"
+    "the branch spawn created omitted advanced-main content"
   pass "a stale pooled worktree refreshes to current origin/main before a crew branch is created"
 }
 

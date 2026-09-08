@@ -297,7 +297,8 @@ test_promote_refuses_a_symlinked_task_record() {
 # prints against a capturing fm-send.sh, and asserts on the message the worker would
 # actually receive - for every supported mode.
 test_promotion_delivers_the_real_definition_of_done() {
-  local home meta out sendroot payload mode id brief_dod delivered_dod
+  local home meta out sendroot payload mode id brief_dod delivered_dod step3
+  local probe_src probe_origin probe_tip probe reset_cmd
   home="$TMP_ROOT/promote-dod/home"
   sendroot="$TMP_ROOT/promote-dod/sendroot"
   mkdir -p "$home/state" "$sendroot/bin"
@@ -307,6 +308,17 @@ test_promotion_delivers_the_real_definition_of_done() {
 printf '%s' "$2" > "$FM_TEST_CAPTURE"
 STUB
   chmod +x "$sendroot/bin/fm-send.sh"
+
+  # A throwaway origin the delivered reset step can actually be run against, so
+  # step 3 is checked as a runnable command rather than as text.
+  probe_src="$TMP_ROOT/promote-dod/probe-src"
+  probe_origin="$TMP_ROOT/promote-dod/probe-origin.git"
+  git init -q -b main "$probe_src"
+  printf 'base\n' > "$probe_src/README.md"
+  git -C "$probe_src" add README.md
+  git -C "$probe_src" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm initial
+  git clone -q --bare "$probe_src" "$probe_origin"
+  probe_tip=$(git -C "$probe_src" rev-parse HEAD)
 
   for mode in no-mistakes direct-PR local-only; do
     id="promote-dod-$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')"
@@ -334,8 +346,36 @@ STUB
       "$mode: promoted worker was not told to verify its repository root"
     assert_grep "If either does not resolve to the worktree you were launched in, stop and escalate to firstmate" "$payload" \
       "$mode: promoted worker was not told to stop for any wrong worktree"
-    assert_grep "git checkout -b fm/$id" "$payload" \
+    assert_grep "on your branch \`fm/$id\`" "$payload" \
       "$mode: promoted worker was not told to leave the scratch base for its ship branch"
+    assert_grep "git checkout fm/$id 2>/dev/null || git checkout -b fm/$id" "$payload" \
+      "$mode: promoted worker was not given the self-healing branch step a scout spawned before fm-spawn named worktrees needs"
+    reset_cmd=$(grep -o 'git fetch origin && git reset --hard [^`]*' "$payload" | head -n 1)
+    [ -n "$reset_cmd" ] \
+      || fail "$mode: promoted worker was not told how to return its branch to the default-branch base"
+    step3=$(grep -F "$reset_cmd" "$payload" | head -n 1)
+    case "${step3%%git fetch origin \&\& git reset --hard*}" in
+      *"git add -A && git commit -m scratch"*"git rev-parse HEAD"*"git checkout fm/$id"*) : ;;
+      *) fail "$mode: promoted worker's reset step does not commit uncommitted scratch, note the tip, and land on fm/$id before the reset --hard" ;;
+    esac
+    # Run exactly what the worker receives. A placeholder the worker has to fill
+    # in, or a default branch re-wrapped as origin/origin/main, dies here the way
+    # it would die in the worker's own worktree - with its scratch tip already
+    # reachable only from the reflog.
+    probe="$TMP_ROOT/promote-dod/probe-$id"
+    git clone -q "$probe_origin" "$probe"
+    git -C "$probe" symbolic-ref -q refs/remotes/origin/HEAD >/dev/null 2>&1 \
+      || git -C "$probe" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+    printf 'scratch\n' > "$probe/scratch.txt"
+    git -C "$probe" add scratch.txt
+    git -C "$probe" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm scratch
+    ( cd "$probe" && eval "$reset_cmd" ) >/dev/null 2>&1 \
+      || fail "$mode: the delivered reset step is not runnable as written: $reset_cmd"
+    [ "$(git -C "$probe" rev-parse HEAD)" = "$probe_tip" ] \
+      || fail "$mode: the delivered reset step did not land the branch on origin's default-branch tip"
+    if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
+      printf '# %s: delivered reset step ran clean: %s\n' "$mode" "$reset_cmd"
+    fi
 
     # Compare the public outputs of both real generation paths. The promoted
     # payload ends at its Definition of done, as does an ordinary generated

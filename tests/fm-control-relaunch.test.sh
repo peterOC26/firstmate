@@ -348,7 +348,12 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     FM_FAKE_TRACE_RELEASE="$launch_release" \
     run_control "$dir" rl28 relaunch --note "continue after publication" > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$prepare" ] && [ "$i" -lt 200 ]; do
+  # fm-spawn refreshes the home summary before it sends launch text.  On a
+  # busy host that normal read-only refresh can exceed the former two-second
+  # observation window, even though the relaunch is healthy; keep the race
+  # assertion bounded but give it a practical ten seconds to reach the
+  # deliberately blocked GOTMPDIR delivery point.
+  while [ ! -e "$prepare" ] && [ "$i" -lt 1000 ]; do
     /bin/sleep 0.01
     i=$((i + 1))
   done
@@ -830,6 +835,208 @@ test_spawn_relaunch_without_a_harness_reuses_the_recorded_one() {
     || fail "fm-spawn --relaunch without --harness must reuse the recorded harness, got '$(meta_field "$dir" rl21 harness)'"
   assert_contains "$out" "spawned rl21 harness=claude" "the launch should report the recorded harness"
   pass "fm-spawn --relaunch: with no explicit harness it reuses the task's recorded one, never the crew default"
+}
+
+# A relaunch reuses the task's own worktree exactly as the previous agent left
+# it. The fm/<id> naming step fm-spawn runs for fresh spawns applies a strict
+# leftover-branch guard against the just-freshened base; on relaunch there is
+# no freshened base and fm/<id> is the task's real work branch, so that guard
+# must not fire, and a worktree git is mid-operation on must not be touched.
+test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch() {
+  local dir wt out rc tip
+  dir=$(new_case relaunch-detached rl40)
+  add_ship_task "$dir" rl40 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl40
+  printf 'task work\n' > "$wt/work.txt"
+  git -C "$wt" add work.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'task work'
+  tip=$(git -C "$wt" rev-parse HEAD)
+  # The previous agent checked out an older commit to test something, then was stopped.
+  git -C "$wt" checkout -q --detach HEAD~1
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl40 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse the task's own fm/<id> as a leftover branch"$'\n'"$out"
+  assert_contains "$out" "spawned rl40" "the relaunch should have launched the replacement"
+  assert_not_contains "$out" "already exists at" \
+    "the fresh-spawn leftover-branch refusal fired on a relaunch"
+  [ "$(git -C "$wt" symbolic-ref --quiet --short HEAD)" = fm/rl40 ] \
+    || fail "the relaunched worktree was not switched back onto fm/rl40"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$tip" ] \
+    || fail "switching back onto fm/rl40 did not land on the task's own tip"
+  assert_grep 'task work' "$wt/work.txt" "the task's committed work is not present after the switch"
+  pass "fm-spawn --relaunch: a clean detached worktree is put back on its own fm/<id>, not refused as a stale leftover"
+}
+
+# bin/fm-control.sh stops the old agent BEFORE it calls fm-spawn --relaunch, so
+# a refusal here would leave the task with no agent at all. Declining to switch
+# strands nothing - the commits stay exactly where the previous agent left them -
+# so the replacement still launches and the untouched HEAD is reported instead.
+test_spawn_relaunch_keeps_commits_off_the_task_branch_and_still_launches() {
+  local dir wt out rc branch_tip detached_tip
+  dir=$(new_case relaunch-strand rl42)
+  add_ship_task "$dir" rl42 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl42
+  printf 'on the branch\n' > "$wt/branch.txt"
+  git -C "$wt" add branch.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'branch work'
+  branch_tip=$(git -C "$wt" rev-parse HEAD)
+  # The previous agent detached HEAD, committed a fix there, and was stopped:
+  # that commit is on no branch, so a quiet switch back onto fm/rl42 would
+  # leave it reachable only from the reflog.
+  git -C "$wt" checkout -q --detach
+  printf 'only on the detached head\n' > "$wt/detached.txt"
+  git -C "$wt" add detached.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'detached fix'
+  detached_tip=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl42 --relaunch); rc=$?
+  expect_code 0 "$rc" "the replacement must still launch when the branch switch is declined"$'\n'"$out"
+  assert_contains "$out" "spawned rl42" "declining the switch left the task with no agent"
+  assert_contains "$out" "holding 1 commit(s) that task branch 'fm/rl42'" \
+    "the notice did not count the commits a switch would have left behind"
+  assert_contains "$out" "as the previous agent left it: it is detached at $detached_tip" \
+    "the notice did not say the worktree was left untouched at its detached commit"
+  assert_contains "$out" "switching would leave them behind" \
+    "the notice did not say why the switch was declined"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$detached_tip" ] \
+    || fail "the relaunch moved HEAD off the detached commit"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the relaunch attached the worktree to a branch"
+  [ "$(git -C "$wt" rev-parse fm/rl42)" = "$branch_tip" ] \
+    || fail "the relaunch moved fm/rl42 (it must not fast-forward, merge, or rebase the detached work)"
+  assert_grep 'only on the detached head' "$wt/detached.txt" "the detached commit's file is gone from the worktree"
+  pass "fm-spawn --relaunch: a detached HEAD holding commits fm/<id> lacks is left alone, and the replacement still launches"
+}
+
+# The branch step must never be why a relaunch fails, because fm-control has
+# already stopped the old agent by the time it runs. An unborn HEAD (a fresh
+# orphan branch) still resolves through symbolic-ref while naming no commit at
+# all, so the containment comparison cannot be made - and there is nothing to
+# strand either, since HEAD stays exactly where the previous agent left it.
+test_spawn_relaunch_survives_a_head_that_names_no_commit() {
+  local dir wt out rc branch_tip
+  dir=$(new_case relaunch-unborn rl43)
+  add_ship_task "$dir" rl43 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl43
+  printf 'on the branch\n' > "$wt/branch.txt"
+  git -C "$wt" add branch.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm 'branch work'
+  branch_tip=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" checkout -q --orphan scratch
+  git -C "$wt" rev-parse --verify --quiet 'HEAD^{commit}' >/dev/null 2>&1 \
+    && fail "fixture did not leave a HEAD that resolves to no commit"
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl43 --relaunch); rc=$?
+  expect_code 0 "$rc" "an unresolvable HEAD must not withhold the replacement agent"$'\n'"$out"
+  assert_contains "$out" "spawned rl43" "the relaunch left the task with no agent at all"
+  assert_contains "$out" "resolves to no commit" \
+    "the notice did not say why the branch switch could not be evaluated"
+  [ "$(git -C "$wt" symbolic-ref --quiet --short HEAD)" = scratch ] \
+    || fail "the relaunch moved HEAD off the orphan branch"
+  [ "$(git -C "$wt" rev-parse fm/rl43)" = "$branch_tip" ] \
+    || fail "the relaunch moved the task's fm/rl43 tip"
+  pass "fm-spawn --relaunch: a HEAD that resolves to no commit is left alone, and the replacement still launches"
+}
+
+test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched() {
+  local dir wt out rc head_before tip_before gitdir
+  dir=$(new_case relaunch-rebase rl41)
+  add_ship_task "$dir" rl41 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl41
+  printf 'one\n' > "$wt/one.txt"
+  git -C "$wt" add one.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm one
+  printf 'two\n' > "$wt/two.txt"
+  git -C "$wt" add two.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm two
+  tip_before=$(git -C "$wt" rev-parse fm/rl41)
+  # Stop an interactive rebase at an `edit` step: HEAD is detached with a clean
+  # tree and the rebase state is live, the state git would let a plain
+  # `git checkout fm/rl41` walk away from.
+  cat > "$dir/edit-first" <<'SH'
+#!/usr/bin/env bash
+awk 'NR==1 { sub(/^pick/, "edit") } { print }' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+SH
+  chmod +x "$dir/edit-first"
+  GIT_SEQUENCE_EDITOR="$dir/edit-first" git -C "$wt" \
+    -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    rebase -q -i HEAD~2 >/dev/null 2>&1 || true
+  gitdir=$(git -C "$wt" rev-parse --absolute-git-dir)
+  [ -d "$gitdir/rebase-merge" ] || fail "fixture did not leave a rebase in progress"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "fixture did not leave HEAD detached mid-rebase"
+  head_before=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl41 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse a worktree that is mid-rebase"$'\n'"$out"
+  assert_contains "$out" "spawned rl41" "the relaunch should have launched the replacement"
+  assert_contains "$out" "has a rebase in progress; leaving it exactly as the previous agent left it" \
+    "the relaunch did not explain why it left the worktree alone"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] \
+    || fail "the relaunch moved a mid-rebase HEAD"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the relaunch attached a mid-rebase worktree to a branch"
+  [ -d "$gitdir/rebase-merge" ] || fail "the relaunch disturbed the in-progress rebase state"
+  [ "$(git -C "$wt" rev-parse fm/rl41)" = "$tip_before" ] \
+    || fail "the relaunch moved the task's fm/rl41 tip"
+  pass "fm-spawn --relaunch: a worktree mid-rebase is left exactly as the previous agent left it"
+}
+
+test_spawn_relaunch_leaves_a_cherry_pick_sequence_untouched() {
+  local dir wt out rc head_before tip_before gitdir
+  dir=$(new_case relaunch-sequencer rl44)
+  add_ship_task "$dir" rl44 claude
+  wt="$dir/wt"
+  git -C "$wt" checkout -q -b fm/rl44
+  printf 'a\n' > "$wt/f.txt"
+  git -C "$wt" add f.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm a
+  tip_before=$(git -C "$wt" rev-parse fm/rl44)
+  git -C "$wt" checkout -q -b side HEAD~1
+  printf 'b\n' > "$wt/f.txt"
+  git -C "$wt" add f.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm b1
+  printf 'c\n' > "$wt/g.txt"
+  git -C "$wt" add g.txt
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm b2
+  # A two-commit cherry-pick onto a detached HEAD at the task's tip conflicts
+  # on its first step; the agent resets that step away, which drops
+  # CHERRY_PICK_HEAD but leaves the sequencer with the remaining step, so git
+  # still reports the cherry-pick in progress and a plain checkout would walk
+  # away from it.
+  git -C "$wt" checkout -q --detach fm/rl44
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+    cherry-pick side~1 side >/dev/null 2>&1 || true
+  git -C "$wt" reset -q --hard HEAD
+  gitdir=$(git -C "$wt" rev-parse --absolute-git-dir)
+  [ -d "$gitdir/sequencer" ] || fail "fixture did not leave a cherry-pick sequence in progress"
+  [ ! -e "$gitdir/CHERRY_PICK_HEAD" ] || fail "fixture left the per-step marker, so it does not isolate the sequencer case"
+  git -C "$wt" status | grep -q 'Cherry-pick currently in progress' \
+    || fail "fixture's git status does not report the cherry-pick as in progress"
+  head_before=$(git -C "$wt" rev-parse HEAD)
+  printf 'zsh' > "$dir/fake/command"
+
+  out=$(run_spawn "$dir" rl44 --relaunch); rc=$?
+  expect_code 0 "$rc" "a relaunch must not refuse a worktree mid cherry-pick sequence"$'\n'"$out"
+  assert_contains "$out" "spawned rl44" "the relaunch should have launched the replacement"
+  assert_contains "$out" "has a cherry-pick in progress; leaving it exactly as the previous agent left it" \
+    "the relaunch did not recognise the sequencer-only cherry-pick as in progress"
+  [ "$(git -C "$wt" rev-parse HEAD)" = "$head_before" ] \
+    || fail "the relaunch moved HEAD during a cherry-pick sequence"
+  [ -z "$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the relaunch attached a worktree mid cherry-pick sequence to a branch"
+  [ -d "$gitdir/sequencer" ] || fail "the relaunch disturbed the in-progress cherry-pick sequence"
+  [ "$(git -C "$wt" rev-parse fm/rl44)" = "$tip_before" ] \
+    || fail "the relaunch moved the task's fm/rl44 tip"
+  pass "fm-spawn --relaunch: a sequencer-only cherry-pick in progress is left exactly as the previous agent left it"
 }
 
 # fm-spawn arms per-task wiring on harness PREFIXES, because a task launched
@@ -1499,6 +1706,11 @@ test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes
 test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
+test_spawn_relaunch_switches_a_detached_worktree_back_onto_its_task_branch
+test_spawn_relaunch_keeps_commits_off_the_task_branch_and_still_launches
+test_spawn_relaunch_leaves_a_mid_rebase_worktree_untouched
+test_spawn_relaunch_leaves_a_cherry_pick_sequence_untouched
+test_spawn_relaunch_survives_a_head_that_names_no_commit
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch
 test_cursor_session_binding_is_retired_on_a_harness_switch

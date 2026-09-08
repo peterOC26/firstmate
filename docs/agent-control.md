@@ -70,6 +70,8 @@ It is not deterministic across the verified adapters: codex and grok resume only
    A secondmate relaunch does not require one and never rewrites its standing charter.
 4. **Stop the old agent** through the `exit` verb, with its postcondition.
 5. **Launch the replacement** through its single owner, `bin/fm-spawn.sh --relaunch`, which adopts the recorded endpoint and worktree instead of creating either, clears the previous harness's per-task wiring, and arms a fresh busy generation.
+   Its `fm/<id>` naming step is best-effort here and never fails the launch: the old agent is already stopped, and declining to switch strands nothing, so a worktree mid-operation, holding commits `fm/<id>` lacks, sitting at a HEAD that resolves to no commit, or that git otherwise declines is left exactly as the previous agent left it and reported as a notice.
+   That guarantee is enforced at the call site, not by each individual branch of the step, so no naming failure can ever be why a stopped task gets no replacement.
 
 Switching harness is therefore one ordinary relaunch rather than a separate mechanism.
 
@@ -118,5 +120,5 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 ## Verification
 
 - `tests/fm-control.test.sh` - the adapter contract for every verified harness, the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
-- `tests/fm-control-relaunch.test.sh` - the relaunch transaction: identity preservation, harness switching, the progress note, checkpoint refusals, and rollback after a failed launch.
+- `tests/fm-control-relaunch.test.sh` - the relaunch transaction: identity preservation, harness switching, the progress note, checkpoint refusals, rollback after a failed launch, and the best-effort `fm/<id>` naming step, which switches a clean detached worktree back onto its task branch, leaves a mid-rebase or ahead-of-branch worktree exactly as the previous agent left it, and launches the replacement either way.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.

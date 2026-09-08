@@ -6,9 +6,11 @@
 # provably stale iff ALL of the following hold -
 #   1. the lock file still exists;
 #   2. no live process holds the lock file open, and none holds a companion
-#      directory (the worktree, or the repo's .git dir) open as cwd or an fd -
-#      a live git process keeps its own lock open for the whole operation, so an
-#      empty lsof result means the file was abandoned, not that no one held it;
+#      directory (the worktree, or the repo's .git dir) open as an fd, or has
+#      its cwd or any open file in that directory or any of its descendants -
+#      a live git process keeps its own lock open for the whole operation, so
+#      an empty lsof result means the file was abandoned, not that no one held
+#      it;
 #   3. its mtime age is at least a caller-supplied threshold - a freshly created
 #      lock might belong to a process lsof has not yet reflected.
 # ANY uncertainty - lsof missing, an lsof error, an unreadable mtime - returns
@@ -31,17 +33,36 @@ fm_lock_path_mtime() {
 }
 
 # fm_lock_lsof_holder <target>: 0 a process holds it, 1 provably none, 2 lsof
-# errored (cannot tell). Diagnostics print on the error path only.
+# errored (cannot tell). A directory target is held when a process has it open
+# as an fd or cwd, or has its cwd or any open file anywhere under it: the
+# descendant check is one system-wide `lsof -n -P -l -Fpn` listing of every
+# process's open paths filtered by path prefix - bounded by what is open, never
+# the recursive +D file-tree walk that lsof documents as slow, and with host,
+# port, and user-name lookups disabled so a slow resolver cannot stall the
+# proof on a host with many sockets. Both queries pass -w: lsof prints benign
+# WARNING lines (an unstatable overlay mount, say) to stderr while still
+# exiting 1 with no match, and without -w those lines would read as an error
+# and turn every provably-free target into "cannot tell", which is safe but
+# makes stale-lock cleanup and abandoned-slot recovery unreachable on such a
+# host. Real errors (a status error on the target, a bad option) are not
+# warnings and still surface. Diagnostics print on the error path only.
 fm_lock_lsof_holder() {
   local target=$1 output status
-  if output=$(lsof -- "$target" 2>&1); then
+  if output=$(lsof -w -- "$target" 2>&1); then
     return 0
   else
     status=$?
   fi
-  if [ "$status" -eq 1 ] && [ -z "$output" ]; then
-    return 1
+  if [ "$status" -ne 1 ] || [ -n "$output" ]; then
+    fm_lock_report_lsof_failure "$target" "$status" "$output"
+    return 2
   fi
+  [ -d "$target" ] || return 1
+  fm_lock_lsof_path_under "$target"
+}
+
+fm_lock_report_lsof_failure() {  # <target> <status> <output>
+  local target=$1 status=$2 output=$3 line
   if [ -n "$output" ]; then
     while IFS= read -r line; do
       fm_lock_log "lsof check failed: $line"
@@ -49,7 +70,54 @@ fm_lock_lsof_holder() {
   else
     fm_lock_log "lsof check failed for $target with exit $status"
   fi
-  return 2
+}
+
+# fm_lock_lsof_path_under <dir>: 0 a process has its cwd, its root, or any
+# open file at or under <dir>, 1 provably none, 2 the scan could not establish
+# a safe result (cannot tell). Parses lsof's -F field output the way
+# fm-teardown.sh pids_with_cwd_under does, but over every fd rather than cwd
+# alone; any line the parser does not recognize means cannot tell, never
+# "nobody".
+fm_lock_lsof_path_under() {
+  local dir=$1 real out status pid path line
+  real=$(cd "$dir" 2>/dev/null && pwd -P) || {
+    fm_lock_log "cannot resolve $dir for the lsof open-path scan"
+    return 2
+  }
+  if out=$(lsof -w -n -P -l -Fpn 2>/dev/null); then
+    status=0
+  else
+    status=$?
+  fi
+  if [ "$status" -ne 0 ]; then
+    if [ "$status" -eq 1 ] && [ -z "$out" ]; then
+      return 1
+    fi
+    fm_lock_log "lsof open-path scan failed for $dir with exit $status"
+    return 2
+  fi
+  pid=
+  while IFS= read -r line; do
+    case "$line" in
+      p*)
+        pid=${line#p}
+        case "$pid" in ''|*[!0-9]*) fm_lock_log "lsof open-path scan returned an unexpected pid line: $line"; return 2 ;; esac
+        ;;
+      f*) [ -n "$pid" ] || { fm_lock_log "lsof open-path scan returned an fd before any pid"; return 2; } ;;
+      n*)
+        [ -n "$pid" ] || { fm_lock_log "lsof open-path scan returned a path before any pid"; return 2; }
+        path=${line#n}
+        case "$path" in
+          "$dir"|"$dir"/*|"$real"|"$real"/*) return 0 ;;
+        esac
+        ;;
+      '') ;;
+      *) fm_lock_log "lsof open-path scan returned an unexpected line: $line"; return 2 ;;
+    esac
+  done <<EOF
+$out
+EOF
+  return 1
 }
 
 # fm_lock_has_live_holder <lock> <dir>: 0 if a live process holds $lock or the
