@@ -1,0 +1,15 @@
+Stock-macOS-Bash CI snapshot expectation: 42 -> 54
+
+The CI job 'Stock macOS Bash snapshot compatibility' asserts an exact
+count of 'ok - ' lines from tests/fm-bearings-snapshot.test.sh. The test
+file itself is unchanged by this branch; the count expectation had drifted.
+
+$ /bin/bash tests/fm-bearings-snapshot.test.sh | grep -c '^ok - '
+54
+
+not-ok lines: 0
+
+(Run as an unprivileged user. Under root the suite's chmod-000 'unreadable
+ secondmate home' fixture cannot fail, so one case reports not ok - a
+ host artifact of running as uid 0, present at the base commit too, and
+ unrelated to this change.)

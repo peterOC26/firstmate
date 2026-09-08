@@ -1,0 +1,82 @@
+Targeted behavioral suites for the fm/<id> readable spawn branch
+host: Linux, bash 5.3.9, git 2.53.0 - run from the change's worktree
+
+=== tests/fm-spawn-readable-branch.test.sh (new) -> exit 0 ===
+ok - fm-spawn: a fresh ship worktree is put on fm/<id> before the worker's launch text is sent
+ok - fm-spawn: a fresh scout worktree also lands on fm/<id>, not a detached HEAD
+ok - fm-spawn: a worktree already on fm/<id> is left alone, not re-checked-out
+ok - fm-spawn: freshening preserves committed work on a clean named fm/<id> branch
+ok - fm-spawn: a clean named fm/<id> behind origin is fast-forwarded, moving the ref only forward
+ok - fm-spawn: a named fm/<id> that diverges from origin is refused with its ref untouched
+ok - fm-spawn: a pooled slot on another fm/<id> returns to origin without moving that branch
+ok - fm-spawn: a slot on the local default branch is detached before the refresh, leaving that ref untouched
+ok - fm-spawn: a leftover fm/<id> behind the freshened base refuses the spawn instead of silently reusing it
+ok - fm-spawn: an existing fm/<id> already at the freshened base is switched onto, not refused or re-created
+ok - fm-spawn: a leftover fm/<id> carrying committed work ahead of the freshened base is switched onto, not refused
+ok - fm-spawn: a leaked slot holding fm/<id> with committed work is reclaimed across slots
+ok - fm-spawn: a leftover fm/<id> that diverges from the freshened base is refused with its ref untouched
+ok - fm-spawn: an on-disk slot no live record claims is reclaimed, not mistaken for a live copy
+ok - fm-spawn: a fresh spawn refuses fm/<id> while a live copy of the same task still has it checked out
+ok - fm-spawn: a fresh spawn never overrides git to share fm/<id> with the project's primary checkout
+ok - fm-spawn: a holder with a live process in it is refused, not reclaimed as abandoned
+ok - fm-spawn: a process in a holder subdirectory prevents branch reclamation
+ok - fm-spawn: a file held open under a holder by a process whose cwd is elsewhere prevents branch reclamation
+ok - fm-spawn: benign lsof warnings on stderr do not block reclaiming an abandoned slot
+ok - fm-spawn: every worktree holding fm/<id> must be provably abandoned, not just the first git lists
+ok - fm-spawn: a fresh spawn reclaims fm/<id> when the only worktree holding it is gone from disk
+ok - fm-brief.sh: a scout brief now carries the same first-action branch step as a ship brief
+ok - fm-brief.sh: a ship brief's first action is a no-op when fm-spawn already created the branch
+
+=== tests/fm-control-relaunch.test.sh (relaunch safeguards) -> exit 0 ===
+ok - fm-spawn --relaunch: a clean detached worktree is put back on its own fm/<id>, not refused as a stale leftover
+ok - fm-spawn --relaunch: a detached HEAD holding commits fm/<id> lacks is left alone, and the replacement still launches
+ok - fm-spawn --relaunch: a worktree mid-rebase is left exactly as the previous agent left it
+ok - fm-spawn --relaunch: a sequencer-only cherry-pick in progress is left exactly as the previous agent left it
+ok - fm-spawn --relaunch: a HEAD that resolves to no commit is left alone, and the replacement still launches
+  (+51 further pre-existing relaunch cases, all ok)
+
+=== tests/fm-spawn-pool-base-freshen.test.sh -> exit 0 ===
+ok - a stale pooled worktree refreshes to current origin/main before a crew branch is created
+ok - a stale pooled worktree resolves and refreshes a non-main default branch
+ok - direct-PR ships and scouts both refresh stale pooled worktrees before launch
+ok - a dirty pooled worktree is refused without discarding its local work
+  (11 cases total, all ok)
+
+=== tests/fm-task-delivery.test.sh (promote step is runnable as written) -> exit 0 ===
+ok - fm-spawn: a ship spawn requires a valid explicit mode and yolo before anything is created
+ok - fm-spawn: scout and secondmate spawns refuse ship delivery flags
+ok - fm-spawn: the brief's recorded mode and the spawn's explicit mode must agree
+ok - fm-spawn: a rigor downgrade against the registered posture is announced, never blocked
+ok - fm-spawn: a scout spawn resolves no delivery posture from the registry
+ok - fm-promote: promotion requires the delivery contract and records it exactly once
+ok - fm-promote: a symlinked task record is refused and its target is left untouched
+# no-mistakes: delivered reset step ran clean: git fetch origin && git reset --hard "$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+# direct-PR: delivered reset step ran clean: git fetch origin && git reset --hard "$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+# local-only: delivered reset step ran clean: git fetch origin && git reset --hard "$(git symbolic-ref --short refs/remotes/origin/HEAD)"
+ok - fm-promote: a promoted worker receives the same mode-specific delivery contract a briefed one does
+ok - fm-project-mode: the conditional policy is accepted, mapped for mechanical callers, and readable raw
+
+=== tests/fm-documentation-audiences.test.sh (board-sync.md classification) -> exit 0 ===
+ok - documentation inventory classifies every maintained prose surface exactly once
+ok - classification, setup routing, and maintained-prose scope fail safely
+ok - required documentation owner pointers cannot silently disappear
+ok - local links resolve while dates, versions, commands, and incident prose remain semantically reviewed
+
+=== other suites touched by the change ===
+tests/fm-brief.test.sh          exit 0, 21 cases ok
+tests/fm-teardown.test.sh       exit 0, 58 cases ok
+tests/fm-tangle-guard.test.sh   exit 0, 6 cases ok
+
+=== bin/fm-test-run.sh --check-coverage (new file is in a CI lane) ===
+FM_TEST_COVERAGE ok total=177 parallel=24 serial=141 serial_shards=4 herdr=12
+  lane portable-serial: tests/fm-spawn-readable-branch.test.sh
+
+=== fail-before / pass-after: docs/verification/board-sync.md classification ===
+base commit d08be9e (file present, unclassified) - tests/fm-documentation-audiences.test.sh:
+  fm-doc-audience-check: unclassified: docs/verification/board-sync.md
+  not ok - repository documentation audience check failed
+  -> exit 1
+
+this change - same suite:
+  ok - documentation inventory classifies every maintained prose surface exactly once
+  -> exit 0

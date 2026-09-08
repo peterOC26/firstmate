@@ -1,0 +1,107 @@
+== 1. BEFORE the change: a fresh ship worker launches at a detached HEAD ==
+(running bin/fm-spawn.sh from base commit d08be9e)
+
+$ fm-spawn.sh demo-ship-101 <project> --mode no-mistakes --yolo off   -> exit 0
+  warning: /tmp/fm-demo/sandbox/before-ship/home/data/demo-ship-101/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  spawned demo-ship-101 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-demo-ship-101 worktree=/tmp/fm-demo/sandbox/before-ship/pool-slot-1
+
+What the worker (and any session list keyed on project:branch) sees:
+  worktree HEAD .......... ## HEAD (no branch)
+  git branch --show-current : 
+  session-list label ..... project:
+
+------------------------------------------------------------------
+== 2. AFTER the change: the same spawn lands on fm/<id> before launch ==
+
+$ fm-spawn.sh demo-ship-101 <project> --mode no-mistakes --yolo off   -> exit 0
+  warning: /tmp/fm-demo/sandbox/after-ship/home/data/demo-ship-101/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  spawned demo-ship-101 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-demo-ship-101 worktree=/tmp/fm-demo/sandbox/after-ship/pool-slot-1
+
+What the worker (and any session list keyed on project:branch) sees:
+  worktree HEAD .......... ## fm/demo-ship-101
+  git branch --show-current : fm/demo-ship-101
+  session-list label ..... project:fm/demo-ship-101
+
+Nothing was pushed - origin still carries only its own branches:
+
+$ git -C '/tmp/fm-demo/sandbox/after-ship/origin.git' for-each-ref --format='%(refname:short)' refs/heads
+  main
+
+------------------------------------------------------------------
+== 3. A scout gets the same readable name (its branch stays local scratch) ==
+
+$ fm-spawn.sh demo-scout-202 <project> --scout   -> exit 0
+  spawned demo-scout-202 harness=codex kind=scout window=firstmate:fm-demo-scout-202 worktree=/tmp/fm-demo/sandbox/after-scout/pool-slot-1
+  worktree HEAD .......... ## fm/demo-scout-202
+  git branch --show-current : fm/demo-scout-202
+  session-list label ..... project:fm/demo-scout-202
+
+$ git -C '/tmp/fm-demo/sandbox/after-scout/origin.git' for-each-ref --format='%(refname:short)' refs/heads
+  main
+
+------------------------------------------------------------------
+== 4. A secondmate is deliberately NOT renamed (persistent home, not a task) ==
+
+$ fm-spawn.sh demo-mate-303 <mate-home> --secondmate   -> exit 0
+  fm-config-inherit: warning: skipped crew-harness for /tmp/fm-demo/sandbox/secondmate/mate-home/config: destination does not allow inherited item (not gitignored or guard failed)
+  spawned demo-mate-303 harness=codex kind=secondmate mode=secondmate yolo=off window=firstmate:fm-demo-mate-303 worktree=/tmp/fm-demo/sandbox/secondmate/mate-home
+
+  secondmate home branches: main 
+  fm/demo-mate-303 created? no (correct)
+
+------------------------------------------------------------------
+== 5. Refuses rather than destroys: a diverged leftover fm/<id> ==
+  leftover fm/demo-ship-404 tip : dd7162a08b6ec36409ff51af0ddebec6fcd87403
+
+$ fm-spawn.sh demo-ship-404 <project> --mode no-mistakes --yolo off   -> exit 1
+  warning: /tmp/fm-demo/sandbox/diverged/home/data/demo-ship-404/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  error: branch 'fm/demo-ship-404' already exists at dd7162a08b6ec36409ff51af0ddebec6fcd87403 and diverges from the freshened base 217c0eb883479460e55fc02f5003bb0b607e9090 of worktree '/tmp/fm-demo/sandbox/diverged/pool-slot-1'; refusing to move the worktree onto it or rewind its ref (inspect or delete 'fm/demo-ship-404' before retrying)
+
+  fm/demo-ship-404 tip after the refusal : dd7162a08b6ec36409ff51af0ddebec6fcd87403  (unchanged)
+  committed work still reachable        : work only on the task branch
+  worker launched?                      : no - refused before launch
+
+------------------------------------------------------------------
+== 6. Freshening never rewinds a clean fm/<id> that is ahead of origin ==
+
+$ fm-spawn.sh demo-ship-505 <project> --mode no-mistakes --yolo off   -> exit 0
+  warning: /tmp/fm-demo/sandbox/preserve/home/data/demo-ship-505/brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+  notice: preserving clean named task branch 'fm/demo-ship-505' at 6f5fca9f4ae0f9f3b0466ecffd709d8f972896a9 while refreshing pooled worktree '/tmp/fm-demo/sandbox/preserve/pool-slot-1'; it contains 'origin/main' at 44b1f4c0b4fd39641b38b0c2a9138f16ff588a51
+  spawned demo-ship-505 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-demo-ship-505 worktree=/tmp/fm-demo/sandbox/preserve/pool-slot-1
+
+  fm/demo-ship-505 tip : 6f5fca9f4ae0f9f3b0466ecffd709d8f972896a9  (preserved, not rewound)
+  keep.txt content     : committed task work that must survive
+  worktree HEAD .......... ## fm/demo-ship-505
+  git branch --show-current : fm/demo-ship-505
+  session-list label ..... project:fm/demo-ship-505
+
+------------------------------------------------------------------
+== 7. The brief the scout worker actually receives (generated prompt) ==
+
+--- data/demo-scout-202/brief.md (Setup section) ---
+  # Setup
+  You are in a disposable git worktree of alpha, already on your task branch `fm/demo-scout-202` (fm-spawn puts you there before you start).
+  This is a SCOUT task: the deliverable is a written report, not a PR.
+  The worktree is your laboratory - install, run, edit, and make scratch commits freely; all of it is discarded at teardown.
+  The report is the only thing that survives, so anything worth keeping must be in it.
+  
+  1. First action: confirm you're on your branch (a no-op if fm-spawn already created it). Check `git status` first: if it reports an operation in progress (rebase, merge, cherry-pick, revert, or bisect), or your current HEAD holds commits `fm/demo-scout-202` does not, fm-spawn deliberately left it that way - leave HEAD exactly where it is, finish or land that work first, and skip the rest of this step. Otherwise: `git checkout fm/demo-scout-202 2>/dev/null || git checkout -b fm/demo-scout-202`
+  
+  # Rules
+
+------------------------------------------------------------------
+== 8. Scout teardown is still scratch/discard: the named branch changes nothing ==
+
+$ fm-spawn.sh demo-scout-606 <project> --scout   -> exit 0
+  spawned demo-scout-606 harness=codex kind=scout window=firstmate:fm-demo-scout-606 worktree=/tmp/fm-demo/sandbox/scout-teardown/pool-slot-1
+  scout worktree branch: fm/demo-scout-606
+  unpushed scratch commits on fm/demo-scout-606: 1
+
+$ fm-teardown.sh demo-scout-606   -> exit 0
+  teardown demo-scout-606 complete (window firstmate:fm-demo-scout-606, worktree /tmp/fm-demo/sandbox/scout-teardown/pool-slot-1)
+  Backlog: demo-scout-606 just finished (this home keeps no backlog at /tmp/fm-demo/sandbox/scout-teardown/home/data/backlog.md). Update /tmp/fm-demo/sandbox/scout-teardown/home/data/backlog.md - move demo-scout-606 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+  refused over unlanded work on the named branch? no (scout stays scratch/discard)
+  origin branches after scout teardown          : main 
+  task record removed                           : yes
+  report survives teardown                      : yes
