@@ -377,6 +377,40 @@ test_freshen_does_not_seed_from_unrelated_named_branch() {
   pass "fm-spawn: a pooled slot on another fm/<id> returns to origin without moving that branch"
 }
 
+test_freshen_does_not_force_move_the_local_default_branch() {
+  local rec id out status local_tip origin_tip
+  id='readable-branch-local-default-r23'
+  rec=$(make_case local-default-branch "$id")
+  read_case_record "$rec"
+  # The pooled slot sits on the repo's own local main, which carries a commit
+  # origin does not have (a local-only project merging approved work into its
+  # main, say). Refreshing the slot must detach first and reset only the
+  # detached HEAD; a hard reset while still on main would rewind that ref.
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" checkout --quiet --detach
+  git -C "$POOL_DIR" checkout --quiet main
+  printf 'merged locally, never pushed\n' > "$POOL_DIR/local-only.txt"
+  git -C "$POOL_DIR" add local-only.txt
+  git -C "$POOL_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -qm local-only
+  local_tip=$(git -C "$POOL_DIR" rev-parse main)
+  origin_tip=$(git -C "$POOL_DIR" rev-parse origin/main)
+  [ "$local_tip" != "$origin_tip" ] || fail "fixture did not put local main ahead of origin"
+
+  out=$(run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "spawn should refresh a slot sitting on the local default branch"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  [ "$(git -C "$POOL_DIR" rev-parse main)" = "$local_tip" ] \
+    || fail "freshening force-moved the local default branch ref off its unpushed commit"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "spawn did not land the slot on fm/$id"
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$origin_tip" ] \
+    || fail "the task worktree did not start from origin's tip"
+  [ ! -e "$POOL_DIR/local-only.txt" ] \
+    || fail "the task worktree carried the local default branch's unpushed commit into the fresh base"
+  pass "fm-spawn: a slot on the local default branch is detached before the refresh, leaving that ref untouched"
+}
+
 # advance_origin <case_dir> <default>: publish one more commit to origin's
 # default branch from a separate clone, so the base freshen_spawn_worktree_base
 # establishes moves past whatever the pool (and any leftover branch) points at.
@@ -910,6 +944,7 @@ test_freshen_preserves_named_branch_commits
 test_freshen_fast_forwards_named_branch_behind_origin
 test_freshen_refuses_diverged_named_branch
 test_freshen_does_not_seed_from_unrelated_named_branch
+test_freshen_does_not_force_move_the_local_default_branch
 test_stale_leftover_branch_is_refused_not_reused
 test_leftover_branch_at_freshened_base_is_reused
 test_leftover_branch_ahead_of_freshened_base_is_recovered

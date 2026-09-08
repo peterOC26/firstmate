@@ -136,7 +136,9 @@
 #   git worktree root distinct from the primary project checkout.
 #   Before a fresh ship or scout worker starts, its clean task worktree fetches
 #   origin and resolves the current remote default branch. Detached worktrees
-#   and unrelated named branches return to that tip without moving their refs;
+#   and unrelated named branches - the local default branch included - return
+#   to that tip without moving their refs, because the slot is detached before
+#   the reset and never force-moves any named ref it happened to be on;
 #   a clean fm/<id> branch that already contains commits ahead of origin is
 #   preserved, a behind one fast-forwards, and a diverged one refuses rather
 #   than rewinding its ref.
@@ -1974,9 +1976,9 @@ freshen_spawn_worktree_base() {  # <worktree> <id>
     echo "error: named task branch '$current_branch' diverges from '$target'; refusing to rewind it while refreshing pooled worktree '$worktree'" >&2
     return 1
   fi
-  if [ -n "$current_branch" ] && [ "$current_branch" != "$default" ]; then
+  if [ -n "$current_branch" ]; then
     if ! git -C "$worktree" checkout --quiet --detach; then
-      echo "error: could not detach pooled worktree '$worktree' from unrelated branch '$current_branch' before refreshing it; refusing to launch" >&2
+      echo "error: could not detach pooled worktree '$worktree' from branch '$current_branch' before refreshing it; refusing to launch" >&2
       return 1
     fi
   fi
