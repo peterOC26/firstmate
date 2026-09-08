@@ -2056,9 +2056,10 @@ EOF
 # holder must clear two independent proofs: this home's record for <id>, when it
 # names the holder, must read positively agent-free (an endpoint whose backend
 # has no recovery-grade classifier reads as neither alive nor dead and therefore
-# never qualifies), and no live process may hold the directory - the same
-# fail-safe lsof proof bin/fm-lock-lib.sh owns, where a missing lsof or any lsof
-# error means "cannot tell", not "nobody there". A registration whose directory
+# never qualifies), and no live process may hold the directory - its cwd or any
+# open file anywhere under the holder counts - by the same fail-safe lsof proof
+# bin/fm-lock-lib.sh owns, where a missing lsof or any lsof error means "cannot
+# tell", not "nobody there". A registration whose directory
 # is gone needs neither proof: nothing can be working inside a directory that
 # does not exist.
 spawn_worktree_is_abandoned_holder() {  # <holder> <worktree> <state> <id>

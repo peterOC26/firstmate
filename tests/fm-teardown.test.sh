@@ -436,14 +436,14 @@ git_index_lock_path() {
 }
 
 # fakebin/lsof stub: no process ever holds anything open (lsof's not-found exit
-# code), so a lock's staleness is decided by age alone. The cwd scan is a
-# separate successful empty query.
+# code), so a lock's staleness is decided by age alone. The system-wide
+# open-path scan is a separate successful empty listing.
 add_lsof_no_holder() {
   local case_dir=$1
   cat > "$case_dir/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 case " $* " in
-  *" -d cwd "*) exit 0 ;;
+  *" -Fpn "*) exit 0 ;;
 esac
 exit 1
 SH

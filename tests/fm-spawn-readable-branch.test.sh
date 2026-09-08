@@ -65,29 +65,34 @@ exit 0
 SH
   chmod +x "$fakebin/tmux"
   # Deterministic stand-in for the two lsof queries fm_lock_has_live_holder
-  # makes ("does any process hold this exact path open?" and the bounded
-  # `-a -d cwd -Fpn` scan of every process's cwd), so a case states which
+  # makes ("does any process hold this exact path open?" and the system-wide
+  # `-Fpn` listing of every process's open paths), so a case states which
   # holders are busy instead of inheriting the host's lsof and whatever else is
   # running on it. Empty output plus exit 1 is lsof's "provably nobody"; exit 0
-  # with a listing is a live holder. FM_FAKE_LSOF_HOLDERS carries the busy
-  # paths, one per line, and defaults to none.
+  # with a listing is a live holder. FM_FAKE_LSOF_HOLDERS carries paths held as
+  # a cwd, FM_FAKE_LSOF_OPEN_FILES paths held only as an ordinary open fd by a
+  # process whose cwd is elsewhere; both are one per line and default to none.
   cat > "$fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 set -u
 target=""
-cwd_scan=0
+path_scan=0
+cwd_only=0
+prev=""
 for arg in "$@"; do
   case "$arg" in
-    -Fpn) cwd_scan=1 ;;
-    -*|cwd) ;;
+    -Fpn) path_scan=1 ;;
+    cwd) [ "$prev" != -d ] || cwd_only=1 ;;
+    -*) ;;
     *) target=$arg ;;
   esac
+  prev=$arg
 done
 found=0
 pid=4242
 while IFS= read -r held; do
   [ -n "$held" ] || continue
-  if [ "$cwd_scan" -eq 1 ]; then
+  if [ "$path_scan" -eq 1 ]; then
     printf 'p%s\nfcwd\nn%s\n' "$pid" "$held"
     pid=$((pid + 1))
     found=1
@@ -100,6 +105,25 @@ while IFS= read -r held; do
 done <<HOLDERS
 ${FM_FAKE_LSOF_HOLDERS:-}
 HOLDERS
+while IFS= read -r open_file; do
+  [ -n "$open_file" ] || continue
+  if [ "$path_scan" -eq 1 ]; then
+    if [ "$cwd_only" -eq 1 ]; then
+      printf 'p%s\nfcwd\nn/elsewhere/home\n' "$pid"
+    else
+      printf 'p%s\nfcwd\nn/elsewhere/home\nf7\nn%s\n' "$pid" "$open_file"
+    fi
+    pid=$((pid + 1))
+    found=1
+    continue
+  fi
+  [ "$open_file" = "$target" ] || continue
+  printf 'COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME\n'
+  printf 'vim 4343 tester 7r REG 0,1 64 1 %s\n' "$target"
+  exit 0
+done <<OPEN_FILES
+${FM_FAKE_LSOF_OPEN_FILES:-}
+OPEN_FILES
 [ "$found" -eq 1 ] && exit 0
 exit 1
 SH
@@ -692,6 +716,35 @@ test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process() {
   pass "fm-spawn: a process in a holder subdirectory prevents branch reclamation"
 }
 
+test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it() {
+  local rec id out status tip other open_file
+  id='readable-branch-open-file-holder-r20'
+  rec=$(make_case refuse-open-file-holder "$id")
+  read_case_record "$rec"
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/open-file-holder"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  mkdir -p "$other/src"
+  open_file="$other/src/main.go"
+  : > "$open_file"
+  # An editor or build started from $HOME with only a file under the holder
+  # open: nothing has its cwd there, so a cwd-only proof would read the slot
+  # as abandoned and hand its branch to a second copy.
+
+  out=$(FM_FAKE_LSOF_OPEN_FILES="$open_file" run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  [ "$status" -ne 0 ] || fail "fresh spawn reclaimed fm/$id while a process held a file under the holder open"
+  assert_contains "$out" "cannot be proven to be an abandoned worker copy" \
+    "the refusal did not account for an open file under the holder"
+  assert_no_grep "checkout --quiet --ignore-other-worktrees" "$CASE_DIR/events.log" \
+    "spawn overrode git's own refusal for a holder with a file open under it"
+  [ "$(git -C "$other" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "the refusal disturbed the worktree that already held fm/$id"
+  [ -z "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" ] \
+    || fail "the refusal attached the pooled worktree to the shared branch"
+  pass "fm-spawn: a file held open under a holder by a process whose cwd is elsewhere prevents branch reclamation"
+}
+
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree() {
   local rec id out status tip other retry_line gotmp_line
   id='readable-branch-missing-worktree-r9'
@@ -787,6 +840,7 @@ test_fresh_spawn_refuses_a_branch_held_by_a_live_task_copy
 test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
 test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in
 test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process
+test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step
 test_ship_brief_branch_step_is_idempotent
