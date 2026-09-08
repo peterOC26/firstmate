@@ -39,10 +39,16 @@ fm_lock_path_mtime() {
 # process's open paths filtered by path prefix - bounded by what is open, never
 # the recursive +D file-tree walk that lsof documents as slow, and with host,
 # port, and user-name lookups disabled so a slow resolver cannot stall the
-# proof on a host with many sockets. Diagnostics print on the error path only.
+# proof on a host with many sockets. Both queries pass -w: lsof prints benign
+# WARNING lines (an unstatable overlay mount, say) to stderr while still
+# exiting 1 with no match, and without -w those lines would read as an error
+# and turn every provably-free target into "cannot tell", which is safe but
+# makes stale-lock cleanup and abandoned-slot recovery unreachable on such a
+# host. Real errors (a status error on the target, a bad option) are not
+# warnings and still surface. Diagnostics print on the error path only.
 fm_lock_lsof_holder() {
   local target=$1 output status
-  if output=$(lsof -- "$target" 2>&1); then
+  if output=$(lsof -w -- "$target" 2>&1); then
     return 0
   else
     status=$?
@@ -78,7 +84,7 @@ fm_lock_lsof_path_under() {
     fm_lock_log "cannot resolve $dir for the lsof open-path scan"
     return 2
   }
-  if out=$(lsof -n -P -l -Fpn 2>/dev/null); then
+  if out=$(lsof -w -n -P -l -Fpn 2>/dev/null); then
     status=0
   else
     status=$?

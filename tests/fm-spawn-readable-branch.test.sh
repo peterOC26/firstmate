@@ -72,22 +72,31 @@ SH
   # with a listing is a live holder. FM_FAKE_LSOF_HOLDERS carries paths held as
   # a cwd, FM_FAKE_LSOF_OPEN_FILES paths held only as an ordinary open fd by a
   # process whose cwd is elsewhere; both are one per line and default to none.
+  # FM_FAKE_LSOF_WARN=1 reproduces an unprivileged lsof on a host with an
+  # unstatable mount: a WARNING block on stderr alongside whatever the query
+  # found, still exit 1 when it found nothing - unless -w was passed, which
+  # real lsof honours by printing no warnings at all.
   cat > "$fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 set -u
 target=""
 path_scan=0
 cwd_only=0
+warn=0
 prev=""
 for arg in "$@"; do
   case "$arg" in
     -Fpn) path_scan=1 ;;
+    -w) warn=1 ;;
     cwd) [ "$prev" != -d ] || cwd_only=1 ;;
     -*) ;;
     *) target=$arg ;;
   esac
   prev=$arg
 done
+if [ "${FM_FAKE_LSOF_WARN:-0}" = 1 ] && [ "$warn" -eq 0 ]; then
+  printf "lsof: WARNING: can't stat() overlay file system /var/lib/docker/rootfs/overlayfs/deadbeef\n      Output information may be incomplete.\n" >&2
+fi
 found=0
 pid=4242
 while IFS= read -r held; do
@@ -745,6 +754,33 @@ test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it() 
   pass "fm-spawn: a file held open under a holder by a process whose cwd is elsewhere prevents branch reclamation"
 }
 
+test_fresh_spawn_reclaims_an_abandoned_slot_despite_lsof_warnings() {
+  local rec id out status tip other
+  id='readable-branch-lsof-warning-r22'
+  rec=$(make_case reclaim-despite-lsof-warnings "$id")
+  read_case_record "$rec"
+  # The same abandoned slot as the reclaim case, on a host where every lsof
+  # query also prints a WARNING block to stderr (an unprivileged lsof meeting
+  # an unstatable overlay mount does exactly this). Nobody holds the slot, so
+  # the warnings must not turn "provably nobody" into "cannot tell".
+  tip=$(git -C "$PROJECT_DIR" rev-parse HEAD)
+  other="$CASE_DIR/leaked-slot"
+  git -C "$PROJECT_DIR" worktree add --quiet -b "fm/$id" "$other" "$tip"
+  : > "$CASE_DIR/events.log"
+
+  out=$(FM_FAKE_LSOF_WARN=1 run_spawn "$id" --mode no-mistakes --yolo off)
+  status=$?
+  expect_code 0 "$status" "benign lsof warnings must not make an abandoned slot unreclaimable"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "spawn did not report success"
+  assert_not_contains "$out" "lsof check failed" \
+    "spawn reported lsof's benign warnings as a failed liveness check"
+  [ "$(git -C "$POOL_DIR" symbolic-ref --quiet --short HEAD)" = "fm/$id" ] \
+    || fail "fresh spawn did not attach its worktree to the reclaimed fm/$id"
+  assert_grep "GIT -C $POOL_DIR checkout --quiet --ignore-other-worktrees fm/$id" "$CASE_DIR/events.log" \
+    "spawn did not reclaim the branch from the abandoned slot"
+  pass "fm-spawn: benign lsof warnings on stderr do not block reclaiming an abandoned slot"
+}
+
 test_fresh_spawn_refuses_when_any_of_several_holders_is_live() {
   local rec id out status tip first second live abandoned line
   id='readable-branch-two-holders-r21'
@@ -885,6 +921,7 @@ test_fresh_spawn_refuses_a_branch_the_primary_checkout_holds
 test_fresh_spawn_refuses_a_branch_held_by_a_worktree_someone_is_working_in
 test_fresh_spawn_refuses_a_branch_held_by_a_subdirectory_process
 test_fresh_spawn_refuses_a_branch_held_by_a_process_with_a_file_open_under_it
+test_fresh_spawn_reclaims_an_abandoned_slot_despite_lsof_warnings
 test_fresh_spawn_refuses_when_any_of_several_holders_is_live
 test_fresh_spawn_reclaims_a_branch_held_only_by_a_missing_worktree
 test_scout_brief_includes_the_branch_step

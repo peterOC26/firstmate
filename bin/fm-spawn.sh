@@ -150,10 +150,10 @@
 #   (the same preserve rule freshening applies to a slot already on fm/<id>),
 #   and a leftover fm/<id> behind or diverged from that base refuses the spawn
 #   rather than moving the worktree off its freshened base or its ref, as
-#   does a branch another worktree already has checked out, unless that holder is
-#   provably abandoned - never the primary checkout, and never a copy holding a
-#   live agent or a live process - so a leaked pool slot does not make an id
-#   unspawnable while a real second copy is still refused.
+#   does a branch another worktree already has checked out, unless every
+#   worktree holding it is provably abandoned - never the primary checkout, and
+#   never a copy holding a live agent or a live process - so a leaked pool slot
+#   does not make an id unspawnable while a real second copy is still refused.
 #   A relaunch owns no base-freshness invariant and its old agent is already
 #   stopped by the time this runs, so there the same step is best-effort and its
 #   call site never lets it fail the launch: it switches back onto the task's own
@@ -329,6 +329,7 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-lock-lib.sh
 . "$SCRIPT_DIR/fm-lock-lib.sh"
+FM_LOCK_LOG_PREFIX=spawn
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
