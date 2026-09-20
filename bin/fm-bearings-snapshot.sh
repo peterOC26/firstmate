@@ -809,14 +809,17 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       reports: $reports,
       recorded_prs: $recorded_prs
     }
-  | . as $board
-  | .board_items += [ .contributions.captain[]? as $call
-      | (if $call.owner == "(main)" then ($call.hold // $call.task)
-         else ($call.owner + "/" + ($call.hold // $call.task)) end) as $id
-      | select(any($board.board_items[];
-          .column == "Waiting on you" and (.id == $id or .artifact == $call.url)) | not)
-      | {column:"Waiting on you",id:$id,summary:$call.task,owner:$call.owner,
-         detail:$call.reason,artifact:$call.url} ]
+  | reduce .contributions.captain[]? as $call (.;
+      (if $call.owner == "(main)" then ($call.hold // $call.task)
+       else ($call.owner + "/" + ($call.hold // $call.task)) end) as $id
+      | if any(.board_items[];
+          .column == "Waiting on you" and (.id == $id or .artifact == $call.url)) then
+          .board_items |= map(if .column == "Waiting on you" and .id == $id
+                              then .artifact = $call.url else . end)
+        else .board_items += [
+          {column:"Waiting on you",id:$id,summary:$call.task,owner:$call.owner,
+           detail:$call.reason,artifact:$call.url} ]
+        end)
   | if .contributions.proven_clear != true then
       .contributions as $coverage
       | .board_columns |= map(if .column == "Waiting on you" then

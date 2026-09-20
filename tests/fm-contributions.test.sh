@@ -19,9 +19,11 @@ new_home() {
 }
 
 bearings() {
-  PATH="$1/fakebin:$PATH" FM_HOME="$1" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_STATE_OVERRIDE="$1/state" FM_DATA_OVERRIDE="$1/data" FM_CONFIG_OVERRIDE="$1/config" \
-    FM_BEARINGS_NOW="$NOW" "$ROOT/bin/fm-bearings-snapshot.sh" --json
+  local home=$1
+  shift
+  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_BEARINGS_NOW="$NOW" "$ROOT/bin/fm-bearings-snapshot.sh" --json "$@"
 }
 
 record() { # home id number forge-state mergeability [hold]
@@ -45,7 +47,7 @@ mutate_record() {
 }
 
 test_actor_coverage() {
-  local home out
+  local home out summary rendered
   home=$(new_home actors)
   record "$home" own 1 open mergeable '(hold: choose scope) (hold-kind: captain)'
   record "$home" repair 2 open conflicting
@@ -58,8 +60,21 @@ test_actor_coverage() {
     and (.contributions.captain | length) == 1
     and .contributions.captain[0].url == "https://github.com/o/r/pull/1"
     and .contributions.complete == true and .contributions.proven_clear == false
-    and ([.board_items[] | select(.column == "Waiting on you" and .id == "own")] | length) == 1' >/dev/null \
+    and .in_flight == [] and .recorded_prs == []
+    and ([.board_items[] | select(.column == "Waiting on you" and .id == "own")] | length) == 1
+    and ((.decisions_open[] | select(.id == "own") | .summary) as $summary
+      | .board_items | any(.id == "own" and .column == "Waiting on you"
+        and .summary == $summary and (.summary | contains("choose scope"))
+        and .detail == "your decision needed"
+        and .artifact == "https://github.com/o/r/pull/1"))' >/dev/null \
     || fail "published deliveries must report actors and measured coverage: $out"
+  summary=$(printf '%s' "$out" | jq -r '.decisions_open[] | select(.id == "own") | .summary')
+  rendered=$(bearings "$home" --render chat) || fail 'held contribution chat rendering failed'
+  assert_contains "$rendered" "- $summary - your decision needed - https://github.com/o/r/pull/1" \
+    'chat must preserve the hold summary and its cached PR artifact without worker metadata'
+  rendered=$(bearings "$home" --render file) || fail 'held contribution file rendering failed'
+  assert_contains "$rendered" "- $summary (main): your decision needed - https://github.com/o/r/pull/1" \
+    'file output must preserve the hold summary and its cached PR artifact without worker metadata'
   pass 'only required-captain contributions are rows; other actors are counted'
 }
 
