@@ -46,6 +46,10 @@ board_repo=${GH_REPO:-captain/fleet}
     printf 'ARG\t%s\n' "$arg"
   done
 } >> "$GH_LOG"
+if [ "${1:-}" = pr ] && [ "${2:-}" = list ]; then
+  cat "$GH_PR_FIXTURE"
+  exit 0
+fi
 if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
   visibility=${GH_PRIVATE:-true}
   if [ "${GH_PRIVATE_AFTER_FIRST:-}" = false ]; then
@@ -81,6 +85,19 @@ if [ "${1:-}" = api ] && [ -n "${GH_REPO_MAPPED:-}" ] && [ "${2:-}" = "repos/$GH
   fi
   printf '%s\n' "$mapped_visibility"
   exit 0
+fi
+if [ "${1:-}" = api ]; then
+  case "${2:-}" in
+    repos/*/issues/[0-9]*)
+      case "${GH_ISSUE_STATE:-open}" in
+        unavailable) exit 1 ;;
+        missing) printf '%s\n' '{}' ;;
+        malformed) printf '%s\n' 'not JSON' ;;
+        *) jq -n --arg state "${GH_ISSUE_STATE:-open}" '{state:$state}' ;;
+      esac
+      exit 0
+      ;;
+  esac
 fi
 if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
   case "$*" in
@@ -469,6 +486,25 @@ test_arm_leaves_no_unauthenticated_check_when_binding_fails() {
   pass "a failed trust binding withdraws the check instead of leaving it unauthenticated"
 }
 
+test_large_snapshots_use_stream_input() {
+  local fixture root home fakebin bearings board output path
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Done
+  for path in "${bearings}.json" "${bearings}.json.fleet"; do
+    jq '.padding = ("x" * 200000)' "$path" > "$path.large"
+    mv "$path.large" "$path"
+  done
+  output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$root/gh.log" reconcile --dry-run)
+  printf '%s' "$output" | jq -e '
+    .operations | any(.action == "create_issue" and .title == "Safe board title")' >/dev/null \
+    || fail "snapshots beyond the exec argument limit must retain the board plan"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "large fleet and bearings snapshots retain the board plan without exec argument limits"
+}
+
 test_allowlist_and_exclusions() {
   local fixture root home fakebin bearings board output log
   fixture=$(make_fixture)
@@ -502,6 +538,195 @@ test_allowlist_and_exclusions() {
   assert_not_contains "$(<"$log")" 'safe-task-internal-id' "internal task ids must never reach GitHub"
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "GitHub writes contain only allowlisted fields and skip excluded tasks"
+}
+
+test_return_catchup_warning_never_creates_a_task_card() {
+  local fixture root home fakebin bearings board log output phase
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Blocked
+  jq '.board_items += [{column:"Blocked",id:"(return-catchup)",
+    summary:"Return catch-up pending",owner:"(main)",detail:"pending",artifact:"-"}]' \
+    "${bearings}.json" > "$root/catchup.json"
+  mv "$root/catchup.json" "${bearings}.json"
+  for phase in open cleared; do
+    output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+    printf '%s' "$output" | jq -e '
+      (.operations | length > 0)
+      and (.operations | all(.task_id == "safe-task-internal-id"))
+    ' >/dev/null || fail "catch-up warning became a desired task card: $output"
+    jq -e '.tasks | keys == ["safe-task-internal-id"]' \
+      "$home/state/board-sync.json" >/dev/null \
+      || fail "catch-up warning left a mapped task while $phase"
+    write_bearings "${bearings}.json" Blocked
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "return catch-up warnings never create or strand mapped task cards"
+}
+
+test_cached_contribution_wins_duplicate_task_rows() {
+  local fixture root home fakebin bearings board log output column order url expected_body
+  for column in Ready Held Blocked 'Under way' Done; do
+    for order in first last; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_board "$board" '[]'
+      write_bearings "${bearings}.json" "$column"
+      url='https://github.com/acme/app/pull/19'
+      jq --arg order "$order" --arg url "$url" '
+        .recorded_prs = [] | .in_flight = [] | .decisions_open = []
+        | .board_items |= map(.artifact = "-")
+        | {column:"Waiting on you",id:"safe-task-internal-id",
+           summary:"PRIVATE_CONTRIBUTION_SUMMARY",owner:"(main)",
+           detail:"PRIVATE_MERGE_APPROVAL_DETAIL",artifact:$url} as $call
+        | .board_items = (if $order == "first" then [$call] + .board_items
+                         else .board_items + [$call] end)
+      ' "${bearings}.json" > "$root/contribution.json"
+      mv "$root/contribution.json" "${bearings}.json"
+      output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      expected_body=$(printf 'project: demo-project\nkind: ship\nPR: %s' "$url")
+      printf '%s' "$output" | jq -e --arg body "$expected_body" '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .title == "Safe board title" and .body == $body)
+          and ([.operations[] | select(.action == "set_column") | .column] == ["Waiting on you"])
+          and (.operations | all(.task_id == "safe-task-internal-id" and .action != "close_issue"))
+      ' >/dev/null || fail "cached contribution lost to $column ($order): $output"
+      assert_contains "$(<"$log")" "PR: $url" "cached contribution PR must reach the issue body"
+      assert_contains "$(<"$log")" 'option=waiting' "cached contribution must set the GitHub waiting column"
+      assert_not_contains "$(<"$log")" 'PRIVATE_CONTRIBUTION_SUMMARY' "contribution summary must remain private"
+      assert_not_contains "$(<"$log")" 'PRIVATE_MERGE_APPROVAL_DETAIL' "contribution detail must remain private"
+      jq -e '.tasks | keys == ["safe-task-internal-id"]' "$home/state/board-sync.json" >/dev/null \
+        || fail "duplicate rows created extra task mappings"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "cached contribution wins duplicate task rows without live PR metadata"
+}
+
+test_pr_enrichment_preserves_task_actionability() {
+  local fixture root home fakebin bearings board log output task_column pr_column detail expected option
+  for task_column in 'Waiting on you' Ready; do
+    for detail in 'PR open - CI failing' 'PR open - checks still running' 'waiting for your review'; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_board "$board" '[]'
+      write_bearings "${bearings}.json" Ready
+      pr_column='Under way'
+      [ "$detail" != 'waiting for your review' ] || pr_column='Waiting on you'
+      expected=$pr_column
+      [ "$task_column" != 'Waiting on you' ] || expected='Waiting on you'
+      option=underway
+      [ "$expected" != 'Waiting on you' ] || option=waiting
+      jq --arg task_column "$task_column" --arg pr_column "$pr_column" --arg detail "$detail" '
+        .recorded_prs = [] | .in_flight = []
+        | if $task_column == "Waiting on you" then
+            .board_items |= map(if .id == "safe-task-internal-id" then .artifact = "-" else . end)
+            | .board_items += [{column:$task_column,id:"safe-task-internal-id",
+                summary:"PRIVATE_HOLD_SUMMARY",owner:"(main)",detail:"your decision needed",
+                artifact:"https://github.com/acme/app/pull/9"}]
+            | .decisions_open = [{id:"safe-task-internal-id",owner:"(main)",summary:"PRIVATE_HOLD_SUMMARY"}]
+          else . end
+        | .board_items += [{column:$pr_column,id:"acme/app#9",summary:"PRIVATE_PR_SUMMARY",
+            owner:"acme/app",detail:$detail,artifact:"https://github.com/acme/app/pull/9"}]
+      ' "${bearings}.json" > "$root/enriched.json"
+      mv "$root/enriched.json" "${bearings}.json"
+      output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      printf '%s' "$output" | jq -e --arg expected "$expected" --arg body "$CANONICAL_BODY" '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .title == "Safe board title" and .body == $body)
+          and ([.operations[] | select(.action == "set_column") | .column] == [$expected])
+          and (.operations | all(.task_id == "safe-task-internal-id"))
+      ' >/dev/null || fail "PR enrichment changed task precedence for $task_column / $detail: $output"
+      assert_contains "$(<"$log")" "option=$option" "GitHub must receive the resolved column"
+      assert_contains "$(<"$log")" 'PR: https://github.com/acme/app/pull/9' "PR enrichment must retain the validated artifact"
+      assert_not_contains "$(<"$log")" 'PRIVATE_HOLD_SUMMARY' "hold summaries must remain private"
+      assert_not_contains "$(<"$log")" 'PRIVATE_PR_SUMMARY' "PR summaries must remain private"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "PR enrichment preserves task actionability and enriches ordinary tasks"
+}
+
+test_live_discovery_preserves_cached_contribution_identity() {
+  local scenario
+  for scenario in absent actionable nonactionable; do
+    (
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      mkdir -p "$home/data/retired" "$home/projects"
+      fm_git_init_commit "$home/projects/other"
+      git -C "$home/projects/other" remote add origin https://github.com/acme/app.git
+      fm_write_meta "$home/state/other.meta" \
+        "window=firstmate:fm-other" "worktree=$home/projects/other" "project=sample" \
+        "harness=claude" "kind=ship" "mode=no-mistakes"
+      fm_fake_exit0 "$fakebin" tmux no-mistakes
+      printf 'working: another task in the same repository\n' > "$home/state/other.status"
+      printf 'other\n' >> "$home/config/board-exclude"
+      cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] other - Other worker (repo: sample) (kind: ship)
+
+## Queued
+- [ ] retired - Cached contribution (repo: sample) (kind: ship)
+
+## Done
+EOF
+      now=2026-09-16T08:00:00Z
+      jq -n --arg now "$now" '{schema:"fm-contributions.v1",task:"retired",records:[{
+        url:"https://github.com/acme/app/pull/19",kind:"pr",checked_at:$now,
+        error:null,pending:[],seen:[],verdict:null,
+        observation:{head:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",state:"open",draft:false,
+          mergeable:"mergeable",review_decision:"APPROVED",can_merge:true,
+          checks:[{name:"test",id:1,status:"completed",conclusion:"success",started_at:$now}],
+          reviews:[],events:[]}}]}' > "$home/data/retired/contributions.json"
+      jq -n --arg scenario "$scenario" '
+        if $scenario == "absent" then [] else [{number:19,title:"PRIVATE_DISCOVERED_TITLE",
+          url:"https://github.com/acme/app/pull/19",headRefName:"fm/retired",
+          reviewDecision:"APPROVED",mergeable:"MERGEABLE",statusCheckRollup:[{
+            status:"COMPLETED",conclusion:(if $scenario == "actionable" then "SUCCESS" else "FAILURE" end)
+          }]}] end' > "$root/prs.json"
+      write_board "$root/board.json" '[]'
+      export PATH="$fakebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT"
+      export FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config"
+      export FM_BEARINGS_NOW="$now" FM_SNAPSHOT_NOW="$now"
+      export GH_LOG="$root/gh.log" GH_PR_FIXTURE="$root/prs.json" BOARD_FIXTURE="$root/board.json"
+      export FM_BOARD_BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh" FM_BOARD_FLEET_SNAPSHOT="$ROOT/bin/fm-fleet-snapshot.sh"
+      projected=$("$FM_BOARD_BEARINGS" --json --include-prs)
+      printf '%s' "$projected" | jq -e --arg scenario "$scenario" '
+        .prs == ("checked (1 repos, " + (if $scenario == "absent" then "0" else "1" end) + " open)")
+        and (.in_flight | any(.id == "other"))
+        and (.in_flight | all(.id != "retired")) and .recorded_prs == []
+        and ([.board_items[] | select(.id == "retired" and .column == "Waiting on you"
+          and .owner == "(main)" and .artifact == "https://github.com/acme/app/pull/19")] | length) == 1
+        and ([.board_items[] | select(.id == "acme/app#19") | .column]
+          == (if $scenario == "absent" then [] elif $scenario == "actionable" then ["Waiting on you"] else ["Under way"] end))
+      ' >/dev/null || fail "discovery lost cached task identity ($scenario): $projected"
+      output=$("$SCRIPT" reconcile)
+      printf '%s' "$output" | jq -e '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .task_id == "retired" and .title == "Cached contribution"
+            and .body == "project: sample\nkind: ship\nPR: https://github.com/acme/app/pull/19")
+          and ([.operations[] | select(.action == "set_column") | .column] == ["Waiting on you"])
+      ' >/dev/null || fail "real projection did not produce the actionable desired card ($scenario): $output"
+      assert_contains "$(<"$GH_LOG")" $'ARG\t--repo' 'discovery must query the other worker repository'
+      assert_contains "$(<"$GH_LOG")" 'option=waiting' 'GitHub card must remain actionable'
+      assert_not_contains "$(<"$GH_LOG")" 'PRIVATE_DISCOVERED_TITLE' 'discovered titles must not be published'
+      jq -e '.tasks | keys == ["retired"]' "$home/state/board-sync.json" >/dev/null \
+        || fail 'discovery created an extra mapped card'
+    )
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "real projection and sync retain cached task identity through live discovery"
 }
 
 test_credential_bearing_artifact_is_not_published() {
@@ -1006,6 +1231,55 @@ test_removed_card_is_restored_and_noted() {
   pass "a card removed from the board is noted once and restored at its fleet column"
 }
 
+test_missing_card_checks_issue_state_before_restoration() {
+  local fleet_column observed fixture root home fakebin bearings board log planned output expected
+  for fleet_column in Ready Done; do
+    for observed in closed open unavailable missing malformed unknown; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_bearings "${bearings}.json" "$fleet_column"
+      write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE safe-task-internal-id 1 captain/legacy)"
+      write_board "$board" '[]'
+      planned=$(GH_REPO_MAPPED=captain/legacy GH_ISSUE_STATE="$observed" \
+        run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
+      assert_not_contains "$(<"$log")" 'mutation(' "dry-run must not restore any card"
+      assert_not_contains "$(<"$log")" $'ARG\tPATCH' "dry-run must not change any issue"
+      output=$(GH_REPO_MAPPED=captain/legacy GH_ISSUE_STATE="$observed" \
+        run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      [ "$(printf '%s' "$planned" | jq -c '{operations,escalations}')" = \
+        "$(printf '%s' "$output" | jq -c '{operations,escalations}')" ] \
+        || fail "missing-card dry-run differs from real-run: $fleet_column / $observed"
+      assert_contains "$(<"$log")" $'ARG\trepos/captain/legacy/issues/1' "issue state must come from the mapped repository"
+      assert_contains "$(<"$log")" $'ARG\trepos/captain/legacy\n' "the mapped repository privacy gate must still run"
+      if [ "$observed" = open ] || { [ "$observed" = closed ] && [ "$fleet_column" = Done ]; }; then
+        expected='["add_item","set_column"]'
+        if [ "$observed" = open ] && [ "$fleet_column" = Done ]; then
+          expected='["add_item","set_column","close_issue"]'
+        fi
+        printf '%s' "$output" | jq -e --argjson expected "$expected" '
+          [.operations[].action] == $expected
+        ' >/dev/null || fail "known issue state lost ordinary restoration: $output"
+        assert_contains "$(<"$log")" 'addProjectV2ItemById' "eligible issue must regain its card"
+      else
+        printf '%s' "$output" | jq -e --arg observed "$observed" '
+          .operations == [] and (.escalations | any(
+            if $observed == "closed" then contains("issue is closed")
+            else contains("issue state is unavailable") end))
+        ' >/dev/null || fail "closed or unknown issue was not left untouched: $output"
+        assert_not_contains "$(<"$log")" 'mutation(' "closed or unknown issue must not regain its card"
+        assert_not_contains "$(<"$log")" $'ARG\tPATCH' "closed or unknown issue must not be rewritten"
+        jq -e '.tasks["safe-task-internal-id"].item_id == "PVTI_ONE"' "$home/state/board-sync.json" >/dev/null \
+          || fail 'skipped restoration changed the task mapping'
+      fi
+      assert_not_contains "$(<"$log")" $'ARG\tPOST' "mapped issues must never be recreated"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "missing-card restoration respects closed and unavailable mapped issue states"
+}
+
 test_archived_card_is_noted_and_left_untouched() {
   local fixture root home fakebin bearings board log output woke again
   fixture=$(make_fixture)
@@ -1048,26 +1322,48 @@ test_archived_card_is_noted_and_left_untouched() {
 }
 
 test_closed_issue_is_noted_and_never_reopened() {
-  local fixture root home fakebin bearings board log output
+  local fixture root home fakebin bearings board log output planned mismatch
   fixture=$(make_fixture)
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
   board="$root/board.json"
   log="$root/gh.log"
   write_bearings "${bearings}.json" Ready
-  write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Ready CLOSED)" '[$card]')"
   write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE)"
+  for mismatch in false true; do
+    write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Ready CLOSED)" \
+      --argjson mismatch "$mismatch" '[$card | if $mismatch then
+        .content.title = "Captain edited title" | .content.body = "Captain edited body"
+        | .fieldValueByName.name = "Held" else . end]')"
+    planned=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
+    output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+    printf '%s' "$output" | jq -e --argjson mismatch "$mismatch" '
+      (.escalations | length == (if $mismatch then 2 else 1 end))
+      and (.escalations | any(contains("task safe-task-internal-id")
+        and contains("issue is closed")
+        and contains("the fleet says \"Ready\"")))
+      and (.operations | length == 0)
+    ' >/dev/null || fail "a closed issue under a live task must be reported and left alone"
+    [ "$(printf '%s' "$planned" | jq -c '{operations,escalations}')" = \
+      "$(printf '%s' "$output" | jq -c '{operations,escalations}')" ] \
+      || fail "dry-run and real-run must agree on leaving closed issues untouched"
+    assert_not_contains "$(<"$log")" $'ARG\tPATCH' "the sync must never reopen or rewrite a closed board issue"
+    assert_not_contains "$(<"$log")" $'ARG\tPOST' "a closed issue must not trigger a new issue"
+    assert_not_contains "$(<"$log")" 'mutation(' "a closed issue must not trigger any project write"
+  done
+  write_bearings "${bearings}.json" Done
+  planned=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
   output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
   printf '%s' "$output" | jq -e '
-    (.escalations | length == 1)
-    and (.escalations[0] | contains("task safe-task-internal-id")
-      and contains("issue is closed")
-      and contains("the fleet says \"Ready\""))
-    and (.operations | length == 0)
-  ' >/dev/null || fail "a closed issue under a live task must be reported and left alone"
-  assert_not_contains "$(<"$log")" $'ARG\tPATCH' "the sync must never reopen or rewrite a closed board issue"
-  assert_not_contains "$(<"$log")" 'mutation(' "a closed issue must not trigger any project write"
+    ([.operations[].action] | sort) == ["set_column","update_issue"]
+    and (.operations | any(.action == "set_column" and .column == "Done"))
+  ' >/dev/null || fail "Done tasks must still reconcile closed issue fields and columns"
+  [ "$(printf '%s' "$planned" | jq -c '.operations')" = \
+    "$(printf '%s' "$output" | jq -c '.operations')" ] \
+    || fail "Done reconciliation must match its dry-run plan"
+  assert_contains "$(<"$log")" $'ARG\tPATCH' "Done must still update mismatched issue fields"
+  assert_contains "$(<"$log")" 'option=98236657' "Done must still update mismatched card columns"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "an issue closed on the board is reported once and never reopened"
+  pass "closed non-Done issues remain untouched while Done reconciliation stays active"
 }
 
 test_excluded_task_is_never_pushed_or_reported() {
@@ -1496,7 +1792,12 @@ test_notes_report_only_what_the_run_observes() {
 
 test_arm_status_and_disarm
 test_arm_leaves_no_unauthenticated_check_when_binding_fails
+test_large_snapshots_use_stream_input
 test_allowlist_and_exclusions
+test_return_catchup_warning_never_creates_a_task_card
+test_cached_contribution_wins_duplicate_task_rows
+test_pr_enrichment_preserves_task_actionability
+test_live_discovery_preserves_cached_contribution_identity
 test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail
@@ -1513,6 +1814,7 @@ test_poll_prints_only_a_deduplicated_pointer
 test_moved_card_is_pushed_back_to_the_fleet_column
 test_cleared_status_is_restored_and_noted
 test_removed_card_is_restored_and_noted
+test_missing_card_checks_issue_state_before_restoration
 test_archived_card_is_noted_and_left_untouched
 test_closed_issue_is_noted_and_never_reopened
 test_excluded_task_is_never_pushed_or_reported

@@ -13,10 +13,15 @@
 # `reconcile` reads every fleet column from fm-bearings-snapshot.sh and pushes
 # those columns onto real issues in the configured private board repository.  It
 # creates a canonical card for every fleet task the sync owns, restores a card
-# that left the board, keeps that card's allowlisted title and body in step,
+# that left the board subject to the issue-state guards below, keeps that card's
+# allowlisted title and body in step,
 # sets the card's column to its own task's fleet column, and closes the issue
 # once that task reaches Done.  Every applied change is listed under
 # `operations`.
+#
+# Only main-home task rows produce cards; synthetic inventory and return-catchup
+# warnings and repository-owned PR rows do not. Duplicate task rows prefer
+# Waiting on you, and subsequent PR enrichment cannot demote that column.
 #
 # The sync never reads board state back into the fleet.  It never observes,
 # owns, retires, or acts on captain-made board or issue state, never writes
@@ -32,6 +37,11 @@
 # holds a non-Done column, and a card the sync does not manage are reported and
 # then left exactly as they are.  Every run reports what it observes, so a note
 # repeats while its board fact persists and stops once the fact is gone.
+# Before restoring a missing mapped card, reconcile reads the issue state.
+# Closed non-Done issues receive no issue or card mutation, even if their card
+# is missing or its title, body, or column differs from fleet state.
+# An unavailable or unrecognized issue state skips that task with a note in
+# both dry-run and real-run mode; it is never assumed OPEN.
 #
 # Writes always target the board item the run actually resolved, and the
 # resolved item id is persisted as soon as it differs from the recorded one, so
@@ -462,10 +472,14 @@ desired_items() {
       and test("^https://github[.]com/[^/@?#[:space:]]+/[^/@?#[:space:]]+/pull/[1-9][0-9]*$");
     ([$root.board_items[]
         | select(.owner == "(main)")
-        | select(.id != "(main-inventory)")
+        | select(.id != "(main-inventory)" and .id != "(return-catchup)")
         | select((.id | contains("#")) | not)]
        | reduce .[] as $item ([];
-           if any(.id == $item.id) then . else . + [$item] end)) as $tasks
+           if any(.id == $item.id) then
+             map(if .id == $item.id and .column != "Waiting on you"
+                    and $item.column == "Waiting on you"
+                 then $item else . end)
+           else . + [$item] end)) as $tasks
     | [ $tasks[]
         | . as $task
         | (($metadata.backlog.records[]? | select(.id == $task.id)) // {}) as $meta
@@ -478,7 +492,8 @@ desired_items() {
         | {
             id:.id,
             title:(if ($meta.title | type) == "string" then ($meta.title | .[0:120]) else null end),
-            column:($prrow.column // .column),
+            column:(if .column == "Waiting on you" then .column
+                    else ($prrow.column // .column) end),
             kind:($meta.kind // $kind),
             project:(if (($meta.repo // "-") == "-") then null else $meta.repo end),
             pr_url:(if ($pr | valid_pr_url) then $pr else null end)
@@ -763,6 +778,29 @@ reconcile() {
     issue_number=$(printf '%s' "$mapping" | jq -er '.issue_number')
     item_id=$(printf '%s' "$mapping" | jq -er '.item_id')
     mapped_repo=$(printf '%s' "$mapping" | jq -er '.repo')
+    if [ "$live" = null ]; then
+      if ! issue=$(gh api "repos/$mapped_repo/issues/$issue_number"); then
+        issue=null
+      fi
+      issue_state=$(printf '%s' "$issue" | jq -er '.state | strings | ascii_upcase' 2>/dev/null) || issue_state=
+    else
+      issue_state=$(printf '%s' "$live" | jq -er '.content.state | strings | ascii_upcase' 2>/dev/null) || issue_state=
+    fi
+    case "$issue_state" in
+      OPEN|CLOSED) ;;
+      *)
+        escalations=$(append_note "$escalations" \
+          "board changed: task $task_id issue state is unavailable, so the task was skipped and left untouched.")
+        continue
+        ;;
+    esac
+    if [ "$issue_state" = CLOSED ] && [ "$column" != Done ]; then
+      if [ "$live" = null ]; then
+        escalations=$(append_note "$escalations" \
+          "board changed: task $task_id issue is closed while the fleet says \"$column\".")
+      fi
+      continue
+    fi
     if [ "$live" != null ]; then
       live_item_id=$(printf '%s' "$live" | jq -r '.id // empty')
       if [ -n "$live_item_id" ] && [ "$live_item_id" != "$item_id" ]; then
@@ -788,10 +826,8 @@ reconcile() {
         '{action:$action,task_id:$task_id}')
       operations=$(append_operation "$operations" "$operation")
       theirs=
-      issue_state=OPEN
     else
       theirs=$(printf '%s' "$live" | jq -r '.fieldValueByName.name // empty')
-      issue_state=$(printf '%s' "$live" | jq -r '(.content.state // "") | ascii_upcase')
       if [ "$(printf '%s' "$live" | jq -r '.content.title // empty')" != "$title" ] ||
         [ "$(printf '%s' "$live" | jq -r '.content.body // empty')" != "$body" ]; then
         if [ "$dry_run" = 0 ]; then
