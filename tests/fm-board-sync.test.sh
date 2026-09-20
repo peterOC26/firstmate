@@ -592,6 +592,53 @@ test_cached_contribution_wins_duplicate_task_rows() {
   pass "cached contribution wins duplicate task rows without live PR metadata"
 }
 
+test_pr_enrichment_preserves_task_actionability() {
+  local fixture root home fakebin bearings board log output task_column pr_column detail expected option
+  for task_column in 'Waiting on you' Ready; do
+    for detail in 'PR open - CI failing' 'PR open - checks still running' 'waiting for your review'; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_board "$board" '[]'
+      write_bearings "${bearings}.json" Ready
+      pr_column='Under way'
+      [ "$detail" != 'waiting for your review' ] || pr_column='Waiting on you'
+      expected=$pr_column
+      [ "$task_column" != 'Waiting on you' ] || expected='Waiting on you'
+      option=underway
+      [ "$expected" != 'Waiting on you' ] || option=waiting
+      jq --arg task_column "$task_column" --arg pr_column "$pr_column" --arg detail "$detail" '
+        .recorded_prs = [] | .in_flight = []
+        | if $task_column == "Waiting on you" then
+            .board_items |= map(if .id == "safe-task-internal-id" then .artifact = "-" else . end)
+            | .board_items += [{column:$task_column,id:"safe-task-internal-id",
+                summary:"PRIVATE_HOLD_SUMMARY",owner:"(main)",detail:"your decision needed",
+                artifact:"https://github.com/acme/app/pull/9"}]
+            | .decisions_open = [{id:"safe-task-internal-id",owner:"(main)",summary:"PRIVATE_HOLD_SUMMARY"}]
+          else . end
+        | .board_items += [{column:$pr_column,id:"acme/app#9",summary:"PRIVATE_PR_SUMMARY",
+            owner:"acme/app",detail:$detail,artifact:"https://github.com/acme/app/pull/9"}]
+      ' "${bearings}.json" > "$root/enriched.json"
+      mv "$root/enriched.json" "${bearings}.json"
+      output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      printf '%s' "$output" | jq -e --arg expected "$expected" --arg body "$CANONICAL_BODY" '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .title == "Safe board title" and .body == $body)
+          and ([.operations[] | select(.action == "set_column") | .column] == [$expected])
+          and (.operations | all(.task_id == "safe-task-internal-id"))
+      ' >/dev/null || fail "PR enrichment changed task precedence for $task_column / $detail: $output"
+      assert_contains "$(<"$log")" "option=$option" "GitHub must receive the resolved column"
+      assert_contains "$(<"$log")" 'PR: https://github.com/acme/app/pull/9' "PR enrichment must retain the validated artifact"
+      assert_not_contains "$(<"$log")" 'PRIVATE_HOLD_SUMMARY' "hold summaries must remain private"
+      assert_not_contains "$(<"$log")" 'PRIVATE_PR_SUMMARY' "PR summaries must remain private"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "PR enrichment preserves task actionability and enriches ordinary tasks"
+}
+
 test_credential_bearing_artifact_is_not_published() {
   local fixture root home fakebin bearings board output log credential_url
   fixture=$(make_fixture)
@@ -1588,6 +1635,7 @@ test_large_snapshots_use_stream_input
 test_allowlist_and_exclusions
 test_return_catchup_warning_never_creates_a_task_card
 test_cached_contribution_wins_duplicate_task_rows
+test_pr_enrichment_preserves_task_actionability
 test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail

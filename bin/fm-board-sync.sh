@@ -482,7 +482,8 @@ desired_items() {
         | {
             id:.id,
             title:(if ($meta.title | type) == "string" then ($meta.title | .[0:120]) else null end),
-            column:($prrow.column // .column),
+            column:(if .column == "Waiting on you" then .column
+                    else ($prrow.column // .column) end),
             kind:($meta.kind // $kind),
             project:(if (($meta.repo // "-") == "-") then null else $meta.repo end),
             pr_url:(if ($pr | valid_pr_url) then $pr else null end)
