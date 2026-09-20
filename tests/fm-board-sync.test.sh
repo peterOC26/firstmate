@@ -550,6 +550,48 @@ test_return_catchup_warning_never_creates_a_task_card() {
   pass "return catch-up warnings never create or strand mapped task cards"
 }
 
+test_cached_contribution_wins_duplicate_task_rows() {
+  local fixture root home fakebin bearings board log output column order url expected_body
+  for column in Ready Held Blocked 'Under way' Done; do
+    for order in first last; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_board "$board" '[]'
+      write_bearings "${bearings}.json" "$column"
+      url='https://github.com/acme/app/pull/19'
+      jq --arg order "$order" --arg url "$url" '
+        .recorded_prs = [] | .in_flight = [] | .decisions_open = []
+        | .board_items |= map(.artifact = "-")
+        | {column:"Waiting on you",id:"safe-task-internal-id",
+           summary:"PRIVATE_CONTRIBUTION_SUMMARY",owner:"(main)",
+           detail:"PRIVATE_MERGE_APPROVAL_DETAIL",artifact:$url} as $call
+        | .board_items = (if $order == "first" then [$call] + .board_items
+                         else .board_items + [$call] end)
+      ' "${bearings}.json" > "$root/contribution.json"
+      mv "$root/contribution.json" "${bearings}.json"
+      output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      expected_body=$(printf 'project: demo-project\nkind: ship\nPR: %s' "$url")
+      printf '%s' "$output" | jq -e --arg body "$expected_body" '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .title == "Safe board title" and .body == $body)
+          and ([.operations[] | select(.action == "set_column") | .column] == ["Waiting on you"])
+          and (.operations | all(.task_id == "safe-task-internal-id" and .action != "close_issue"))
+      ' >/dev/null || fail "cached contribution lost to $column ($order): $output"
+      assert_contains "$(<"$log")" "PR: $url" "cached contribution PR must reach the issue body"
+      assert_contains "$(<"$log")" 'option=waiting' "cached contribution must set the GitHub waiting column"
+      assert_not_contains "$(<"$log")" 'PRIVATE_CONTRIBUTION_SUMMARY' "contribution summary must remain private"
+      assert_not_contains "$(<"$log")" 'PRIVATE_MERGE_APPROVAL_DETAIL' "contribution detail must remain private"
+      jq -e '.tasks | keys == ["safe-task-internal-id"]' "$home/state/board-sync.json" >/dev/null \
+        || fail "duplicate rows created extra task mappings"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "cached contribution wins duplicate task rows without live PR metadata"
+}
+
 test_credential_bearing_artifact_is_not_published() {
   local fixture root home fakebin bearings board output log credential_url
   fixture=$(make_fixture)
@@ -1545,6 +1587,7 @@ test_arm_leaves_no_unauthenticated_check_when_binding_fails
 test_large_snapshots_use_stream_input
 test_allowlist_and_exclusions
 test_return_catchup_warning_never_creates_a_task_card
+test_cached_contribution_wins_duplicate_task_rows
 test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail

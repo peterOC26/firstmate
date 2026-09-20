@@ -465,7 +465,11 @@ desired_items() {
         | select(.id != "(main-inventory)" and .id != "(return-catchup)")
         | select((.id | contains("#")) | not)]
        | reduce .[] as $item ([];
-           if any(.id == $item.id) then . else . + [$item] end)) as $tasks
+           if any(.id == $item.id) then
+             map(if .id == $item.id and .column != "Waiting on you"
+                    and $item.column == "Waiting on you"
+                 then $item else . end)
+           else . + [$item] end)) as $tasks
     | [ $tasks[]
         | . as $task
         | (($metadata.backlog.records[]? | select(.id == $task.id)) // {}) as $meta
