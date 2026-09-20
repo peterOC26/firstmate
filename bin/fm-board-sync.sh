@@ -797,6 +797,9 @@ reconcile() {
     else
       theirs=$(printf '%s' "$live" | jq -r '.fieldValueByName.name // empty')
       issue_state=$(printf '%s' "$live" | jq -r '(.content.state // "") | ascii_upcase')
+      if [ "$issue_state" = CLOSED ] && [ "$column" != Done ]; then
+        continue
+      fi
       if [ "$(printf '%s' "$live" | jq -r '.content.title // empty')" != "$title" ] ||
         [ "$(printf '%s' "$live" | jq -r '.content.body // empty')" != "$body" ]; then
         if [ "$dry_run" = 0 ]; then

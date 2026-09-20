@@ -1260,26 +1260,48 @@ test_archived_card_is_noted_and_left_untouched() {
 }
 
 test_closed_issue_is_noted_and_never_reopened() {
-  local fixture root home fakebin bearings board log output
+  local fixture root home fakebin bearings board log output planned mismatch
   fixture=$(make_fixture)
   IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
   board="$root/board.json"
   log="$root/gh.log"
   write_bearings "${bearings}.json" Ready
-  write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Ready CLOSED)" '[$card]')"
   write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE)"
+  for mismatch in false true; do
+    write_board "$board" "$(jq -n --argjson card "$(owned_card PVTI_ONE Ready CLOSED)" \
+      --argjson mismatch "$mismatch" '[$card | if $mismatch then
+        .content.title = "Captain edited title" | .content.body = "Captain edited body"
+        | .fieldValueByName.name = "Held" else . end]')"
+    planned=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
+    output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+    printf '%s' "$output" | jq -e --argjson mismatch "$mismatch" '
+      (.escalations | length == (if $mismatch then 2 else 1 end))
+      and (.escalations | any(contains("task safe-task-internal-id")
+        and contains("issue is closed")
+        and contains("the fleet says \"Ready\"")))
+      and (.operations | length == 0)
+    ' >/dev/null || fail "a closed issue under a live task must be reported and left alone"
+    [ "$(printf '%s' "$planned" | jq -c '{operations,escalations}')" = \
+      "$(printf '%s' "$output" | jq -c '{operations,escalations}')" ] \
+      || fail "dry-run and real-run must agree on leaving closed issues untouched"
+    assert_not_contains "$(<"$log")" $'ARG\tPATCH' "the sync must never reopen or rewrite a closed board issue"
+    assert_not_contains "$(<"$log")" $'ARG\tPOST' "a closed issue must not trigger a new issue"
+    assert_not_contains "$(<"$log")" 'mutation(' "a closed issue must not trigger any project write"
+  done
+  write_bearings "${bearings}.json" Done
+  planned=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
   output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
   printf '%s' "$output" | jq -e '
-    (.escalations | length == 1)
-    and (.escalations[0] | contains("task safe-task-internal-id")
-      and contains("issue is closed")
-      and contains("the fleet says \"Ready\""))
-    and (.operations | length == 0)
-  ' >/dev/null || fail "a closed issue under a live task must be reported and left alone"
-  assert_not_contains "$(<"$log")" $'ARG\tPATCH' "the sync must never reopen or rewrite a closed board issue"
-  assert_not_contains "$(<"$log")" 'mutation(' "a closed issue must not trigger any project write"
+    ([.operations[].action] | sort) == ["set_column","update_issue"]
+    and (.operations | any(.action == "set_column" and .column == "Done"))
+  ' >/dev/null || fail "Done tasks must still reconcile closed issue fields and columns"
+  [ "$(printf '%s' "$planned" | jq -c '.operations')" = \
+    "$(printf '%s' "$output" | jq -c '.operations')" ] \
+    || fail "Done reconciliation must match its dry-run plan"
+  assert_contains "$(<"$log")" $'ARG\tPATCH' "Done must still update mismatched issue fields"
+  assert_contains "$(<"$log")" 'option=98236657' "Done must still update mismatched card columns"
   TESTS_RUN=$((TESTS_RUN + 1))
-  pass "an issue closed on the board is reported once and never reopened"
+  pass "closed non-Done issues remain untouched while Done reconciliation stays active"
 }
 
 test_excluded_task_is_never_pushed_or_reported() {
