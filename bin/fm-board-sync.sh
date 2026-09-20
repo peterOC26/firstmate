@@ -768,6 +768,29 @@ reconcile() {
     issue_number=$(printf '%s' "$mapping" | jq -er '.issue_number')
     item_id=$(printf '%s' "$mapping" | jq -er '.item_id')
     mapped_repo=$(printf '%s' "$mapping" | jq -er '.repo')
+    if [ "$live" = null ]; then
+      if ! issue=$(gh api "repos/$mapped_repo/issues/$issue_number"); then
+        issue=null
+      fi
+      issue_state=$(printf '%s' "$issue" | jq -er '.state | strings | ascii_upcase' 2>/dev/null) || issue_state=
+    else
+      issue_state=$(printf '%s' "$live" | jq -er '.content.state | strings | ascii_upcase' 2>/dev/null) || issue_state=
+    fi
+    case "$issue_state" in
+      OPEN|CLOSED) ;;
+      *)
+        escalations=$(append_note "$escalations" \
+          "board changed: task $task_id issue state is unavailable, so the task was skipped and left untouched.")
+        continue
+        ;;
+    esac
+    if [ "$issue_state" = CLOSED ] && [ "$column" != Done ]; then
+      if [ "$live" = null ]; then
+        escalations=$(append_note "$escalations" \
+          "board changed: task $task_id issue is closed while the fleet says \"$column\".")
+      fi
+      continue
+    fi
     if [ "$live" != null ]; then
       live_item_id=$(printf '%s' "$live" | jq -r '.id // empty')
       if [ -n "$live_item_id" ] && [ "$live_item_id" != "$item_id" ]; then
@@ -793,13 +816,8 @@ reconcile() {
         '{action:$action,task_id:$task_id}')
       operations=$(append_operation "$operations" "$operation")
       theirs=
-      issue_state=OPEN
     else
       theirs=$(printf '%s' "$live" | jq -r '.fieldValueByName.name // empty')
-      issue_state=$(printf '%s' "$live" | jq -r '(.content.state // "") | ascii_upcase')
-      if [ "$issue_state" = CLOSED ] && [ "$column" != Done ]; then
-        continue
-      fi
       if [ "$(printf '%s' "$live" | jq -r '.content.title // empty')" != "$title" ] ||
         [ "$(printf '%s' "$live" | jq -r '.content.body // empty')" != "$body" ]; then
         if [ "$dry_run" = 0 ]; then

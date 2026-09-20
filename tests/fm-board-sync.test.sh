@@ -86,6 +86,19 @@ if [ "${1:-}" = api ] && [ -n "${GH_REPO_MAPPED:-}" ] && [ "${2:-}" = "repos/$GH
   printf '%s\n' "$mapped_visibility"
   exit 0
 fi
+if [ "${1:-}" = api ]; then
+  case "${2:-}" in
+    repos/*/issues/[0-9]*)
+      case "${GH_ISSUE_STATE:-open}" in
+        unavailable) exit 1 ;;
+        missing) printf '%s\n' '{}' ;;
+        malformed) printf '%s\n' 'not JSON' ;;
+        *) jq -n --arg state "${GH_ISSUE_STATE:-open}" '{state:$state}' ;;
+      esac
+      exit 0
+      ;;
+  esac
+fi
 if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
   case "$*" in
     *'query=query('* )
@@ -1218,6 +1231,55 @@ test_removed_card_is_restored_and_noted() {
   pass "a card removed from the board is noted once and restored at its fleet column"
 }
 
+test_missing_card_checks_issue_state_before_restoration() {
+  local fleet_column observed fixture root home fakebin bearings board log planned output expected
+  for fleet_column in Ready Done; do
+    for observed in closed open unavailable missing malformed unknown; do
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      board="$root/board.json"
+      log="$root/gh.log"
+      write_bearings "${bearings}.json" "$fleet_column"
+      write_state "$home/state/board-sync.json" "$(mapping PVTI_ONE safe-task-internal-id 1 captain/legacy)"
+      write_board "$board" '[]'
+      planned=$(GH_REPO_MAPPED=captain/legacy GH_ISSUE_STATE="$observed" \
+        run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile --dry-run)
+      assert_not_contains "$(<"$log")" 'mutation(' "dry-run must not restore any card"
+      assert_not_contains "$(<"$log")" $'ARG\tPATCH' "dry-run must not change any issue"
+      output=$(GH_REPO_MAPPED=captain/legacy GH_ISSUE_STATE="$observed" \
+        run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+      [ "$(printf '%s' "$planned" | jq -c '{operations,escalations}')" = \
+        "$(printf '%s' "$output" | jq -c '{operations,escalations}')" ] \
+        || fail "missing-card dry-run differs from real-run: $fleet_column / $observed"
+      assert_contains "$(<"$log")" $'ARG\trepos/captain/legacy/issues/1' "issue state must come from the mapped repository"
+      assert_contains "$(<"$log")" $'ARG\trepos/captain/legacy\n' "the mapped repository privacy gate must still run"
+      if [ "$observed" = open ] || { [ "$observed" = closed ] && [ "$fleet_column" = Done ]; }; then
+        expected='["add_item","set_column"]'
+        if [ "$observed" = open ] && [ "$fleet_column" = Done ]; then
+          expected='["add_item","set_column","close_issue"]'
+        fi
+        printf '%s' "$output" | jq -e --argjson expected "$expected" '
+          [.operations[].action] == $expected
+        ' >/dev/null || fail "known issue state lost ordinary restoration: $output"
+        assert_contains "$(<"$log")" 'addProjectV2ItemById' "eligible issue must regain its card"
+      else
+        printf '%s' "$output" | jq -e --arg observed "$observed" '
+          .operations == [] and (.escalations | any(
+            if $observed == "closed" then contains("issue is closed")
+            else contains("issue state is unavailable") end))
+        ' >/dev/null || fail "closed or unknown issue was not left untouched: $output"
+        assert_not_contains "$(<"$log")" 'mutation(' "closed or unknown issue must not regain its card"
+        assert_not_contains "$(<"$log")" $'ARG\tPATCH' "closed or unknown issue must not be rewritten"
+        jq -e '.tasks["safe-task-internal-id"].item_id == "PVTI_ONE"' "$home/state/board-sync.json" >/dev/null \
+          || fail 'skipped restoration changed the task mapping'
+      fi
+      assert_not_contains "$(<"$log")" $'ARG\tPOST' "mapped issues must never be recreated"
+    done
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "missing-card restoration respects closed and unavailable mapped issue states"
+}
+
 test_archived_card_is_noted_and_left_untouched() {
   local fixture root home fakebin bearings board log output woke again
   fixture=$(make_fixture)
@@ -1752,6 +1814,7 @@ test_poll_prints_only_a_deduplicated_pointer
 test_moved_card_is_pushed_back_to_the_fleet_column
 test_cleared_status_is_restored_and_noted
 test_removed_card_is_restored_and_noted
+test_missing_card_checks_issue_state_before_restoration
 test_archived_card_is_noted_and_left_untouched
 test_closed_issue_is_noted_and_never_reopened
 test_excluded_task_is_never_pushed_or_reported
