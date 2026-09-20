@@ -1,0 +1,417 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": ".test-phase-tmp/large-home",
+  "generated": "2026-09-20T13:24:05Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "board_columns": [
+    {
+      "column": "Ready",
+      "empty": "No dispatchable queued work."
+    },
+    {
+      "column": "Held",
+      "empty": "No captain- or time-gated work."
+    },
+    {
+      "column": "Blocked",
+      "empty": "No queued work is waiting on another item."
+    },
+    {
+      "column": "Under way",
+      "empty": "No live workers are under way."
+    },
+    {
+      "column": "Waiting on you",
+      "empty": "Nothing needs your action right now, captain."
+    },
+    {
+      "column": "Done",
+      "empty": "No recent completions are in the current baseline."
+    }
+  ],
+  "board_items": [
+    {
+      "column": "Ready",
+      "id": "bulk-0000",
+      "summary": "Bulk task 0000 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0001",
+      "summary": "Bulk task 0001 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0002",
+      "summary": "Bulk task 0002 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0003",
+      "summary": "Bulk task 0003 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0004",
+      "summary": "Bulk task 0004 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0005",
+      "summary": "Bulk task 0005 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0006",
+      "summary": "Bulk task 0006 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0007",
+      "summary": "Bulk task 0007 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0008",
+      "summary": "Bulk task 0008 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0009",
+      "summary": "Bulk task 0009 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0010",
+      "summary": "Bulk task 0010 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0011",
+      "summary": "Bulk task 0011 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0012",
+      "summary": "Bulk task 0012 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0013",
+      "summary": "Bulk task 0013 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0014",
+      "summary": "Bulk task 0014 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0015",
+      "summary": "Bulk task 0015 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0016",
+      "summary": "Bulk task 0016 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0017",
+      "summary": "Bulk task 0017 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0018",
+      "summary": "Bulk task 0018 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Ready",
+      "id": "bulk-0019",
+      "summary": "Bulk task 0019 volume verification volume verification volum…",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    }
+  ],
+  "in_flight": [],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [],
+  "landed": [],
+  "gates": [
+    {
+      "id": "bulk-0000",
+      "title": "Bulk task 0000 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0001",
+      "title": "Bulk task 0001 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0002",
+      "title": "Bulk task 0002 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0003",
+      "title": "Bulk task 0003 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0004",
+      "title": "Bulk task 0004 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0005",
+      "title": "Bulk task 0005 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0006",
+      "title": "Bulk task 0006 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0007",
+      "title": "Bulk task 0007 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0008",
+      "title": "Bulk task 0008 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0009",
+      "title": "Bulk task 0009 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0010",
+      "title": "Bulk task 0010 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0011",
+      "title": "Bulk task 0011 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0012",
+      "title": "Bulk task 0012 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0013",
+      "title": "Bulk task 0013 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0014",
+      "title": "Bulk task 0014 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0015",
+      "title": "Bulk task 0015 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0016",
+      "title": "Bulk task 0016 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0017",
+      "title": "Bulk task 0017 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0018",
+      "title": "Bulk task 0018 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "bulk-0019",
+      "title": "Bulk task 0019 volume verification volume verification volum…",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "gates showing 20 of 600",
+      "reveal": "--all-queued"
+    },
+    {
+      "surface": "board Ready showing 20 of 600",
+      "reveal": "--all-queued"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

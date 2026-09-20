@@ -1,0 +1,157 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": ".test-phase-tmp/live-home",
+  "generated": "2026-09-20T13:22:03Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "board_columns": [
+    {
+      "column": "Ready",
+      "empty": "No dispatchable queued work."
+    },
+    {
+      "column": "Held",
+      "empty": "No captain- or time-gated work."
+    },
+    {
+      "column": "Blocked",
+      "empty": "No queued work is waiting on another item."
+    },
+    {
+      "column": "Under way",
+      "empty": "No live workers are under way."
+    },
+    {
+      "column": "Waiting on you",
+      "empty": "Nothing needs your action right now, captain."
+    },
+    {
+      "column": "Done",
+      "empty": "No recent completions are in the current baseline."
+    }
+  ],
+  "board_items": [
+    {
+      "column": "Ready",
+      "id": "validation-ready",
+      "summary": "Review integration",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Held",
+      "id": "validation-dated",
+      "summary": "Schedule follow-up",
+      "owner": "(main)",
+      "detail": "until 2099-01-01: Schedule follow-up",
+      "artifact": "-"
+    },
+    {
+      "column": "Blocked",
+      "id": "validation-blocked",
+      "summary": "Wait for integration",
+      "owner": "(main)",
+      "detail": "blocked by validation-ready",
+      "artifact": "-"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "validation-held",
+      "summary": "Choose delivery scope: Choose delivery scope",
+      "owner": "(main)",
+      "detail": "your decision needed",
+      "artifact": "-"
+    }
+  ],
+  "in_flight": [],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [
+    {
+      "id": "validation-held",
+      "key": "validation-held",
+      "verb": "captain-hold",
+      "summary": "Choose delivery scope: Choose delivery scope",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [],
+  "gates": [
+    {
+      "id": "validation-ready",
+      "title": "Review integration",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-09-20"
+    },
+    {
+      "id": "validation-dated",
+      "title": "Schedule follow-up",
+      "blocked_by": "-",
+      "reason": "until 2099-01-01: Schedule follow-up",
+      "owner": "(main)",
+      "filed": "2026-09-20"
+    },
+    {
+      "id": "validation-blocked",
+      "title": "Wait for integration",
+      "blocked_by": "validation-ready",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": "2026-09-20"
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "captain holds bucketed blocked, dated, or aged: 1",
+      "reveal": "--all-decisions"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Command: bin/fm-fleet-snapshot.sh --json; bin/fm-bearings-snapshot.sh --json
+Input: isolated markdown backlog containing 600 queued tasks with long titles
+Fleet JSON bytes: 1231888
+Bearings board columns: 6
+Projected board rows: 20

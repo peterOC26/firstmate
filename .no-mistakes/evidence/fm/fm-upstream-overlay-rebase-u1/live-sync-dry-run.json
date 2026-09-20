@@ -1,0 +1,79 @@
+{
+  "schema": "fm-board-sync-plan.v1",
+  "dry_run": true,
+  "repository": "peterOC26/fleet",
+  "repository_private": true,
+  "project": {
+    "id": "PVT_kwHOD8nN_M4BghOF",
+    "title": "Fleet",
+    "status_field_id": "PVTSSF_lAHOD8nN_M4BghOFzhfggCY",
+    "options": {
+      "Ready": "61e4505c",
+      "Held": "f75ad846",
+      "Blocked": "d6e069c8",
+      "Under way": "47fc9ee4",
+      "Waiting on you": "df73e18b",
+      "Done": "98236657"
+    }
+  },
+  "operations": [
+    {
+      "action": "create_issue",
+      "task_id": "validation-ready",
+      "title": "Review integration",
+      "body": "project: firstmate\nkind: ship",
+      "column": "Ready"
+    },
+    {
+      "action": "add_item",
+      "task_id": "validation-ready",
+      "issue_url": "https://github.com/peterOC26/fleet/issues/(new)"
+    },
+    {
+      "action": "set_column",
+      "task_id": "validation-ready",
+      "column": "Ready",
+      "explanation": "Review integration set to Ready to match fleet state."
+    },
+    {
+      "action": "create_issue",
+      "task_id": "validation-held",
+      "title": "Choose delivery scope",
+      "body": "project: firstmate\nkind: ship",
+      "column": "Waiting on you"
+    },
+    {
+      "action": "add_item",
+      "task_id": "validation-held",
+      "issue_url": "https://github.com/peterOC26/fleet/issues/(new)"
+    },
+    {
+      "action": "set_column",
+      "task_id": "validation-held",
+      "column": "Waiting on you",
+      "explanation": "Choose delivery scope set to Waiting on you to match fleet state."
+    },
+    {
+      "action": "create_issue",
+      "task_id": "validation-dated",
+      "title": "Schedule follow-up",
+      "body": "project: firstmate\nkind: ship",
+      "column": "Waiting on you"
+    },
+    {
+      "action": "add_item",
+      "task_id": "validation-dated",
+      "issue_url": "https://github.com/peterOC26/fleet/issues/(new)"
+    },
+    {
+      "action": "set_column",
+      "task_id": "validation-dated",
+      "column": "Waiting on you",
+      "explanation": "Schedule follow-up set to Waiting on you to match fleet state."
+    }
+  ],
+  "excluded": [
+    "validation-blocked"
+  ],
+  "unmanaged_notes_redacted": 131
+}

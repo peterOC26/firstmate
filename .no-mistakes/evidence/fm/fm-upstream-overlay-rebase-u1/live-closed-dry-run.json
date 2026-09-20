@@ -1,0 +1,46 @@
+{
+  "schema": "fm-board-sync-plan.v1",
+  "dry_run": true,
+  "operations": [
+    {
+      "action": "create_issue",
+      "task_id": "validation-held",
+      "title": "Choose delivery scope",
+      "body": "project: firstmate\nkind: ship",
+      "column": "Waiting on you"
+    },
+    {
+      "action": "add_item",
+      "task_id": "validation-held",
+      "issue_url": "https://github.com/peterOC26/fleet/issues/(new)"
+    },
+    {
+      "action": "set_column",
+      "task_id": "validation-held",
+      "column": "Waiting on you",
+      "explanation": "Choose delivery scope set to Waiting on you to match fleet state."
+    },
+    {
+      "action": "create_issue",
+      "task_id": "validation-dated",
+      "title": "Schedule follow-up",
+      "body": "project: firstmate\nkind: ship",
+      "column": "Waiting on you"
+    },
+    {
+      "action": "add_item",
+      "task_id": "validation-dated",
+      "issue_url": "https://github.com/peterOC26/fleet/issues/(new)"
+    },
+    {
+      "action": "set_column",
+      "task_id": "validation-dated",
+      "column": "Waiting on you",
+      "explanation": "Schedule follow-up set to Waiting on you to match fleet state."
+    }
+  ],
+  "closed_task_notes": [
+    "board changed: task validation-ready card is in \"Done\" while the fleet says \"Ready\".",
+    "board changed: task validation-ready issue is closed while the fleet says \"Ready\"."
+  ]
+}

@@ -1,0 +1,6 @@
+fm-board-sync: missing config/board-exclude: list one excluded task id per line before syncing
+Missing exclusion list exit: 1
+fm-board-sync: invalid config/board-sync.json
+Public repository exit: 1
+fm-board-sync: refusing GitHub writes: kunchenguid/firstmate is public or its visibility is unknown
+Public repository with matching owner exit: 1

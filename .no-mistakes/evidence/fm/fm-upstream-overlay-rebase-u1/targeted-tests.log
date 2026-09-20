@@ -1,0 +1,701 @@
+FM_TEST_BEGIN 2026-09-20T13:21:26Z tests/fm-board-sync.test.sh family=unclassified expected_gate_skip=none
+ok - arm, status, and disarm use the registered custom-check mechanism
+ok - a failed trust binding withdraws the check instead of leaving it unauthenticated
+ok - large fleet and bearings snapshots retain the board plan without exec argument limits
+ok - GitHub writes contain only allowlisted fields and skip excluded tasks
+ok - return catch-up warnings never create or strand mapped task cards
+ok - cached contribution wins duplicate task rows without live PR metadata
+ok - PR enrichment preserves task actionability and enriches ordinary tasks
+ok - real projection and sync retain cached task identity through live discovery
+ok - credential-bearing artifacts never enter GitHub issue bodies
+ok - a missing, empty, unreadable, or redirected exclusion list fails closed before GitHub
+ok - a task without a structured title publishes an opaque placeholder, never runtime detail
+ok - overlapping reconciles fail closed instead of minting duplicate issues
+ok - a live lock owner blocks a second reconcile, a dead owner is reclaimed, and reclaimers serialize
+ok - an interrupted lock publication leaves no ownership claim to wedge later runs
+ok - public or unknown repository visibility refuses every push
+ok - repository privacy is revalidated immediately before mutation
+ok - dry-run is complete but performs no GitHub or local state mutations
+ok - dry-run reports the complete plan for already-mapped tasks without mutating anything
+ok - the dry-run plan and the real run build the same operation list from one code path
+ok - the sync persists only the mapping its one-way push needs
+ok - poll emits a durable, deduplicated pointer instead of a lossy payload
+ok - a card off its fleet column is noted and set back to its own task's column
+ok - a cleared board Status is noted and set back to the fleet column
+ok - a card removed from the board is noted once and restored at its fleet column
+ok - missing-card restoration respects closed and unavailable mapped issue states
+ok - an archived card is reported and never written, unarchived, or deleted
+ok - closed non-Done issues remain untouched while Done reconciliation stays active
+ok - an excluded task gets no card, no write, and no note
+ok - a card the sync does not manage is left untouched and reported as a note
+ok - a hand-filed card stays untouched while its fleet task gets a canonical card
+ok - a manual draft stays untouched while the fleet task gets a canonical card
+ok - a card re-added under a new item id reconciles and rebinds instead of wedging
+ok - issue writes follow the recorded mapping repository, never the reconfigured one
+ok - the privacy gate is revalidated against the mapping's own repository immediately before mutation
+ok - an unreachable mapping repository skips only its own task and the run still completes
+ok - an all-digit GitHub login is sent as a String and still reads the board
+ok - an already-reported board difference stops re-waking the watcher while a new one still wakes it
+ok - a board move landing mid-reconcile is never silently marked already-reported
+ok - an archive arriving mid-reconcile remains pending for the next poll
+ok - an issue close arriving mid-reconcile remains pending for the next poll
+ok - an unmanaged card changed or added mid-reconcile is never silently absorbed
+ok - the poll signature ignores GitHub timestamps, so a bare touch never re-wakes the watcher
+ok - each run reports only the board differences it actually observes
+board-sync tests: 43 passed
+FM_TEST_END 2026-09-20T13:23:22Z tests/fm-board-sync.test.sh exit=0 duration_ms=116092 gate_skip=false
+FM_TEST_BEGIN 2026-09-20T13:23:22Z tests/fm-bearings-snapshot.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - task teardown during metadata capture is omitted without aborting the snapshot
+ok - current state and decision hints share one captured status observation
+ok - reused live state is discarded when task generation changes
+ok - large local snapshot overlaps local reads with byte-identical serial and concurrent projections
+ok - remote ledgers collect concurrently under one budget, reuse aged cache, and cancel wedged collectors
+ok - a missing remote ledger stays explicitly unreadable without remote summary computation
+ok - Domain Alpha structured state overrides a stale parent Phase 7 event
+ok - GNU stat file reads select -c without BSD filesystem-report pollution
+ok - parent activity evidence is bounded and disclosed
+ok - Bearings excludes a status-only child decision
+ok - a structured child captain hold reaches Waiting on you
+ok - missing, invalid, unreadable, malformed, and unavailable-child homes stay explicit unknowns
+ok - oversized ledgers stay strict unknown
+ok - secondmate and per-home child counts are bounded, disclosed, and explicitly expandable
+ok - parent decisions remain untrusted contradiction evidence
+ok - parent evidence reconciliation distinguishes matching holds, blocks, and decisions
+ok - nonprogressing child states are explicit and inconsistent terminal rows invalidate
+ok - registry unavailability and bounded truncation remain explicit
+ok - repeated snapshots keep the same current landed baseline and ignore prior reports
+ok - default output is bounded, local-only, and marks omitted surfaces
+ok - Kanban board columns are complete and projected from the bounded snapshot
+ok - chat and file board renderers emit all six selected icons and preserve empty sentences
+ok - chat render suppresses report paths and local notes while keeping PR URLs
+ok - a real worker failure keeps its needs-a-look cue while validation stops stay calm
+ok - queued work becomes Ready once its blocker lands, and real holds stay Held
+ok - Ready, Held, and Blocked each keep their share of one gate bound
+ok - the main-inventory integrity gate outranks queued work when the gate bound is full
+ok - a secondmate ship held on its own child state stays under Held beside that home's queued work
+ok - a readable home whose child only logged a decision is never boarded as unavailable
+ok - a flood of unavailable homes still leaves each queued column its share
+not ok - open PRs needing the captain did not reach Waiting on you: {
+  "schema": "fm-bearings.v1",
+  "home": "fm-bearings.DQl6r7/pr-columns",
+  "generated": "2026-07-11T18:00:00Z",
+  "prs": "checked (2 repos, 16 open)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 3,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 3,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": false,
+    "proven_clear": false,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "board_columns": [
+    {
+      "column": "Ready",
+      "empty": "No dispatchable queued work."
+    },
+    {
+      "column": "Held",
+      "empty": "No captain- or time-gated work."
+    },
+    {
+      "column": "Blocked",
+      "empty": "No queued work is waiting on another item."
+    },
+    {
+      "column": "Under way",
+      "empty": "No live workers are under way."
+    },
+    {
+      "column": "Waiting on you",
+      "empty": "No decision is recorded; contributions checked 0/3; coverage is incomplete."
+    },
+    {
+      "column": "Done",
+      "empty": "No recent completions are in the current baseline."
+    }
+  ],
+  "board_items": [
+    {
+      "column": "Ready",
+      "id": "dead-gate",
+      "summary": "Old conditional work",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    },
+    {
+      "column": "Held",
+      "id": "mate/mate",
+      "summary": "Decide subscription order",
+      "owner": "mate",
+      "detail": "pick subscribe order",
+      "artifact": "-"
+    },
+    {
+      "column": "Blocked",
+      "id": "live-gate",
+      "summary": "Real queued work",
+      "owner": "(main)",
+      "detail": "blocked by ship-task",
+      "artifact": "-"
+    },
+    {
+      "column": "Under way",
+      "id": "external-wait",
+      "summary": "external-wait: declared external-wait for upstream release",
+      "owner": "(main)",
+      "detail": "paused, waiting on something outside the fleet",
+      "artifact": "-"
+    },
+    {
+      "column": "Under way",
+      "id": "scout-x",
+      "summary": "Investigate the thing: report ready",
+      "owner": "(main)",
+      "detail": "finished, awaiting pickup",
+      "artifact": "-"
+    },
+    {
+      "column": "Under way",
+      "id": "ship-task",
+      "summary": "Ship the thing: harness busy (claude-hook)",
+      "owner": "(main)",
+      "detail": "working now",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/9"
+    },
+    {
+      "column": "Under way",
+      "id": "kunchenguid/firstmate#12",
+      "summary": "kunchenguid/firstmate PR 12: Red CI",
+      "owner": "kunchenguid/firstmate",
+      "detail": "PR open - CI failing",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/12"
+    },
+    {
+      "column": "Under way",
+      "id": "kunchenguid/firstmate#13",
+      "summary": "kunchenguid/firstmate PR 13: Author must act",
+      "owner": "kunchenguid/firstmate",
+      "detail": "PR open - changes requested",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/13"
+    },
+    {
+      "column": "Under way",
+      "id": "kunchenguid/firstmate#14",
+      "summary": "kunchenguid/firstmate PR 14: Approved but no checks reported",
+      "owner": "kunchenguid/firstmate",
+      "detail": "PR open - no checks reported",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/14"
+    },
+    {
+      "column": "Under way",
+      "id": "kunchenguid/firstmate#16",
+      "summary": "kunchenguid/firstmate PR 16: Approved while CI runs",
+      "owner": "kunchenguid/firstmate",
+      "detail": "PR open - checks still running",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/16"
+    },
+    {
+      "column": "Under way",
+      "id": "kunchenguid/firstmate#17",
+      "summary": "kunchenguid/firstmate PR 17: Approved but conflicting",
+      "owner": "kunchenguid/firstmate",
+      "detail": "PR open - needs author update",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/17"
+    },
+    {
+      "column": "Under way",
+      "id": "peterOC26/firstmate#12",
+      "summary": "peterOC26/firstmate PR 12: Red CI",
+      "owner": "peterOC26/firstmate",
+      "detail": "PR open - CI failing",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/12"
+    },
+    {
+      "column": "Under way",
+      "id": "peterOC26/firstmate#13",
+      "summary": "peterOC26/firstmate PR 13: Author must act",
+      "owner": "peterOC26/firstmate",
+      "detail": "PR open - changes requested",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/13"
+    },
+    {
+      "column": "Under way",
+      "id": "peterOC26/firstmate#14",
+      "summary": "peterOC26/firstmate PR 14: Approved but no checks reported",
+      "owner": "peterOC26/firstmate",
+      "detail": "PR open - no checks reported",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/14"
+    },
+    {
+      "column": "Under way",
+      "id": "peterOC26/firstmate#16",
+      "summary": "peterOC26/firstmate PR 16: Approved while CI runs",
+      "owner": "peterOC26/firstmate",
+      "detail": "PR open - checks still running",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/16"
+    },
+    {
+      "column": "Under way",
+      "id": "peterOC26/firstmate#17",
+      "summary": "peterOC26/firstmate PR 17: Approved but conflicting",
+      "owner": "peterOC26/firstmate",
+      "detail": "PR open - needs author update",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/17"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "mate/mate-decision-race",
+      "summary": "Choose subscription order: captain choice pending",
+      "owner": "mate",
+      "detail": "your decision needed",
+      "artifact": "-"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "kunchenguid/firstmate#11",
+      "summary": "kunchenguid/firstmate PR 11: Needs a look",
+      "owner": "kunchenguid/firstmate",
+      "detail": "waiting for your review",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/11"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "kunchenguid/firstmate#15",
+      "summary": "kunchenguid/firstmate PR 15: Green and approved",
+      "owner": "kunchenguid/firstmate",
+      "detail": "ready to merge",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/15"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "kunchenguid/firstmate#18",
+      "summary": "kunchenguid/firstmate PR 18: Green and approved, mergeability unreported",
+      "owner": "kunchenguid/firstmate",
+      "detail": "ready to merge - GitHub has not reported mergeability yet",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/18"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "peterOC26/firstmate#11",
+      "summary": "peterOC26/firstmate PR 11: Needs a look",
+      "owner": "peterOC26/firstmate",
+      "detail": "waiting for your review",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/11"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "peterOC26/firstmate#15",
+      "summary": "peterOC26/firstmate PR 15: Green and approved",
+      "owner": "peterOC26/firstmate",
+      "detail": "ready to merge",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/15"
+    },
+    {
+      "column": "Waiting on you",
+      "id": "peterOC26/firstmate#18",
+      "summary": "peterOC26/firstmate PR 18: Green and approved, mergeability unreported",
+      "owner": "peterOC26/firstmate",
+      "detail": "ready to merge - GitHub has not reported mergeability yet",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/18"
+    },
+    {
+      "column": "Done",
+      "id": "done-a",
+      "summary": "Landed thing",
+      "owner": "(main)",
+      "detail": "recent completion",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/7"
+    },
+    {
+      "column": "Done",
+      "id": "mate-landed",
+      "summary": "Secondmate-managed fix",
+      "owner": "mate",
+      "detail": "recent completion",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/50"
+    }
+  ],
+  "in_flight": [
+    {
+      "id": "external-wait",
+      "kind": "ship",
+      "state": "paused",
+      "repo": "firstmate",
+      "name": "external-wait",
+      "doing": "declared external-wait for upstream release"
+    },
+    {
+      "id": "scout-x",
+      "kind": "scout",
+      "state": "done",
+      "repo": "firstmate",
+      "name": "Investigate the thing",
+      "doing": "report ready"
+    },
+    {
+      "id": "ship-task",
+      "kind": "ship",
+      "state": "working",
+      "repo": "firstmate",
+      "name": "Ship the thing",
+      "doing": "harness busy (claude-hook)"
+    }
+  ],
+  "secondmates": [
+    {
+      "id": "mate",
+      "state": "captain_decision",
+      "doing": "Choose subscription order",
+      "provenance": "structured-home",
+      "freshness": "fresh",
+      "age_seconds": 0,
+      "contradiction": false,
+      "reason": "-"
+    }
+  ],
+  "secondmate_reconcile": [
+    {
+      "id": "mate",
+      "spawn_gen": null,
+      "host": null,
+      "kind": null,
+      "ids": []
+    }
+  ],
+  "decisions_open": [
+    {
+      "id": "mate/mate-decision-race",
+      "key": "mate-decision-race",
+      "verb": "captain-hold",
+      "summary": "Choose subscription order: captain choice pending",
+      "owner": "mate"
+    }
+  ],
+  "landed": [
+    {
+      "id": "done-a",
+      "what": "Landed thing",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/7",
+      "owner": "(main)"
+    },
+    {
+      "id": "mate-landed",
+      "what": "Secondmate-managed fix",
+      "artifact": "https://github.com/kunchenguid/firstmate/pull/50",
+      "owner": "mate"
+    }
+  ],
+  "gates": [
+    {
+      "id": "dead-gate",
+      "title": "Old conditional work",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "mate/mate",
+      "title": "Decide subscription order",
+      "blocked_by": "-",
+      "reason": "pick subscribe order",
+      "owner": "mate"
+    },
+    {
+      "id": "live-gate",
+      "title": "Real queued work",
+      "blocked_by": "ship-task",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [
+    {
+      "id": "scout-x",
+      "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M2ZCPSAH23WA1PHQ7ZA7BX8P/.test-phase-tmp/fm-bearings.DQl6r7/pr-columns/data/scout-x/report.md"
+    }
+  ],
+  "recorded_prs": [
+    {
+      "id": "ship-task",
+      "url": "https://github.com/kunchenguid/firstmate/pull/9"
+    }
+  ],
+  "unhealthy_endpoints": [
+    {
+      "id": "mate",
+      "backend": "tmux",
+      "target": "firstmate:fm-mate",
+      "exists": true,
+      "agent": "dead"
+    }
+  ],
+  "candidate_prs": [
+    {
+      "num": "11",
+      "repo": "kunchenguid/firstmate",
+      "title": "Needs a look",
+      "task": "eleven",
+      "url": "https://github.com/kunchenguid/firstmate/pull/11",
+      "review": "",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "12",
+      "repo": "kunchenguid/firstmate",
+      "title": "Red CI",
+      "task": "twelve",
+      "url": "https://github.com/kunchenguid/firstmate/pull/12",
+      "review": "",
+      "mergeable": "MERGEABLE",
+      "checks": "failing"
+    },
+    {
+      "num": "13",
+      "repo": "kunchenguid/firstmate",
+      "title": "Author must act",
+      "task": "thirteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/13",
+      "review": "CHANGES_REQUESTED",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "14",
+      "repo": "kunchenguid/firstmate",
+      "title": "Approved but no checks reported",
+      "task": "fourteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/14",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "15",
+      "repo": "kunchenguid/firstmate",
+      "title": "Green and approved",
+      "task": "fifteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/15",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "passing"
+    },
+    {
+      "num": "16",
+      "repo": "kunchenguid/firstmate",
+      "title": "Approved while CI runs",
+      "task": "sixteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/16",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "pending"
+    },
+    {
+      "num": "17",
+      "repo": "kunchenguid/firstmate",
+      "title": "Approved but conflicting",
+      "task": "seventeen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/17",
+      "review": "APPROVED",
+      "mergeable": "CONFLICTING",
+      "checks": "passing"
+    },
+    {
+      "num": "18",
+      "repo": "kunchenguid/firstmate",
+      "title": "Green and approved, mergeability unreported",
+      "task": "eighteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/18",
+      "review": "APPROVED",
+      "mergeable": "UNKNOWN",
+      "checks": "passing"
+    },
+    {
+      "num": "11",
+      "repo": "peterOC26/firstmate",
+      "title": "Needs a look",
+      "task": "eleven",
+      "url": "https://github.com/kunchenguid/firstmate/pull/11",
+      "review": "",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "12",
+      "repo": "peterOC26/firstmate",
+      "title": "Red CI",
+      "task": "twelve",
+      "url": "https://github.com/kunchenguid/firstmate/pull/12",
+      "review": "",
+      "mergeable": "MERGEABLE",
+      "checks": "failing"
+    },
+    {
+      "num": "13",
+      "repo": "peterOC26/firstmate",
+      "title": "Author must act",
+      "task": "thirteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/13",
+      "review": "CHANGES_REQUESTED",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "14",
+      "repo": "peterOC26/firstmate",
+      "title": "Approved but no checks reported",
+      "task": "fourteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/14",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "none"
+    },
+    {
+      "num": "15",
+      "repo": "peterOC26/firstmate",
+      "title": "Green and approved",
+      "task": "fifteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/15",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "passing"
+    },
+    {
+      "num": "16",
+      "repo": "peterOC26/firstmate",
+      "title": "Approved while CI runs",
+      "task": "sixteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/16",
+      "review": "APPROVED",
+      "mergeable": "MERGEABLE",
+      "checks": "pending"
+    },
+    {
+      "num": "17",
+      "repo": "peterOC26/firstmate",
+      "title": "Approved but conflicting",
+      "task": "seventeen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/17",
+      "review": "APPROVED",
+      "mergeable": "CONFLICTING",
+      "checks": "passing"
+    },
+    {
+      "num": "18",
+      "repo": "peterOC26/firstmate",
+      "title": "Green and approved, mergeability unreported",
+      "task": "eighteen",
+      "url": "https://github.com/kunchenguid/firstmate/pull/18",
+      "review": "APPROVED",
+      "mergeable": "UNKNOWN",
+      "checks": "passing"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    }
+  ]
+}
+FM_TEST_END 2026-09-20T13:26:00Z tests/fm-bearings-snapshot.test.sh exit=1 duration_ms=158504 gate_skip=false
+FM_TEST_BEGIN 2026-09-20T13:26:00Z tests/fm-fleet-snapshot-view.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - empty fleet snapshot and view use explicit absence markers
+ok - fixture snapshot covers task rows, backlog rows, pointers, stable ordering, and emission-time event age
+ok - home-summary excludes kind=secondmate from unowned_current and terminal_in_flight
+ok - undated captain holds age after a configurable threshold, decided only from structured fields
+ok - captain-hold buckets are total, mutually exclusive, and never decided by prose
+ok - main_inventory discloses orphan/unstructured and clears when inventory is consistent
+ok - backlog normalization preserves strict roles and resolves every blocker compatibly
+ok - snapshot event hints follow reconciled current state
+ok - durable fold keeps an open decision past a later unrelated event
+ok - a live secondmate endpoint preserves unrelated open decisions
+ok - durable captain-held transfer closes the duplicate live status decision
+ok - durable fold clears a decision only on a keyed resolution
+ok - a completed scout's stale decision surfaces as a report pointer, not pending
+ok - a scout still parked at a decision stays pending (terminal clear does not over-fire)
+ok - snapshot includes durable scout reports after teardown
+ok - snapshot parses tasks-axi rows and respects operational overrides
+ok - fleet view renders the snapshot without secondmate peek guidance
+ok - fleet view renders secondmate agent liveness
+FM_TEST_END 2026-09-20T13:26:43Z tests/fm-fleet-snapshot-view.test.sh exit=0 duration_ms=43049 gate_skip=false
+FM_TEST_BEGIN 2026-09-20T13:26:43Z tests/fm-contributions.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+ok - retired tasks retain distinct actionable PRs in JSON and rendered output
+ok - cached contribution merge call reaches Waiting on you
+ok - only required-captain contributions are rows; other actors are counted
+ok - replaced-head verdict is stale and cannot create a captain requirement
+ok - unchecked ownership is disclosed and cannot prove silence
+ok - newest check with no verdict is distinct from passing and pending
+ok - new maintainer comment wakes once and stays pending until acknowledged
+ok - new maintainer review wakes once and stays pending until acknowledged
+ok - new maintainer inline wakes once and stays pending until acknowledged
+ok - ready-for-pr on a filed issue becomes a planning wake
+ok - a fresh open issue remains measured maintainer triage
+ok - an absent check lane remains missing across repeated observations
+ok - mixed freshness retains measured captain work and discloses the gap
+ok - malformed durable evidence cannot prove silence
+ok - a transient ready-for-pr label wakes and its exact acknowledgement survives replay
+ok - recorded judgment keeps its exact head and is stale immediately on a published replacement
+ok - a current forge observation refreshes a verdict after a replacement
+ok - an unavailable current head leaves verdict freshness unknown
+ok - away yolo delivery is fleet work without granting merge authority
+actionable: PR https://github.com/o/r/pull/8 is registered but its ready line did not reach the parent channel (rc=3)
+not ok - cross-home away yolo delivery requiring a merge remained captain work
+ok - retired ownership persists and unsupported forge remains visibly unmeasured
+ok - unsupported forge coverage is disclosed without inventing fleet work
+ok - held unsupported forge coverage remains unmeasured
+ok - shared contribution signal wakes once while retaining both acknowledgements
+ok - watcher keeps observer diagnostics separate from contribution wakes
+not ok - expired child unsupported-forge coverage became fleet work
+ok - watcher surfaces one newly durable contribution signal without re-ringing it
+not ok - measured child coverage did not reach parent
+ok - unreadable pending signals refuse an empty-inbox claim
+ok - budget exhausted mid-observation (exhaust) keeps the prior record and stays silent
+ok - budget exhausted mid-observation (hang) keeps the prior record and stays silent
+ok - a genuine forge failure inside the budget still records the error and wakes
+ok - a URL owned by two tasks is observed once and every owner receives the result
+ok - a merged or closed contribution settles once, is not re-read, and never wakes again
+ok - a late owner inherits a terminal observation without a forge read or wake
+ok - an open PR linked from a done task keeps being observed
+ok - a repeated read failure on an open PR records its error but wakes once per episode
+ok - a late owner does not restart a shared forge failure episode
+not ok - 3 contribution regressions
+FM_TEST_END 2026-09-20T13:27:51Z tests/fm-contributions.test.sh exit=1 duration_ms=67612 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=2 skipped_gate=0 duration_ms=385535
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=3 duration_ms=269165 failed=2
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=116092 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-bearings-snapshot.test.sh duration_ms=158504
+FM_TEST_SLOWEST rank=2 script=tests/fm-board-sync.test.sh duration_ms=116092
+FM_TEST_SLOWEST rank=3 script=tests/fm-contributions.test.sh duration_ms=67612
+FM_TEST_SLOWEST rank=4 script=tests/fm-fleet-snapshot-view.test.sh duration_ms=43049
