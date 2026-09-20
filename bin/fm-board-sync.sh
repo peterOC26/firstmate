@@ -462,7 +462,7 @@ desired_items() {
       and test("^https://github[.]com/[^/@?#[:space:]]+/[^/@?#[:space:]]+/pull/[1-9][0-9]*$");
     ([$root.board_items[]
         | select(.owner == "(main)")
-        | select(.id != "(main-inventory)")
+        | select(.id != "(main-inventory)" and .id != "(return-catchup)")
         | select((.id | contains("#")) | not)]
        | reduce .[] as $item ([];
            if any(.id == $item.id) then . else . + [$item] end)) as $tasks

@@ -523,6 +523,33 @@ test_allowlist_and_exclusions() {
   pass "GitHub writes contain only allowlisted fields and skip excluded tasks"
 }
 
+test_return_catchup_warning_never_creates_a_task_card() {
+  local fixture root home fakebin bearings board log output phase
+  fixture=$(make_fixture)
+  IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+  board="$root/board.json"
+  log="$root/gh.log"
+  write_board "$board" '[]'
+  write_bearings "${bearings}.json" Blocked
+  jq '.board_items += [{column:"Blocked",id:"(return-catchup)",
+    summary:"Return catch-up pending",owner:"(main)",detail:"pending",artifact:"-"}]' \
+    "${bearings}.json" > "$root/catchup.json"
+  mv "$root/catchup.json" "${bearings}.json"
+  for phase in open cleared; do
+    output=$(run_sync "$home" "$fakebin" "$bearings" "$board" "$log" reconcile)
+    printf '%s' "$output" | jq -e '
+      (.operations | length > 0)
+      and (.operations | all(.task_id == "safe-task-internal-id"))
+    ' >/dev/null || fail "catch-up warning became a desired task card: $output"
+    jq -e '.tasks | keys == ["safe-task-internal-id"]' \
+      "$home/state/board-sync.json" >/dev/null \
+      || fail "catch-up warning left a mapped task while $phase"
+    write_bearings "${bearings}.json" Blocked
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "return catch-up warnings never create or strand mapped task cards"
+}
+
 test_credential_bearing_artifact_is_not_published() {
   local fixture root home fakebin bearings board output log credential_url
   fixture=$(make_fixture)
@@ -1517,6 +1544,7 @@ test_arm_status_and_disarm
 test_arm_leaves_no_unauthenticated_check_when_binding_fails
 test_large_snapshots_use_stream_input
 test_allowlist_and_exclusions
+test_return_catchup_warning_never_creates_a_task_card
 test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail

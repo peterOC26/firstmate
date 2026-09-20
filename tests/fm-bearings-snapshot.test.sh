@@ -1136,7 +1136,7 @@ test_board_columns_are_complete_and_classified() {
         and .detail == "stalled, needs a look" and .owner == "(main)"
         and .artifact == "-"))
       and (.board_items | any(.column == "Under way" and .id == "cancelled-task"
-        and .summary == "parked after validation stop"
+        and .summary == "cancelled-task: parked after validation stop"
         and .detail == "parked after validation stop"))
       and (.board_items | any(.column == "Under way" and .id == "external-wait"
         and (.detail | test("walk") | not)
@@ -1266,13 +1266,13 @@ test_real_worker_failure_is_not_dressed_as_a_deliberate_park() {
   json=$(run "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     (.board_items | any(.column == "Under way" and .id == "wrecked-task"
-      and .summary == "worktree gone, work lost"
+      and .summary == "wrecked-task: worktree gone, work lost"
       and .detail == "failed, needs a look"))
       and (.board_items | any(.column == "Under way" and .id == "masquerading-task"
-        and .summary == "the validation run failed and the worktree is gone"
+        and .summary == "masquerading-task: the validation run failed and the worktree is gone"
         and .detail == "failed, needs a look"))
       and (.board_items | any(.column == "Under way" and .id == "parked-task"
-        and .summary == "parked after validation stop"
+        and .summary == "parked-task: parked after validation stop"
         and .detail == "parked after validation stop"))
   ' >/dev/null || fail "a real worker failure was reported as a deliberate park: $json"
   pass "a real worker failure keeps its needs-a-look cue while validation stops stay calm"
@@ -3007,7 +3007,7 @@ EOF
 # board orders Charted Next by the durable filed date, so both facts have to come
 # out of fleet state rather than being invented at render time.
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date() {
-  local home mate fakebin json
+  local home mate fakebin json rendered mode run_status
   home=$(make_home durable-name-filed)
   : > "$home/data/secondmates.md"
   mate="$TMP_ROOT/durable-name-home"
@@ -3040,7 +3040,7 @@ EOF
     "window=firstmate:fm-mate-child" "worktree=$mate/projects/mate-child" "project=sample" \
     "harness=claude" "kind=ship" "mode=no-mistakes"
   record_claude_state "$mate/state" mate-child busy
-  printf 'working: waiting on the pipeline\n' > "$mate/state/mate-child.status"
+  printf 'working: no-mistakes review round 2\n' > "$mate/state/mate-child.status"
 
   fakebin=$(make_fakebin "$home")
   json=$(run "$home" "$fakebin" --json)
@@ -3057,7 +3057,36 @@ EOF
       and (.gates | any(.id == "older-gate" and .filed == "2026-07-01"))
       and (.gates | any(.id == "undated-gate" and .filed == null))
   ' >/dev/null || fail "durable Underway names or gate filed dates are missing: $json"
-  pass "Underway rows carry the durable task name and gates carry their filed date"
+  printf '%s' "$json" | jq -e '
+    (.board_items | any(.id == "main-ship"
+      and .summary == "Rename the fleet board rows: harness busy (claude-hook)"))
+    and (.board_items | any(.id == "named-mate/mate-child"
+      and .summary == "Tighten the ledger contract: harness busy (claude-hook)"))
+  ' >/dev/null || fail "board summaries lost task names or shared progress: $json"
+  for mode in chat file; do
+    rendered=$(run "$home" "$fakebin" --render "$mode")
+    assert_contains "$rendered" 'Rename the fleet board rows: harness busy (claude-hook)' "main board row must identify the task and progress"
+    assert_contains "$rendered" 'Tighten the ledger contract: harness busy (claude-hook)' "child board row must identify the task and progress"
+  done
+  write_run_step_task "$home" main-ship failed
+  for run_status in failed cancelled; do
+    printf '%s\n' "$run_status" > "$home/projects/main-ship-wt/.fm-fake-run"
+    json=$(run "$home" "$fakebin" --json)
+    printf '%s' "$json" | jq -e '
+      (.board_items | any(.id == "main-ship"
+        and .summary == "Rename the fleet board rows: parked after validation stop"
+        and .detail == "parked after validation stop"))
+      and (.board_items | any(.id == "named-mate/mate-child"
+        and .summary == "Tighten the ledger contract: harness busy (claude-hook)"
+        and .detail == "working now"))
+    ' >/dev/null || fail "validation stops lost task identity or honest park wording: $json"
+    for mode in chat file; do
+      rendered=$(run "$home" "$fakebin" --render "$mode")
+      assert_contains "$rendered" 'Rename the fleet board rows: parked after validation stop' "main validation park must identify the task"
+      assert_contains "$rendered" 'Tighten the ledger contract: harness busy (claude-hook)' "active child must retain its own progress"
+    done
+  done
+  pass "Underway board rows retain task names with progress and validation parks"
 }
 
 test_mixed_secondmate_roles_partial_state_and_captain_readiness() {

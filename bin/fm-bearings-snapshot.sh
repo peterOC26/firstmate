@@ -452,7 +452,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       elif $state == "done" then "finished, awaiting pickup"
       else "current state unclear" end;
   def under_way_summary:
-    if validation_park then "parked after validation stop" else .doing end;
+    .name + ": " + (if validation_park then "parked after validation stop" else .doing end);
   def fit($n):
     tostring | gsub("\\s+"; " ")
     | if $n <= 0 then ""
