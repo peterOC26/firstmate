@@ -813,7 +813,7 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       (if $call.owner == "(main)" then ($call.hold // $call.task)
        else ($call.owner + "/" + ($call.hold // $call.task)) end) as $id
       | if any(.board_items[];
-          .column == "Waiting on you" and (.id == $id or .artifact == $call.url)) then
+          .column == "Waiting on you" and .id == $id) then
           .board_items |= map(if .column == "Waiting on you" and .id == $id
                               then .artifact = $call.url else . end)
         else .board_items += [

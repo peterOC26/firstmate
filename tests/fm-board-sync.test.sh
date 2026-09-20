@@ -46,6 +46,10 @@ board_repo=${GH_REPO:-captain/fleet}
     printf 'ARG\t%s\n' "$arg"
   done
 } >> "$GH_LOG"
+if [ "${1:-}" = pr ] && [ "${2:-}" = list ]; then
+  cat "$GH_PR_FIXTURE"
+  exit 0
+fi
 if [ "${1:-}" = api ] && [ "${2:-}" = "repos/$board_repo" ]; then
   visibility=${GH_PRIVATE:-true}
   if [ "${GH_PRIVATE_AFTER_FIRST:-}" = false ]; then
@@ -637,6 +641,79 @@ test_pr_enrichment_preserves_task_actionability() {
   done
   TESTS_RUN=$((TESTS_RUN + 1))
   pass "PR enrichment preserves task actionability and enriches ordinary tasks"
+}
+
+test_live_discovery_preserves_cached_contribution_identity() {
+  local scenario
+  for scenario in absent actionable nonactionable; do
+    (
+      fixture=$(make_fixture)
+      IFS=$'\t' read -r root home fakebin bearings <<< "$fixture"
+      mkdir -p "$home/data/retired" "$home/projects"
+      fm_git_init_commit "$home/projects/other"
+      git -C "$home/projects/other" remote add origin https://github.com/acme/app.git
+      fm_write_meta "$home/state/other.meta" \
+        "window=firstmate:fm-other" "worktree=$home/projects/other" "project=sample" \
+        "harness=claude" "kind=ship" "mode=no-mistakes"
+      fm_fake_exit0 "$fakebin" tmux no-mistakes
+      printf 'working: another task in the same repository\n' > "$home/state/other.status"
+      printf 'other\n' >> "$home/config/board-exclude"
+      cat > "$home/data/backlog.md" <<'EOF'
+## In flight
+- [ ] other - Other worker (repo: sample) (kind: ship)
+
+## Queued
+- [ ] retired - Cached contribution (repo: sample) (kind: ship)
+
+## Done
+EOF
+      now=2026-09-16T08:00:00Z
+      jq -n --arg now "$now" '{schema:"fm-contributions.v1",task:"retired",records:[{
+        url:"https://github.com/acme/app/pull/19",kind:"pr",checked_at:$now,
+        error:null,pending:[],seen:[],verdict:null,
+        observation:{head:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",state:"open",draft:false,
+          mergeable:"mergeable",review_decision:"APPROVED",can_merge:true,
+          checks:[{name:"test",id:1,status:"completed",conclusion:"success",started_at:$now}],
+          reviews:[],events:[]}}]}' > "$home/data/retired/contributions.json"
+      jq -n --arg scenario "$scenario" '
+        if $scenario == "absent" then [] else [{number:19,title:"PRIVATE_DISCOVERED_TITLE",
+          url:"https://github.com/acme/app/pull/19",headRefName:"fm/retired",
+          reviewDecision:"APPROVED",mergeable:"MERGEABLE",statusCheckRollup:[{
+            status:"COMPLETED",conclusion:(if $scenario == "actionable" then "SUCCESS" else "FAILURE" end)
+          }]}] end' > "$root/prs.json"
+      write_board "$root/board.json" '[]'
+      export PATH="$fakebin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT"
+      export FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config"
+      export FM_BEARINGS_NOW="$now" FM_SNAPSHOT_NOW="$now"
+      export GH_LOG="$root/gh.log" GH_PR_FIXTURE="$root/prs.json" BOARD_FIXTURE="$root/board.json"
+      export FM_BOARD_BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh" FM_BOARD_FLEET_SNAPSHOT="$ROOT/bin/fm-fleet-snapshot.sh"
+      projected=$("$FM_BOARD_BEARINGS" --json --include-prs)
+      printf '%s' "$projected" | jq -e --arg scenario "$scenario" '
+        .prs == ("checked (1 repos, " + (if $scenario == "absent" then "0" else "1" end) + " open)")
+        and (.in_flight | any(.id == "other"))
+        and (.in_flight | all(.id != "retired")) and .recorded_prs == []
+        and ([.board_items[] | select(.id == "retired" and .column == "Waiting on you"
+          and .owner == "(main)" and .artifact == "https://github.com/acme/app/pull/19")] | length) == 1
+        and ([.board_items[] | select(.id == "acme/app#19") | .column]
+          == (if $scenario == "absent" then [] elif $scenario == "actionable" then ["Waiting on you"] else ["Under way"] end))
+      ' >/dev/null || fail "discovery lost cached task identity ($scenario): $projected"
+      output=$("$SCRIPT" reconcile)
+      printf '%s' "$output" | jq -e '
+        [.operations[] | select(.action == "create_issue")] as $created
+        | ($created | length) == 1
+          and ($created[0] | .task_id == "retired" and .title == "Cached contribution"
+            and .body == "project: sample\nkind: ship\nPR: https://github.com/acme/app/pull/19")
+          and ([.operations[] | select(.action == "set_column") | .column] == ["Waiting on you"])
+      ' >/dev/null || fail "real projection did not produce the actionable desired card ($scenario): $output"
+      assert_contains "$(<"$GH_LOG")" $'ARG\t--repo' 'discovery must query the other worker repository'
+      assert_contains "$(<"$GH_LOG")" 'option=waiting' 'GitHub card must remain actionable'
+      assert_not_contains "$(<"$GH_LOG")" 'PRIVATE_DISCOVERED_TITLE' 'discovered titles must not be published'
+      jq -e '.tasks | keys == ["retired"]' "$home/state/board-sync.json" >/dev/null \
+        || fail 'discovery created an extra mapped card'
+    )
+  done
+  TESTS_RUN=$((TESTS_RUN + 1))
+  pass "real projection and sync retain cached task identity through live discovery"
 }
 
 test_credential_bearing_artifact_is_not_published() {
@@ -1636,6 +1713,7 @@ test_allowlist_and_exclusions
 test_return_catchup_warning_never_creates_a_task_card
 test_cached_contribution_wins_duplicate_task_rows
 test_pr_enrichment_preserves_task_actionability
+test_live_discovery_preserves_cached_contribution_identity
 test_credential_bearing_artifact_is_not_published
 test_exclusion_file_is_a_hard_gate
 test_untitled_task_never_publishes_runtime_detail
