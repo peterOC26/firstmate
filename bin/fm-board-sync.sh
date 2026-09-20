@@ -13,10 +13,15 @@
 # `reconcile` reads every fleet column from fm-bearings-snapshot.sh and pushes
 # those columns onto real issues in the configured private board repository.  It
 # creates a canonical card for every fleet task the sync owns, restores a card
-# that left the board, keeps that card's allowlisted title and body in step,
+# that left the board subject to the issue-state guards below, keeps that card's
+# allowlisted title and body in step,
 # sets the card's column to its own task's fleet column, and closes the issue
 # once that task reaches Done.  Every applied change is listed under
 # `operations`.
+#
+# Only main-home task rows produce cards; synthetic inventory and return-catchup
+# warnings and repository-owned PR rows do not. Duplicate task rows prefer
+# Waiting on you, and subsequent PR enrichment cannot demote that column.
 #
 # The sync never reads board state back into the fleet.  It never observes,
 # owns, retires, or acts on captain-made board or issue state, never writes
@@ -32,6 +37,11 @@
 # holds a non-Done column, and a card the sync does not manage are reported and
 # then left exactly as they are.  Every run reports what it observes, so a note
 # repeats while its board fact persists and stops once the fact is gone.
+# Before restoring a missing mapped card, reconcile reads the issue state.
+# Closed non-Done issues receive no issue or card mutation, even if their card
+# is missing or its title, body, or column differs from fleet state.
+# An unavailable or unrecognized issue state skips that task with a note in
+# both dry-run and real-run mode; it is never assumed OPEN.
 #
 # Writes always target the board item the run actually resolved, and the
 # resolved item id is persisted as soon as it differs from the recorded one, so

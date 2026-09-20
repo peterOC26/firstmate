@@ -23,7 +23,12 @@
 # This wrapper consumes canonical status decisions plus canonically normalized
 # backlog roles, unresolved blockers, and captain actionability.
 # Contributions project cached coverage and required actors from fm-contributions.sh;
-# only captain rows are exposed, with counts for the other actors and unmeasured homes. It never infers
+# only captain rows are exposed, with counts for the other actors and unmeasured homes.
+# A cached captain contribution enriches a pre-existing Waiting on you hold with
+# its PR artifact while preserving hold wording. Otherwise each contribution
+# keeps a task-owned row, even when live discovery also projects the same PR;
+# distinct newly projected contributions are not collapsed by task id.
+# It never infers
 # decisions from report or visual-review prose or reimplements snapshot semantics.
 # Under way (in_flight) projects every main live worker plus every active child
 # from every readable secondmate ledger, independently of that home's
@@ -250,7 +255,7 @@ command -v jq >/dev/null 2>&1 || { echo "fm-bearings-snapshot: jq not found" >&2
 # away window still refuses here: the correct answer to a bearings request then
 # is to run the return first. Return CATCH-UP is different - the captain is
 # back and asking for the picture, so the catch-up posture is reported as
-# content (a Charted Next gate row) and collection continues. bin/fm-afk-return.sh
+# content (a Blocked warning row) and collection continues. bin/fm-afk-return.sh
 # owns both the gate format and the branch distinction; bearings reproduces
 # neither. Acting on the fleet still waits for its `check`.
 RETURN_CATCHUP=null

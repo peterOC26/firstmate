@@ -42,7 +42,7 @@ Run `bin/fm-board-sync.sh arm` after creating both config files to initialize `s
 `reconcile --dry-run` verifies the configured repository is private and prints the complete issue, project-item, column, and close plan without changing GitHub or local state.
 A normal reconcile refuses all writes unless repository privacy is confirmed at that moment, publishes only canonical credential-free GitHub pull request URLs, mirrors only the columns emitted by `bin/fm-bearings-snapshot.sh`, and never writes fleet state.
 
-The push is everything under `operations`: a canonical Firstmate-managed issue and card for every fleet task the sync owns, a card put back on the board when it is missing, an allowlisted title and body kept in step, the card's column set to its own task's fleet column, and the issue closed once that task reaches Done.
+The push is everything under `operations`: a canonical Firstmate-managed issue and card for every fleet task the sync owns, an eligible missing card restored under the issue-state guards in `bin/fm-board-sync.sh`, an allowlisted title and body kept in step, the card's column set to its own task's fleet column, and the issue closed once that task reaches Done.
 Every fleet task receives its own canonical card, regardless of a manual card's title, repository, or item type, and the sync never adopts an existing issue.
 `state/board-sync.json` therefore holds only the task-to-issue mapping that push needs, and the sync stores no board history, no agreed column, and no record of captain-made state.
 Writes always target the board item the run actually resolved, and the resolved item id is persisted as soon as it differs from the recorded one, so a card removed and re-added by hand cannot wedge later runs against a stale item id.
@@ -53,7 +53,7 @@ A run interrupted between creating an issue and recording its mapping leaves tha
 Board facts that do not match fleet state become one-line informational notes under `escalations`, each a plain `board changed: ...` observation of what that run saw when it read the board.
 A note is a report and never an action: the sync neither owns, retires, nor reconciles board or issue state from one, and it never deletes, archives, or unarchives a card.
 Notes carry no attribution, because a board read cannot establish who made a change.
-An archived card, an issue closed while the fleet holds a non-Done column, and a card the sync does not manage are each reported and then left exactly as they are; a card off its fleet column and a card missing from the board are reported by the same run that pushes them back.
+The script header owns which board differences permit a push and which leave the issue and card untouched, including closed issues and unavailable issue state.
 Every run reports what it observes, so a note repeats while its board fact persists and stops as soon as that fact is gone.
 `poll` performs the same read, derives the same notes, and emits a compact pointer instead of a lossy payload, so the existing watcher can wake firstmate.
 The pointer's signature comes from the note text alone and never from a GitHub timestamp, so a bare touch on a card stays quiet.
@@ -1105,7 +1105,7 @@ FM_SNAPSHOT_CREW_STATE_TIMEOUT=10   # seconds bounding each local per-task curre
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=8   # maximum local tasks whose current-state and endpoint observations are collected concurrently during snapshot composition
 FM_SNAPSHOT_BUDGET=5                # one total seconds budget for all concurrent remote home-ledger reads
 FM_SNAPSHOT_CACHE_DIR=$FM_HOME/state/secondmate-summary-cache   # private parent-side cache of successfully fetched remote home ledgers
-FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=14  # floored elapsed-day threshold at which an undated captain hold (no hold-until; age from its UTC hold-set timestamp, falling back to since for legacy unstamped holds) is projected as a Charted Next gate instead of a live Captain's Call; 0 applies once the computed age is non-negative
+FM_SNAPSHOT_UNDATED_HOLD_AGE_DAYS=14  # floored elapsed-day threshold at which an undated captain hold (no hold-until; age from its UTC hold-set timestamp, falling back to since for legacy unstamped holds) moves out of the live decision bucket (presentation: bin/fm-bearings-snapshot.sh); 0 applies once the computed age is non-negative
 FM_RECONCILE_REQUEST_MAX_BYTES=1048576   # maximum captured Bearings or fleet snapshot accepted for durable reconcile-notify request publication
 FM_HEARTBEAT=600        # base seconds between heartbeat scans; no-change heartbeats are absorbed while idle
 FM_HEARTBEAT_MAX=7200   # heartbeat backoff cap

@@ -182,7 +182,7 @@ Rules that keep the contract unambiguous:
 - Every column ALWAYS renders, even when empty; never omit a column.
 - `board_columns` is the single source of the empty-state wording: render an empty column's `empty` sentence from `board_columns` verbatim, and never restate, paraphrase, or hardcode those sentences here or anywhere else.
 - A column whose `omitted` entry reports a bound shows that disclosure and its `reveal` hint under the column's own lines; a disclosure is part of its column, never a seventh section.
-- Waiting on you includes cached `contributions.captain` rows, deduplicated against a live hold or merge call by the renderer.
+- Waiting on you includes cached `contributions.captain` rows through the projection owned by `bin/fm-bearings-snapshot.sh`.
 - Show other contribution actors only as counts beside checked/known coverage, and disclose nonzero `captain_omitted`, `unmeasured_homes`, stale verdicts, and checks with no verdict.
 - Incomplete contribution coverage changes the column's empty sentence; never replace it with a claim that nothing needs action.
 - Every chat digest and file-mode report is a complete current snapshot, never a delta against a prior report.
@@ -221,7 +221,7 @@ When a maintainer verdict has an identifiable judged commit, record it through t
 Never bind old prose to the head current at capture time merely because no judged head was supplied.
 A STALE verdict describes an earlier version; keep its provenance and reassess the current version before treating its blocker as current.
 Route repairs already within accepted intent to the fleet.
-Carry any unresolved scope or authority choice through `captain-hold-lifecycle` in the owning task, then surface it through the existing Captain's Call.
+Carry any unresolved scope or authority choice through `captain-hold-lifecycle` in the owning task, then surface it through Bearings under the chat-response contract above.
 The classifier does not infer a captain decision from comment prose, and a recorded captain-actor verdict without a live hold asks the fleet to reconcile that missing arbitration.
 A merge-ready classification grants no merge authority and the ordinary exact-PR checks still govern any later approval.
 
