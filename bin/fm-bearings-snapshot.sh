@@ -809,10 +809,11 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       reports: $reports,
       recorded_prs: $recorded_prs
     }
+  | .board_items as $existing_board_items
   | reduce .contributions.captain[]? as $call (.;
       (if $call.owner == "(main)" then ($call.hold // $call.task)
        else ($call.owner + "/" + ($call.hold // $call.task)) end) as $id
-      | if any(.board_items[];
+      | if any($existing_board_items[];
           .column == "Waiting on you" and .id == $id) then
           .board_items |= map(if .column == "Waiting on you" and .id == $id
                               then .artifact = $call.url else . end)
