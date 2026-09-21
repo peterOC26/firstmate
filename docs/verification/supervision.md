@@ -597,6 +597,9 @@ FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=34170
 The regression asserts a durable typed handoff containing the completed artifact, next scout, and existing authority, and its delivery to an automatic MAIN turn across session replacement.
 It also checks that identical waiting prose without a handoff stays routine and that a closed handoff is not replayed.
 It proves the handoff boundary, not a live model's subsequent spawn decision.
+For validation evidence, classify the real outcome-store CLI and the stub-SDK extension checks separately.
+The CLI exercises live executable behavior, while the SDK fixture is regression-only evidence; it cannot support a live-pass verdict for automatic MAIN delivery or subsequent model-driven continuation.
+When a scenario requires live model execution and the isolated environment has no authenticated model, record that scenario as untested with the missing prerequisite rather than pass, and retain the completed CLI results.
 Pi and Pi-signed share this extension and protocol; the protocol suite exercises every supported primary-harness rendering path.
 The other harness protocols do not host this in-process branch; their shared outcome-store startup reader remains covered by the store suite's captain barrier and legacy-row cases.
 No runtime backend lifecycle API participates in continuation storage or routing, so tmux, Herdr, zellij, Orca, and cmux require no lifecycle change for this guarantee.
