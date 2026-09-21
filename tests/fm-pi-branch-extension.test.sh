@@ -924,7 +924,7 @@ EOF
     *) fail "the processing request body lost its self-description or the outcome itself: $body" ;;
   esac
   case "$body" in
-    *"do not re-drain, re-run, or acknowledge the wake."*"call fm_branch_processed with through=3 exactly once."*"never counts as processing."*) ;;
+    *"do not re-drain, re-run, or acknowledge that wake."*"call fm_branch_processed with through=3 exactly once."*"never counts as processing."*) ;;
     *) fail "the processing request body lost the event-ownership boundary or the sequence-bound acknowledgement duty: $body" ;;
   esac
   if ./bin/fm-operational-input.sh kind < "$home/state/delivered-routine-note" >/dev/null 2>&1; then
@@ -1237,6 +1237,70 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "captain outcome recovery must be deterministic across crash, reload, and stale assistant context: $out"
   pass "captain outcomes are exact and exactly once across crash, reload, busy main, compaction, and an unrelated assistant response"
+}
+
+test_completed_stage_hands_continuation_to_main() {
+  local repo home status
+  repo="$TMP_ROOT/continuation-root"
+  home="$TMP_ROOT/continuation-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'JS'
+await eval(`(async () => { ${process.env.DRIVER_PRELUDE}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainTools, outcomeScript, defaultSessionCtx }; })()`);
+const { fire, dispatch, settle, sentToMain, mainTools, outcomeScript, defaultSessionCtx } = globalThis.__t;
+const requests = () => sentToMain.filter((sent) => sent.message.customType === "fm-branch-process");
+await fire("session_start", {}, defaultSessionCtx);
+let finishPrompt;
+globalThis.__fmOnBranchPrompt = () => new Promise((resolve) => { finishPrompt = resolve; });
+const offered = dispatch("signal: completed plan revision");
+if (!offered.accepted) throw new Error("completed-stage wake refused");
+await settle(() => (globalThis.__fmPrompts ?? []).length === 1, "completed-stage branch prompt");
+const report = globalThis.__fmSessions[0].options.customTools.find((tool) => tool.name === "fm_branch_report");
+const summary = "The speech-before-audio plan was rewritten again and is waiting for the next plan look. Live site is untouched.";
+// Counterfactual: identical waiting prose alone cannot grant or trigger action.
+const ordinary = await report.execute("ordinary", { task: "branch-driver", verdict: "routine", summary });
+if (ordinary.isError || requests().length) throw new Error("waiting prose was mechanically promoted");
+const continuation = "Plan revision 4 committed 58a6cb7 closes H4; spawn the opposite-family plan-review round 4 scout as required by the accepted plan-review workflow in the task brief.";
+const invalid = await report.execute("empty-handoff", { task: "branch-driver", verdict: "routine", summary, continuation: "  " });
+if (!invalid.isError) throw new Error("empty handoff accepted");
+const handed = await report.execute("handoff", { task: "branch-driver", verdict: "routine", summary, continuation });
+if (handed.isError) throw new Error(`handoff failed: ${JSON.stringify(handed)}`);
+// Assert the action handoff itself, not just a rendered outcome or cursor:
+// the real append-only store must retain the completed artifact, next spawn,
+// and authority as a typed pending continuation with a concrete sequence.
+const row = JSON.parse(outcomeScript(["unprocessed"]));
+if (row.continuation !== continuation || row.verdict !== "captain" || row.task !== "branch-driver") {
+  throw new Error(`no durable actionable handoff: ${JSON.stringify(row)}`);
+}
+if (requests().length !== 1 || requests()[0].options.triggerTurn !== true ||
+    !requests()[0].message.content.includes(`MAIN continuation handoff: ${continuation}`)) {
+  throw new Error("pending spawn was not handed to an automatic MAIN turn");
+}
+finishPrompt();
+await offered.settlement;
+globalThis.__fmOnBranchPrompt = undefined;
+await fire("session_shutdown", {});
+await fire("session_start", {}, defaultSessionCtx);
+if (JSON.parse(outcomeScript(["unprocessed"])).continuation !== continuation ||
+    !requests().at(-1).message.content.includes(`MAIN continuation handoff: ${continuation}`)) {
+  throw new Error("session replacement lost the actionable continuation");
+}
+// Closing the handoff follows the same existing sequence-bound contract.
+const processed = mainTools.find((tool) => tool.name === "fm_branch_processed");
+const ack = await processed.execute("handoff-complete", { through: row.seq });
+if (ack.isError) throw new Error(`handoff acknowledgement failed: ${JSON.stringify(ack)}`);
+const count = requests().length;
+await fire("agent_start", {});
+await fire("agent_end", {});
+await fire("agent_settled", {});
+if (requests().length !== count || outcomeScript(["unprocessed"]).trim()) throw new Error("closed handoff replayed");
+await fire("session_shutdown", {});
+console.log("ok");
+JS
+  status=$?
+  [ "$status" -eq 0 ] || fail "completed-stage continuation handoff failed: $(cat "$TMP_ROOT/node-output")"
+  pass "completed plan stage durably hands the authorized next scout to MAIN without a human prompt"
 }
 
 test_captain_outcome_processing_turn_is_sequence_keyed_and_re_presented() {
@@ -5313,3 +5377,5 @@ test_delivery_keeps_the_event_loop_live_and_ordered
 test_session_replacement_during_delivery_neither_loses_nor_duplicates
 test_store_failure_during_delivery_neither_loses_nor_duplicates
 test_mark_read_failure_keeps_routine_redelivery_and_captain_deduplication
+
+test_completed_stage_hands_continuation_to_main

@@ -62,6 +62,29 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
 
 # --- append-only outcome store ------------------------------------------------
 
+test_continuation_store_routes_and_validates_handoffs() {
+  local home row out status
+  home="$TMP_ROOT/continuation-store"
+  mkdir -p "$home/state"
+  row=$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task plan --verdict routine \
+    --summary 'Waiting for the next look' --continuation 'Revision 4 committed; spawn round 4 under accepted review plan') \
+    || fail "continuation append failed"
+  [ "$row" = 1 ] || fail "continuation sequence missing"
+  row=$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" unread) || fail "continuation unread failed"
+  printf '%s\n' "$row" | jq -e '.verdict == "captain" and (.continuation | contains("spawn round 4"))' >/dev/null \
+    || fail "store did not persist actionable MAIN handoff"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task fleet --verdict routine \
+    --summary waiting --silent true --continuation 'Spawn next authorized scout' 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "store accepted silent continuation"
+  # Reject corrupt typed handoffs rather than dropping their action on read.
+  printf '%s\n' "$row" | jq -c '.continuation = 42' > "$home/state/branch-outcomes.jsonl"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" unread 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail "store accepted malformed continuation: $out"
+  pass "continuation store forces MAIN routing and rejects silent or malformed handoffs"
+}
+
 test_outcome_store_is_append_only_with_cursor_reads() {
   local home store snapshot seq1 seq2 unread replay out status
   home="$TMP_ROOT/store-home"
@@ -1117,3 +1140,5 @@ test_branch_cannot_force_teardown_or_directly_relaunch
 test_away_record_relocates_main_owned_actions_to_the_branch
 test_away_branch_spawn_requires_queued_dispatchable_work
 test_away_spend_cap_is_rechecked_under_the_task_set_lock
+
+test_continuation_store_routes_and_validates_handoffs

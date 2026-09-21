@@ -122,6 +122,9 @@ A presentation already pending its run boundary is not resent or widened; once t
 The first two presentations of a given sequence set open a turn of their own; after that the request rides the captain's next prompt so an ignored request cannot become an unbounded loop of empty turns, while changed sequence membership and a session replacement each start that budget over.
 Routine outcomes never enter this path and stay turn-free.
 A home upgraded with outcomes already delivered treats those rows as processed once, at the first reconciliation that finds no processed marker, so its history is not re-presented.
+A typed continuation handoff from `fm_branch_report` is stored with the outcome and forces captain routing even if the caller supplies routine; it survives session replacement as part of the same sequence-bound processing request.
+The branch prompt owns when to hand off a completed stage, and the [Pi supervision protocol](supervision-protocols/pi.md) owns MAIN's continuation duty; the store header owns the optional field format.
+This does not interpret waiting prose, launch a worker automatically, grant branch spawn authority, or replay handled history.
 The generated [Pi supervision protocol](supervision-protocols/pi.md) owns event ownership for merged outcomes and main's acknowledgement duty, while deterministic entry delivery owns captain visibility.
 A no-change heartbeat outcome explicitly reported with `task=fleet` and `silent=true` is also delivered silently with no rendered note, while every other `routine` outcome stays rendered with its sailboat prefix.
 The branch prompt's "Verdict: routine or captain" section owns the verdict criteria, including how requested work's finished results and its mere progress updates are classified; unsolicited routine outcomes remain routine sailboat notes, unchanged fleet reviews remain silent, and doubt escalates.
