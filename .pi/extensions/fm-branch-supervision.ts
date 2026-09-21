@@ -197,8 +197,9 @@ const AWAY_POSTURE_TAIL =
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
   "It was not typed by the captain. " +
-  "The outcomes below are already stored durably and already shown to the captain as anchor entries in this transcript; each fleet event is already handled, so do not re-drain, re-run, or acknowledge the wake. " +
+  "The outcomes below are already stored durably and already shown to the captain as anchor entries in this transcript; the originating wake is already handled, so do not re-drain, re-run, or acknowledge that wake. This does not complete a pending workflow continuation. " +
   "Process each outcome now as firstmate: give the captain a visible response where one is due, answer or escalate a decision, act on a blocker or failure, or record that no further action is needed. " +
+  "For a continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. Waiting for firstmate to act is not an external pause. " +
   "When every outcome below is processed, call fm_branch_processed with through={N} exactly once. " +
   "Until that call the outcomes stay open and are presented again; an answer that does not make that call never counts as processing.";
 type MirrorItem = { tag: "captain" | "main"; text: string };
@@ -211,6 +212,7 @@ type OutcomeRow = {
   verdict: Verdict;
   summary: string;
   silent: boolean;
+  continuation?: string;
 };
 type VisibleOutcomeRecord = OutcomeRow & { version: 1 };
 type ProviderRecovery = {
@@ -492,7 +494,11 @@ function parseOutcomeRow(value: unknown): OutcomeRow | null {
   if (row.silent !== undefined && typeof row.silent !== "boolean") return null;
   const silent = row.silent === true;
   if (silent && (row.task !== "fleet" || row.verdict !== "routine")) return null;
-  return { seq: row.seq, task: row.task, verdict: row.verdict, summary: row.summary, silent };
+  if (row.continuation !== undefined && (typeof row.continuation !== "string" || !row.continuation.trim() || row.verdict !== "captain" || silent)) return null;
+  return {
+    seq: row.seq, task: row.task, verdict: row.verdict, summary: row.summary, silent,
+    ...(row.continuation !== undefined ? { continuation: row.continuation as string } : {}),
+  };
 }
 
 function parseVisibleOutcomeRecord(value: unknown): VisibleOutcomeRecord | null {
@@ -506,7 +512,8 @@ function sameOutcome(left: OutcomeRow, right: OutcomeRow): boolean {
     left.task === right.task &&
     left.verdict === right.verdict &&
     left.summary === right.summary &&
-    left.silent === right.silent;
+    left.silent === right.silent &&
+    left.continuation === right.continuation;
 }
 
 // Volatile mirror-collection state. Instance-scoped and cleared at the
@@ -1031,7 +1038,7 @@ export default function (pi: ExtensionAPI) {
   // beats an outcome that is never processed.
   async function processingRequestInput(rows: OutcomeRow[]): Promise<string> {
     const through = rows[rows.length - 1].seq;
-    const listed = rows.map((row) => `[seq ${row.seq}] ${row.task}: ${row.summary}`).join("\n");
+    const listed = rows.map((row) => `[seq ${row.seq}] ${row.task}: ${row.summary}${row.continuation ? `\nMAIN continuation handoff: ${row.continuation}` : ""}`).join("\n");
     const body = `${PROCESSING_INSTRUCTION.replace("{N}", String(through))}\n\n${listed}`;
     try {
       return await encodeFirstmateOperationalInputWith(runCommandAsync, "branch-outcome", body);
@@ -1186,6 +1193,9 @@ export default function (pi: ExtensionAPI) {
           description:
             "One or two sentences in captain outcome language; include the full https:// PR URL when a PR is involved",
         }),
+        continuation: Type.Optional(Type.String({
+          description: "Pending MAIN action: completed stage/artifact, next spawn/steer/handoff, and existing authorization from the brief or accepted plan. Forces captain routing; omit when no MAIN action remains. Never infer authority from waiting prose.",
+        })),
         wake: Type.Optional(Type.String({ description: "The wake reason line this outcome answers" })),
         silent: Type.Optional(Type.Boolean({
           description: "True only when a fleet-wide heartbeat review found literally nothing worth reporting; omit or use false whenever any action was taken or any routine result is worth a note",
@@ -1196,20 +1206,26 @@ export default function (pi: ExtensionAPI) {
         const verdictRaw = String((params as { verdict: unknown }).verdict || "");
         const summary = String((params as { summary: unknown }).summary || "").trim();
         const wake = String((params as { wake?: unknown }).wake ?? "").trim();
+        const continuationRaw = (params as { continuation?: unknown }).continuation;
+        if (continuationRaw !== undefined && (typeof continuationRaw !== "string" || !continuationRaw.trim())) {
+          return { content: [{ type: "text", text: "invalid continuation: a nonempty handoff is required" }], details: undefined, isError: true };
+        }
+        const continuation = typeof continuationRaw === "string" ? continuationRaw.trim() : undefined;
         const silent = (params as { silent?: unknown }).silent === true;
-        if (!task || !summary || (verdictRaw !== "routine" && verdictRaw !== "captain") || (silent && (task !== "fleet" || verdictRaw !== "routine"))) {
+        if (!task || !summary || (verdictRaw !== "routine" && verdictRaw !== "captain") || (silent && (task !== "fleet" || verdictRaw !== "routine" || continuation !== undefined))) {
           return {
             content: [{ type: "text", text: "invalid report: task, verdict (routine|captain), and summary are required" }],
             details: undefined,
             isError: true,
           };
         }
-        const verdict = verdictRaw as Verdict;
+        const verdict: Verdict = continuation ? "captain" : verdictRaw as Verdict;
         const scopeRefusal = wakeScopeRefusal(task);
         if (scopeRefusal) {
           return { content: [{ type: "text", text: scopeRefusal }], details: undefined, isError: true };
         }
         const appendArgs = ["append", "--task", task, "--verdict", verdict, "--summary", summary, "--silent", String(silent)];
+        if (continuation) appendArgs.push("--continuation", continuation);
         if (wake) appendArgs.push("--wake", wake);
         // Ownership, the durable append, and the delivery it authorizes are
         // ONE unit of the delivery queue: store-before-visible-delivery and
@@ -2222,7 +2238,7 @@ ${context.command}
     name: "fm_branch_processed",
     label: "Acknowledge processed supervision outcomes",
     description:
-      "Acknowledge that every captain-facing supervision outcome up to a sequence number has been processed by this conversation. Call it exactly once after handling a supervision processing request, with through set to the highest sequence that request listed; an outcome that is not acknowledged is presented again.",
+      "Acknowledge that every captain-facing supervision outcome up to a sequence number has been processed by this conversation. Call it exactly once after handling a supervision processing request, with through set to the highest sequence that request listed, after performing any authorized continuation or recording its actual blocker/decision/no-action evidence; an outcome that is not acknowledged is presented again.",
     promptSnippet: "Acknowledge processed captain-facing supervision outcomes by sequence.",
     parameters: Type.Object({
       through: Type.Number({ description: "The highest outcome sequence number this conversation has processed" }),

@@ -65,6 +65,11 @@ For anything it tells you to escalate, or any failure that survives the playbook
 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
+A completed stage awaiting firstmate's next authorized action is an active continuation, even if the worker calls it paused or waiting.
+Reconcile the brief, accepted plan, and current task state: perform an authorized action within your role, or set fm_branch_report.continuation to hand MAIN the completed stage/artifact, the next spawn/steer/handoff, and the existing authority for it.
+The tool forces that handoff to verdict captain; an attended branch must use it when continuation needs a new worker because spawning remains MAIN-only.
+Before handing off a repeated wake, check whether that stage already advanced or has an unprocessed handoff in bin/fm-branch-outcome.sh unprocessed; do not request the same continuation again.
+Never derive authorization from arbitrary waiting prose; uncertain authority is a captain decision, and an actual external wait remains routine.
 Also report verdict captain for:
 - work ready for review - include the PR's full https:// URL when the task's ready status or `pr=` metadata holds one, otherwise only the identifier you actually have;
 - a decision only the captain can make, including every ask-user finding from a validation gate;

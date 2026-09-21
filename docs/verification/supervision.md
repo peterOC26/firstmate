@@ -572,3 +572,34 @@ Observed output:
 ```
 
 The safe command-channel contract is covered without a notification by `tests/fm-daemon.test.sh`: the summary reaches both `$1` and stdin, every channel is process-group bounded, and a failed channel falls through.
+
+## Completed-stage continuation handoff
+
+Verified on 2026-09-21 with Node v22.23.2 and Pi 0.85.1 installed; the portable extension fixture uses a stub SDK with the real outcome-store scripts.
+The current routing contract is in [Pi supervision branch](../pi-supervision-branch.md), with MAIN's action duty in the generated [Pi protocol](../supervision-protocols/pi.md).
+
+Commands:
+
+```sh
+bin/fm-test-run.sh tests/fm-pi-branch-extension.test.sh
+bin/fm-test-run.sh tests/fm-branch-supervision.test.sh tests/fm-supervision-instructions.test.sh
+```
+
+Relevant exact output:
+
+```text
+ok - completed plan stage durably hands the authorized next scout to MAIN without a human prompt
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=121314
+ok - continuation store forces MAIN routing and rejects silent or malformed handoffs
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=34170
+```
+
+The regression asserts a durable typed handoff containing the completed artifact, next scout, and existing authority, and its delivery to an automatic MAIN turn across session replacement.
+It also checks that identical waiting prose without a handoff stays routine and that a closed handoff is not replayed.
+It proves the handoff boundary, not a live model's subsequent spawn decision.
+For validation evidence, classify the real outcome-store CLI and the stub-SDK extension checks separately.
+The CLI exercises live executable behavior, while the SDK fixture is regression-only evidence; it cannot support a live-pass verdict for automatic MAIN delivery or subsequent model-driven continuation.
+When a scenario requires live model execution and the isolated environment has no authenticated model, record that scenario as untested with the missing prerequisite rather than pass, and retain the completed CLI results.
+Pi and Pi-signed share this extension and protocol; the protocol suite exercises every supported primary-harness rendering path.
+The other harness protocols do not host this in-process branch; their shared outcome-store startup reader remains covered by the store suite's captain barrier and legacy-row cases.
+No runtime backend lifecycle API participates in continuation storage or routing, so tmux, Herdr, zellij, Orca, and cmux require no lifecycle change for this guarantee.
