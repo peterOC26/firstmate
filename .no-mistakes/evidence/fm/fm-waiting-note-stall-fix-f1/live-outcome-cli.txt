@@ -1,0 +1,50 @@
+$ fm-branch-outcome.sh 'processed-init'
+[exit 0]
+
+$ fm-branch-outcome.sh 'append' '--task' 'external' '--verdict' 'routine' '--summary' 'Waiting for external review'
+1
+[exit 0]
+
+$ fm-branch-outcome.sh 'unprocessed'
+[exit 0]
+
+$ fm-branch-outcome.sh 'append' '--task' 'plan' '--verdict' 'routine' '--summary' 'Waiting for the next look' '--continuation' 'Plan revision 4 complete; spawn next scout under the accepted review plan.'
+2
+[exit 0]
+
+$ fm-branch-outcome.sh 'unread'
+{"seq":1,"epoch":1789983109,"task":"external","wake":"","verdict":"routine","summary":"Waiting for external review","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":2,"epoch":1789983109,"task":"plan","wake":"","verdict":"captain","summary":"Waiting for the next look","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"Plan revision 4 complete; spawn next scout under the accepted review plan."}
+[exit 0]
+
+$ fm-branch-outcome.sh 'mark-read' '--through' '2'
+[exit 0]
+
+$ fm-branch-outcome.sh 'unprocessed'
+{"seq":2,"epoch":1789983109,"task":"plan","wake":"","verdict":"captain","summary":"Waiting for the next look","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"Plan revision 4 complete; spawn next scout under the accepted review plan."}
+[exit 0]
+
+$ fm-branch-outcome.sh 'unprocessed'
+{"seq":2,"epoch":1789983109,"task":"plan","wake":"","verdict":"captain","summary":"Waiting for the next look","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"Plan revision 4 complete; spawn next scout under the accepted review plan."}
+[exit 0]
+
+$ fm-branch-outcome.sh 'append' '--task' 'fleet' '--verdict' 'routine' '--summary' 'hidden' '--silent' 'true' '--continuation' 'launch next'
+error: silent outcomes must be routine fleet outcomes
+[exit 2]
+
+$ fm-branch-outcome.sh 'append' '--task' 'plan' '--verdict' 'routine' '--summary' 'blank' '--continuation' '   '
+usage: fm-branch-outcome.sh append --task <id> --verdict routine|captain --summary <text> [--wake <text>] [--silent true|false] [--continuation <text>] | unread | mark-read --through <seq> | unprocessed | mark-processed --through <seq> | processed-init [--held-lock] | list [--recent <n>] | startup-replay
+[exit 2]
+
+$ fm-branch-outcome.sh 'list'
+{"seq":1,"epoch":1789983109,"task":"external","wake":"","verdict":"routine","summary":"Waiting for external review","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":2,"epoch":1789983109,"task":"plan","wake":"","verdict":"captain","summary":"Waiting for the next look","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"Plan revision 4 complete; spawn next scout under the accepted review plan."}
+[exit 0]
+
+$ fm-branch-outcome.sh 'mark-processed' '--through' '2'
+[exit 0]
+
+$ fm-branch-outcome.sh 'unprocessed'
+[exit 0]
+
+Observed: external waiting stays routine; explicit continuation is captain-routed and retained across independent process reads until acknowledged; invalid/silent handoffs do not append; processed handoff is no longer pending.
