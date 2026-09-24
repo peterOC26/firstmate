@@ -565,6 +565,27 @@ It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact fl
 It spends no model tokens, so it runs by default wherever Codex is installed.
 The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: a crewmate launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
 
+## Grok approval-mode composer
+
+Verified on 2026-09-24 with `grok 1.0.25 (f7e67d6988e2) [stable]`, selecting Grok 4.6, in a named Herdr lab session provisioned and torn down through `bin/fm-herdr-lab.sh`.
+All Herdr calls, including those from the control plane, passed through the helper with the exact lab session; teardown completed its default-session tripwire check.
+Launch and capture commands were `pane run w1:p1 grok --model grok-4.6 --always-approve` and `pane read w1:p1 --ansi`, through the helper's `run` command.
+The captured bottom border contained `Grok 4.6 (high) · always-approve`; its inner width matched the top and content rows at 113 columns.
+The separator now contributes one column to the title geometry proof.
+
+With isolated task metadata, `FM_HOME="$LAB_HOME" FM_CONTROL_POLL=0.2 bin/fm-control.sh lab exit` refused the draft `KEEP UNSENT DRAFT` with:
+
+```text
+error: task lab's composer visibly holds pending text; refusing to type the /exit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+```
+
+The before/after ANSI captures compared byte-for-byte equal using `cmp`.
+After clearing that test draft with `pane send-keys w1:p1 Ctrl+u`, the same control command returned `stopped lab harness=grok backend=herdr` with the original endpoint and worktree fields.
+A subsequent pane capture showed the shell prompt and `Resume this session with:` from Grok, verifying agent exit with the endpoint retained.
+No model prompt was submitted.
+Portable coverage is `bin/fm-test-run.sh tests/fm-composer-lib.test.sh tests/fm-control.test.sh`; the live refresh guard `FM_COMPOSER_MATRIX_LIVE=1 tests/fm-composer-matrix-live-e2e.test.sh` now launches Grok with `--always-approve` to exercise this title.
+The portable matrix checks the real capture across styled, plain, and cursor-bearing backends, preserves pending drafts, and refuses malformed widths.
+
 ## Composer classification matrix
 
 The shared composer classifier (`bin/fm-composer-lib.sh`, `fm_composer_classify_screen`) owns every composer shape fleet-wide; each backend contributes only a capture and a capability descriptor.

@@ -520,6 +520,22 @@ test_matrix_opencode_leftbar_signals() {
   pass "matrix: opencode's left-bar composer reads empty everywhere and scans the full active run"
 }
 
+test_grok_approval_mode_title() {
+  # Grok Build 1.0.25 / Grok 4.6, real Herdr 120-column capture.
+  local screen typed malformed caps
+  screen=$'  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n  │ ❯                                                                                                               │\n  ╰────────────────────────────────────────────────────────────────────────────── Grok 4.6 (high) · always-approve ─╯'
+  typed=${screen/❯                  /❯ KEEP UNSENT DRAFT}
+  malformed=${screen/always-approve/always-approveX}
+  for caps in "$CAPS_STYLED" "$CAPS_PLAIN" "$CAPS_STYLED_NOID"; do
+    assert_screen "grok approval title empty" empty "$caps" "$screen"
+    assert_screen "grok approval title draft" pending "$caps" "$typed"
+    assert_screen "grok approval title bad geometry" unknown "$caps" "$malformed"
+  done
+  assert_screen "grok approval title tmux" empty "$CAPS_TMUX" "$screen" 1
+  assert_screen "grok approval title tmux draft" pending "$CAPS_TMUX" "$typed" 1
+  pass "grok approval separator retains exact geometry and unsent text"
+}
+
 test_matrix_grok_titled_bottom_border() {
   # Grok 1.0.5 widened its titled BOTTOM border three columns past the top and
   # content rows. This is the idle capture from issue #3436; Herdr has no
@@ -791,6 +807,7 @@ test_matrix_omp_status_row_bounds_bare_composer
 test_matrix_codex_idle_starfield_furniture
 test_matrix_pi_separated_needs_identity
 test_matrix_opencode_leftbar_signals
+test_grok_approval_mode_title
 test_matrix_grok_titled_bottom_border
 test_matrix_kimi_bordered_shell_glyph_box
 test_matrix_claude_inside_zellij_ansi_dump

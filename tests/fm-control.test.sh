@@ -887,6 +887,28 @@ test_fm_send_still_marks_the_same_secondmate_task() {
   pass "fm-control's arrival leaves fm-send's from-firstmate marking untouched"
 }
 
+test_grok_approval_title_exit_preserves_drafts() {
+  local dir out rc screen
+  screen=$'  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n  │ ❯                                                                                                               │\n  ╰────────────────────────────────────────────────────────────────────────────── Grok 4.6 (high) · always-approve ─╯'
+  dir=$(new_case grok-approval-title)
+  add_task "$dir" t1 grok
+  alive_as "$dir" grok
+  printf '%s\n' "${screen/❯                  /❯ KEEP UNSENT DRAFT}" > "$dir/fake/pane"
+  out=$(run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "Grok exit must preserve a draft"$'\n'"$out"
+  assert_contains "$out" "visibly holds pending text" "Grok draft must be recognized"
+  [ -z "$(literals "$dir")" ] || fail "Grok draft must not receive exit text"
+  [ -z "$(keys_sent "$dir")" ] || fail "Grok draft must not receive keys"
+  [ "$(cat "$dir/fake/command")" = grok ] || fail "Grok draft owner must remain alive"
+  printf '%s\n' "$screen" > "$dir/fake/pane"
+  out=$(run_control "$dir" t1 exit); rc=$?
+  expect_code 0 "$rc" "Empty Grok approval-mode composer must exit"$'\n'"$out"
+  [ "$(literals "$dir")" = /exit ] || fail "Grok must receive only /exit"
+  assert_contains "$out" "stopped t1 harness=grok" "Grok stop must be verified"
+  pass "fm-control: Grok approval-mode title permits empty exit and preserves drafts"
+}
+
+test_grok_approval_title_exit_preserves_drafts
 test_exit_types_each_harness_verified_command
 test_interrupt_sends_each_harness_verified_key
 test_opencode_interrupts_twice_and_others_once
