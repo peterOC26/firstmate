@@ -1,0 +1,7 @@
+empty: bash bin/fm-fleet-snapshot.sh --contribution-input; exit=0; stdout_bytes=207; stderr=''
+small: bash bin/fm-fleet-snapshot.sh --contribution-input; exit=0; stdout_bytes=2594; stderr=''
+before-small: bash bin/.snapshot-before-live.sh --contribution-input; exit=0; stdout_bytes=2594; stderr=''
+before-large: bash bin/.snapshot-before-live.sh --contribution-input; exit=0; stdout_bytes=0; stderr='/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3AW9WA03WFB8Z3P57KX132C/bin/.snapshot-before-live.sh: line 1986: /usr/bin/jq: Argument list too long'
+large: bash bin/fm-fleet-snapshot.sh --contribution-input; exit=0; stdout_bytes=550870; stderr=''
+Large snapshot: backlog JSON 357111 bytes (>131072); all 500 ordered records and PR ownership preserved.
+Empty snapshot contract and small snapshot semantic equality with base verified; oversized backlog reproduces base error and succeeds on target.
