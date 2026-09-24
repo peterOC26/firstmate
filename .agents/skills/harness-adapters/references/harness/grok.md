@@ -37,6 +37,10 @@ For unavoidable non-project launch, `[hints] project_picker_disabled = true` in 
 
 ## Composer
 
+Grok Build 1.0.25 includes `· always-approve` in its model-titled bottom border.
+The shared classifier counts that separator as one display column while retaining the exact box-width check, so an empty composer permits `/exit` and an unsent draft still refuses lifecycle text.
+Current live evidence and the refresh guard are in `../../../docs/verification/runtime-backends.md` under "Grok approval-mode composer".
+
 Fresh placeholder `Type a message...` uses dark 24-bit TRUECOLOR, not SGR-2.
 `fm_composer_strip_ghost` in `../../../bin/fm-composer-lib.sh` drops dim or faint and truecolor below `FM_COMPOSER_GHOST_LUMA_MAX`, default 128.
 On Grok 0.2.93, real input `38;2;224;222;244` measured about 225 luminance, while borders and placeholder ranged from `38;2;50;47;70` through `38;2;110;106;134`, about 51-110, and were dropped.
