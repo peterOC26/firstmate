@@ -3862,6 +3862,29 @@ test_a_remote_home_without_any_ledger_is_explicitly_unreadable_without_remote_co
   pass "a missing remote ledger stays explicitly unreadable without remote summary computation"
 }
 
+test_contribution_input_with_large_backlog() {
+  local home out
+  home=$(make_home contribution-large-backlog)
+  {
+    printf '## Queued\n'
+    awk 'BEGIN { for (i = 1; i <= 500; i++) printf "- [ ] queued-%d - Queued contribution %d (repo: sample) (kind: ship)\n", i, i }'
+  } > "$home/data/backlog.md"
+  fm_write_meta "$home/state/contribution.meta" "kind=ship"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input) \
+    || fail 'contribution input failed with a backlog exceeding the exec argument limit'
+  printf '%s\n' "$out" | jq -e --arg path "$home/data/backlog.md" '
+    keys == ["backlog", "tasks"]
+    and (.backlog | tojson | length) > 131072
+    and .backlog.path == $path and .backlog.present == true
+    and (.backlog.records | length) == 500
+    and [.backlog.records[].id] == [range(1;501) | "queued-\(.)"]
+    and all(.backlog.records[]; .state == "queued" and .kind == "ship")
+    and .tasks == [{id:"contribution",kind:"ship",pr:{url:"",head:""},merge_authority:"attended"}]
+  ' >/dev/null || fail 'large contribution input lost backlog records or changed the ownership pair shape'
+  pass 'contribution input preserves backlog larger than 128 KiB and task ownership'
+}
+
+test_contribution_input_with_large_backlog
 test_task_teardown_during_metadata_capture_does_not_abort_snapshot
 test_current_state_uses_captured_status_observation
 test_relaunched_task_does_not_inherit_reused_endpoint_state
