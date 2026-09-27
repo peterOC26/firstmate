@@ -1,0 +1,4 @@
+Named lab: fm-lab-upstream-sync-3730658-25750
+{"running":true,"compatible":true,"protocol":22}
+{"type":"workspace_created","workspace":"fm-sync-probe","pane":"w2:p1"}
+["firstmate","fm-sync-probe"]

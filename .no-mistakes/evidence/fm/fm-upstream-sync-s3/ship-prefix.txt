@@ -1,0 +1,2 @@
+Registered upstream ship branch prefix: fix/
+Legacy ship branch prefix: fm/

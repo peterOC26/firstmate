@@ -1,0 +1,16 @@
+Pi prompt emitted by bin/fm-branch-prompt.sh:
+Reconcile the brief, accepted plan, and current task state: perform an authorized action within your role, or set fm_branch_report.continuation to hand MAIN the completed stage/artifact, the next spawn/steer/handoff, and the existing authority for it.
+Supervision host prompt emitted by bin/fm-branch-prompt.sh --supervision-host:
+There, also report verdict captain for anything MAIN must act on to move the work forward, such as a local-only branch ready to land, a pull request ready to merge, or a step MAIN said it would take once the work was ready, even when the captain asked not to hear about that work; MAIN, not you, decides what the captain hears.
+Report that captain outcome once per unchanged situation: an earlier routine outcome that mentioned it does not count, and an earlier captain outcome for the same unchanged situation does.
+Host continuation mention count:
+0
+Unsupported host report flag:
+Usage:
+  fm-branch-report.sh --task <id|fleet> --verdict routine|captain \
+      --summary <text> [--silent true|false] [--wake <text>]
+
+The verdict criteria are owned by bin/fm-branch-prompt.sh ("Verdict: routine
+or captain"); --silent true is legal only for a routine fleet outcome.
+--wake defaults to the wake reason the host recorded for the turn.
+exit=2

@@ -1,0 +1,6 @@
+Committed object body:
+fix: keep the typed message clean
+
+Co-authored-by: Jane Doe <jane@example.com>
+
+Author: Captain Test <captain@example.invalid>

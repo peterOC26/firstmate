@@ -1,0 +1,9 @@
+First invocation:
+created: AGENTS.md and CLAUDE.md @AGENTS.md pointer in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3GAP0X9W1KV7VFACBJN83MX/.test-agents-xqs2k_mr
+Second invocation:
+unchanged: AGENTS.md with CLAUDE.md @AGENTS.md pointer in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3GAP0X9W1KV7VFACBJN83MX/.test-agents-xqs2k_mr
+Generated CLAUDE.md:
+<!-- Points Claude at AGENTS.md via import; edit AGENTS.md, not this file. -->
+@AGENTS.md
+AGENTS.md governance heading:
+## Maintaining this file
