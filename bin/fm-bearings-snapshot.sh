@@ -114,10 +114,11 @@
 # and must not reach crewmate-facing material, commits, PRs, briefs, or tool inputs.
 #
 # Under way wording must stay honest about live and deliberately parked workers.
-# A failed/cancelled crew state whose source is the run step means the validation
+# A failed crew state whose source is the run step means the validation
 # run stopped, not that the worker died, so it reads as a validation park instead
 # of "failed, needs a look". The run-step source keys that shield, never detail
 # prose, so a genuine worker failure from any other source still reads as one.
+# A cancelled run has no verdict and shows as unclear.
 #
 # Under --include-prs, every discovered open PR reaches exactly one column and
 # none silently vanishes: it boards Waiting on you only when the captain must
@@ -455,14 +456,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       elif .checks == "none" then "PR open - no checks reported"
       else "PR open" end;
   def validation_park:
-    (.state == "failed" or .state == "cancelled") and .source == "run-step";
+    (.state == "failed") and .source == "run-step";
   def under_way_detail:
     .state as $state
     | if $state == "working" then "working now"
       elif $state == "active_child_work" then "child work under way"
       elif $state == "paused" then "paused, waiting on something outside the fleet"
       elif $state == "blocked" then "stalled, needs a look"
-      elif $state == "failed" or $state == "cancelled" then
+      elif $state == "failed" then
         (if validation_park then "parked after validation stop" else "failed, needs a look" end)
       elif $state == "parked" then "parked between steps"
       elif $state == "done" then "finished, awaiting pickup"

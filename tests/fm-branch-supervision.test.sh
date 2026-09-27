@@ -17,7 +17,7 @@ fm_git_identity fmtest fmtest@example.invalid
 # --- byte-stable branch prompt ------------------------------------------------
 
 test_branch_prompt_is_byte_stable_and_above_cache_floor() {
-  local home_a home_b out_a out_b out_c size
+  local home_a home_b out_a out_b out_c host_a host_b size
   home_a="$TMP_ROOT/prompt-home-a"
   home_b="$TMP_ROOT/prompt-home-b"
   mkdir -p "$home_a/state" "$home_b/state"
@@ -35,6 +35,16 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
 
   [ "$out_a" = "$out_b" ] || fail "branch prompt differs across homes/cwd/timezone: prefix stability broken"
   [ "$out_a" = "$out_c" ] || fail "branch prompt differs across runs at different times: prefix stability broken"
+
+  assert_contains "$out_a" "fm_branch_report.continuation" "Pi must retain its structured handoff"
+  host_a=$(FM_HOME="$home_a" TZ=UTC "$ROOT/bin/fm-branch-prompt.sh" --supervision-host) \
+    || fail "host prompt generator failed for home A"
+  host_b=$(cd "$TMP_ROOT" && FM_HOME="$home_b" TZ=Australia/Eucla "$ROOT/bin/fm-branch-prompt.sh" --supervision-host) \
+    || fail "host prompt generator failed for home B"
+  [ "$host_a" = "$host_b" ] || fail "host prompt lost prefix stability"
+  assert_not_contains "$host_a" "continuation" "host must not request unsupported handoffs"
+  assert_contains "$host_a" "also report verdict captain for anything MAIN must act on to move the work forward" "host must retain upstream routing"
+  assert_contains "$host_a" "Report that captain outcome once per unchanged situation" "host must retain upstream deduplication"
 
   # Below the provider's 1024-token caching minimum a branch prompt gets no
   # cache reuse at all (measured in the feasibility evidence), so hold a

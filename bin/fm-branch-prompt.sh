@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # fm-branch-prompt.sh - emit the supervision branch's system prompt
-# (docs/pi-supervision-branch.md; the same bytes run off Pi under the
-# supervision host, docs/supervision-host.md) to stdout.
+# (docs/pi-supervision-branch.md; --supervision-host selects the off-Pi
+# report interface, docs/supervision-host.md) to stdout.
 #
 # PREFIX-STABILITY CONTRACT (this header is the one owner). The branch's
 # provider prompt cache only pays off while the request prefix stays
 # byte-identical, so this generator must be a pure function of this repo's
-# tracked files: fixed rules text plus the verbatim tracked recovery skill.
+# tracked files and the fixed caller-selected report interface: fixed rules
+# text plus the verbatim tracked recovery skill.
 # NO timestamps, NO fleet snapshot, NO per-wake content, NO home-specific
 # paths, NO environment reads. Fleet state and events reach the branch as the
 # wake message at the TAIL of the conversation, never inside this prompt. The
 # same rule extends to the branch session's tool set: each host offers the
-# same tools in the same order on every request. The text stays host-neutral,
-# so one prompt serves the Pi branch and the supervision host; each wake names
-# its host's report surface. Any later
+# same tools in the same order on every request. Each caller selects its fixed
+# prompt variant; each wake names its host's report surface. Any later
 # "helpful" dynamic content added here silently removes most of the cache
 # benefit - see the measured evidence cited in docs/pi-supervision-branch.md.
 #
@@ -22,8 +22,14 @@
 # version". tests/fm-branch-supervision.test.sh holds this to byte-identical
 # output across runs, environments, and fleet states.
 #
-# Usage: fm-branch-prompt.sh   (stdout is the complete system prompt)
+# Usage: fm-branch-prompt.sh [--supervision-host]
+# stdout is the complete system prompt; the default is the Pi branch.
 set -eu
+
+case "$#:${1:-}" in
+  0:|1:--supervision-host) ;;
+  *) echo 'Usage: fm-branch-prompt.sh [--supervision-host]' >&2; exit 2 ;;
+esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_TRACKED_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -73,11 +79,17 @@ Report the cleanup in that event's outcome with the PR's URL.
 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
+PROMPT
+if [ "$#" -eq 0 ]; then
+  cat <<'PROMPT'
 A completed stage awaiting firstmate's next authorized action is an active continuation, even if the worker calls it paused or waiting.
 Reconcile the brief, accepted plan, and current task state: perform an authorized action within your role, or set fm_branch_report.continuation to hand MAIN the completed stage/artifact, the next spawn/steer/handoff, and the existing authority for it.
 The tool forces that handoff to verdict captain; an attended branch must use it when continuation needs a new worker because spawning remains MAIN-only.
 Before handing off a repeated wake, check whether that stage already advanced or has an unprocessed handoff in bin/fm-branch-outcome.sh unprocessed; do not request the same continuation again.
 Never derive authorization from arbitrary waiting prose; uncertain authority is a captain decision, and an actual external wait remains routine.
+PROMPT
+fi
+cat <<'PROMPT'
 Also report verdict captain for:
 - work ready for review - include the PR's full https:// URL when the task's ready status or `pr=` metadata holds one, otherwise only the identifier you actually have;
 - a decision only the captain can make, including every ask-user finding from a validation gate;

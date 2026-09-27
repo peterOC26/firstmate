@@ -474,20 +474,20 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 ### Cleanup of a captain-held row
 
-- Cleanup of a finished task whose own row is the captain call leaves that call open, queued, held, carrying its deliverable, and visible in Bearings' Captain's Call.
+- Cleanup of a finished task whose own row is the captain call leaves that call open, queued, held, carrying its deliverable, and visible in Bearings' decision projection.
   That cleanup leaves no pending record behind.
   The call survives a `--force` cleanup and closes only when `answer` records the captain's words.
   An ordinary finished task in the same home still closes with its report link.
 - An interrupted cleanup leaves the row In flight and untouched with its pending record.
   When the row remains unanswered, the next session start retains it as queued and held with the deliverable recorded.
-  An answer before replay preserves that record's completed report while closing the call, so the next session start retires the satisfied record without losing the delivery from Recently Landed.
+  An answer before replay preserves that record's completed report while closing the call, so the next session start retires the satisfied record without losing the delivery from the landed projection.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
 
 ### Merges, releases, and unreadable holds
 
 - Direct PR and local-only merge entrypoint calls refuse a still-held task before reaching the forge or moving local main.
-- A released pull request passes the guarded PR entrypoint, cleanup records its artifact, and Recently Landed publishes it.
+- A released pull request passes the guarded PR entrypoint, cleanup records its artifact, and the landed projection publishes it.
 - An ordinary release still survives zero-retention cleanup and archives when configured.
 - A ship row whose captain hold cannot be read refuses cleanup before any destructive step and surfaces the read failure.
 - A released call whose decision text is `local main`, closed with no artifact, is not published as a local-only landing.

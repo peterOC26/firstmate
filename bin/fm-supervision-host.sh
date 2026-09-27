@@ -616,7 +616,7 @@ choose_conversation() {
   ENGINE_KEY=$key
   local tmp
   tmp=$(mktemp "$PROMPT_FILE.tmp.XXXXXX") || return 1
-  if ! "$SCRIPT_DIR/fm-branch-prompt.sh" > "$tmp" 2>/dev/null \
+  if ! "$SCRIPT_DIR/fm-branch-prompt.sh" --supervision-host > "$tmp" 2>/dev/null \
     || [ "$(wc -c < "$tmp" | tr -d ' ')" -lt 1024 ]; then
     rm -f "$tmp"
     return 1
