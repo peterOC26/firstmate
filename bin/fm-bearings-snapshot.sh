@@ -114,10 +114,11 @@
 # and must not reach crewmate-facing material, commits, PRs, briefs, or tool inputs.
 #
 # Under way wording must stay honest about live and deliberately parked workers.
-# A failed/cancelled crew state whose source is the run step means the validation
+# A failed crew state whose source is the run step means the validation
 # run stopped, not that the worker died, so it reads as a validation park instead
 # of "failed, needs a look". The run-step source keys that shield, never detail
 # prose, so a genuine worker failure from any other source still reads as one.
+# A cancelled run has no verdict and shows as unclear.
 #
 # Under --include-prs, every discovered open PR reaches exactly one column and
 # none silently vanishes: it boards Waiting on you only when the captain must
@@ -334,6 +335,12 @@ EOF
     for repo in $repos; do PR_REPOS_TOTAL=$((PR_REPOS_TOTAL + 1)); done
     nrepos=0; npr=0; nwarn=0; ncapped=0; rows='[]'
     pr_fetch_limit=$((FM_BEARINGS_PR_LIMIT + 1))
+    # The task side of the mapping rides a temp file, not an argv element: a
+    # fleet snapshot exceeds the ~128KB per-argument exec cap on large fleets,
+    # and an E2BIG there would drop the repo's PR rows into the warning count.
+    tasks_file=$(mktemp "${TMPDIR:-/tmp}/fm-bearings-tasks.XXXXXX") \
+      || { echo "fm-bearings-snapshot: cannot create a temporary tasks file" >&2; exit 1; }
+    printf '%s' "$SNAP" | jq '.tasks // []' > "$tasks_file"
     for repo in $repos; do
       if [ "$ALL_PR_REPOS" != 1 ] && [ "$nrepos" -ge "$FM_BEARINGS_PR_REPOS" ]; then break; fi
       nrepos=$((nrepos + 1))
@@ -341,14 +348,18 @@ EOF
         --json number,title,url,headRefName,reviewDecision,mergeable,statusCheckRollup 2>/dev/null) \
         || { nwarn=$((nwarn + 1)); continue; }
       [ -n "$out" ] || out='[]'
-      repo_result=$(printf '%s' "$out" | jq --arg repo "$repo" --argjson limit "$FM_BEARINGS_PR_LIMIT" '
+      repo_result=$(printf '%s' "$out" | jq --arg repo "$repo" --argjson limit "$FM_BEARINGS_PR_LIMIT" --slurpfile tasks "$tasks_file" '
         def trunc($n): if . == null then null else
           (tostring | gsub("\\s+"; " ") | if (length > $n) then (.[:$n] + "…") else . end) end;
+        ($tasks[0] // []) as $all_tasks
+        | def task_for_branch($ref):
+            ( [ $all_tasks[] | select((.branch // ("fm/" + .id)) == $ref) | .id ] | .[0] )
+            // (if ($ref | startswith("fm/")) then ($ref | ltrimstr("fm/")) else "-" end);
         [ .[] | {
           num:(.number|tostring),
           repo:$repo,
           title:((.title // "-") | trunc(70)),
-          task:(if (.headRefName // "" | startswith("fm/")) then (.headRefName | ltrimstr("fm/")) else "-" end),
+          task:task_for_branch(.headRefName // ""),
           url:(.url // "-"),
           review:(.reviewDecision // "none"),
           mergeable:(.mergeable // "UNKNOWN"),
@@ -366,6 +377,7 @@ EOF
       npr=$((npr + cnt))
       rows=$(jq -n --argjson a "$rows" --argjson b "$repo_rows" '$a + $b')
     done
+    rm -f "$tasks_file"
     PR_REPOS_SHOWN=$nrepos
     PR_ROWS_CAPPED=$ncapped
     PR_ROWS_MIN_TOTAL=$((npr + ncapped))
@@ -444,14 +456,14 @@ MODEL=$(printf '%s' "$SNAP" | jq \
       elif .checks == "none" then "PR open - no checks reported"
       else "PR open" end;
   def validation_park:
-    (.state == "failed" or .state == "cancelled") and .source == "run-step";
+    (.state == "failed") and .source == "run-step";
   def under_way_detail:
     .state as $state
     | if $state == "working" then "working now"
       elif $state == "active_child_work" then "child work under way"
       elif $state == "paused" then "paused, waiting on something outside the fleet"
       elif $state == "blocked" then "stalled, needs a look"
-      elif $state == "failed" or $state == "cancelled" then
+      elif $state == "failed" then
         (if validation_park then "parked after validation stop" else "failed, needs a look" end)
       elif $state == "parked" then "parked between steps"
       elif $state == "done" then "finished, awaiting pickup"

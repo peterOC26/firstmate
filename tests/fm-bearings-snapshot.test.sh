@@ -12,6 +12,9 @@ set -u
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
 # shellcheck disable=SC1091
 . "$ROOT/bin/fm-secondmate-registry-lib.sh"
+# shellcheck source=bin/fm-tasks-axi-lib.sh
+# shellcheck disable=SC1091
+. "$ROOT/bin/fm-tasks-axi-lib.sh"
 
 BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh"
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
@@ -1136,8 +1139,8 @@ test_board_columns_are_complete_and_classified() {
         and .detail == "stalled, needs a look" and .owner == "(main)"
         and .artifact == "-"))
       and (.board_items | any(.column == "Under way" and .id == "cancelled-task"
-        and .summary == "cancelled-task: parked after validation stop"
-        and .detail == "parked after validation stop"))
+        and (.summary | contains("run cancelled: no verdict"))
+        and .detail == "current state unclear"))
       and (.board_items | any(.column == "Under way" and .id == "external-wait"
         and (.detail | test("walk") | not)
         and (.summary | contains("upstream release"))))
@@ -1939,6 +1942,35 @@ test_include_prs_is_the_only_fetch_path() {
   pass "--include-prs is the only path that fetches, and it enriches correctly"
 }
 
+test_include_prs_maps_custom_branch_prefix_to_task() {
+  local home fakebin json
+  home=$(make_home custom-prefix); write_fixture "$home"
+  fm_write_meta "$home/state/ship-task.meta" \
+    "window=firstmate:fm-ship-task" \
+    "worktree=$home/projects/ship-wt" \
+    "project=firstmate" \
+    "harness=claude" \
+    "kind=ship" \
+    "mode=no-mistakes" \
+    "branch=fix/ship-task" \
+    "pr=https://github.com/kunchenguid/firstmate/pull/9"
+  fakebin=$(make_fakebin "$home"); : > "$home/net.log"
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$NET_LOG"
+if [ "${FAKE_GH_FAIL:-0}" = 1 ]; then exit 1; fi
+cat <<'JSON'
+[{"number":9,"title":"Ship the thing","url":"https://github.com/kunchenguid/firstmate/pull/9","headRefName":"fix/ship-task","reviewDecision":"APPROVED","mergeable":"MERGEABLE","statusCheckRollup":[{"conclusion":"SUCCESS","status":"COMPLETED"}]}]
+JSON
+SH
+  chmod +x "$fakebin/gh"
+  json=$(run "$home" "$fakebin" --include-prs --json)
+  printf '%s' "$json" | jq -e '
+    .candidate_prs | any(.[]; .num == "9" and .task == "ship-task")
+  ' >/dev/null || fail "a PR on a custom (non-fm/) branch prefix must still map to its recorded task, not fall to '-': $json"
+  pass "--include-prs maps a custom branch-prefix PR back to its recorded task"
+}
+
 test_partial_github_failure_degrades() {
   local home fakebin json rc
   home=$(make_home partial); write_fixture "$home"
@@ -2144,6 +2176,10 @@ test_landed_accepts_only_kind_owned_delivery_artifacts() {
   local home fakebin json main_backlog report_path report_pr
   local keyword_report shipping_report fleet_json created_kind failures=''
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the landed-selector regression"
+  fm_tasks_axi_compatible || {
+    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    return 0
+  }
   home=$(make_home kind-owned-landed)
   write_fixture "$home"
   fakebin=$(make_fakebin "$home")
@@ -2296,6 +2332,10 @@ EOF
 test_kind_fallback_matches_tasks_axi_word_boundaries() {
   local home fakebin id title kind producer_kind fleet_json json
   [ -n "$TASKS_AXI_BIN" ] || fail "tasks-axi is required for the kind-boundary regression"
+  fm_tasks_axi_compatible || {
+    echo "skip: installed tasks-axi predates ${FM_TASKS_AXI_MIN}, so the real backlog mutations this regression needs are refused"
+    return 0
+  }
   home=$(make_home kind-word-boundaries)
   fakebin=$(make_fakebin "$home")
   : > "$home/net.log"
@@ -3007,7 +3047,7 @@ EOF
 # board orders Charted Next by the durable filed date, so both facts have to come
 # out of fleet state rather than being invented at render time.
 test_underway_and_gate_rows_carry_the_durable_name_and_filed_date() {
-  local home mate fakebin json rendered mode run_status
+  local home mate fakebin json rendered mode run_status expected_summary expected_detail
   home=$(make_home durable-name-filed)
   : > "$home/data/secondmates.md"
   mate="$TMP_ROOT/durable-name-home"
@@ -3071,18 +3111,29 @@ EOF
   write_run_step_task "$home" main-ship failed
   for run_status in failed cancelled; do
     printf '%s\n' "$run_status" > "$home/projects/main-ship-wt/.fm-fake-run"
+    case "$run_status" in
+      failed)
+        expected_summary='Rename the fleet board rows: parked after validation stop'
+        expected_detail='parked after validation stop'
+        ;;
+      cancelled)
+        expected_summary='Rename the fleet board rows: run cancelled: no verdict · run: 01FAKE'
+        expected_detail='current state unclear'
+        ;;
+    esac
     json=$(run "$home" "$fakebin" --json)
-    printf '%s' "$json" | jq -e '
+    printf '%s' "$json" | jq -e --arg summary "$expected_summary" --arg detail "$expected_detail" '
       (.board_items | any(.id == "main-ship"
-        and .summary == "Rename the fleet board rows: parked after validation stop"
-        and .detail == "parked after validation stop"))
+        and .summary == $summary
+        and .detail == $detail))
       and (.board_items | any(.id == "named-mate/mate-child"
         and .summary == "Tighten the ledger contract: harness busy (claude-hook)"
         and .detail == "working now"))
     ' >/dev/null || fail "validation stops lost task identity or honest park wording: $json"
     for mode in chat file; do
       rendered=$(run "$home" "$fakebin" --render "$mode")
-      assert_contains "$rendered" 'Rename the fleet board rows: parked after validation stop' "main validation park must identify the task"
+      assert_contains "$rendered" "$expected_summary" "main validation stop must identify the task"
+      assert_contains "$rendered" "$expected_detail" "main validation stop must retain its canonical classification"
       assert_contains "$rendered" 'Tighten the ledger contract: harness busy (claude-hook)' "active child must retain its own progress"
     done
   done
@@ -3946,6 +3997,7 @@ test_open_decision_surfaces_end_to_end
 test_report_pointers_surface
 test_queued_item_prose_never_hides_it
 test_include_prs_is_the_only_fetch_path
+test_include_prs_maps_custom_branch_prefix_to_task
 test_partial_github_failure_degrades
 test_perl_fallback_bounds_github_call
 test_section_caps_and_expansion_flags
