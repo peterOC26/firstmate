@@ -10,7 +10,7 @@ So the host owns the watcher cycle for the primary and runs the branch as a head
 It is one architecture with Pi's, not a second one.
 These parts are shared with Pi and decide what the branch may do:
 
-- The same branch prompt.
+- The shared branch prompt core, with host-specific report routing.
 - The same row eligibility.
 - The same records.
 - The same guarded scripts.
@@ -84,6 +84,7 @@ The other owners read the file at every arm.
 ### The report surface
 
 `bin/fm-branch-report.sh` appends to the outcome store (`bin/fm-branch-outcome.sh`) plus a per-turn receipt the host requires.
+The host prompt routes a completed stage that needs main's action as a captain outcome; the typed continuation handoff belongs to Pi's `fm_branch_report` tool.
 A row an away turn recorded after the captain returned is also queued for main as a durable check wake.
 An attended turn queues nothing: its captain rows reach main through the host's `branch-outcome` exit and the drain, and its routine rows stay in the store.
 
@@ -149,7 +150,7 @@ On each actionable close the engine takes, the host runs these steps:
 1. It starts and verifies the successor watcher cycle and confirms the handling handoff, so the fleet stays supervised while the engine works.
 2. It computes the branch-claimable rows in the turn's posture and publishes the grant.
 3. It runs one bounded engine turn with the branch prompt and the wake message carrying, attended, the dialog mirror and, away, the record's read-back.
-   The engine drains, handles, reports through `bin/fm-branch-report.sh`, and acknowledges, exactly as the Pi branch does.
+   The engine drains, handles, reports through `bin/fm-branch-report.sh`, and acknowledges using the shared branch workflow.
 4. It releases the branch's leases and grant, whether or not the wake was handled.
 5. It parks on the successor only for a handled wake.
 
