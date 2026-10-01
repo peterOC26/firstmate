@@ -1,0 +1,105 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": "01M3TPYMH3H1WWQPTW9R5NESD6/.fm-board-home.vJn99A",
+  "generated": "2026-10-01T03:35:41Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": true,
+    "proven_clear": true,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "board_columns": [
+    {
+      "column": "Ready",
+      "empty": "No dispatchable queued work."
+    },
+    {
+      "column": "Held",
+      "empty": "No captain- or time-gated work."
+    },
+    {
+      "column": "Blocked",
+      "empty": "No queued work is waiting on another item."
+    },
+    {
+      "column": "Under way",
+      "empty": "No live workers are under way."
+    },
+    {
+      "column": "Waiting on you",
+      "empty": "Nothing needs your action right now, captain."
+    },
+    {
+      "column": "Done",
+      "empty": "No recent completions are in the current baseline."
+    }
+  ],
+  "board_items": [
+    {
+      "column": "Ready",
+      "id": "board-task",
+      "summary": "Keep the fleet board working",
+      "owner": "(main)",
+      "detail": "dispatchable queued",
+      "artifact": "-"
+    }
+  ],
+  "in_flight": [],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [],
+  "landed": [],
+  "gates": [
+    {
+      "id": "board-task",
+      "title": "Keep the fleet board working",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

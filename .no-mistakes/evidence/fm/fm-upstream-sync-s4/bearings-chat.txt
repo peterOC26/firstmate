@@ -1,0 +1,12 @@
+## 🟢 Ready
+- Keep the fleet board working - dispatchable queued
+## ⏸️ Held
+No captain- or time-gated work.
+## 🚧 Blocked
+No queued work is waiting on another item.
+## ⚙️ Under way
+No live workers are under way.
+## ❓ Waiting on you
+Nothing needs your action right now, captain.
+## ✅ Done
+No recent completions are in the current baseline.
