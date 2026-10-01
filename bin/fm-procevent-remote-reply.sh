@@ -639,7 +639,7 @@ EOF
 }
 
 cmd_handle_locked() {
-  local id=${1:-} seq=${2:-} result=${3:-} sid class rc=0 to
+  local id=${1:-} seq=${2:-} result=${3:-} sid class rc=0 to handled
   validate_id "$id"
   case "$seq" in ''|*[!0-9]*) die "sequence must be a nonnegative integer" ;; esac
   sid=$(source_id "$id")
@@ -652,6 +652,11 @@ cmd_handle_locked() {
     cmd_ingest "$id" "$result" "$seq" || rc=$?
   fi
   if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+    return "$rc"
+  fi
+  handled="$STATE/procevent-inbox/$sid.$seq.handled"
+  if [ -f "$handled" ] && [ ! -L "$handled" ]; then
+    "$SCRIPT_DIR/fm-procevent.sh" handled "$sid" "$seq" || return 1
     return "$rc"
   fi
   if [ "$class" = delta ]; then
