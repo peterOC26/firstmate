@@ -189,7 +189,7 @@ const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
   "It was not typed by the captain. " +
-  "The outcomes below are stored durably, and each was recorded earlier, possibly before a restart or a switch of primary, so the captain may already have seen it and it may already have been handled; each fleet event is already handled, so do not re-drain, re-run, or acknowledge the wake. " +
+  "The outcomes below are stored durably, and each was recorded earlier, possibly before a restart or a switch of primary, so the captain may already have seen it and it may already have been handled; the originating wake is already handled, so do not re-drain, re-run, or acknowledge that wake. This does not complete a pending workflow continuation. " +
   "Each outcome says what was true when it was recorded and how long ago, so check the task's current state first. " +
   "An abbreviated line is incomplete: read the full outcome before acting on, relaying, or acknowledging it, using that line's lookup --seqs command. " +
   "First sort the outcomes by that current state into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished. " +
