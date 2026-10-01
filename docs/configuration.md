@@ -335,7 +335,7 @@ Both choices are local to each Firstmate home and are not part of secondmate inh
 
 ## Supervision host (config/supervision-host)
 
-Two optional local, gitignored files control the supervision host for this home: `config/supervision-host-off` opts the home out, and `config/supervision-host` opts a home in and selects its engine.
+Two optional local, gitignored files control the supervision host for this home: `config/supervision-host-off` opts the home out, and `config/supervision-host` selects its engine and enables it on supported non-Claude, non-Pi primaries.
 The host runs the supervision branch's contract on a headless engine session beside a non-Pi primary.
 [docs/supervision-host.md](supervision-host.md) defines its design, current scope, and verified engines.
 A Claude, Cursor, OpenCode, omp, Grok, or Codex primary can run the host.
