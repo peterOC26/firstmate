@@ -757,7 +757,7 @@ Cursor is deliberately outside this cursor-anchored empty-composer matrix becaus
 ### 2026-09-20 claude 2.1.236 statusLine footer through Herdr
 
 Verified on 2026-09-20 on macOS arm64 (Darwin 25.6.0) against Claude Code 2.1.236 running as Firstmate workers in Herdr 0.8.0 panes, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`, `rows=20`).
-Claude 2.x draws its composer as a bare `❯` + U+00A0 row between two solid `─` rules, and this home's configured statusLine plus Claude's permission-mode hint render on the two rows directly below the closing rule.
+In these observed panes, Claude drew its composer as a bare `❯` + U+00A0 row between two solid `─` rules, and this home's configured statusLine plus Claude's permission-mode hint rendered on the two rows directly below the closing rule.
 The statusLine's first glyph is `→` (U+2192), which is Cursor's own prompt glyph, so the cursorless "bottom-most shape wins" rule selected the statusLine as a bare composer at `kind=bare first=18 last=19` within the 20-row tail, read the statusLine and the hint row as wrapped typed input, and answered `pending` on a composer holding nothing.
 `fm_task_inbox_ring` (`bin/fm-task-inbox-lib.sh`) defers on exactly that verdict, and `bin/fm-watch.sh`'s re-ring calls the same function, so both the first doorbell and every retry were skipped and the worker never saw the steer.
 
