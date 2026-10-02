@@ -1,0 +1,19 @@
+task:
+  id: sample-call
+  title: Route decision
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "Choose route (north) at 100%\nSecond line: keep %28 literal"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-10-03
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-02T22:42:40Z"
+

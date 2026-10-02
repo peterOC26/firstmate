@@ -1,0 +1,34 @@
+call-a
+
+FIRSTMATE BACKLOG READ
+task:
+  id: call-a
+  title: Captain choice
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "Choose (blue)\nor green 50%"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-10-03
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-02T22:09:52Z\nCaptain hold origin: origin-a\n\nOrigin: origin-a"
+
+ORIGIN INVENTORY
+complete: origin-a captain-call inventory reviewed (call-a)
+verified: origin-a captain-call inventory
+
+ADVERSARIAL OTHER ORIGIN
+fm-captain-hold: captain-held task call-a was held for origin origin-a, not origin-b; hold a task for origin-b or list the right one
+wrong origin refused
+
+ADVERSARIAL SELF INVENTORY
+origin-b
+fm-captain-hold: origin origin-b cannot be its own captain-call inventory entry; hold a separate captain task for the call and list that task
+self inventory refused

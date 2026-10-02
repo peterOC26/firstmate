@@ -1,0 +1,11 @@
+Missing captain-call inventory entry:
+fm-captain-hold: no captain-held task sample-missing and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3ZABSMH0VW9BGYCDXKG2F0Q/.fm-lab-inventory.T84XPa/data); the nearest legacy identity sample-origin-decision-sample-missing also resolves to nothing
+task:
+  id: sample-origin
+  title: Origin task
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"

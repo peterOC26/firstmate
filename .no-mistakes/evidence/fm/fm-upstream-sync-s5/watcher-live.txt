@@ -1,0 +1,4 @@
+watcher: started pid=1057613 (beacon fresh)
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3ZABSMH0VW9BGYCDXKG2F0Q/.fm-lab-watch.Q167QK/state/demo.status
+1790981146	1	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3ZABSMH0VW9BGYCDXKG2F0Q/.fm-lab-watch.Q167QK/state/demo.status
+1790981146	2	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M3ZABSMH0VW9BGYCDXKG2F0Q/.fm-lab-watch.Q167QK/state/demo.status

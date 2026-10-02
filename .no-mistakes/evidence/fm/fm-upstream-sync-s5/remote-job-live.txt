@@ -1,0 +1,7 @@
+remote job exit=0
+count: 1
+tasks[1]{id,state,kind,repo,title}:
+  sample-job,queued,ship,sample,Remote task
+help[2]:
+  - Run `tasks-axi show <id>` for full notes on a task
+  - Run `tasks-axi ready` to see unblocked queued work
