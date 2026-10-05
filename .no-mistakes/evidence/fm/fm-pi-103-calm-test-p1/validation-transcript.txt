@@ -1,0 +1,87 @@
+=== pi-0992-before.log ===
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+
+
+=== pi-103-before.log ===
+not ok - Pi calm renderer and lifecycle contract failed: file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-calm-pi-extension.b8yj7m/renderer/[eval1]:547
+      throw new Error(`${name} disappeared from ${command} HTML while calm mode was on`);
+            ^
+
+Error: grep disappeared from /export calm.html HTML while calm mode was on
+    at assertStockHtmlRendering (file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-calm-pi-extension.b8yj7m/renderer/[eval1]:547:13)
+    at file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-calm-pi-extension.b8yj7m/renderer/[eval1]:554:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+Node.js v22.23.2
+
+
+=== pi-0992-calm.log ===
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+
+
+=== pi-103-calm.log ===
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+
+
+=== pi-0992-branch.log ===
+ok - fm_branch_outcomes hides through ToolExecutionComponent while Calm-off and HTML export stay stock
+
+
+=== pi-103-branch.log ===
+ok - fm_branch_outcomes hides through ToolExecutionComponent while Calm-off and HTML export stay stock
+
+
+=== pi-103-branch-mutation-before.log ===
+ok - fm_branch_outcomes hides through ToolExecutionComponent while Calm-off and HTML export stay stock
+
+
+=== pi-103-branch-mutation-after.log ===
+not ok - Pi outcomes rendering consumers must preserve stock behavior: file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-pi-branch-extension.0EYrNT/stock-render-consumers/[eval1]:130
+  throw new Error("stock export rendering did not delegate to Pi's structured fallback");
+        ^
+
+Error: stock export rendering did not delegate to Pi's structured fallback
+    at file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-pi-branch-extension.0EYrNT/stock-render-consumers/[eval1]:130:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+Node.js v22.23.2: expected exit 0, got 1
+
+
+=== pi-0992-branch-live.log ===
+Pi 0992: stock branch outputs visible; Calm hides; non-submit Enter neither exports nor reveals; Alt+S exports persisted outcomes with stock HTML fallback; Calm hiding restores; toggle off reveals outcomes.
+
+
+=== pi-103-branch-live.log ===
+Pi 103: stock branch outputs visible; Calm hides; non-submit Enter neither exports nor reveals; Alt+S exports persisted outcomes with stock HTML fallback; Calm hiding restores; toggle off reveals outcomes.
+
+
+=== pi-0992-queue-retention.log ===
+FM_TEST_BEGIN 2026-10-05T10:18:25Z tests/fm-calm-pi-queue-retention-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - Pi 0.99.2 exposes every queue-retention member Calm preflights before hiding queued Firstmate rows
+FM_TEST_END 2026-10-05T10:18:27Z tests/fm-calm-pi-queue-retention-live-e2e.test.sh exit=0 duration_ms=2292 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=2407
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=2292 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-calm-pi-queue-retention-live-e2e.test.sh duration_ms=2292
+
+
+=== pi-103-queue-retention.log ===
+FM_TEST_BEGIN 2026-10-05T10:16:03Z tests/fm-calm-pi-queue-retention-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+ok - Pi 1.0.3 exposes every queue-retention member Calm preflights before hiding queued Firstmate rows
+FM_TEST_END 2026-10-05T10:16:05Z tests/fm-calm-pi-queue-retention-live-e2e.test.sh exit=0 duration_ms=1696 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=1790
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=1696 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-calm-pi-queue-retention-live-e2e.test.sh duration_ms=1696
+
+
+=== pi-0992-screenshot.log ===
+{"html":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/pi-0992/calm-export.html","screenshot":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/pi-0992-calm.png","visible":{"marker":"CALM_EXPORT_GREP","text":"sample.txt:1:CALM_EXPORT_GREP","tools":["grep","find"]}}
+
+
+=== pi-103-screenshot.log ===
+{"html":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/pi-103/calm-export.html","screenshot":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/pi-103-calm.png","visible":{"marker":"CALM_EXPORT_GREP","text":"sample.txt:1:CALM_EXPORT_GREP","tools":["grep","find"]}}
+
+
+=== pi-103-branch-screenshot.log ===
+{"html":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/branch-103/export.html","screenshot":"/home/zabi/.no-mistakes/evidence/01M45RE5DJ7B3MS5TT4S6FF568/pi-103-branch.png","visible":{"marker":"LIVE_BRANCH_OUTCOME_ONE","text":"LIVE_BRANCH_OUTCOME_ONE","tools":["fm_branch_outcomes","fm_branch_outcomes"]}}

@@ -1,0 +1,9 @@
+not ok - Pi outcomes rendering consumers must preserve stock behavior: file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-pi-branch-extension.0EYrNT/stock-render-consumers/[eval1]:130
+  throw new Error("stock export rendering did not delegate to Pi's structured fallback");
+        ^
+
+Error: stock export rendering did not delegate to Pi's structured fallback
+    at file:///home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45RE5DJ7B3MS5TT4S6FF568/.test-live/tmp/fm-pi-branch-extension.0EYrNT/stock-render-consumers/[eval1]:130:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+Node.js v22.23.2: expected exit 0, got 1
