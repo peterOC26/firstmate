@@ -2386,6 +2386,80 @@ test_relaunch_moves_a_drifted_item_back_in_flight() {
   pass "relaunch heals an item that drifted out of In flight while the task stayed live"
 }
 
+test_away_branch_relaunch_accepts_an_in_flight_item() {
+  local dir out rc=0
+  fm_tasks_axi_compatible || {
+    pass "skipped: away relaunch backlog test needs compatible tasks-axi"
+    return 0
+  }
+  dir=$(new_case away-inflight rl-away1)
+  add_ship_task "$dir" rl-away1 claude
+  seed_backlog "$dir" rl-away1 in_flight
+  FM_HOME="$dir/home" "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null \
+    || fail "could not enter the fixture's away posture"
+  break_tasks_axi_start "$dir"
+
+  out=$(FM_SUPERVISION_ACTOR=branch run_control "$dir" rl-away1 relaunch \
+    --note "move the existing task to its next stage") || rc=$?
+  expect_code 0 "$rc" "the away branch must relaunch its existing In-flight task even at the spend cap"$'\n'"$out"
+  [ "$(journal_field "$dir" rl-away1 phase)" = complete ] \
+    || fail "the away relaunch transaction did not complete"
+  [ "$(meta_field "$dir" rl-away1 worktree)" = "$dir/wt" ] \
+    || fail "the away relaunch replaced the task's worktree"
+  [ "$(meta_field "$dir" rl-away1 window)" = "fmses:fm-rl-away1" ] \
+    || fail "the away relaunch replaced the task's endpoint"
+  [ "$(backlog_state "$dir" rl-away1)" = in_flight ] \
+    || fail "the away relaunch changed the In-flight backlog state"
+  pass "the away branch relaunches an existing In-flight task through fm-control at the spend cap"
+}
+
+test_away_branch_fresh_spawn_still_refuses_an_in_flight_item() {
+  local dir out rc=0
+  fm_tasks_axi_compatible || {
+    pass "skipped: away fresh-spawn backlog test needs compatible tasks-axi"
+    return 0
+  }
+  dir=$(new_case away-fresh rl-away2)
+  seed_backlog "$dir" rl-away2 in_flight
+  FM_HOME="$dir/home" "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null \
+    || fail "could not enter the fixture's away posture"
+
+  out=$(FM_SUPERVISION_ACTOR=branch run_spawn "$dir" rl-away2 \
+    --mode no-mistakes --yolo off) || rc=$?
+  expect_code 1 "$rc" "a fresh away branch spawn must still require queued work"$'\n'"$out"
+  assert_contains "$out" "queued unblocked work" "fresh away spawn lost its queued-work guard"
+  assert_absent "$dir/home/state/rl-away2.meta" "a refused fresh spawn published a task record"
+  [ "$(backlog_state "$dir" rl-away2)" = in_flight ] \
+    || fail "the refused fresh spawn changed the backlog state"
+  pass "a fresh away branch spawn still refuses an In-flight backlog item"
+}
+
+test_away_branch_relaunch_still_refuses_a_held_item() {
+  local dir out rc=0
+  fm_tasks_axi_compatible || {
+    pass "skipped: held away relaunch backlog test needs compatible tasks-axi"
+    return 0
+  }
+  dir=$(new_case away-held rl-away3)
+  add_ship_task "$dir" rl-away3 claude
+  seed_backlog "$dir" rl-away3 in_flight
+  tasks-axi hold rl-away3 --reason "decision pending" --kind captain \
+    --file "$dir/home/data/backlog.md" >/dev/null || fail "could not hold the fixture item"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-afk-contract.sh" enter --spend 1 >/dev/null \
+    || fail "could not enter the fixture's away posture"
+
+  out=$(FM_SUPERVISION_ACTOR=branch run_control "$dir" rl-away3 relaunch \
+    --note "retry the held stage") || rc=$?
+  expect_code 1 "$rc" "the away relaunch exemption must preserve the held-row refusal"$'\n'"$out"
+  assert_contains "$out" "state in_flight yes no" "the held-row refusal lost its ineligible state"
+  assert_no_grep "Firstmate operational input waiting: read" "$dir/fake/literal" \
+    "a held task launched a replacement worker"
+  pass "the away branch relaunch still refuses a held In-flight backlog item"
+}
+
+test_away_branch_relaunch_accepts_an_in_flight_item
+test_away_branch_fresh_spawn_still_refuses_an_in_flight_item
+test_away_branch_relaunch_still_refuses_a_held_item
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
