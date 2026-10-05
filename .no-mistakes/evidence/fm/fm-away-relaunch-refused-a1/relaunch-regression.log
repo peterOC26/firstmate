@@ -1,0 +1,254 @@
+ok - the away branch relaunches an existing In-flight task through fm-control at the spend cap
+ok - a fresh away branch spawn still refuses an In-flight backlog item
+ok - the away branch relaunch still refuses a held In-flight backlog item
+ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
+ok - fm-control relaunch: pending composer text refuses before the exit command is typed
+ok - fm-control relaunch: an unreadable composer fails safe before the exit command is typed
+ok - fm-control relaunch: a linked spawning home preserves committed and unfinished work in the recorded copy
+ok - fm-control relaunch: durable task metadata survives replacement launch publication
+ok - fm-control relaunch: delivery and concurrent task metadata publication serialize
+ok - fm-control relaunch: disabling tracing clears metadata and pane context
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+ok - fm-control relaunch: a ship task refuses without the progress note its replacement needs
+ok - fm-control relaunch: switching harness is one ordinary relaunch, and the old wiring goes with the old agent
+ok - fm-control relaunch: a harness switch resets model and effort unless they are named too
+ok - fm-control relaunch: a prefixed recorded harness can switch adapters transactionally
+ok - fm-control relaunch: a prefixed command requires an explicit replacement harness
+ok - fm-control relaunch: a same-harness relaunch keeps the profile axes it was running with
+ok - native Ultra relaunch preserves its profile and rejects an unsupported model before stopping
+ok - fm-control relaunch: a signed-out worker account pin refuses before the old agent stops
+ok - fm-control relaunch: the replacement follows the home's current worker account pin
+ok - fm-control relaunch: explicit model and effort win over the recorded ones
+ok - fm-control relaunch: refuses to relaunch onto an adapter with no verified mechanics
+ok - fm-control relaunch: the retired incarnation's global turn-end token is revoked
+ok - fm-control relaunch: wiring cleanup failure refuses replacement arming
+ok - fm-control-lib: one owner resolves each harness's turn-end registry entry, and refuses a malformed token
+not ok - a configured secondmate harness should relaunch
+error: secondmate home cannot be inside the firstmate repo: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/smpin-31990/smhome
+error: the replacement agent for sm3 could not be launched on codex
+error: sm3's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/smpin-31990/smhome: expected exit 0, got 1
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/keepprofile-17756/home/state/rl6.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/explicit-30530/home/state/rl7.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/away-inflight-1973/home/state/rl-away1.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/metadata-race-3851/home/state/rl28.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/durable-meta-18347/home/state/rl19.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/acct-13201/home/state/rl-acct.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/native-ultra-29444/home/state/rl-ultra.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/linked-home-2377/home/state/rl42.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/prefixcontrol-27117/home/state/rl32.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/note-27656/home/state/rl2.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/switch-26244/home/state/rl4.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/profile-20070/home/state/rl5.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/same-27483/home/state/rl1.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/grokauth-11005/home/state/rl9.git-hooks/sendemail-validate': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/applypatch-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/prepare-commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-push': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/post-rewrite': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-rebase': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/commit-msg': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-auto-gc': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-merge-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/post-checkout': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/post-merge': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/post-applypatch': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/pre-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/post-commit': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.nb2X1V/trace-off-1497/home/state/rl33.git-hooks/sendemail-validate': Permission denied

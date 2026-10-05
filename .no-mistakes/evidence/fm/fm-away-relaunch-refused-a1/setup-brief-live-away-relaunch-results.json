@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Fresh away dispatch refuses an In-flight row without creating a worker",
+    "result": "pass",
+    "live": true,
+    "detail": "Queue-only refusal, unchanged endpoint inventory and In-flight row"
+  },
+  {
+    "name": "Away supervisor relaunches an existing In-flight worker at the spend cap preserving its work",
+    "result": "fail",
+    "live": true,
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nerror: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/data/awaylive-eh9b6y2_/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn\nerror: the replacement agent for awaylive-eh9b6y2_ could not be launched on codex\nerror: awaylive-eh9b6y2_'s agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker\n"
+  },
+  {
+    "name": "driver",
+    "result": "error",
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nerror: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/data/awaylive-eh9b6y2_/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn\nerror: the replacement agent for awaylive-eh9b6y2_ could not be launched on codex\nerror: awaylive-eh9b6y2_'s agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker\n"
+  }
+]

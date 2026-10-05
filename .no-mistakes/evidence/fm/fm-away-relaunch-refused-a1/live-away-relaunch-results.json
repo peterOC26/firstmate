@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Fresh away dispatch refuses an In-flight row without creating a worker",
+    "result": "pass",
+    "live": true,
+    "detail": "Queue-only refusal, unchanged endpoint inventory and In-flight row"
+  },
+  {
+    "name": "Away supervisor relaunches an existing In-flight worker at the spend cap preserving its work",
+    "result": "pass",
+    "live": true,
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y\nwarning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/data/awaylive-p44zn0_y/launch-brief.md records no ship branch; defaulting to legacy branch fm/awaylive-p44zn0_y\nwarning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/data/awaylive-p44zn0_y/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches\nrelaunched awaylive-p44zn0_y harness=codex from=codex model=default effort=default backend=tmux endpoint=primary:fm-awaylive-p44zn0_y worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/worker\n"
+  },
+  {
+    "name": "Away relaunch refuses a captain-held In-flight row",
+    "result": "pass",
+    "live": true,
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y\nwarning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/data/awaylive-p44zn0_y/launch-brief.md records no ship branch; defaulting to legacy branch fm/awaylive-p44zn0_y\nwarning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/data/awaylive-p44zn0_y/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches\nerror: this home's backlog item awaylive-p44zn0_y is not dispatchable in state in_flight yes no; refusing before creating its endpoint or local copy\nerror: the replacement agent for awaylive-p44zn0_y could not be launched on codex\nerror: awaylive-p44zn0_y's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.lp44zn0_y/worker\n"
+  }
+]

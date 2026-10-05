@@ -1,0 +1,347 @@
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+
+exit=0
+$ tmux -L fm-lab new-session -d -x 120 -y 40 -s primary -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY -e FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_ 'codex --disable hooks --dangerously-bypass-approvals-and-sandbox'
+
+exit=0
+$ tmux -L fm-lab display-message -p -t primary '#{socket_path},#{pid},0'
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/tmux/tmux-1000/fm-lab,2696661,0
+
+exit=0
+$ tmux -L fm-lab capture-pane -p -t primary -S -80
+
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY
+  permissions: YOLO mode
+
+  Shall we turn “what if” into something?
+
+
+
+
+
+                                                       ⣀⣤⣤⣤⣀⣀
+                                                    ⣠⣶⣿⣿⣿⣿⣿⣿⣿⣿⣦⣤⣤⣤⣤⣤⣤⡀
+                                                  ⢀⣾⣿⣿⠿⠋⠉⠉⢉⣭⣿⣿⣿⣿⣿⠿⣿⣿⣿⣿⣷⣄
+                                                 ⣀⣾⣿⣿⠃ ⣀⣴⣾⣿⣿⡿⠟⠋ ⣀⡀ ⠈⠙⢿⣿⣿⣧
+                                              ⣀⣶⣿⣿⣿⣿⡇ ⢸⣿⣿⡿⠛⠉⢀⣠⣴⣿⣿⣿⣷⣦⣀⠈⢻⣿⣿⡇
+                                             ⣰⣿⣿⡿⢿⣿⣿⡇ ⢸⣿⣿⢀⣤⣶⣿⣿⣿⠟⠛⠻⣿⣿⣿⣿⣮⣿⣿⡷
+                                            ⢰⣿⣿⡟⠁⢸⣿⣿⡇ ⢸⣿⣿⣿⣿⠿⠿⣿⣿⣿⣦⣄⡀⠈⠛⠿⣿⣿⣿⣧⡀
+                                            ⣾⣿⣿⠃ ⢸⣿⣿⡇ ⢸⣿⣿⠋⠁  ⠈⠙⢻⣿⣿⣿⣶⣤⡀ ⠹⢿⣿⣷⡄
+                                            ⢸⣿⣿⣇ ⠸⣿⣿⣷⣦⣼⣿⣿      ⢸⣿⣿⠻⢿⣿⣿⡇ ⠘⣿⣿⣿
+                                            ⠈⢿⣿⣿⣦⡀⠈⠛⠿⣿⣿⣿⣿⣄⡀  ⢀⣠⣼⣿⣿  ⣿⣿⡇  ⣿⣿⣿⠇
+                                              ⢻⣿⣿⣿⣷⣦⣀⠈⠙⠻⣿⣿⣿⣶⣶⣿⣿⣿⣿⣿  ⣿⣿⡇ ⣠⣿⣿⣿
+                                              ⢸⣿⣿⡿⢿⣿⣿⣿⣦⣠⣴⣿⣿⣿⡿⠟⠋⢸⣿⣿  ⣿⣿⣷⣴⣿⣿⣿⠃
+                                              ⠘⣿⣿⣷ ⠈⠛⢿⣿⣿⣿⠿⠋⠉ ⣠⣴⣿⣿⣿  ⣿⣿⣿⣿⣿⠟⠁
+                                               ⠻⣿⣿⣿⣤⣀ ⠈⠉ ⢀⣤⣶⣿⣿⣿⠿⠟⠁ ⣰⣿⣿⡟⠋⠁
+                                                ⠈⠿⣿⣿⣿⣿⣶⣾⣿⣿⣿⣿⠟⠋⠁  ⣠⣼⣿⣿⡟
+                                                   ⠙⠛⠛⠛⠻⠛⢿⣿⣿⣿⣿⣷⣾⣿⣿⣿⡿⠏
+                                                          ⠈⠙⠛⠿⠿⠿⠿⠛⠉
+
+
+
+
+
+
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · ~/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY
+  ? for shortcuts                                                                              ⚠ 1 warning · f2 to view
+
+exit=0
+$ git init -q /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project add seed.txt
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project -c 'user.name=Live Test' -c user.email=live-test@example.invalid commit -qm fixture
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project worktree add -qb fixture-worker /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh add awayfresh 'fresh In-flight row' --kind ship
+ok: added awayfresh (ship) -> Queued
+task:
+  id: awayfresh
+  title: fresh In-flight row
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start awayfresh` to move it to in flight
+  - Run `tasks-axi block awayfresh --by <other>` to record a dependency
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh start awayfresh
+ok: start awayfresh -> In flight
+help[1]:
+  - Run `tasks-axi done awayfresh --pr <url>` when it ships
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-afk-contract.sh enter --spend 1 --words 'you can move to other stages'
+Away posture recorded at 2026-10-05T08:34:32Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 1 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-05T08:34:32Z
+  expected return: not given
+  spend cap: 1 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    you can move to other stages
+
+exit=0
+$ tmux -L fm-lab list-windows -t primary -F '#{window_id}:#{window_name}'
+@0:node
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-spawn.sh awayfresh /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project --harness codex --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+note: new-task spawn (fm-spawn) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+note: new-task spawn (fm-spawn) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task awayfresh has no dispatchable backlog item in this home
+
+exit=1
+$ tmux -L fm-lab list-windows -t primary -F '#{window_id}:#{window_name}'
+@0:node
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh show awayfresh
+task:
+  id: awayfresh
+  title: fresh In-flight row
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+
+exit=0
+SCENARIO {"name": "Fresh away dispatch refuses an In-flight row without creating a worker", "result": "pass", "live": true, "detail": "Queue-only refusal, unchanged endpoint inventory and In-flight row"}
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh add awaylive-eh9b6y2_ 'existing stage worker' --kind ship
+ok: added awaylive-eh9b6y2_ (ship) -> Queued
+task:
+  id: awaylive-eh9b6y2_
+  title: existing stage worker
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start awaylive-eh9b6y2_` to move it to in flight
+  - Run `tasks-axi block awaylive-eh9b6y2_ --by <other>` to record a dependency
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh start awaylive-eh9b6y2_
+ok: start awaylive-eh9b6y2_ -> In flight
+help[1]:
+  - Run `tasks-axi done awaylive-eh9b6y2_ --pr <url>` when it ships
+
+exit=0
+$ tmux -L fm-lab new-window -d -t primary: -n fm-awaylive-eh9b6y2_ -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker 'bash --noprofile --norc'
+
+exit=0
+$ tmux -L fm-lab set-window-option -t primary:fm-awaylive-eh9b6y2_ automatic-rename off
+
+exit=0
+$ tmux -L fm-lab set-window-option -t primary:fm-awaylive-eh9b6y2_ allow-rename off
+
+exit=0
+$ tmux -L fm-lab send-keys -t primary:fm-awaylive-eh9b6y2_ 'codex --disable hooks --dangerously-bypass-approvals-and-sandbox '"'"'Reply exactly BEFORE_AWAY_RELAUNCH and wait. Do not call any tools.'"'"'' Enter
+
+exit=0
+$ tmux -L fm-lab capture-pane -p -t primary:fm-awaylive-eh9b6y2_ -S -80
+
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+  permissions: YOLO mode
+
+  Is this a plan day or a poke-around day?
+
+
+› Reply exactly BEFORE_AWAY_RELAUNCH and wait. Do not call any tools.
+
+
+• BEFORE_AWAY_RELAUNCH
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol low · ~/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker · Reply BEFORE_A…
+  ? for shortcuts                                                                              ⚠ 1 warning · f2 to view
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker rev-parse HEAD
+8ce139be5e77f2dcf1b7d314348680ffb88af742
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-control.sh awaylive-eh9b6y2_ relaunch --note 'Continue the next stage by replying exactly AFTER_AWAY_RELAUNCH. Do not call tools or change files.'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+error: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/data/awaylive-eh9b6y2_/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn
+error: the replacement agent for awaylive-eh9b6y2_ could not be launched on codex
+error: awaylive-eh9b6y2_'s agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+
+exit=1
+$ tmux -L fm-lab capture-pane -p -t primary:fm-awaylive-eh9b6y2_ -S -80
+bash-5.2$ codex --disable hooks --dangerously-bypass-approvals-and-sandbox 'Reply exactly BEFORE_AWAY_RELAUNCH and wait.
+ Do not call any tools.'
+WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary di
+r "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_" (codex_home: AbsolutePathBuf("/
+home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/codex"))
+Token usage: total=1,805 input=1,794 (+ 12,160 cached) output=11
+To continue this session, run:
+  codex resume 01a10b33-533b-70d2-8054-64cc1685a2a0
+Or run codex resume and select Reply BEFORE_AWAY_RELAUNCH.
+bash-5.2$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/bin/fm-tasks-axi.sh show awaylive-eh9b6y2_
+task:
+  id: awaylive-eh9b6y2_
+  title: existing stage worker
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+
+exit=0
+Persisted relaunch journal:
+v1
+task=awaylive-eh9b6y2_
+phase=failed:launching
+ts=2026-10-05T08:34:49Z
+backend=tmux
+endpoint=primary:fm-awaylive-eh9b6y2_
+worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+kind=ship
+from_harness=codex
+from_model=default
+from_effort=default
+to_harness=codex
+to_model=default
+to_effort=default
+rollback=prior-record-kept
+
+Persisted task record:
+window=primary:fm-awaylive-eh9b6y2_
+endpoint_task_id=awaylive-eh9b6y2_
+worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+project=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/project
+harness=codex
+kind=ship
+mode=no-mistakes
+yolo=off
+model=default
+effort=default
+backend=tmux
+SCENARIO {"name": "Away supervisor relaunches an existing In-flight worker at the spend cap preserving its work", "result": "fail", "live": true, "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nfm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_\nerror: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/data/awaylive-eh9b6y2_/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn\nerror: the replacement agent for awaylive-eh9b6y2_ could not be launched on codex\nerror: awaylive-eh9b6y2_'s agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker\n"}
+DRIVER ERROR: fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_
+error: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/data/awaylive-eh9b6y2_/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn
+error: the replacement agent for awaylive-eh9b6y2_ could not be launched on codex
+error: awaylive-eh9b6y2_'s agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.leh9b6y2_/worker
+
+$ tmux -L fm-lab kill-server
+
+exit=0
+Private socket stopped and disposable lab removed.

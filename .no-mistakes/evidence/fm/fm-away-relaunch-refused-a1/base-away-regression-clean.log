@@ -1,0 +1,6 @@
+not ok - the away branch must relaunch its existing In-flight task even at the spend cap
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.k4pIAU/away-inflight-11917/home/data/rl-away1/launch-brief.md records no ship branch; defaulting to legacy branch fm/rl-away1
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.k4pIAU/away-inflight-11917/home/data/rl-away1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: spawn refused - the supervision branch under the away-posture record may dispatch only queued unblocked work (already queued, or filed by the branch from the captain's away words); task rl-away1 has no dispatchable backlog item in this home
+error: the replacement agent for rl-away1 could not be launched on claude
+error: rl-away1's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.test-tmp/fm-control-relaunch.k4pIAU/away-inflight-11917/wt: expected exit 0, got 1

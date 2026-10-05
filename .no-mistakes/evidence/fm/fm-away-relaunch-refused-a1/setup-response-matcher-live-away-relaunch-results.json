@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Fresh away dispatch refuses an In-flight row without creating a worker",
+    "result": "pass",
+    "live": true,
+    "detail": "Queue-only refusal, unchanged endpoint inventory and In-flight row"
+  }
+]

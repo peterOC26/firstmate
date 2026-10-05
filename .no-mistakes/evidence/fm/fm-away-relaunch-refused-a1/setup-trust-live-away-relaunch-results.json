@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Fresh away dispatch refuses an In-flight row without creating a worker",
+    "result": "pass",
+    "live": true,
+    "detail": "Queue-only refusal, unchanged endpoint inventory and In-flight row"
+  },
+  {
+    "name": "Away supervisor relaunches an existing In-flight worker at the spend cap preserving its work",
+    "result": "fail",
+    "live": true,
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.le9g_xip3\nerror: task awaylive-e9g_xip3's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'relaunch'\nerror: relaunch of awaylive-e9g_xip3 failed while stopping the old agent, which is still running; its original instructions were restored\n"
+  },
+  {
+    "name": "driver",
+    "result": "error",
+    "detail": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M45JK2T8YBWNQFKRGCB50VWY/.le9g_xip3\nerror: task awaylive-e9g_xip3's composer state is 'unknown', not proven empty; refusing to type the /quit exit command because it could concatenate onto existing text. Clear the composer, then retry 'relaunch'\nerror: relaunch of awaylive-e9g_xip3 failed while stopping the old agent, which is still running; its original instructions were restored\n"
+  }
+]
