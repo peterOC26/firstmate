@@ -603,9 +603,13 @@ Each relocated script keeps its own gate, enforcing exactly what a script can ch
 | Script | Gate while away |
 | --- | --- |
 | `bin/fm-pr-merge.sh` | Merges any pull request green at its live head, synchronously, under the record lock, and refuses `--allow-red` and `--allow-missing` while away, so the green gate is absolute in this posture; which pull request the words meant is the branch's reading. |
-| `bin/fm-spawn.sh` | Dispatches only queued work whose blockers cleared - already queued, or filed by the branch because the words explicitly call for it; refuses a fresh ordinary spawn for either actor once the home holds as many ordinary task records as the record's spend cap (relaunches and secondmates exempt). |
+| `bin/fm-spawn.sh` | A fresh branch spawn dispatches only queued work whose blockers cleared - already queued, or filed by the branch because the words explicitly call for it; refuses a fresh ordinary spawn for either actor once the home holds as many ordinary task records as the record's spend cap (relaunches and secondmates exempt). |
 | `bin/fm-send.sh --resolve-key` | Answers a decision the words pre-answer, or one `ask-user-authority`'s judgment (carried verbatim in the branch prompt) lets firstmate decide. |
 | `bin/fm-merge-local.sh` | Never relocated. |
+
+An existing task's relaunch through `bin/fm-control.sh` can continue its next stage with an In-flight backlog item, including at the spend cap, because it replaces a worker that already counts.
+Where backlog preflight applies, relaunch still requires a readable, dispatchable item with no hold or time gate; the queued-only restriction applies to fresh branch spawns.
+The [relaunch transaction](agent-control.md#transactional-relaunch) retains its ordinary lifecycle safety checks.
 
 The merge-authority record and the outcome row's summary are the audit trail.
 The return brief renders the words verbatim beside that account.
@@ -652,7 +656,9 @@ At that moment the branch reports any refusal instead of concluding there is "no
 - Prompt stability, including the landed-work cleanup instruction and the second-mate relay, signal-span, and stale-liveness rules.
 - Store append-only behavior, the captain cursor barrier, processed-marker sequence bounds and absent-marker safety, and captain-only recorded ages.
 - Leases, guards, and non-branch-home invariance.
-- The away relocation: only under a valid live record, never for local-only landing, queued-only branch dispatch rather than orphaned in-flight recovery, the spend cap for both actors and its lock-held recheck, and the attended guarded-action behavior restored by archive or an invalid record.
+- The away relocation: only under a valid live record, never for local-only landing, queued-only fresh branch dispatch, the spend cap for both actors and its lock-held recheck, and the attended guarded-action behavior restored by archive or an invalid record.
+
+`tests/fm-control-relaunch.test.sh` covers the away branch relaunching an existing In-flight task at the spend cap with its worktree, endpoint, and backlog state preserved, a fresh branch spawn still refusing an In-flight item, and a relaunch still refusing a held item.
 
 `tests/fm-afk-return.test.sh` covers the ordered cleanup-due section, its durable merge-marker requirement, and exclusion of both a done task without durable merge evidence and a persistent secondmate carrying that evidence.
 
