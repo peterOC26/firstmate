@@ -2210,6 +2210,25 @@ FM_TEST_END 2026-08-29T01:01:01Z tests/fm-pi-branch-live-e2e.test.sh exit=0 dura
 
 The focused extension suite also exercised the installed Pi 0.84.4 picker and outcome-renderer consumers; [`calm-mode-feasibility.md`](../calm-mode-feasibility.md#2026-08-28-pi-0844-outcome-renderer-compatibility-verification) owns the version-scoped renderer evidence.
 
+### 2026-10-05 Pi Calm export compatibility
+
+Verified on Linux x86_64 with Node v22.23.2, Chromium 152.0.7977.82, and Pi 0.99.2 plus a scratch-installed Pi 1.0.3.
+For each installation, `FM_PI_PACKAGE_DIR` selected its importable package and `PATH` selected its matching CLI before running:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-calm-pi-extension.test.sh tests/fm-calm-pi-queue-retention-live-e2e.test.sh
+```
+
+Both versions passed the renderer assertions, real interactive `/export`, rendered export DOM, and queue-retention live guard with no skipped gates.
+The export fixture supplies both Pi's legacy `getToolDefinition` lookup and the `getToolRenderers` lookup used by 1.0.3, preserving the positive export assertion and the non-submit negative assertion against each installed implementation.
+The Calm extension requires no change for this lookup rename.
+The version-specific live-guard output was:
+
+```text
+ok - Pi 0.99.2 exposes every queue-retention member Calm preflights before hiding queued Firstmate rows
+ok - Pi 1.0.3 exposes every queue-retention member Calm preflights before hiding queued Firstmate rows
+```
+
 ### 2026-08-29 deterministic captain-outcome delivery
 
 The credential-free live guard, focused extension suite, store suite, and strict typecheck were run against the locally installed `@earendil-works/pi-coding-agent` 0.84.3 package.
