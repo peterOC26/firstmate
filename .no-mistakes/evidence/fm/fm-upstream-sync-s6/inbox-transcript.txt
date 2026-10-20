@@ -1,0 +1,67 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75
+exit=0
+
+$ tmux -L fm-lab new-session -d -x 120 -y 40 -s inbox-lab -n fm-inbox1 -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR 'bash --noprofile --norc'
+exit=0
+
+$ tmux -L fm-lab display-message -p -t inbox-lab '#{socket_path}'
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75/t/tmux-1000/fm-lab
+exit=0
+
+$ bin/fm-send.sh inbox1 'Inspect this exact multiline request.
+Keep these bytes literal: $(touch /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75/MUST_NOT_EXIST) `false` ; exit
+Do not lose the final line.'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-send: doorbell not typed because the agent in inbox-lab:fm-inbox1 has exited; the steer is durably recorded at /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75/state/inbox1.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t inbox-lab:fm-inbox1
+bash-5.2$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0

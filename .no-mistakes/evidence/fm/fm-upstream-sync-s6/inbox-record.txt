@@ -1,0 +1,6 @@
+schema=fm-task-inbox.v1
+at=2026-10-19T23:38:24Z
+--
+Inspect this exact multiline request.
+Keep these bytes literal: $(touch /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/i.xmxqya75/MUST_NOT_EXIST) `false` ; exit
+Do not lose the final line.

@@ -1,0 +1,100 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers
+exit=0
+
+$ bin/fm-afk-contract.sh enter --words 'Finish the queued local checks; keep review decisions for my return.'
+Away posture recorded at 2026-10-19T23:36:24Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-19T23:36:24Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Finish the queued local checks; keep review decisions for my return.
+exit=0
+
+$ bin/fm-afk-contract.sh field spend_max_concurrent_workers
+4
+exit=0
+
+$ bin/fm-afk-contract.sh archive
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers/state/afk-contracts/1792452984.afk-contract
+exit=0
+
+$ bin/fm-afk-contract.sh live-workers
+5
+exit=0
+
+$ bin/fm-afk-contract.sh enter --words 'Continue the existing workers.'
+Away posture recorded at 2026-10-19T23:36:24Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 5 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-19T23:36:24Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the existing workers.
+exit=0
+
+$ bin/fm-afk-contract.sh field spend_max_concurrent_workers
+5
+exit=0
+
+$ bin/fm-afk-contract.sh readback
+Away posture (recorded):
+  entered: 2026-10-19T23:36:24Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the existing workers.
+exit=0
+
+$ bin/fm-afk-contract.sh archive
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers/state/afk-contracts/1792452984.afk-contract
+exit=0
+
+$ bin/fm-afk-contract.sh enter --spend 3 --words 'Keep the explicit cap of three.'
+Away posture recorded at 2026-10-19T23:36:25Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 3 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-19T23:36:25Z
+  expected return: not given
+  spend cap: 3 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep the explicit cap of three.
+exit=0
+
+$ bin/fm-afk-contract.sh field spend_max_concurrent_workers
+3
+exit=0
+
+$ bin/fm-afk-contract.sh archive
+/home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers/state/afk-contracts/1792452985.afk-contract
+exit=0
+
+$ bin/fm-afk-contract.sh enter --spend 0
+fm-afk-contract: --spend must be a positive integer, got '0'
+exit=2
+
+$ bin/fm-role.sh report
+fm-role: user (default)
+exit=0
+
+$ bin/fm-role.sh check /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR
+refused: this home runs as firstmate user/operator and holds no publication authority for github.com/peteroc26/firstmate
+exit=1
+
+$ bin/fm-brief.sh publish-guard firstmate --project /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR --mode direct-PR
+error: this home runs as firstmate user/operator and holds no publication authority for github.com/peteroc26/firstmate
+error: to let this home publish to github.com/peteroc26/firstmate, write 'maintainer github.com/peteroc26/firstmate' into /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers/config/firstmate-role (docs/configuration.md "Firstmate role"), or pass --upstream-consent github.com/peteroc26/firstmate for this one task with the captain's explicit approval
+exit=1
+
+$ bin/fm-brief.sh local-draft firstmate --project /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR --mode local-only
+scaffolded: /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/cli-lab.rfi0mers/data/local-draft/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+exit=0
+
+$ bin/fm-role.sh report
+fm-role: user (default)
+exit=0
+

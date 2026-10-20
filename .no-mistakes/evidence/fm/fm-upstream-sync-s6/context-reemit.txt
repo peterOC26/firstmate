@@ -1,0 +1,637 @@
+RE-EMIT CUE: if this output ends with "Output too large ... Full output saved to <path>",
+read that whole file now, before acting. Otherwise read data/captain.md, data/captain-shared.md,
+and data/learnings.md under /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/reemit-lab.3ff_kw4i/data now if any of them is missing below.
+
+================================================================================
+SESSION START (CONTEXT RE-EMIT) - /home/zabi/.no-mistakes/evidence/01M5B7X8B9PHV0M9J8T3GFVBJR/reemit-lab.3ff_kw4i
+================================================================================
+This session already took the helm at its own startup and has only lost its
+context. Lock ownership is re-verified and the durable records below are
+reprinted, but the sweeps startup already reconciled - project clone refresh,
+secondmate convergence and liveness, pending remote handoff
+retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.
+Queued wakes ARE still drained: they arrived after startup and are this turn work.
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 3527642
+
+HOME ROLE
+--------------------------------------------------------------------------------
+fm-role: user (default)
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: follow the continuation in the harness protocol below; do not use shell &.
+
+Mode: Unknown harness fallback.
+
+This primary harness does not have a verified watcher wake adapter.
+Follow the generic supervision contract in `AGENTS.md`.
+First cycle: drain queued wakes, then choose a supervision wait that the harness can actually wake from.
+Ordinary wake: drain, handle all emitted wakes, reconcile open decisions and unread status lines, and run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`, then repeat that verified wait while supervision is still required.
+Before that acknowledgement, interruption leaves the work durable for idempotent re-handling.
+Use `bin/fm-watch-arm.sh` only when the harness has a tracked background mechanism that survives the tool call and notifies the model on process exit.
+Use a bounded foreground wait over `bin/fm-watch.sh` when that wake mechanism is not verified.
+Never use shell `&` for watcher supervision.
+Failure or missing cycle only: inspect the failure and restore the same verified wait shape.
+
+Record new verification evidence before promoting an unknown harness to a named snippet.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled,
+  - or a context re-emit opened with a read cue because the
+    harness cut the digest short.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+completed off the startup path in 0s: GitHub authentication.
+(silent - no problems found)
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+Live lab preference 0000: only check this disposable home.
+Live lab preference 0001: only check this disposable home.
+Live lab preference 0002: only check this disposable home.
+Live lab preference 0003: only check this disposable home.
+Live lab preference 0004: only check this disposable home.
+Live lab preference 0005: only check this disposable home.
+Live lab preference 0006: only check this disposable home.
+Live lab preference 0007: only check this disposable home.
+Live lab preference 0008: only check this disposable home.
+Live lab preference 0009: only check this disposable home.
+Live lab preference 0010: only check this disposable home.
+Live lab preference 0011: only check this disposable home.
+Live lab preference 0012: only check this disposable home.
+Live lab preference 0013: only check this disposable home.
+Live lab preference 0014: only check this disposable home.
+Live lab preference 0015: only check this disposable home.
+Live lab preference 0016: only check this disposable home.
+Live lab preference 0017: only check this disposable home.
+Live lab preference 0018: only check this disposable home.
+Live lab preference 0019: only check this disposable home.
+Live lab preference 0020: only check this disposable home.
+Live lab preference 0021: only check this disposable home.
+Live lab preference 0022: only check this disposable home.
+Live lab preference 0023: only check this disposable home.
+Live lab preference 0024: only check this disposable home.
+Live lab preference 0025: only check this disposable home.
+Live lab preference 0026: only check this disposable home.
+Live lab preference 0027: only check this disposable home.
+Live lab preference 0028: only check this disposable home.
+Live lab preference 0029: only check this disposable home.
+Live lab preference 0030: only check this disposable home.
+Live lab preference 0031: only check this disposable home.
+Live lab preference 0032: only check this disposable home.
+Live lab preference 0033: only check this disposable home.
+Live lab preference 0034: only check this disposable home.
+Live lab preference 0035: only check this disposable home.
+Live lab preference 0036: only check this disposable home.
+Live lab preference 0037: only check this disposable home.
+Live lab preference 0038: only check this disposable home.
+Live lab preference 0039: only check this disposable home.
+Live lab preference 0040: only check this disposable home.
+Live lab preference 0041: only check this disposable home.
+Live lab preference 0042: only check this disposable home.
+Live lab preference 0043: only check this disposable home.
+Live lab preference 0044: only check this disposable home.
+Live lab preference 0045: only check this disposable home.
+Live lab preference 0046: only check this disposable home.
+Live lab preference 0047: only check this disposable home.
+Live lab preference 0048: only check this disposable home.
+Live lab preference 0049: only check this disposable home.
+Live lab preference 0050: only check this disposable home.
+Live lab preference 0051: only check this disposable home.
+Live lab preference 0052: only check this disposable home.
+Live lab preference 0053: only check this disposable home.
+Live lab preference 0054: only check this disposable home.
+Live lab preference 0055: only check this disposable home.
+Live lab preference 0056: only check this disposable home.
+Live lab preference 0057: only check this disposable home.
+Live lab preference 0058: only check this disposable home.
+Live lab preference 0059: only check this disposable home.
+Live lab preference 0060: only check this disposable home.
+Live lab preference 0061: only check this disposable home.
+Live lab preference 0062: only check this disposable home.
+Live lab preference 0063: only check this disposable home.
+Live lab preference 0064: only check this disposable home.
+Live lab preference 0065: only check this disposable home.
+Live lab preference 0066: only check this disposable home.
+Live lab preference 0067: only check this disposable home.
+Live lab preference 0068: only check this disposable home.
+Live lab preference 0069: only check this disposable home.
+Live lab preference 0070: only check this disposable home.
+Live lab preference 0071: only check this disposable home.
+Live lab preference 0072: only check this disposable home.
+Live lab preference 0073: only check this disposable home.
+Live lab preference 0074: only check this disposable home.
+Live lab preference 0075: only check this disposable home.
+Live lab preference 0076: only check this disposable home.
+Live lab preference 0077: only check this disposable home.
+Live lab preference 0078: only check this disposable home.
+Live lab preference 0079: only check this disposable home.
+Live lab preference 0080: only check this disposable home.
+Live lab preference 0081: only check this disposable home.
+Live lab preference 0082: only check this disposable home.
+Live lab preference 0083: only check this disposable home.
+Live lab preference 0084: only check this disposable home.
+Live lab preference 0085: only check this disposable home.
+Live lab preference 0086: only check this disposable home.
+Live lab preference 0087: only check this disposable home.
+Live lab preference 0088: only check this disposable home.
+Live lab preference 0089: only check this disposable home.
+Live lab preference 0090: only check this disposable home.
+Live lab preference 0091: only check this disposable home.
+Live lab preference 0092: only check this disposable home.
+Live lab preference 0093: only check this disposable home.
+Live lab preference 0094: only check this disposable home.
+Live lab preference 0095: only check this disposable home.
+Live lab preference 0096: only check this disposable home.
+Live lab preference 0097: only check this disposable home.
+Live lab preference 0098: only check this disposable home.
+Live lab preference 0099: only check this disposable home.
+Live lab preference 0100: only check this disposable home.
+Live lab preference 0101: only check this disposable home.
+Live lab preference 0102: only check this disposable home.
+Live lab preference 0103: only check this disposable home.
+Live lab preference 0104: only check this disposable home.
+Live lab preference 0105: only check this disposable home.
+Live lab preference 0106: only check this disposable home.
+Live lab preference 0107: only check this disposable home.
+Live lab preference 0108: only check this disposable home.
+Live lab preference 0109: only check this disposable home.
+Live lab preference 0110: only check this disposable home.
+Live lab preference 0111: only check this disposable home.
+Live lab preference 0112: only check this disposable home.
+Live lab preference 0113: only check this disposable home.
+Live lab preference 0114: only check this disposable home.
+Live lab preference 0115: only check this disposable home.
+Live lab preference 0116: only check this disposable home.
+Live lab preference 0117: only check this disposable home.
+Live lab preference 0118: only check this disposable home.
+Live lab preference 0119: only check this disposable home.
+Live lab preference 0120: only check this disposable home.
+Live lab preference 0121: only check this disposable home.
+Live lab preference 0122: only check this disposable home.
+Live lab preference 0123: only check this disposable home.
+Live lab preference 0124: only check this disposable home.
+Live lab preference 0125: only check this disposable home.
+Live lab preference 0126: only check this disposable home.
+Live lab preference 0127: only check this disposable home.
+Live lab preference 0128: only check this disposable home.
+Live lab preference 0129: only check this disposable home.
+Live lab preference 0130: only check this disposable home.
+Live lab preference 0131: only check this disposable home.
+Live lab preference 0132: only check this disposable home.
+Live lab preference 0133: only check this disposable home.
+Live lab preference 0134: only check this disposable home.
+Live lab preference 0135: only check this disposable home.
+Live lab preference 0136: only check this disposable home.
+Live lab preference 0137: only check this disposable home.
+Live lab preference 0138: only check this disposable home.
+Live lab preference 0139: only check this disposable home.
+Live lab preference 0140: only check this disposable home.
+Live lab preference 0141: only check this disposable home.
+Live lab preference 0142: only check this disposable home.
+Live lab preference 0143: only check this disposable home.
+Live lab preference 0144: only check this disposable home.
+Live lab preference 0145: only check this disposable home.
+Live lab preference 0146: only check this disposable home.
+Live lab preference 0147: only check this disposable home.
+Live lab preference 0148: only check this disposable home.
+Live lab preference 0149: only check this disposable home.
+Live lab preference 0150: only check this disposable home.
+Live lab preference 0151: only check this disposable home.
+Live lab preference 0152: only check this disposable home.
+Live lab preference 0153: only check this disposable home.
+Live lab preference 0154: only check this disposable home.
+Live lab preference 0155: only check this disposable home.
+Live lab preference 0156: only check this disposable home.
+Live lab preference 0157: only check this disposable home.
+Live lab preference 0158: only check this disposable home.
+Live lab preference 0159: only check this disposable home.
+Live lab preference 0160: only check this disposable home.
+Live lab preference 0161: only check this disposable home.
+Live lab preference 0162: only check this disposable home.
+Live lab preference 0163: only check this disposable home.
+Live lab preference 0164: only check this disposable home.
+Live lab preference 0165: only check this disposable home.
+Live lab preference 0166: only check this disposable home.
+Live lab preference 0167: only check this disposable home.
+Live lab preference 0168: only check this disposable home.
+Live lab preference 0169: only check this disposable home.
+Live lab preference 0170: only check this disposable home.
+Live lab preference 0171: only check this disposable home.
+Live lab preference 0172: only check this disposable home.
+Live lab preference 0173: only check this disposable home.
+Live lab preference 0174: only check this disposable home.
+Live lab preference 0175: only check this disposable home.
+Live lab preference 0176: only check this disposable home.
+Live lab preference 0177: only check this disposable home.
+Live lab preference 0178: only check this disposable home.
+Live lab preference 0179: only check this disposable home.
+Live lab preference 0180: only check this disposable home.
+Live lab preference 0181: only check this disposable home.
+Live lab preference 0182: only check this disposable home.
+Live lab preference 0183: only check this disposable home.
+Live lab preference 0184: only check this disposable home.
+Live lab preference 0185: only check this disposable home.
+Live lab preference 0186: only check this disposable home.
+Live lab preference 0187: only check this disposable home.
+Live lab preference 0188: only check this disposable home.
+Live lab preference 0189: only check this disposable home.
+Live lab preference 0190: only check this disposable home.
+Live lab preference 0191: only check this disposable home.
+Live lab preference 0192: only check this disposable home.
+Live lab preference 0193: only check this disposable home.
+Live lab preference 0194: only check this disposable home.
+Live lab preference 0195: only check this disposable home.
+Live lab preference 0196: only check this disposable home.
+Live lab preference 0197: only check this disposable home.
+Live lab preference 0198: only check this disposable home.
+Live lab preference 0199: only check this disposable home.
+Live lab preference 0200: only check this disposable home.
+Live lab preference 0201: only check this disposable home.
+Live lab preference 0202: only check this disposable home.
+Live lab preference 0203: only check this disposable home.
+Live lab preference 0204: only check this disposable home.
+Live lab preference 0205: only check this disposable home.
+Live lab preference 0206: only check this disposable home.
+Live lab preference 0207: only check this disposable home.
+Live lab preference 0208: only check this disposable home.
+Live lab preference 0209: only check this disposable home.
+Live lab preference 0210: only check this disposable home.
+Live lab preference 0211: only check this disposable home.
+Live lab preference 0212: only check this disposable home.
+Live lab preference 0213: only check this disposable home.
+Live lab preference 0214: only check this disposable home.
+Live lab preference 0215: only check this disposable home.
+Live lab preference 0216: only check this disposable home.
+Live lab preference 0217: only check this disposable home.
+Live lab preference 0218: only check this disposable home.
+Live lab preference 0219: only check this disposable home.
+Live lab preference 0220: only check this disposable home.
+Live lab preference 0221: only check this disposable home.
+Live lab preference 0222: only check this disposable home.
+Live lab preference 0223: only check this disposable home.
+Live lab preference 0224: only check this disposable home.
+Live lab preference 0225: only check this disposable home.
+Live lab preference 0226: only check this disposable home.
+Live lab preference 0227: only check this disposable home.
+Live lab preference 0228: only check this disposable home.
+Live lab preference 0229: only check this disposable home.
+Live lab preference 0230: only check this disposable home.
+Live lab preference 0231: only check this disposable home.
+Live lab preference 0232: only check this disposable home.
+Live lab preference 0233: only check this disposable home.
+Live lab preference 0234: only check this disposable home.
+Live lab preference 0235: only check this disposable home.
+Live lab preference 0236: only check this disposable home.
+Live lab preference 0237: only check this disposable home.
+Live lab preference 0238: only check this disposable home.
+Live lab preference 0239: only check this disposable home.
+Live lab preference 0240: only check this disposable home.
+Live lab preference 0241: only check this disposable home.
+Live lab preference 0242: only check this disposable home.
+Live lab preference 0243: only check this disposable home.
+Live lab preference 0244: only check this disposable home.
+Live lab preference 0245: only check this disposable home.
+Live lab preference 0246: only check this disposable home.
+Live lab preference 0247: only check this disposable home.
+Live lab preference 0248: only check this disposable home.
+Live lab preference 0249: only check this disposable home.
+Live lab preference 0250: only check this disposable home.
+Live lab preference 0251: only check this disposable home.
+Live lab preference 0252: only check this disposable home.
+Live lab preference 0253: only check this disposable home.
+Live lab preference 0254: only check this disposable home.
+Live lab preference 0255: only check this disposable home.
+Live lab preference 0256: only check this disposable home.
+Live lab preference 0257: only check this disposable home.
+Live lab preference 0258: only check this disposable home.
+Live lab preference 0259: only check this disposable home.
+Live lab preference 0260: only check this disposable home.
+Live lab preference 0261: only check this disposable home.
+Live lab preference 0262: only check this disposable home.
+Live lab preference 0263: only check this disposable home.
+Live lab preference 0264: only check this disposable home.
+Live lab preference 0265: only check this disposable home.
+Live lab preference 0266: only check this disposable home.
+Live lab preference 0267: only check this disposable home.
+Live lab preference 0268: only check this disposable home.
+Live lab preference 0269: only check this disposable home.
+Live lab preference 0270: only check this disposable home.
+Live lab preference 0271: only check this disposable home.
+Live lab preference 0272: only check this disposable home.
+Live lab preference 0273: only check this disposable home.
+Live lab preference 0274: only check this disposable home.
+Live lab preference 0275: only check this disposable home.
+Live lab preference 0276: only check this disposable home.
+Live lab preference 0277: only check this disposable home.
+Live lab preference 0278: only check this disposable home.
+Live lab preference 0279: only check this disposable home.
+Live lab preference 0280: only check this disposable home.
+Live lab preference 0281: only check this disposable home.
+Live lab preference 0282: only check this disposable home.
+Live lab preference 0283: only check this disposable home.
+Live lab preference 0284: only check this disposable home.
+Live lab preference 0285: only check this disposable home.
+Live lab preference 0286: only check this disposable home.
+Live lab preference 0287: only check this disposable home.
+Live lab preference 0288: only check this disposable home.
+Live lab preference 0289: only check this disposable home.
+Live lab preference 0290: only check this disposable home.
+Live lab preference 0291: only check this disposable home.
+Live lab preference 0292: only check this disposable home.
+Live lab preference 0293: only check this disposable home.
+Live lab preference 0294: only check this disposable home.
+Live lab preference 0295: only check this disposable home.
+Live lab preference 0296: only check this disposable home.
+Live lab preference 0297: only check this disposable home.
+Live lab preference 0298: only check this disposable home.
+Live lab preference 0299: only check this disposable home.
+Live lab preference 0300: only check this disposable home.
+Live lab preference 0301: only check this disposable home.
+Live lab preference 0302: only check this disposable home.
+Live lab preference 0303: only check this disposable home.
+Live lab preference 0304: only check this disposable home.
+Live lab preference 0305: only check this disposable home.
+Live lab preference 0306: only check this disposable home.
+Live lab preference 0307: only check this disposable home.
+Live lab preference 0308: only check this disposable home.
+Live lab preference 0309: only check this disposable home.
+Live lab preference 0310: only check this disposable home.
+Live lab preference 0311: only check this disposable home.
+Live lab preference 0312: only check this disposable home.
+Live lab preference 0313: only check this disposable home.
+Live lab preference 0314: only check this disposable home.
+Live lab preference 0315: only check this disposable home.
+Live lab preference 0316: only check this disposable home.
+Live lab preference 0317: only check this disposable home.
+Live lab preference 0318: only check this disposable home.
+Live lab preference 0319: only check this disposable home.
+Live lab preference 0320: only check this disposable home.
+Live lab preference 0321: only check this disposable home.
+Live lab preference 0322: only check this disposable home.
+Live lab preference 0323: only check this disposable home.
+Live lab preference 0324: only check this disposable home.
+Live lab preference 0325: only check this disposable home.
+Live lab preference 0326: only check this disposable home.
+Live lab preference 0327: only check this disposable home.
+Live lab preference 0328: only check this disposable home.
+Live lab preference 0329: only check this disposable home.
+Live lab preference 0330: only check this disposable home.
+Live lab preference 0331: only check this disposable home.
+Live lab preference 0332: only check this disposable home.
+Live lab preference 0333: only check this disposable home.
+Live lab preference 0334: only check this disposable home.
+Live lab preference 0335: only check this disposable home.
+Live lab preference 0336: only check this disposable home.
+Live lab preference 0337: only check this disposable home.
+Live lab preference 0338: only check this disposable home.
+Live lab preference 0339: only check this disposable home.
+Live lab preference 0340: only check this disposable home.
+Live lab preference 0341: only check this disposable home.
+Live lab preference 0342: only check this disposable home.
+Live lab preference 0343: only check this disposable home.
+Live lab preference 0344: only check this disposable home.
+Live lab preference 0345: only check this disposable home.
+Live lab preference 0346: only check this disposable home.
+Live lab preference 0347: only check this disposable home.
+Live lab preference 0348: only check this disposable home.
+Live lab preference 0349: only check this disposable home.
+Live lab preference 0350: only check this disposable home.
+Live lab preference 0351: only check this disposable home.
+Live lab preference 0352: only check this disposable home.
+Live lab preference 0353: only check this disposable home.
+Live lab preference 0354: only check this disposable home.
+Live lab preference 0355: only check this disposable home.
+Live lab preference 0356: only check this disposable home.
+Live lab preference 0357: only check this disposable home.
+Live lab preference 0358: only check this disposable home.
+Live lab preference 0359: only check this disposable home.
+Live lab preference 0360: only check this disposable home.
+Live lab preference 0361: only check this disposable home.
+Live lab preference 0362: only check this disposable home.
+Live lab preference 0363: only check this disposable home.
+Live lab preference 0364: only check this disposable home.
+Live lab preference 0365: only check this disposable home.
+Live lab preference 0366: only check this disposable home.
+Live lab preference 0367: only check this disposable home.
+Live lab preference 0368: only check this disposable home.
+Live lab preference 0369: only check this disposable home.
+Live lab preference 0370: only check this disposable home.
+Live lab preference 0371: only check this disposable home.
+Live lab preference 0372: only check this disposable home.
+Live lab preference 0373: only check this disposable home.
+Live lab preference 0374: only check this disposable home.
+Live lab preference 0375: only check this disposable home.
+Live lab preference 0376: only check this disposable home.
+Live lab preference 0377: only check this disposable home.
+Live lab preference 0378: only check this disposable home.
+Live lab preference 0379: only check this disposable home.
+Live lab preference 0380: only check this disposable home.
+Live lab preference 0381: only check this disposable home.
+Live lab preference 0382: only check this disposable home.
+Live lab preference 0383: only check this disposable home.
+Live lab preference 0384: only check this disposable home.
+Live lab preference 0385: only check this disposable home.
+Live lab preference 0386: only check this disposable home.
+Live lab preference 0387: only check this disposable home.
+Live lab preference 0388: only check this disposable home.
+Live lab preference 0389: only check this disposable home.
+Live lab preference 0390: only check this disposable home.
+Live lab preference 0391: only check this disposable home.
+Live lab preference 0392: only check this disposable home.
+Live lab preference 0393: only check this disposable home.
+Live lab preference 0394: only check this disposable home.
+Live lab preference 0395: only check this disposable home.
+Live lab preference 0396: only check this disposable home.
+Live lab preference 0397: only check this disposable home.
+Live lab preference 0398: only check this disposable home.
+Live lab preference 0399: only check this disposable home.
+Live lab preference 0400: only check this disposable home.
+Live lab preference 0401: only check this disposable home.
+Live lab preference 0402: only check this disposable home.
+Live lab preference 0403: only check this disposable home.
+Live lab preference 0404: only check this disposable home.
+Live lab preference 0405: only check this disposable home.
+Live lab preference 0406: only check this disposable home.
+Live lab preference 0407: only check this disposable home.
+Live lab preference 0408: only check this disposable home.
+Live lab preference 0409: only check this disposable home.
+Live lab preference 0410: only check this disposable home.
+Live lab preference 0411: only check this disposable home.
+Live lab preference 0412: only check this disposable home.
+Live lab preference 0413: only check this disposable home.
+Live lab preference 0414: only check this disposable home.
+Live lab preference 0415: only check this disposable home.
+Live lab preference 0416: only check this disposable home.
+Live lab preference 0417: only check this disposable home.
+Live lab preference 0418: only check this disposable home.
+Live lab preference 0419: only check this disposable home.
+Live lab preference 0420: only check this disposable home.
+Live lab preference 0421: only check this disposable home.
+Live lab preference 0422: only check this disposable home.
+Live lab preference 0423: only check this disposable home.
+Live lab preference 0424: only check this disposable home.
+Live lab preference 0425: only check this disposable home.
+Live lab preference 0426: only check this disposable home.
+Live lab preference 0427: only check this disposable home.
+Live lab preference 0428: only check this disposable home.
+Live lab preference 0429: only check this disposable home.
+Live lab preference 0430: only check this disposable home.
+Live lab preference 0431: only check this disposable home.
+Live lab preference 0432: only check this disposable home.
+Live lab preference 0433: only check this disposable home.
+Live lab preference 0434: only check this disposable home.
+Live lab preference 0435: only check this disposable home.
+Live lab preference 0436: only check this disposable home.
+Live lab preference 0437: only check this disposable home.
+Live lab preference 0438: only check this disposable home.
+Live lab preference 0439: only check this disposable home.
+Live lab preference 0440: only check this disposable home.
+Live lab preference 0441: only check this disposable home.
+Live lab preference 0442: only check this disposable home.
+Live lab preference 0443: only check this disposable home.
+Live lab preference 0444: only check this disposable home.
+Live lab preference 0445: only check this disposable home.
+Live lab preference 0446: only check this disposable home.
+Live lab preference 0447: only check this disposable home.
+Live lab preference 0448: only check this disposable home.
+Live lab preference 0449: only check this disposable home.
+Live lab preference 0450: only check this disposable home.
+Live lab preference 0451: only check this disposable home.
+Live lab preference 0452: only check this disposable home.
+Live lab preference 0453: only check this disposable home.
+Live lab preference 0454: only check this disposable home.
+Live lab preference 0455: only check this disposable home.
+Live lab preference 0456: only check this disposable home.
+Live lab preference 0457: only check this disposable home.
+Live lab preference 0458: only check this disposable home.
+Live lab preference 0459: only check this disposable home.
+Live lab preference 0460: only check this disposable home.
+Live lab preference 0461: only check this disposable home.
+Live lab preference 0462: only check this disposable home.
+Live lab preference 0463: only check this disposable home.
+Live lab preference 0464: only check this disposable home.
+Live lab preference 0465: only check this disposable home.
+Live lab preference 0466: only check this disposable home.
+Live lab preference 0467: only check this disposable home.
+Live lab preference 0468: only check this disposable home.
+Live lab preference 0469: only check this disposable home.
+Live lab preference 0470: only check this disposable home.
+Live lab preference 0471: only check this disposable home.
+Live lab preference 0472: only check this disposable home.
+Live lab preference 0473: only check this disposable home.
+Live lab preference 0474: only check this disposable home.
+Live lab preference 0475: only check this disposable home.
+Live lab preference 0476: only check this disposable home.
+Live lab preference 0477: only check this disposable home.
+Live lab preference 0478: only check this disposable home.
+Live lab preference 0479: only check this disposable home.
+Live lab preference 0480: only check this disposable home.
+Live lab preference 0481: only check this disposable home.
+Live lab preference 0482: only check this disposable home.
+Live lab preference 0483: only check this disposable home.
+Live lab preference 0484: only check this disposable home.
+Live lab preference 0485: only check this disposable home.
+Live lab preference 0486: only check this disposable home.
+Live lab preference 0487: only check this disposable home.
+Live lab preference 0488: only check this disposable home.
+Live lab preference 0489: only check this disposable home.
+Live lab preference 0490: only check this disposable home.
+Live lab preference 0491: only check this disposable home.
+Live lab preference 0492: only check this disposable home.
+Live lab preference 0493: only check this disposable home.
+Live lab preference 0494: only check this disposable home.
+Live lab preference 0495: only check this disposable home.
+Live lab preference 0496: only check this disposable home.
+Live lab preference 0497: only check this disposable home.
+Live lab preference 0498: only check this disposable home.
+Live lab preference 0499: only check this disposable home.
+END_OF_LIVE_LAB_CONTEXT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'unknown'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.

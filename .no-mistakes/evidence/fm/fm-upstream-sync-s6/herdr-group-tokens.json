@@ -1,0 +1,56 @@
+{
+  "id": "cli:pane:list",
+  "result": {
+    "panes": [
+      {
+        "agent_status": "unknown",
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "focused": true,
+        "foreground_cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "pane_id": "w1:p1",
+        "revision": 2,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w1:t1",
+        "terminal_id": "term_65e39fea3f3871",
+        "terminal_title": "zabi@purplevoice: ~/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "terminal_title_stripped": "zabi@purplevoice: ~/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "tokens": {
+          "fm_group": "Frontend",
+          "fm_sort": "001.Frontend.3.web-lab",
+          "fm_state": "running",
+          "fm_task": "web-lab"
+        },
+        "workspace_id": "w1"
+      },
+      {
+        "agent_status": "unknown",
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "focused": false,
+        "foreground_cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "pane_id": "w2:p1",
+        "revision": 2,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w2:t1",
+        "terminal_id": "term_65e39fea443d32",
+        "terminal_title": "zabi@purplevoice: ~/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "terminal_title_stripped": "zabi@purplevoice: ~/.no-mistakes/worktrees/7f0ec18181b6/01M5B7X8B9PHV0M9J8T3GFVBJR",
+        "tokens": {
+          "fm_group": "Backend",
+          "fm_sort": "002.Backend.2.api-lab",
+          "fm_state": "problem",
+          "fm_task": "api-lab"
+        },
+        "workspace_id": "w2"
+      }
+    ],
+    "type": "pane_list"
+  }
+}
