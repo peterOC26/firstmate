@@ -293,8 +293,11 @@ FAKE
   chmod +x "$FAKEBIN/treehouse"
   out=$(spawn_task interrupted 1); rc=$?
   [ "$rc" -ne 0 ] || fail "a failed acquisition response was accepted"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"' "abort omitted guarded manual return"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'rm -f -- "$(dirname "$worktree")/.fm-slot-owner"' "abort omitted claim removal"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'rm -rf -- "$journal"' "abort omitted journal removal"
   assert_contains "$out" "$HOME_DIR/state/interrupted.treehouse-acquire" "abort omitted journal path"
   assert_absent "$HOME_DIR/state/interrupted.meta" "failed acquisition published a task record"
@@ -306,8 +309,11 @@ FAKE
   : > "$CASE_DIR/mutations"
   out=$(spawn_task interrupted 2); rc=$?
   [ "$rc" -ne 0 ] || fail "a same-task retry bypassed its journal"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"' "retry omitted guarded manual return"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'rm -f -- "$(dirname "$worktree")/.fm-slot-owner"' "retry omitted claim removal"
+  # shellcheck disable=SC2016
   assert_contains "$out" 'rm -rf -- "$journal"' "retry omitted journal removal"
   out=$(spawn_task later 2); rc=$?
   [ "$rc" -ne 0 ] || fail "a partial acquisition journal was silently bypassed"
