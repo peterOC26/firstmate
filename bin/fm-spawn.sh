@@ -1475,6 +1475,26 @@ spawn_orca_reclaim_launch_file() {
   return 1
 }
 
+spawn_treehouse_recovery_steps() {
+  local journal=$1
+  {
+    echo "Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything."
+    printf 'journal=%q\n' "$journal"
+    cat <<'RECOVERY'
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess or use treehouse status.
+Preserve any unlanded work and reconcile any retained task record first. Stop if another task owns the claim or lease.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim is confirmed to belong to this acquisition (or is absent), run:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+RECOVERY
+  } >&2
+}
+
 spawn_abort_cleanup() {
   local status=$?
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ] &&
@@ -1630,6 +1650,7 @@ spawn_abort_cleanup() {
   if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
     [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
     echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
+    spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
@@ -3558,6 +3579,7 @@ if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   else
     if [ -e "$STATE/$ID.treehouse-acquire" ] || [ -L "$STATE/$ID.treehouse-acquire" ]; then
       echo "REFUSED: task $ID has a retained Treehouse acquisition journal; reconcile $STATE/$ID.treehouse-acquire before retrying" >&2
+      spawn_treehouse_recovery_steps "$STATE/$ID.treehouse-acquire"
       exit 1
     fi
     fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1

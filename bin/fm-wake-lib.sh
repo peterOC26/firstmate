@@ -1807,7 +1807,7 @@ fm_treehouse_record_paths_safe() {  # <meta>
 # An acquisition journal survives failed spawns, even without a .meta record;
 # it is never automatically returned, overwritten, or forgotten on retry.
 fm_treehouse_records_reserved() {  # <project> <state>
-  local project=$1 state=$2 dir meta id path field journal paths pool_state
+  local project=$1 state=$2 dir meta id path field journal journal_project paths pool_state
   fm_local_firstmate_state_dirs "$state" || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; no Treehouse allocation was attempted" >&2
     return 1
@@ -1852,7 +1852,24 @@ fm_treehouse_records_reserved() {  # <project> <state>
     done
     for journal in "$dir"/*.treehouse-acquire; do
       [ -e "$journal" ] || [ -L "$journal" ] || continue
-      [ -d "$journal" ] && [ ! -L "$journal" ] || return 1
+      journal_project=
+      if [ -f "$journal/identity" ] && [ -r "$journal/identity" ] && [ ! -L "$journal/identity" ]; then
+        journal_project=$(awk '
+          /^project=/ { count++; value=substr($0,9) }
+          END { if (count == 1 && length(value)) print value; else exit 1 }
+        ' "$journal/identity") || journal_project=
+      fi
+      if [ -n "$journal_project" ]; then
+        fm_treehouse_same_project "$project" "$journal_project" || continue
+      fi
+      if [ ! -d "$journal" ] || [ -L "$journal" ]; then
+        echo "REFUSED: unsafe Treehouse acquisition journal $journal (not a directory or a symlink); reconcile it before allocating" >&2
+        return 1
+      fi
+      if [ -z "$journal_project" ]; then
+        echo "REFUSED: cannot determine project of Treehouse acquisition journal $journal; reconcile its identity before allocating" >&2
+        return 1
+      fi
       # A pending/partial response is unknown ownership, not a free copy.
       paths=$(jq -er '.path | select(type == "string" and length > 0)' "$journal/allocation.json" 2>/dev/null) || {
         echo "REFUSED: unresolved Treehouse acquisition journal $journal; reconcile it before allocating" >&2

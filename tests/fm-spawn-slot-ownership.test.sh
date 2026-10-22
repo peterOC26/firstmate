@@ -163,31 +163,50 @@ test_relaunch_keeps_acquisition_and_rejects_stale_claim() {
 
 test_cleanup_rerun_after_released_lease_is_records_only() {
   local shape out rc
-  for shape in released held; do
+  for shape in released held legacy-alone legacy-shared-worktree legacy-shared-home; do
     make_case "rerun-$shape"
     out=$(spawn_task retained 1); rc=$?
     expect_code 0 "$rc" "setup spawn failed: $out"
     # An earlier cleanup returned the copy and dropped its claim, then failed.
     rm -f "$POOL/1/.fm-slot-owner"
-    if [ "$shape" = released ]; then
+    if [ "$shape" != held ]; then
       jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
       mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
     fi
+    case "$shape" in
+      legacy-*)
+        sed -i '/^treehouse_lease_/d' "$HOME_DIR/state/retained.meta"
+        rm -rf "$HOME_DIR/state/retained.treehouse-acquire"
+        if [ "$shape" != legacy-alone ]; then
+          mkdir -p "$CASE_DIR/mate/state" "$CASE_DIR/mate/data" "$CASE_DIR/mate/config"
+          printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' "$CASE_DIR/mate" > "$HOME_DIR/data/secondmates.md"
+          fm_write_meta "$CASE_DIR/mate/state/other.meta" "${shape##legacy-shared-}=$POOL/1/project" "project=$PROJECT" "kind=scout"
+        fi
+        ;;
+    esac
     : > "$POOL/1/project/dirty-sentinel"
+    printf 'preserve wiring\n' > "$POOL/1/project/.fm-grok-turnend"
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/pool-before.json"
     : > "$CASE_DIR/treehouse.log"
     FM_HOME="$HOME_DIR" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project" \
       FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH" \
       bash "$ROOT/bin/fm-teardown.sh" retained --force > "$CASE_DIR/cleanup" 2>&1; rc=$?
-    if [ "$shape" = released ]; then
+    if [ "$shape" = released ] || [ "$shape" = legacy-alone ]; then
       expect_code 0 "$rc" "a re-run after the lease was released was stranded: $(cat "$CASE_DIR/cleanup")"
       assert_absent "$HOME_DIR/state/retained.meta" "the re-run left its task record"
-      assert_grep 'already released' "$CASE_DIR/cleanup" "the re-run did not name the released lease"
+      if [ "$shape" = released ]; then
+        assert_grep 'already released' "$CASE_DIR/cleanup" "the re-run did not name the released lease"
+      else
+        assert_grep 'records-only cleanup' "$CASE_DIR/cleanup" "legacy cleanup did not name its records-only scope"
+      fi
     else
       [ "$rc" -ne 0 ] || fail "an unclaimed copy still holding this lease was cleaned up"
       assert_present "$HOME_DIR/state/retained.meta" "a refused cleanup removed its task record"
     fi
     [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape cleanup returned a copy it could not prove was its own"
     assert_present "$POOL/1/project/dirty-sentinel" "$shape cleanup touched the copy"
+    assert_grep 'preserve wiring' "$POOL/1/project/.fm-grok-turnend" "$shape cleanup removed harness wiring"
+    cmp -s "$CASE_DIR/pool-before.json" "$POOL/treehouse-state.json" || fail "$shape cleanup changed pool state"
   done
   pass "a cleanup re-run after its lease was released retires records only; an unclaimed held lease still refuses"
 }
@@ -222,6 +241,10 @@ FAKE
   chmod +x "$FAKEBIN/treehouse"
   out=$(spawn_task interrupted 1); rc=$?
   [ "$rc" -ne 0 ] || fail "a failed acquisition response was accepted"
+  assert_contains "$out" 'treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"' "abort omitted guarded manual return"
+  assert_contains "$out" 'rm -f -- "$(dirname "$worktree")/.fm-slot-owner"' "abort omitted claim removal"
+  assert_contains "$out" 'rm -rf -- "$journal"' "abort omitted journal removal"
+  assert_contains "$out" "$HOME_DIR/state/interrupted.treehouse-acquire" "abort omitted journal path"
   assert_absent "$HOME_DIR/state/interrupted.meta" "failed acquisition published a task record"
   raw_id=$(jq -er .lease_id "$HOME_DIR/state/interrupted.treehouse-acquire/allocation.json") || fail "abort lost its raw lease identity"
   pool_id=$(jq -r '.worktrees[] | select(.leased == true) | .lease_id' "$POOL/treehouse-state.json")
@@ -229,6 +252,11 @@ FAKE
   assert_grep 'treehouse_lease_holder=' "$HOME_DIR/state/interrupted.treehouse-acquire/identity" "abort lost its acquisition holder"
   : > "$CASE_DIR/treehouse.log"
   : > "$CASE_DIR/mutations"
+  out=$(spawn_task interrupted 2); rc=$?
+  [ "$rc" -ne 0 ] || fail "a same-task retry bypassed its journal"
+  assert_contains "$out" 'treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"' "retry omitted guarded manual return"
+  assert_contains "$out" 'rm -f -- "$(dirname "$worktree")/.fm-slot-owner"' "retry omitted claim removal"
+  assert_contains "$out" 'rm -rf -- "$journal"' "retry omitted journal removal"
   out=$(spawn_task later 2); rc=$?
   [ "$rc" -ne 0 ] || fail "a partial acquisition journal was silently bypassed"
   [ ! -s "$CASE_DIR/treehouse.log" ] && [ ! -s "$CASE_DIR/mutations" ] || fail "unknown acquisition recovery reached get or endpoint mutation"
@@ -246,6 +274,49 @@ test_another_project_record_does_not_block_this_pool() {
   out=$(spawn_task candidate 1); rc=$?
   expect_code 0 "$rc" "an unrelated project's retained record blocked this pool: $out"
   pass "retained copies of another repository do not block this project's allocation"
+}
+
+test_acquisition_journals_are_project_scoped() {
+  local location shape out rc state journal journal_project
+  for location in local registered; do
+    for shape in foreign same unknown symlink non-directory; do
+      make_case "journal-$location-$shape"
+      state="$HOME_DIR/state"
+      if [ "$location" = registered ]; then
+        state="$CASE_DIR/mate/state"
+        mkdir -p "$state" "$CASE_DIR/mate/data" "$CASE_DIR/mate/config"
+        printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' "$CASE_DIR/mate" > "$HOME_DIR/data/secondmates.md"
+      fi
+      journal="$state/pending.treehouse-acquire"
+      journal_project=$PROJECT
+      if [ "$shape" = foreign ]; then
+        journal_project="$CASE_DIR/foreign"
+        fm_git_init_commit "$journal_project"
+      fi
+      if [ "$shape" = non-directory ]; then
+        : > "$journal"
+      else
+        mkdir "$journal"
+        [ "$shape" = unknown ] || printf 'project=%s\n' "$journal_project" > "$journal/identity"
+        printf '{' > "$journal/allocation.json"
+        if [ "$shape" = symlink ]; then
+          mv "$journal" "$CASE_DIR/journal-target"
+          ln -s "$CASE_DIR/journal-target" "$journal"
+        fi
+      fi
+      out=$(spawn_task candidate 1); rc=$?
+      if [ "$shape" = foreign ]; then
+        expect_code 0 "$rc" "an unrelated partial journal blocked spawn: $out"
+        assert_present "$HOME_DIR/state/candidate.meta" "foreign journal prevented publication"
+      else
+        [ "$rc" -ne 0 ] || fail "$shape journal allowed allocation"
+        assert_contains "$out" "$journal" "$shape refusal omitted the journal needing reconciliation"
+        [ ! -s "$CASE_DIR/treehouse.log" ] && [ ! -s "$CASE_DIR/mutations" ] || fail "$shape journal reached allocation or endpoint mutation"
+      fi
+      [ -e "$journal" ] || fail "spawn removed $shape journal"
+    done
+  done
+  pass "partial journals block their own project; unknown and unsafe journals diagnose refusal across local homes"
 }
 
 test_separate_clones_share_the_origin_pool_reservation() {
@@ -289,3 +360,5 @@ test_cleanup_rerun_after_released_lease_is_records_only
 test_unsupported_cli_and_failed_acquisition_preserve_reservations
 test_another_project_record_does_not_block_this_pool
 test_separate_clones_share_the_origin_pool_reservation
+
+test_acquisition_journals_are_project_scoped
