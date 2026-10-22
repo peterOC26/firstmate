@@ -108,6 +108,8 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
+On the markdown backend, a listed task that done retention pruned from the live backlog is read from the configured done archive instead.
+An archived entry passes only with a recorded resolution, never on a surviving hold annotation alone, and a live row with the same id always takes precedence.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
 For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
 An entry whose recorded origin differs from the one being completed is refused.
@@ -516,6 +518,8 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
 - Non-forced scout teardown always requires the durable inventory verification.
 - The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call.
+- An answered or released call that done retention pruned into the configured done archive still passes `complete`, `verify`, and cleanup, including through a legacy inventory identity.
+  An archived call without a recorded answer, an archived row still bearing a hold, a call absent from both records, a reopened live row without an answer, and an archived call held for another origin all still refuse cleanup at the completion gate.
 
 ### Answers, stamps, and deferral
 
