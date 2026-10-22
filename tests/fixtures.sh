@@ -324,12 +324,13 @@ fm_test_lease_existing_worktree() {  # <worktree> <meta> <id> <home>
   printf 'treehouse_lease_id=fixture-%s\ntreehouse_lease_holder=%s\n' "$id" "$holder" >> "$meta"
 }
 
-# fm_test_make_spawn_fakebin <dir> [extra-exit0-tool...]
-# Creates <dir>/fakebin with the spawn tmux stub, a leased fake pool, and any
-# extra exit-0 tools. Echoes the fakebin path.
-fm_test_fake_treehouse() {  # <fakebin>
-  cat > "$1/treehouse" <<'SH'
+# A lease-aware fake allocator, using the supplied path or the pane-path env.
+fm_test_fake_treehouse() {  # <fakebin> [worktree]
+  cat > "$1/treehouse" <<SH
 #!/usr/bin/env bash
+export FM_FAKE_TREEHOUSE_PATH=\${FM_FAKE_TREEHOUSE_PATH:-$(printf '%q' "${2:-}")}
+SH
+  cat >> "$1/treehouse" <<'SH'
 set -eu
 case "$*" in
   'get --help') echo '--lease --lease-holder --json'; exit 0 ;;
@@ -381,6 +382,9 @@ SH
   chmod +x "$1/treehouse"
 }
 
+# fm_test_make_spawn_fakebin <dir> [extra-exit0-tool...]
+# Creates <dir>/fakebin with the spawn tmux stub, a leased fake pool, and any
+# extra exit-0 tools. Echoes the fakebin path.
 fm_test_make_spawn_fakebin() {
   local dir=$1 fakebin
   shift

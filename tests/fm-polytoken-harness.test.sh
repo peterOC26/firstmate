@@ -41,8 +41,8 @@
 # and the fakes must survive inside the subshell that runs that command.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 # bin/fm-harness.sh checks verified ENV markers before ancestry. A suite run
 # from inside another harness inherits those markers, which outrank the fake
@@ -573,7 +573,8 @@ case "\$subcmd" in
 esac
 SH
   chmod +x "$fakebin/polytoken"
-  fm_fake_exit0 "$fakebin" treehouse gh-axi gh
+  fm_fake_exit0 "$fakebin" gh-axi gh
+  fm_test_fake_treehouse "$fakebin"
   printf '%s\n' "$fakebin"
 }
 
@@ -1144,10 +1145,9 @@ test_polytoken_readiness_failure_fails_loudly_and_cleans_up() {
   pass "fm-spawn: a failed readiness gate fails loudly, reaps, and retires its wiring"
 }
 
-# A gate failure after the task record is published rolls that record back, so
-# the slot claim the spawn took must go with it rather than name a task no
-# record describes.
-test_polytoken_post_launch_failure_drops_its_slot_claim() {
+# A gate failure rolls the task record back, but the durable acquisition and
+# claim must remain available for explicit recovery.
+test_polytoken_post_launch_failure_retains_its_slot_claim() {
   local id rec out rc slot_root claim
   id="pt-noready-slot-z9-$$"
   rec=$(make_polytoken_spawn_case noready-slot "$id")
@@ -1166,8 +1166,11 @@ test_polytoken_post_launch_failure_drops_its_slot_claim() {
   assert_contains "$(cat "$CASE_DIR/tmux-calls.log")" "kill-window" \
     "the failed gate must close the endpoint holding the slot"
   assert_absent "$HOME_DIR/state/$id.meta" "the failed launch must not leave its task record"
-  [ ! -e "$claim" ] || fail "the failed launch left a slot claim naming a task with no record: $(cat "$claim")"
-  pass "fm-spawn: a gate failure after publication drops the slot claim with the record"
+  assert_grep "task=$id" "$claim" "the failed launch lost its acquisition's slot claim"
+  assert_present "$HOME_DIR/state/$id.treehouse-acquire/identity" "the failed launch lost its recovery identity"
+  jq -e '.worktrees[0] | .leased == true and (.lease_id | length > 0)' \
+    "$slot_root/treehouse-state.json" >/dev/null || fail "the failed launch released its durable reservation"
+  pass "fm-spawn: a gate failure after publication retains the lease, claim, and recovery journal"
 }
 
 test_polytoken_spawn_arms_the_busy_contract() {
@@ -1218,5 +1221,5 @@ test_polytoken_secondmate_is_refused
 test_polytoken_existing_project_hook_layer_refuses
 test_polytoken_whitespace_state_dir_refuses
 test_polytoken_readiness_failure_fails_loudly_and_cleans_up
-test_polytoken_post_launch_failure_drops_its_slot_claim
+test_polytoken_post_launch_failure_retains_its_slot_claim
 test_polytoken_spawn_arms_the_busy_contract

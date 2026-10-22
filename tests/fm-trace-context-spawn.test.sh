@@ -4,8 +4,8 @@
 # See docs/verification/trace-context.md for the maintained coverage inventory.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-trace-context-lib.sh"
 
@@ -34,6 +34,8 @@ make_spawn_fakebin() {
 set -u
 case "$*" in
   *"#{pane_current_path}"*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
+  *pane_current_command*) printf 'bash\n'; exit 0 ;;
+  *pane_pid*) printf '99999999\n'; exit 0 ;;
 esac
 window_file="$(dirname "$0")/.spawn-window"
 case "${1:-}" in
@@ -50,12 +52,11 @@ case "${1:-}" in
       [ "$previous" = -n ] && name=$arg
       previous=$arg
     done
-    printf '%s\n' "$name" > "$window_file"
+    printf '%s\n' "$name" >> "$window_file"
     exit 0 ;;
   kill-window) : > "$window_file"; exit 0 ;;
   has-session|new-session) exit 0 ;;
   send-keys)
-    case " $* " in *' -l '*) : > "$window_file.launch-pending" ;; esac
     if [ "${FM_FAKE_TRACEPARENT_SEND_FAIL:-0}" = 1 ]; then
       for a in "$@"; do
         case "$a" in
@@ -100,21 +101,13 @@ case "${1:-}" in
         esac
       done
     fi
-    case " $* " in
-      *' Enter '*|*' C-m '*)
-        if [ -e "$window_file.launch-pending" ]; then
-          : > "$window_file"
-          rm -f "$window_file.launch-pending"
-        fi
-        ;;
-    esac
     exit 0
     ;;
 esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
-  fm_fake_exit0 "$fakebin" treehouse
+  fm_test_fake_treehouse "$fakebin"
   printf '%s\n' "$fakebin"
 }
 
@@ -144,6 +137,8 @@ make_spawn_case() {
 run_spawn() {
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
+  local -a delivery_args=(--mode no-mistakes --yolo off)
+  [ "${2:-}" != --relaunch ] || delivery_args=()
   : > "$launchlog"
   # A claude spawn pre-registers workspace trust in the launching user's own
   # store (bin/fm-claude-trust.sh), so it runs against a throwaway HOME;
@@ -159,7 +154,7 @@ run_spawn() {
     FM_FAKE_TRACE_METADATA_APPEND_FAIL="${FM_FAKE_TRACE_METADATA_APPEND_FAIL:-0}" \
     FM_FAKE_META_PATH="$home/state/$1.meta" \
     FM_FAKE_LAUNCH_LOG="$launchlog" PATH="$fakebin:$PATH" \
-    "$SPAWN" "$@" --mode no-mistakes --yolo off 2>&1
+    "$SPAWN" "$@" ${delivery_args[@]+"${delivery_args[@]}"} 2>&1
 }
 
 # Same, but with an explicit FM_TRACE_CONTEXT override, to prove the env decides.
@@ -457,9 +452,9 @@ test_relaunch_reuses_recorded_carrier() {
   # Relaunch the same task: the recorded carrier must be reused verbatim for both
   # the meta and the injected export, so an observer keeps one identity across
   # restarts.
-  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" --relaunch)
   status=$?
-  expect_code 0 "$status" "relaunch spawn should succeed"
+  expect_code 0 "$status" "relaunch spawn should succeed: $out"
   assert_contains "$out" "spawned $CASE_ID" "relaunch spawn should report success"
   second=$(meta_traceparent "$meta")
   injected=$(injected_traceparent "$LAUNCH_LOG")
@@ -555,8 +550,8 @@ test_two_routed_tasks_through_one_secondmate_root_distinct_traces() {
 
   id_a=routed-a-z1
   id_b=routed-b-z1
-  proj_a="$base/proj-a"; wt_a="$base/wt-a"
-  proj_b="$base/proj-b"; wt_b="$base/wt-b"
+  proj_a="$base/proj-a"; wt_a="$base/task-a/wt"
+  proj_b="$base/proj-b"; wt_b="$base/task-b/wt"
   fm_git_worktree "$proj_a" "$wt_a" wt-routed-a
   fm_git_worktree "$proj_b" "$wt_b" wt-routed-b
   mkdir -p "$sm/data/$id_a" "$sm/data/$id_b"
@@ -591,7 +586,7 @@ test_two_routed_tasks_through_one_secondmate_root_distinct_traces() {
 
   # Same environment, same task: a relaunch must reuse task A's recorded
   # carrier verbatim, so the per-task boundary never costs recovery identity.
-  out=$(TRACEPARENT="$sm_tp" run_spawn "$sm" "$wt_a" "$fakebin" "$log_a" "$id_a" "$proj_a")
+  out=$(TRACEPARENT="$sm_tp" run_spawn "$sm" "$wt_a" "$fakebin" "$log_a" "$id_a" --relaunch)
   status=$?
   expect_code 0 "$status" "routed task A relaunch should succeed"
   relaunch_tp=$(meta_traceparent "$sm/state/$id_a.meta")

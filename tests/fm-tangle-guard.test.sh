@@ -168,7 +168,7 @@ test_spawn_isolation_abort() {
   # The assertions concern identity, not how long an unchanged cwd is polled.
   fm_test_fake_sleep_noop "$fakebin"
   # A genuine isolated linked worktree of the project, detached on the default.
-  git -C "$proj" worktree add -q --detach "$TMP_ROOT/spawn-wt" >/dev/null 2>&1
+  git -C "$proj" worktree add -q --detach "$TMP_ROOT/spawn-pool/1/repo" >/dev/null 2>&1
   # The non-git case must BE non-git wherever this suite runs. A directory under
   # TMPDIR is not one when TMPDIR itself sits inside a git repository - git walks
   # up and finds that repo, and the spawn reports the subdirectory cause instead.
@@ -183,7 +183,10 @@ test_spawn_isolation_abort() {
   # a path like this is never adopted and the refusal comes from the poll's own
   # deadline, naming the path and why it was rejected. The assertions pin which
   # cause fired, not the operator wording that explains it.
-  out=$(GIT_CEILING_DIRECTORIES="$TMP_ROOT/spawn-notgit-root" \
+  git -C "$proj" worktree add -q --detach "$TMP_ROOT/notgit-acquisition/wt" || fail "could not prepare non-git probe copy"
+  git -C "$proj" worktree add -q --detach "$TMP_ROOT/primary-acquisition/wt" || fail "could not prepare primary probe copy"
+  out=$(FM_FAKE_TREEHOUSE_PATH="$TMP_ROOT/notgit-acquisition/wt" \
+    GIT_CEILING_DIRECTORIES="$TMP_ROOT/spawn-notgit-root" \
     run_spawn "$home" abort-notgit-dd4 "$proj" "$TMP_ROOT/spawn-notgit-root/plain" "$fakebin"); status=$?
   expect_code 1 "$status" "spawn into a non-worktree dir should abort"
   assert_contains "$out" "did not enter an isolated worktree" "non-worktree spawn lacked the isolation error"
@@ -191,14 +194,14 @@ test_spawn_isolation_abort() {
   assert_absent "$home/state/abort-notgit-dd4.meta" "aborted spawn must not record meta"
 
   # Abort: the pane resolves INTO the primary checkout (a subdir of PROJ_ABS).
-  out=$(run_spawn "$home" abort-primary-ee5 "$proj" "$proj/sub" "$fakebin"); status=$?
+  out=$(FM_FAKE_TREEHOUSE_PATH="$TMP_ROOT/primary-acquisition/wt" run_spawn "$home" abort-primary-ee5 "$proj" "$proj/sub" "$fakebin"); status=$?
   expect_code 1 "$status" "spawn landing inside the primary checkout should abort"
   assert_contains "$out" "did not enter an isolated worktree" "primary-checkout spawn lacked the isolation error"
   assert_contains "$out" "not a worktree root" "primary-checkout spawn did not say why the path was rejected"
   assert_absent "$home/state/abort-primary-ee5.meta" "aborted spawn must not record meta"
 
   # Proceed: the pane resolves to a genuine, isolated worktree.
-  out=$(run_spawn "$home" ok-isolated-ff6 "$proj" "$TMP_ROOT/spawn-wt" "$fakebin"); status=$?
+  out=$(run_spawn "$home" ok-isolated-ff6 "$proj" "$TMP_ROOT/spawn-pool/1/repo" "$fakebin"); status=$?
   expect_code 0 "$status" "spawn into a genuine isolated worktree should succeed"
   assert_contains "$out" "spawned ok-isolated-ff6" "isolated spawn did not report success"
   assert_not_contains "$out" "isolated worktree" "isolated spawn wrongly tripped the guard"
@@ -254,7 +257,7 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
-  fm_fake_exit0 "$fakebin" treehouse
+  fm_test_fake_treehouse "$fakebin"
   printf '%s\n' "$fakebin"
 }
 
@@ -274,7 +277,7 @@ test_spawn_tmux_window_construction() {
   fakebin=$(make_spawn_record_fakebin "$TMP_ROOT/spawn-rec-fake")
   rec="$TMP_ROOT/spawn-rec.log"
   : > "$rec"
-  wt="$TMP_ROOT/spawn-rec-wt"
+  wt="$TMP_ROOT/spawn-rec-pool/1/repo"
   git -C "$proj" worktree add -q --detach "$wt" >/dev/null 2>&1
 
   out=$(run_spawn_record "$home" rec-win-gg7 "$proj" "$wt" "$fakebin" "$rec"); status=$?
@@ -294,8 +297,8 @@ test_spawn_tmux_window_construction() {
     "must disable allow-rename on the spawned window"
 
   # Bug 2 fix (b): treehouse-get and the worktree wait loop target the stable id.
-  assert_grep "send-keys -t @spawnwid treehouse get Enter" "$rec" \
-    "treehouse get must be sent to the stable window id"
+  assert_grep "send-keys -t @spawnwid cd -- '$wt' Enter" "$rec" \
+    "the leased copy cd must be sent to the stable window id"
   assert_grep "display-message -p -t @spawnwid #{pane_current_path}" "$rec" \
     "the worktree wait loop must query the stable window id, not the name"
 

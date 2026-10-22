@@ -23,8 +23,8 @@
 # deliberately not asserted here.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$ROOT/bin/fm-timeout-lib.sh"
 
@@ -126,7 +126,8 @@ esac
 exit 0
 SH
   chmod +x "$fakebin/tmux"
-  fm_fake_exit0 "$fakebin" treehouse gh gh-axi no-mistakes
+  fm_fake_exit0 "$fakebin" gh gh-axi no-mistakes
+  fm_test_fake_treehouse "$fakebin"
 
   fm_git_init_commit "$case_dir/project"
   fm_git_add_origin "$case_dir/project" "$case_dir/project.origin.git"
@@ -488,18 +489,26 @@ track_teardown_resource_actions() {  # <case-dir>
 : > "$case_dir/backend-resource-action"
 exit 0
 SH
+  mv "$case_dir/fakebin/treehouse" "$case_dir/fakebin/treehouse.base"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\$*" in
+  'get --help'|'return --help') exec "$case_dir/fakebin/treehouse.base" "\$@" ;;
+esac
 : > "$case_dir/local-copy-resource-action"
-exit 0
+exec "$case_dir/fakebin/treehouse.base" "\$@"
 SH
   chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
 }
 
 interrupt_teardown_during_treehouse_return() {  # <case-dir>
   local case_dir=$1
+  mv "$case_dir/fakebin/treehouse" "$case_dir/fakebin/treehouse.base"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\$*" in
+  'get --help'|'return --help') exec "$case_dir/fakebin/treehouse.base" "\$@" ;;
+esac
 if [ "\${1:-}" = return ] && [ ! -f "$case_dir/teardown-interrupted" ]; then
   : > "$case_dir/teardown-interrupted"
   teardown_pid=\$(ps -o ppid= -p "\$PPID" | tr -d ' ')
@@ -507,7 +516,7 @@ if [ "\${1:-}" = return ] && [ ! -f "$case_dir/teardown-interrupted" ]; then
   kill -TERM "\$teardown_pid"
   kill -TERM "\$\$"
 fi
-exit 0
+exec "$case_dir/fakebin/treehouse.base" "\$@"
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 }
@@ -627,7 +636,7 @@ run_spawn() {  # <case-dir> <args...>
   # without it this suite would write the developer's real ~/.claude.json.
   mkdir -p "$case_dir/user-home"
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$(home_of "$case_dir")" HOME="$case_dir/user-home" \
-    FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
+    FM_SPAWN_NO_GUARD=1 FM_FAKE_TREEHOUSE_LOG="$case_dir/local-copy-requested" FM_FAKE_PANE_PATH="$case_dir/wt" TMUX="fake,1,0" \
     CLAUDE_CONFIG_DIR='' \
     PATH="$case_dir/fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
@@ -939,7 +948,6 @@ test_dispatch_refuses_a_pending_authoritative_close() {
 #!/usr/bin/env bash
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
-  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
@@ -974,7 +982,6 @@ test_dispatch_refuses_a_held_row_before_creating_resources() {
 #!/usr/bin/env bash
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
-  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
@@ -1009,7 +1016,6 @@ test_dispatch_refuses_a_blocked_row_before_creating_resources() {
 #!/usr/bin/env bash
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
-  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac
@@ -1044,7 +1050,6 @@ test_dispatch_refuses_a_held_in_flight_row_before_relaunch() {
 #!/usr/bin/env bash
 case "\$*" in
   *new-window*) : > "$case_dir/task-endpoint-created" ;;
-  *treehouse\\ get*) : > "$case_dir/local-copy-requested" ;;
   *"#{pane_current_path}"*) printf '%s\n' "\${FM_FAKE_PANE_PATH:-}"; exit 0 ;;
 esac
 case "\${1:-}" in display-message) printf 'firstmate\n'; exit 0 ;; esac

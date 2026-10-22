@@ -3549,11 +3549,17 @@ if [ "$KIND" != secondmate ] &&
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
 fi
-if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  fm_treehouse_lease_cli || {
-    echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
+if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
+  if ! fm_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
+    echo "error: spawn refused: project $(basename "$PROJ_ABS") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($FM_PROJECT_CAPACITY_ERROR)" >&2
     exit 1
-  }
+  fi
+  if [ "$FM_PROJECT_CAPACITY_OCCUPANTS" -ge "$SPAWN_PROJECT_CAPACITY" ]; then
+    echo "deferred: project $(basename "$PROJ_ABS") admits $SPAWN_PROJECT_CAPACITY worker(s) at once on this machine ($FM_PROJECT_CAPACITY_FILE) and $FM_PROJECT_CAPACITY_OCCUPANTS already hold a place ($FM_PROJECT_CAPACITY_OCCUPANT_IDS); task $ID was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up" >&2
+    exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
+  fi
+fi
+if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   if [ "$RELAUNCH" -eq 1 ]; then
     if ! grep -q '^treehouse_lease_' "$RELAUNCH_META"; then
       # A record from before durable leases keeps relaunching into its own
@@ -3583,16 +3589,6 @@ if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       exit 1
     fi
     fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1
-  fi
-fi
-if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
-  if ! fm_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
-    echo "error: spawn refused: project $(basename "$PROJ_ABS") declares a capacity of $SPAWN_PROJECT_CAPACITY, but this machine's task records cannot all be read to count it ($FM_PROJECT_CAPACITY_ERROR)" >&2
-    exit 1
-  fi
-  if [ "$FM_PROJECT_CAPACITY_OCCUPANTS" -ge "$SPAWN_PROJECT_CAPACITY" ]; then
-    echo "deferred: project $(basename "$PROJ_ABS") admits $SPAWN_PROJECT_CAPACITY worker(s) at once on this machine ($FM_PROJECT_CAPACITY_FILE) and $FM_PROJECT_CAPACITY_OCCUPANTS already hold a place ($FM_PROJECT_CAPACITY_OCCUPANT_IDS); task $ID was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up" >&2
-    exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
 [ -f "$BRIEF" ] || {
@@ -3815,6 +3811,13 @@ if [ "$KIND" = ship ]; then
   if [ "$BRANCH" != "$STANDING_BRANCH$ID" ]; then
     echo "notice: $ID ships branch=$BRANCH while $PROJ_NAME registers the ship-branch prefix '$STANDING_BRANCH' (branch $STANDING_BRANCH$ID) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state" >&2
   fi
+fi
+
+if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  fm_treehouse_lease_cli || {
+    echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
+    exit 1
+  }
 fi
 
 BRIEF_DIR_REAL=$(cd "$(dirname "$BRIEF")" && pwd -P)

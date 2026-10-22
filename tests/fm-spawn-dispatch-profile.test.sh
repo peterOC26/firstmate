@@ -317,6 +317,8 @@ test_home_defaults_preserve_absolute_or_resolve_relative_paths() {
   assert_contains "$launch" "< '$home_real/data/$relative_id/launch-brief.md'" \
     "relative FM_HOME leaked into the default cross-process brief path"
 
+  WT_DIR="$CASE_DIR/absolute-home/wt"
+  git -C "$PROJ_DIR" worktree add --quiet --detach "$WT_DIR" || fail "could not prepare absolute home copy"
   linked_home="$CASE_DIR/home-link"
   ln -s "$HOME_DIR" "$linked_home"
   : > "$LAUNCH_LOG"
@@ -968,12 +970,32 @@ test_native_pi_ultra_is_explicit_and_model_scoped() {
   pass "Ultra is explicit for native Pi and Pi-signed, including direct-PR, and refuses unsupported profiles before provisioning"
 }
 
+prepare_batch_pool() {
+  mkdir -p "$CASE_DIR/pool/1" "$CASE_DIR/pool/2"
+  git -C "$PROJ_DIR" worktree move "$WT_DIR" "$CASE_DIR/pool/1/project"
+  git -C "$PROJ_DIR" worktree add --quiet --detach "$CASE_DIR/pool/2/project"
+  jq -n --arg a "$CASE_DIR/pool/1/project" --arg b "$CASE_DIR/pool/2/project" \
+    '{worktrees:[{path:$a},{path:$b}]}' > "$CASE_DIR/pool/treehouse-state.json"
+  mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux.base"
+  cat > "$FAKEBIN_DIR/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *pane_current_path*)
+    jq -er '[.worktrees[] | select(.leased == true)] | last.path' "$FM_FAKE_TREEHOUSE_POOL/treehouse-state.json"
+    exit $? ;;
+esac
+exec "$(dirname "$0")/tmux.base" "$@"
+SH
+  chmod +x "$FAKEBIN_DIR/tmux"
+}
+
 test_batch_preserves_native_ultra() {
   local rec id1=ultra-batch-a id2=ultra-batch-b out launch
   rec=$(make_spawn_case ultra-batch pi "$id1" "$id2")
   read_case_record "$rec"
   enable_dispatch_profile "$HOME_DIR"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+  prepare_batch_pool
+  out=$(FM_FAKE_TREEHOUSE_POOL="$CASE_DIR/pool" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
     "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness pi --model codex-native/gpt-6-astra --effort ultra)
   expect_code 0 "$?" "native Ultra batch failed: $out"
   assert_meta_profile "$HOME_DIR/state/$id1.meta" pi codex-native/gpt-6-astra ultra
@@ -1515,8 +1537,9 @@ test_batch_forwards_shared_profile_flags() {
   rec=$(make_spawn_case profile-batch claude "$id1" "$id2")
   read_case_record "$rec"
   enable_dispatch_profile "$HOME_DIR"
+  prepare_batch_pool
 
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+  out=$(FM_FAKE_TREEHOUSE_POOL="$CASE_DIR/pool" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
     "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high)
   status=$?
   expect_code 0 "$status" "batch spawn with shared profile flags should succeed"

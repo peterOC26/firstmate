@@ -1522,6 +1522,7 @@ move_case_to_pool_slot() {
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$dest"
   printf '{"worktrees":[{"name":"%s","path":"%s"}]}\n' "$slot" "$dest" \
     > "$case_dir/pool/treehouse-state.json"
+  printf 'task=task-x1\nhome=%s\n' "$case_dir" > "$case_dir/pool/$slot/.fm-slot-owner"
   printf '%s\n' "$dest"
 }
 
