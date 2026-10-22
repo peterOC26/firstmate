@@ -473,8 +473,20 @@ teardown_task() {  # <id> <home>
     "$ROOT/bin/fm-teardown.sh" "$id" --force
 }
 
-# Model an orphaned presentation after stopping its placeholder worker: the
-# acquisition is explicitly retired while its disposable endpoint layout stays.
+# Return a fixture copy whose task record is already retired or torn down.
+# Nothing else removes that copy's slot claim, and a stale claim refuses the
+# next spawn that Treehouse allocates the released copy to.
+return_retired_copy() {  # <worktree>
+  [ -n "$1" ] || return 0
+  "$REAL_TREEHOUSE" return --force "$1" >/dev/null 2>&1 || true
+  rm -f "$(dirname "$1")/.fm-slot-owner"
+}
+
+# Model an orphaned presentation after stopping its placeholder worker: only
+# the retained acquisition journal that refuses a same-id spawn is retired.
+# The record stays for the reclaim to read, and the copy stays leased until the
+# suite's own returns: a Treehouse return terminates processes in the copy,
+# which would kill the restored husk shell the reclaim under test must find.
 retire_stopped_acquisition() {  # <meta>
   local meta=$1 wt lease_id holder id
   [ -f "$meta" ] || return 0
@@ -484,9 +496,7 @@ retire_stopped_acquisition() {  # <meta>
   id=$(basename "$meta" .meta)
   [ -n "$wt" ] && [ -n "$lease_id" ] && [ -n "$holder" ] \
     || fail "orphan presentation fixture has no acquisition identity: $meta"
-  "$REAL_TREEHOUSE" return --force --if-lease-id "$lease_id" --if-lease-holder "$holder" "$wt" \
-    || fail "could not retire the stopped presentation fixture's lease: $id"
-  rm -f "$(dirname "$wt")/.fm-slot-owner" "$meta"
+  RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   rm -rf "$(dirname "$meta")/$id.treehouse-acquire"
 }
 
@@ -1257,9 +1267,11 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
   PATH="$HERDR_ORIGINAL_PATH" \
     "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
     || fail "could not reprovision the isolated session for $RESTART_ID validation"
-  # Retire the stopped placeholder's acquisition explicitly while leaving its
-  # restored shell available as the durable presentation anchor.
+  # Stopping the whole Herdr session also ends the anchor's agent. Its restored
+  # shell remains useful as the durable layout anchor, but its task record no
+  # longer represents a live slot owner.
   retire_stopped_acquisition "$ANCHOR_META"
+  rm -f "$ANCHOR_META"
   retire_stopped_acquisition "$RESTART_META"
   lab pane get "$OLD_RESTART_PANE" >/dev/null 2>&1 \
     || fail "$RESTART_ID restart did not preserve the projected pane structurally"
@@ -1303,7 +1315,7 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
     [ "$NEW_RESTART_PANE" != "$PRIOR_RESTART_PANE" ] \
       || fail "$RESTART_ID repeated reclaim reused the prior husk pane"
     if [ "$PRIOR_RESTART_WT" != "$NEW_RESTART_WT" ]; then
-      "$REAL_TREEHOUSE" return --force "$PRIOR_RESTART_WT" >/dev/null 2>&1 || true
+      return_retired_copy "$PRIOR_RESTART_WT"
     fi
   fi
 
@@ -1311,8 +1323,8 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
     || fail "$RESTART_ID teardown after reclaim failed: $(cat "$TMP_ROOT/$RESTART_ID-teardown.err")"
   [ ! -e "$HOME_DIR/state/$RESTART_ID.herdr-presentation" ] \
     || fail "$RESTART_ID exact reclaimed teardown did not retire its journal"
-  "$REAL_TREEHOUSE" return --force "$OLD_RESTART_WT" >/dev/null 2>&1 || true
-  "$REAL_TREEHOUSE" return --force "$NEW_RESTART_WT" >/dev/null 2>&1 || true
+  return_retired_copy "$OLD_RESTART_WT"
+  return_retired_copy "$NEW_RESTART_WT"
 done
 pass "real Herdr lab: Hi Bit and Wheelhouse-style same-identity restarts reclaim one nested space with exact focus and idempotence"
 
@@ -1348,8 +1360,8 @@ CROSS_NEW_PANE=$(grep '^herdr_pane_id=' "$CROSS_RESTART_META" | cut -d= -f2-)
   || fail "cross-home reclaim changed the secondmate child's presentation label"
 teardown_task "$CROSS_RESTART_ID" "$SECOND_HOME_A" > "$TMP_ROOT/cross-restart-teardown.out" 2> "$TMP_ROOT/cross-restart-teardown.err" \
   || fail "cross-home reclaimed teardown failed: $(cat "$TMP_ROOT/cross-restart-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$CROSS_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$CROSS_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$CROSS_OLD_WT"
+return_retired_copy "$CROSS_NEW_WT"
 pass "real Herdr lab: secondmate restart binding and reclaim stay isolated to the exact child home and parent"
 
 # Two homes recovering concurrently serialize on the named session lock and
@@ -1403,10 +1415,10 @@ teardown_task "$PRIMARY_WAVE_ID" "$HOME_DIR" > "$TMP_ROOT/primary-wave-teardown.
   || fail "concurrent primary recovery teardown failed: $(cat "$TMP_ROOT/primary-wave-teardown.err")"
 teardown_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" > "$TMP_ROOT/bravo-wave-teardown.out" 2> "$TMP_ROOT/bravo-wave-teardown.err" \
   || fail "concurrent secondmate recovery teardown failed: $(cat "$TMP_ROOT/bravo-wave-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$BRAVO_WAVE_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_NEW_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$BRAVO_WAVE_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$PRIMARY_WAVE_OLD_WT"
+return_retired_copy "$BRAVO_WAVE_OLD_WT"
+return_retired_copy "$PRIMARY_WAVE_NEW_WT"
+return_retired_copy "$BRAVO_WAVE_NEW_WT"
 pass "real Herdr lab: concurrent cross-home recoveries replace exact husks under one session lock with no focus drift"
 
 # Exact-resume presentation-lock contention refuses by default. Hold the
@@ -1529,8 +1541,8 @@ fi
 assert_focus_is "$LOCK_WAIT_FOCUS" "resume lock-wait"
 teardown_task "$LOCK_WAIT_ID" "$HOME_DIR" > "$TMP_ROOT/lock-wait-teardown.out" 2> "$TMP_ROOT/lock-wait-teardown.err" \
   || fail "resume lock-wait fixture teardown failed: $(cat "$TMP_ROOT/lock-wait-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$LOCK_WAIT_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$LOCK_WAIT_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$LOCK_WAIT_OLD_WT"
+return_retired_copy "$LOCK_WAIT_NEW_WT"
 pass "real Herdr lab: --herdr-resume-lock-wait waits out session lock contention instead of refusing"
 
 # Seed a legacy old-format primary projection and a flat secondmate tab; correction must not migrate them.
