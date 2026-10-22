@@ -904,8 +904,9 @@ LAVISH_AXI_MIN=0.1.80
 LAVISH_AXI_BOARD_MIN=0.1.77
 
 treehouse_supports_lease() (
-  FM_STATE_OVERRIDE="$SCRIPT_DIR"
-  . "$SCRIPT_DIR/fm-wake-lib.sh"
+  # This capability probe intentionally discards the wake library globals.
+  # shellcheck source=/dev/null
+  FM_STATE_OVERRIDE="$SCRIPT_DIR" . "$SCRIPT_DIR/fm-wake-lib.sh"
   fm_treehouse_lease_cli
 )
 

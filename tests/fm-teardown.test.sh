@@ -2954,6 +2954,7 @@ test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes() {
   thlog="$case_dir/treehouse.log"; : > "$thlog"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+[ -e "$closed" ] || { echo 'pane is still live at pool-return boundary' >&2; exit 1; }
 printf '%s\n' "\$*" >> "$thlog"
 exit 0
 SH
@@ -3003,6 +3004,17 @@ SH
 
   : > "$release"
   wait "$holder_pid" 2>/dev/null || true
+  # Reaping or returning a copy can kill its pane shell. The focus-preserving
+  # close must finish first, while the workspace and active tab still exist.
+  cat > "$case_dir/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+if [ ! -e "${FM_FAKE_HERDR_CLOSED:?}" ]; then
+  echo 'pane is still live at process-reap boundary' >&2
+  exit 2
+fi
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/lsof"
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
     run_teardown "$case_dir" --force > "$case_dir/stdout2" 2> "$case_dir/stderr2" \
     || fail "herdr-orphan-refusal: the retry after lock release failed: $(cat "$case_dir/stderr2")"
