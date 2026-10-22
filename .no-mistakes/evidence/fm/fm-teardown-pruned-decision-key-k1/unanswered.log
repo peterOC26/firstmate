@@ -1,0 +1,75 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+[exit 0]
+$ tasks-axi add review-unanswered Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-unanswered (scout, repo sample) -> In flight
+task:
+  id: review-unanswered
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-unanswered --pr <url>` when it ships
+  - Run `tasks-axi block review-unanswered --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-unanswered --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-unanswered
+call-unanswered
+[exit 0]
+$ tasks-axi done call-unanswered
+ok: done call-unanswered -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-unanswered --full
+error: "Task \"call-unanswered\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-unanswered - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Captain hold set: 2026-10-22T09:20:22Z
+  Captain hold origin: review-unanswered
+
+  Origin: review-unanswered
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-unanswered
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-unanswered --none
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-unanswered
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+REFUSED: scout task review-unanswered has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

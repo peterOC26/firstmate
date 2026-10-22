@@ -1,0 +1,80 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+[exit 0]
+$ tasks-axi add review-wrong-origin Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-wrong-origin (scout, repo sample) -> In flight
+task:
+  id: review-wrong-origin
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-wrong-origin --pr <url>` when it ships
+  - Run `tasks-axi block review-wrong-origin --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-wrong-origin --title Choose the review outcome --reason Captain choice pending --repo sample --origin another-review
+call-wrong-origin
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-wrong-origin --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin/answer.txt
+answered: call-wrong-origin
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-wrong-origin --full
+error: "Task \"call-wrong-origin\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-wrong-origin - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: another-review
+
+  Origin: another-review
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-wrong-origin
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-wrong-origin --none
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-wrong-origin
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+REFUSED: scout task review-wrong-origin has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

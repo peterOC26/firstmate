@@ -1,0 +1,75 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+[exit 0]
+$ tasks-axi add review-held-annotation Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-held-annotation (scout, repo sample) -> In flight
+task:
+  id: review-held-annotation
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-held-annotation --pr <url>` when it ships
+  - Run `tasks-axi block review-held-annotation --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-held-annotation --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-held-annotation
+call-held-annotation
+[exit 0]
+$ tasks-axi done call-held-annotation
+ok: done call-held-annotation -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-held-annotation --full
+error: "Task \"call-held-annotation\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-held-annotation - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Captain hold set: 2026-10-22T09:20:32Z
+  Captain hold origin: review-held-annotation
+
+  Origin: review-held-annotation
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-held-annotation
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-held-annotation --none
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-held-annotation
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+REFUSED: scout task review-held-annotation has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

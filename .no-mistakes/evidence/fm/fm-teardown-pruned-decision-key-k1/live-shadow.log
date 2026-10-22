@@ -1,0 +1,104 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+[exit 0]
+$ tasks-axi add review-live-shadow Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-live-shadow (scout, repo sample) -> In flight
+task:
+  id: review-live-shadow
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-live-shadow --pr <url>` when it ships
+  - Run `tasks-axi block review-live-shadow --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-live-shadow --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-live-shadow
+call-live-shadow
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-live-shadow --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow/answer.txt
+answered: call-live-shadow
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-live-shadow --full
+error: "Task \"call-live-shadow\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-live-shadow - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-live-shadow
+
+  Origin: review-live-shadow
+
+
+$ tasks-axi add call-live-shadow Reopened call without recorded answer --repo sample
+ok: added call-live-shadow (repo sample) -> Queued
+task:
+  id: call-live-shadow
+  title: Reopened call without recorded answer
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start call-live-shadow` to move it to in flight
+  - Run `tasks-axi block call-live-shadow --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-live-shadow
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-live-shadow --none
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-live-shadow
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+REFUSED: scout task review-live-shadow has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

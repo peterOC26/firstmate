@@ -1,0 +1,1094 @@
+Real fm-captain-hold.sh, fm-teardown.sh and tasks-axi 0.2.6; disposable marked FM_HOME directories; no force and no mocked executables.
+Lab records represent completed scouts whose runtime endpoint and scratch copy have departed, except the missing-inventory refusal which retains an existing scratch directory.
+
+SCENARIO: answered-program
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+[exit 0]
+$ tasks-axi add pv-voice-reliability-program-p1 Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added pv-voice-reliability-program-p1 (scout, repo sample) -> In flight
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done pv-voice-reliability-program-p1 --pr <url>` when it ships
+  - Run `tasks-axi block pv-voice-reliability-program-p1 --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold pv-voice-reliability-program-approve-a1 --title Choose the review outcome --reason Captain choice pending --repo sample --origin pv-voice-reliability-program-p1
+pv-voice-reliability-program-approve-a1
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer pv-voice-reliability-program-approve-a1 --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/answer.txt
+answered: pv-voice-reliability-program-approve-a1
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-reliability-program-p1 pv-voice-reliability-program-approve-a1
+complete: pv-voice-reliability-program-p1 captain-call inventory reviewed (pv-voice-reliability-program-approve-a1)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-reliability-program-p1
+verified: pv-voice-reliability-program-p1 captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-approve-a1 --full
+error: "Task \"pv-voice-reliability-program-approve-a1\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] pv-voice-reliability-program-approve-a1 - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: pv-voice-reliability-program-p1
+
+  Origin: pv-voice-reliability-program-p1
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/.fm-captain-hold-baseline.sh complete pv-voice-reliability-program-p1 --none
+fm-captain-hold: no captain-held task pv-voice-reliability-program-approve-a1 and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data); the nearest legacy identity pv-voice-reliability-program-p1-decision-pv-voice-reliability-program-approve-a1 also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-remote-job-reap-orphans.sh --dry-run
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-reliability-program-p1
+verified: pv-voice-reliability-program-p1 captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-reliability-program-p1 --none
+complete: pv-voice-reliability-program-p1 captain-call inventory reviewed (pv-voice-reliability-program-approve-a1)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer pv-voice-reliability-program-approve-a1 --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/answer.txt
+fm-captain-hold: captain-held task pv-voice-reliability-program-approve-a1 is absent from this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data)
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh pv-voice-reliability-program-p1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for pv-voice-reliability-program-p1
+teardown pv-voice-reliability-program-p1 complete (window fm-lab-cleanup:fm-pv-voice-reliability-program-p1, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/projects/departed-pv-voice-reliability-program-p1)
+Backlog: pv-voice-reliability-program-p1 is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-p1 --full
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup data/pv-voice-reliability-program-p1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-reliability-program-p1/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-p1 --full
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup data/pv-voice-reliability-program-p1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-reliability-program-p1/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: answered-sibilant
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant
+[exit 0]
+$ tasks-axi add pv-voice-sibilant-listen-l1 Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added pv-voice-sibilant-listen-l1 (scout, repo sample) -> In flight
+task:
+  id: pv-voice-sibilant-listen-l1
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done pv-voice-sibilant-listen-l1 --pr <url>` when it ships
+  - Run `tasks-axi block pv-voice-sibilant-listen-l1 --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold pv-voice-sibilant-listen-l1-review --title Choose the review outcome --reason Captain choice pending --repo sample --origin pv-voice-sibilant-listen-l1
+pv-voice-sibilant-listen-l1-review
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer pv-voice-sibilant-listen-l1-review --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant/answer.txt
+answered: pv-voice-sibilant-listen-l1-review
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-sibilant-listen-l1 pv-voice-sibilant-listen-l1-review
+complete: pv-voice-sibilant-listen-l1 captain-call inventory reviewed (pv-voice-sibilant-listen-l1-review)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-sibilant-listen-l1
+verified: pv-voice-sibilant-listen-l1 captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show pv-voice-sibilant-listen-l1-review --full
+error: "Task \"pv-voice-sibilant-listen-l1-review\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] pv-voice-sibilant-listen-l1-review - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: pv-voice-sibilant-listen-l1
+
+  Origin: pv-voice-sibilant-listen-l1
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-sibilant-listen-l1
+verified: pv-voice-sibilant-listen-l1 captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-sibilant-listen-l1 --none
+complete: pv-voice-sibilant-listen-l1 captain-call inventory reviewed (pv-voice-sibilant-listen-l1-review)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh pv-voice-sibilant-listen-l1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for pv-voice-sibilant-listen-l1
+teardown pv-voice-sibilant-listen-l1 complete (window fm-lab-cleanup:fm-pv-voice-sibilant-listen-l1, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant/projects/departed-pv-voice-sibilant-listen-l1)
+Backlog: pv-voice-sibilant-listen-l1 is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-sibilant/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show pv-voice-sibilant-listen-l1 --full
+task:
+  id: pv-voice-sibilant-listen-l1
+  title: Completed scout awaiting cleanup data/pv-voice-sibilant-listen-l1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-sibilant-listen-l1/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show pv-voice-sibilant-listen-l1 --full
+task:
+  id: pv-voice-sibilant-listen-l1
+  title: Completed scout awaiting cleanup data/pv-voice-sibilant-listen-l1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-sibilant-listen-l1/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: released-custom
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+[exit 0]
+$ tasks-axi add review-released-custom Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-released-custom (scout, repo sample) -> In flight
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-released-custom --pr <url>` when it ships
+  - Run `tasks-axi block review-released-custom --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-released-custom --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-released-custom
+call-released-custom
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-released-custom --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/answer.txt --release
+released: call-released-custom
+[exit 0]
+$ tasks-axi done call-released-custom
+ok: done call-released-custom -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-released-custom call-released-custom
+complete: review-released-custom captain-call inventory reviewed (call-released-custom)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-released-custom
+verified: review-released-custom captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-released-custom --full
+error: "Task \"call-released-custom\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-released-custom - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: released
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-released-custom
+
+  Origin: review-released-custom
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-released-custom
+verified: review-released-custom captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-released-custom --none
+complete: review-released-custom captain-call inventory reviewed (call-released-custom)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-released-custom
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for review-released-custom
+teardown review-released-custom complete (window fm-lab-cleanup:fm-review-released-custom, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/projects/departed-review-released-custom)
+Backlog: review-released-custom is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show review-released-custom --full
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup data/review-released-custom/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-released-custom/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show review-released-custom --full
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup data/review-released-custom/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-released-custom/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: legacy
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy
+[exit 0]
+$ tasks-axi add review-legacy Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-legacy (scout, repo sample) -> In flight
+task:
+  id: review-legacy
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-legacy --pr <url>` when it ships
+  - Run `tasks-axi block review-legacy --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold review-legacy-decision-choice --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-legacy
+review-legacy-decision-choice
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer review-legacy-decision-choice --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy/answer.txt
+answered: review-legacy-decision-choice
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-legacy review-legacy-decision-choice
+complete: review-legacy captain-call inventory reviewed (choice,review-legacy-decision-choice)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-legacy
+verified: review-legacy captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show review-legacy-decision-choice --full
+error: "Task \"review-legacy-decision-choice\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] review-legacy-decision-choice - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-legacy
+
+  Origin: review-legacy
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-legacy
+verified: review-legacy captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-legacy --none
+complete: review-legacy captain-call inventory reviewed (choice,review-legacy-decision-choice)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-legacy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for review-legacy
+teardown review-legacy complete (window fm-lab-cleanup:fm-review-legacy, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy/projects/departed-review-legacy)
+Backlog: review-legacy is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/legacy/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show review-legacy --full
+task:
+  id: review-legacy
+  title: Completed scout awaiting cleanup data/review-legacy/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-legacy/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show review-legacy --full
+task:
+  id: review-legacy
+  title: Completed scout awaiting cleanup data/review-legacy/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-legacy/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: unanswered
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+[exit 0]
+$ tasks-axi add review-unanswered Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-unanswered (scout, repo sample) -> In flight
+task:
+  id: review-unanswered
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-unanswered --pr <url>` when it ships
+  - Run `tasks-axi block review-unanswered --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-unanswered --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-unanswered
+call-unanswered
+[exit 0]
+$ tasks-axi done call-unanswered
+ok: done call-unanswered -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-unanswered --full
+error: "Task \"call-unanswered\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-unanswered - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Captain hold set: 2026-10-22T09:20:22Z
+  Captain hold origin: review-unanswered
+
+  Origin: review-unanswered
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-unanswered
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-unanswered --none
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-unanswered
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/unanswered
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-unanswered is neither held for the captain nor closed with a recorded captain answer
+REFUSED: scout task review-unanswered has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: held-annotation
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+[exit 0]
+$ tasks-axi add review-held-annotation Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-held-annotation (scout, repo sample) -> In flight
+task:
+  id: review-held-annotation
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-held-annotation --pr <url>` when it ships
+  - Run `tasks-axi block review-held-annotation --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-held-annotation --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-held-annotation
+call-held-annotation
+[exit 0]
+$ tasks-axi done call-held-annotation
+ok: done call-held-annotation -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-held-annotation --full
+error: "Task \"call-held-annotation\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-held-annotation - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Captain hold set: 2026-10-22T09:20:32Z
+  Captain hold origin: review-held-annotation
+
+  Origin: review-held-annotation
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-held-annotation
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-held-annotation --none
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-held-annotation
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: no captain-held task call-held-annotation and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/held-annotation/data); the nearest legacy identity review-held-annotation-decision-call-held-annotation also resolves to nothing
+REFUSED: scout task review-held-annotation has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: missing
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing
+[exit 0]
+$ tasks-axi add review-missing Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-missing (scout, repo sample) -> In flight
+task:
+  id: review-missing
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-missing --pr <url>` when it ships
+  - Run `tasks-axi block review-missing --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-missing
+fm-captain-hold: no captain-held task call-missing and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing/data); the nearest legacy identity review-missing-decision-call-missing also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-missing --none
+fm-captain-hold: no captain-held task call-missing and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing/data); the nearest legacy identity review-missing-decision-call-missing also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-missing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: no captain-held task call-missing and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/missing/data); the nearest legacy identity review-missing-decision-call-missing also resolves to nothing
+REFUSED: scout task review-missing has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: refused cleanup preserved the existing scratch directory and its uncommitted file.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: live-shadow
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+[exit 0]
+$ tasks-axi add review-live-shadow Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-live-shadow (scout, repo sample) -> In flight
+task:
+  id: review-live-shadow
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-live-shadow --pr <url>` when it ships
+  - Run `tasks-axi block review-live-shadow --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-live-shadow --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-live-shadow
+call-live-shadow
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-live-shadow --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow/answer.txt
+answered: call-live-shadow
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-live-shadow --full
+error: "Task \"call-live-shadow\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-live-shadow - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-live-shadow
+
+  Origin: review-live-shadow
+
+
+$ tasks-axi add call-live-shadow Reopened call without recorded answer --repo sample
+ok: added call-live-shadow (repo sample) -> Queued
+task:
+  id: call-live-shadow
+  title: Reopened call without recorded answer
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start call-live-shadow` to move it to in flight
+  - Run `tasks-axi block call-live-shadow --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-live-shadow
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-live-shadow --none
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-live-shadow
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/live-shadow
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-live-shadow is neither held for the captain nor closed with a recorded captain answer
+REFUSED: scout task review-live-shadow has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: wrong-origin
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+[exit 0]
+$ tasks-axi add review-wrong-origin Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-wrong-origin (scout, repo sample) -> In flight
+task:
+  id: review-wrong-origin
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-wrong-origin --pr <url>` when it ships
+  - Run `tasks-axi block review-wrong-origin --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-wrong-origin --title Choose the review outcome --reason Captain choice pending --repo sample --origin another-review
+call-wrong-origin
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-wrong-origin --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin/answer.txt
+answered: call-wrong-origin
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-wrong-origin --full
+error: "Task \"call-wrong-origin\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-wrong-origin - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: another-review
+
+  Origin: another-review
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-wrong-origin
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-wrong-origin --none
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-wrong-origin
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/wrong-origin
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-held task call-wrong-origin was held for origin another-review, not review-wrong-origin; hold a task for review-wrong-origin or list the right one
+REFUSED: scout task review-wrong-origin has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: duplicate
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate
+[exit 0]
+$ tasks-axi add review-duplicate Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-duplicate (scout, repo sample) -> In flight
+task:
+  id: review-duplicate
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-duplicate --pr <url>` when it ships
+  - Run `tasks-axi block review-duplicate --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-duplicate --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-duplicate
+call-duplicate
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-duplicate --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate/answer.txt
+answered: call-duplicate
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-duplicate --full
+error: "Task \"call-duplicate\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-duplicate - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-duplicate
+
+  Origin: review-duplicate
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-duplicate
+fm-captain-hold: captain-call inventory call-duplicate is ambiguous in done archive /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate/data/done-archive.md
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-duplicate --none
+fm-captain-hold: captain-call inventory call-duplicate is ambiguous in done archive /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate/data/done-archive.md
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-duplicate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: captain-call inventory call-duplicate is ambiguous in done archive /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/duplicate/data/done-archive.md
+REFUSED: scout task review-duplicate has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+[exit 1]
+PERSISTED RESULT: refusal preserved task metadata.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
+
+SCENARIO: active-live
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/active-live
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/active-live
+[exit 0]
+$ tasks-axi add review-active-live Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-active-live (scout, repo sample) -> In flight
+task:
+  id: review-active-live
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-active-live --pr <url>` when it ships
+  - Run `tasks-axi block review-active-live --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-active-live --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-active-live
+call-active-live
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-active-live
+verified: review-active-live captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-active-live --none
+complete: review-active-live captain-call inventory reviewed (call-active-live)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-active-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/active-live
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for review-active-live
+teardown review-active-live complete (window fm-lab-cleanup:fm-review-active-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/active-live/projects/departed-review-active-live)
+Backlog: review-active-live is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/active-live/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show review-active-live --full
+task:
+  id: review-active-live
+  title: Completed scout awaiting cleanup data/review-active-live/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-active-live/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show review-active-live --full
+task:
+  id: review-active-live
+  title: Completed scout awaiting cleanup data/review-active-live/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-active-live/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

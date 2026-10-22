@@ -1,0 +1,130 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+[exit 0]
+$ tasks-axi add review-released-custom Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added review-released-custom (scout, repo sample) -> In flight
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done review-released-custom --pr <url>` when it ships
+  - Run `tasks-axi block review-released-custom --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold call-released-custom --title Choose the review outcome --reason Captain choice pending --repo sample --origin review-released-custom
+call-released-custom
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer call-released-custom --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/answer.txt --release
+released: call-released-custom
+[exit 0]
+$ tasks-axi done call-released-custom
+ok: done call-released-custom -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-released-custom call-released-custom
+complete: review-released-custom captain-call inventory reviewed (call-released-custom)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-released-custom
+verified: review-released-custom captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show call-released-custom --full
+error: "Task \"call-released-custom\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] call-released-custom - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: released
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: review-released-custom
+
+  Origin: review-released-custom
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify review-released-custom
+verified: review-released-custom captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete review-released-custom --none
+complete: review-released-custom captain-call inventory reviewed (call-released-custom)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh review-released-custom
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for review-released-custom
+teardown review-released-custom complete (window fm-lab-cleanup:fm-review-released-custom, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/projects/departed-review-released-custom)
+Backlog: review-released-custom is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/released-custom/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show review-released-custom --full
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup data/review-released-custom/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-released-custom/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show review-released-custom --full
+task:
+  id: review-released-custom
+  title: Completed scout awaiting cleanup data/review-released-custom/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/review-released-custom/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.

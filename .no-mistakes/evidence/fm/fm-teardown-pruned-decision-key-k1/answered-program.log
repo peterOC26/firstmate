@@ -1,0 +1,134 @@
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+[exit 0]
+$ tasks-axi add pv-voice-reliability-program-p1 Completed scout awaiting cleanup --kind scout --repo sample --start
+ok: added pv-voice-reliability-program-p1 (scout, repo sample) -> In flight
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: 2026-10-22
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done pv-voice-reliability-program-p1 --pr <url>` when it ships
+  - Run `tasks-axi block pv-voice-reliability-program-p1 --by <other>` to record a dependency
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh hold pv-voice-reliability-program-approve-a1 --title Choose the review outcome --reason Captain choice pending --repo sample --origin pv-voice-reliability-program-p1
+pv-voice-reliability-program-approve-a1
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer pv-voice-reliability-program-approve-a1 --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/answer.txt
+answered: pv-voice-reliability-program-approve-a1
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-reliability-program-p1 pv-voice-reliability-program-approve-a1
+complete: pv-voice-reliability-program-p1 captain-call inventory reviewed (pv-voice-reliability-program-approve-a1)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-reliability-program-p1
+verified: pv-voice-reliability-program-p1 captain-call inventory
+[exit 0]
+$ tasks-axi prune --keep 0
+ok: prune done -> archived 1 (kept 0)
+help[1]:
+  - Run `tasks-axi list --state done` to see retained Done items
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-approve-a1 --full
+error: "Task \"pv-voice-reliability-program-approve-a1\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[exit 1]
+PERSISTED DONE ARCHIVE:
+
+## Archived 2026-10-22
+- [x] pv-voice-reliability-program-approve-a1 - Choose the review outcome (repo: sample) (kind: captain) (done 2026-10-22) (hold: fm-hold-v1:Q2FwdGFpbiBjaG9pY2UgcGVuZGluZw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 815c98a9d74bd473c8f063bcd37102b4bc142a62f1af5193f3ca0f77054e94de
+  Resolution mode: answered
+
+  Captain decision:
+  Close it, keep the report.
+
+  Captain hold origin: pv-voice-reliability-program-p1
+
+  Origin: pv-voice-reliability-program-p1
+
+
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/.fm-captain-hold-baseline.sh complete pv-voice-reliability-program-p1 --none
+fm-captain-hold: no captain-held task pv-voice-reliability-program-approve-a1 and no migrated hold for it in this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data); the nearest legacy identity pv-voice-reliability-program-p1-decision-pv-voice-reliability-program-approve-a1 also resolves to nothing
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-remote-job-reap-orphans.sh --dry-run
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh verify pv-voice-reliability-program-p1
+verified: pv-voice-reliability-program-p1 captain-call inventory
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh complete pv-voice-reliability-program-p1 --none
+complete: pv-voice-reliability-program-p1 captain-call inventory reviewed (pv-voice-reliability-program-approve-a1)
+[exit 0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-captain-hold.sh answer pv-voice-reliability-program-approve-a1 --decision-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/answer.txt
+fm-captain-hold: captain-held task pv-voice-reliability-program-approve-a1 is absent from this home's configured backlog (data directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data)
+[exit 1]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/bin/fm-teardown.sh pv-voice-reliability-program-p1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for pv-voice-reliability-program-p1
+teardown pv-voice-reliability-program-p1 complete (window fm-lab-cleanup:fm-pv-voice-reliability-program-p1, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/projects/departed-pv-voice-reliability-program-p1)
+Backlog: pv-voice-reliability-program-p1 is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HE5B2T4PX6W0SD17VS5PYR/.lv/answered-program/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-p1 --full
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup data/pv-voice-reliability-program-p1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-reliability-program-p1/report.md"
+  body: ""
+[exit 0]
+$ tasks-axi show pv-voice-reliability-program-p1 --full
+task:
+  id: pv-voice-reliability-program-p1
+  title: Completed scout awaiting cleanup data/pv-voice-reliability-program-p1/report.md
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: scout
+  repo: sample
+  priority: "-"
+  created: "-"
+  closed: 2026-10-22
+  deps: none
+  links: "report:data/pv-voice-reliability-program-p1/report.md"
+  body: ""
+[exit 0]
+PERSISTED RESULT: task metadata removed; origin is done.
+PERSISTED RESULT: report bytes preserved; done archive unchanged.
