@@ -1,0 +1,14 @@
+ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
+ok - fm-teardown: a concurrent lifecycle action refuses before mutation
+ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for metadata-locked-task
+warning: failed to remove ./: Invalid argument
+error: could not clean scratch in worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HG3T4R8EZNC83GMRF3JYZE/.test-tmp/fm-teardown-endpoint-safety.q8hDI2/metadata-lock/worktree before returning it; teardown aborted
+cat: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HG3T4R8EZNC83GMRF3JYZE/.test-tmp/fm-teardown-endpoint-safety.q8hDI2/metadata-lock/stderr: input file is output file

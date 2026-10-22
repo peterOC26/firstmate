@@ -1,0 +1,60 @@
+[
+  {
+    "name": "Installed Treehouse v2.3.0 exposes lease JSON and conditional-return flags",
+    "result": "pass"
+  },
+  {
+    "name": "New spawn refuses a clean, finished retained legacy record before allocation",
+    "result": "pass",
+    "copy_and_pool_unchanged": true,
+    "endpoints_unchanged": true
+  },
+  {
+    "name": "New spawn refuses an aliased retained copy in a registered local home",
+    "result": "pass",
+    "copy_and_pool_unchanged": true,
+    "endpoints_unchanged": true
+  },
+  {
+    "name": "Owner-first cleanup refuses and identifies the stale task",
+    "result": "pass",
+    "copy_claim_lease_unchanged": true,
+    "successor_process_alive": true
+  },
+  {
+    "name": "Relaunch refuses a stale record without changing its endpoint or successor copy",
+    "result": "pass",
+    "copy_claim_lease_unchanged": true,
+    "endpoints_unchanged": true
+  },
+  {
+    "name": "Stale-first cleanup retires only the stale record and endpoint",
+    "result": "pass",
+    "copy_claim_lease_byte_identical": true,
+    "successor_process_alive": true,
+    "successor_endpoint_alive": true
+  },
+  {
+    "name": "Unclaimed legacy copy with uncommitted work refuses plain cleanup and keeps its record",
+    "result": "pass",
+    "copy_byte_identical": true,
+    "record_unchanged": true
+  },
+  {
+    "name": "Unclaimed legacy copy with an unlanded commit refuses plain cleanup",
+    "result": "pass",
+    "copy_byte_identical": true,
+    "record_unchanged": true
+  },
+  {
+    "name": "Lock-blocked legacy cleanup explains refusal and recovery while leaving lock and copy untouched",
+    "result": "pass",
+    "copy_and_lock_byte_identical": true,
+    "record_unchanged": true
+  },
+  {
+    "name": "Clean unclaimed legacy cleanup removes its record and accurately reports an untouched copy",
+    "result": "pass",
+    "copy_byte_identical": true
+  }
+]
