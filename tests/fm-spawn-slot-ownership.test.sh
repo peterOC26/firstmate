@@ -400,6 +400,77 @@ FAKE
   pass "unsupported CLIs refuse before mutation; interrupted acquisitions retain exact lease evidence and block unsafe reuse"
 }
 
+test_manual_recovery_for_unacquired_and_orphaned_slots() {
+  local shape out rc marker attempt
+  for shape in never-acquired orphan; do
+    make_case "recovery-$shape"
+    marker="$POOL/1/.fm-slot-owner"
+    if [ "$shape" = never-acquired ]; then
+      mv "$FAKEBIN/treehouse" "$FAKEBIN/treehouse.base"
+      cat > "$FAKEBIN/treehouse" <<'FAKE'
+#!/usr/bin/env bash
+if [ "$1" = get ] && [ "${2:-}" != --help ]; then exit 23; fi
+exec "$(dirname "$0")/treehouse.base" "$@"
+FAKE
+      chmod +x "$FAKEBIN/treehouse"
+    else
+      printf 'task=gone\nhome=%s\n' "$HOME_DIR" > "$marker"
+      cp "$marker" "$CASE_DIR/prior-claim"
+    fi
+    for attempt in abort retry; do
+      out=$(spawn_task interrupted 1); rc=$?
+      [ "$rc" -ne 0 ] || fail "$shape $attempt unexpectedly succeeded"
+      assert_contains "$out" 'If no pool entry carries the recorded lease holder' "$attempt omitted never-acquired evidence"
+      assert_contains "$out" 'then remove only this journal by hand and stop' "$attempt omitted never-acquired recovery"
+      assert_contains "$out" "no live task record in any local home names the claim's task and home" "$attempt omitted orphan proof"
+      assert_contains "$out" 'Only after return succeeds' "$attempt omitted guarded-return prerequisite"
+      assert_contains "$out" 'is confirmed orphaned' "$attempt omitted orphan removal path"
+      assert_present "$HOME_DIR/state/interrupted.treehouse-acquire/identity" "$shape lost recovery identity"
+      assert_absent "$HOME_DIR/state/interrupted.meta" "$shape published metadata"
+      if [ "$attempt" = retry ]; then
+        [ ! -s "$CASE_DIR/mutations" ] || fail "$shape retry mutated an endpoint"
+      fi
+      : > "$CASE_DIR/mutations"
+      if [ "$shape" = orphan ]; then
+        cmp -s "$marker" "$CASE_DIR/prior-claim" || fail "orphan claim was altered"
+        jq -e '.worktrees[] | select(.leased == true)' "$POOL/treehouse-state.json" >/dev/null || fail "orphan refusal lost lease"
+      else
+        jq -e 'all(.worktrees[]; .leased != true)' "$POOL/treehouse-state.json" >/dev/null || fail "failed get acquired a lease"
+      fi
+    done
+  done
+  pass "never-acquired and orphan-claim refusals explain manual recovery without clearing evidence"
+}
+
+test_record_scans_name_missing_state_directories() {
+  local location scan out rc state
+  for location in local registered; do
+    for scan in reserved exclusive; do
+      make_case "missing-state-$location-$scan"
+      state="$HOME_DIR/state"
+      if [ "$location" = registered ]; then
+        mkdir -p "$CASE_DIR/mate/data"
+        printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' "$CASE_DIR/mate" > "$HOME_DIR/data/secondmates.md"
+        state="$CASE_DIR/mate/state"
+      fi
+      out=$(FM_HOME="$HOME_DIR" bash -c '
+        . "$1/bin/fm-wake-lib.sh"
+        . "$1/bin/fm-backend.sh"
+        . "$1/bin/fm-secondmate-registry-lib.sh"
+        if [ -d "$4" ]; then mv "$4" "$4.saved"; fi
+        if [ "$5" = reserved ]; then
+          fm_treehouse_records_reserved "$2" "$FM_HOME/state"
+        else
+          fm_treehouse_record_exclusive "$FM_HOME/state" "$3"
+        fi
+      ' _ "$ROOT" "$PROJECT" "$POOL/1/project" "$state" "$scan" 2>&1); rc=$?
+      [ "$rc" -ne 0 ] || fail "$scan accepted missing $location state"
+      assert_contains "$out" "REFUSED: missing or unreadable local state directory $state" "$scan omitted missing directory"
+    done
+  done
+  pass "both record scans diagnose missing local and registered state directories"
+}
+
 test_another_project_record_does_not_block_this_pool() {
   local out rc other="$TMP_ROOT/foreign-project"
   make_case unrelated-project
@@ -505,3 +576,6 @@ test_legacy_unclaimed_ship_preserves_unlanded_work
 test_missing_leased_copy_recovery_messages
 test_unrecognized_leased_copy_refuses_publication
 test_empty_record_fields_name_no_copy
+
+test_manual_recovery_for_unacquired_and_orphaned_slots
+test_record_scans_name_missing_state_directories

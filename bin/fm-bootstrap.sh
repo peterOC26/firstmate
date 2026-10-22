@@ -903,9 +903,11 @@ GH_AXI_MIN=0.1.29
 LAVISH_AXI_MIN=0.1.80
 LAVISH_AXI_BOARD_MIN=0.1.77
 
-treehouse_supports_lease() {
-  treehouse get --help 2>&1 | grep -Eq '(^|[^[:alnum:]_-])--lease([^[:alnum:]_-]|$)'
-}
+treehouse_supports_lease() (
+  FM_STATE_OVERRIDE="$SCRIPT_DIR"
+  . "$SCRIPT_DIR/fm-wake-lib.sh"
+  fm_treehouse_lease_cli
+)
 
 # Shared semantic-version floor for the tool gates below. A version string that
 # cannot be parsed into exactly one major.minor.patch triple is incompatible,

@@ -67,11 +67,16 @@ SH
 #!/usr/bin/env bash
 if [ "${1:-}" = get ] && [ "${2:-}" = --help ]; then
   if [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
-    printf '%s\n' 'Usage: treehouse get [--lease] [--lease-holder <holder>]'
+    printf '%s\n' '--lease --lease-holder --json'
+  elif [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = legacy ]; then
+    echo --lease
   else
     printf '%s\n' 'Usage: treehouse get'
   fi
   exit 0
+fi
+if [ "${1:-}" = return ] && [ "${2:-}" = --help ] && [ "${FM_FAKE_TREEHOUSE_LEASE_HELP:-}" = 1 ]; then
+  echo "--if-lease-id --if-lease-holder"
 fi
 exit 0
 SH
@@ -304,7 +309,8 @@ test_bootstrap_reporting() {
         ;;
     esac
   done <<'ROWS'
-treehouse --lease support is accepted silently^1^0.2.6^1^manual^empty^^
+treehouse full lease support is accepted silently^1^0.2.6^1^manual^empty^^
+treehouse legacy lease support reports an upgrade^legacy^0.2.6^1^-^grep^MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)^NEEDS_GH_AUTH
 treehouse without --lease reports an upgrade, gh auth is fine^0^0.2.6^1^-^grep^MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)^NEEDS_GH_AUTH
 compatible tasks-axi is silent by default^1^0.2.6^1^-^empty^^
 missing tasks-axi is required by default^1^-^1^-^exact^MISSING: tasks-axi (install: npm install -g tasks-axi)^

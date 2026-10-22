@@ -1483,11 +1483,15 @@ spawn_treehouse_recovery_steps() {
     cat <<'RECOVERY'
 Read project= and treehouse_lease_holder= from "$journal/identity".
 Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
-If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess or use treehouse status.
-Preserve any unlanded work and reconcile any retained task record first. Stop if another task owns the claim or lease.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
 With worktree, lease_id, and lease_holder set to those verified values, run:
   treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
-Only after return succeeds, and the slot claim is confirmed to belong to this acquisition (or is absent), run:
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
   rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
   rm -rf -- "$journal"
 Keep the journal and claim if return fails or ownership is uncertain.

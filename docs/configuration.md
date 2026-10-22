@@ -510,6 +510,8 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
   [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release and records-only reconciliation.
   These fields do not apply to Orca or replace the existing secondmate home-seed lease contract.
   For an aborted acquisition, follow the manual recovery instructions printed by spawn or a refused same-task retry; `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns that procedure.
+  The procedure covers manual journal removal only after pool state confirms no entry carries the recorded holder, and guarded return of this acquisition before manually removing a claim confirmed orphaned by checking task records in every local home.
+  Remember that finished or exited tasks still retain their records.
 
 - A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
 

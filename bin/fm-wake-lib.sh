@@ -1813,7 +1813,10 @@ fm_treehouse_records_reserved() {  # <project> <state>
     return 1
   }
   for dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
-    [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ] || return 1
+    [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ] || {
+      echo "REFUSED: missing or unreadable local state directory $dir; cannot verify retained task records" >&2
+      return 1
+    }
     for meta in "$dir"/*.meta; do
       [ -e "$meta" ] || [ -L "$meta" ] || continue
       fm_treehouse_record_paths_safe "$meta" || {
@@ -1892,7 +1895,10 @@ fm_treehouse_record_exclusive() {  # <state> <worktree> [own-meta]
   slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || return 1
   fm_local_firstmate_state_dirs "$state" || return 1
   for dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
-    [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ] || return 1
+    [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ] || {
+      echo "REFUSED: missing or unreadable local state directory $dir; cannot verify retained task records" >&2
+      return 1
+    }
     for meta in "$dir"/*.meta; do
       [ -e "$meta" ] || [ -L "$meta" ] || continue
       fm_treehouse_record_paths_safe "$meta" || return 1
