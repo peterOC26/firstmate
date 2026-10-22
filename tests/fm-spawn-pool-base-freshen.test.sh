@@ -59,6 +59,18 @@ run_spawn() {
     "$id" "$PROJECT_DIR" "$@"
 }
 
+# Complete only the fixture's reservation lifetime, preserving the copy's
+# contents for freshness assertions. Guarded cleanup itself has a dedicated
+# offline ownership suite; this helper invokes only the fake Treehouse binary.
+release_fixture_task() {  # <id>
+  local id=$1 allocation="$HOME_DIR/state/$1.treehouse-acquire/allocation.json"
+  "$FAKEBIN_DIR/treehouse" return --force "$POOL_DIR" \
+    --if-lease-id "$(jq -r .lease_id "$allocation")" \
+    --if-lease-holder "$(jq -r .lease_holder "$allocation")" || fail "fixture lease release failed"
+  rm -f "$HOME_DIR/state/$id.meta" "$(dirname "$POOL_DIR")/.fm-slot-owner" "$FAKEBIN_DIR/.spawn-window"
+  rm -rf "$HOME_DIR/state/$id.treehouse-acquire"
+}
+
 test_remote_seeded_home_spawns_from_treehouse_pool() {
   local rec id out status lock
   id='pool-remote-seeded-r13'
@@ -149,9 +161,9 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
       # own project comparison, and the repository primary (named directly or
       # through a symlink) fails the isolation screen the poll shares with the
       # guard. The refusal names the last path the pane reported.
-      assert_contains "$out" "did not enter an isolated worktree" \
-        "spawn did not explain its isolation refusal"
-      assert_contains "$out" "last seen" "refusal did not name the path the pane reported"
+      assert_contains "$out" "did not yield an isolated worktree" \
+        "spawn did not explain its allocation isolation refusal"
+      assert_contains "$out" "$(cd "$POOL_DIR" && pwd -P)" "refusal did not name the allocated path"
       [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "refused spawn published task metadata"
       [ ! -e "$primary/.git/FETCH_HEAD" ] || fail "refused spawn fetched before proving isolation"
     fi
@@ -183,6 +195,7 @@ test_stale_pool_base_refreshes_before_branching() {
       "$branch_head" "$current" "$(cat "$POOL_DIR/advanced-main.txt")"
   fi
 
+  release_fixture_task "$id"
   id='pool-current-base-repeat-r1'
   fm_test_spawn_brief "$HOME_DIR" "$id"
   out=$(run_spawn "$id" --mode no-mistakes --yolo off)
@@ -528,6 +541,7 @@ strand_submodule_pin_via_spawn() {  # <seed-id>
     || fail "the first spawn did not move the pooled base across the moved submodule pin"
   [ "$(git -C "$POOL_DIR/ui" rev-parse HEAD)" = "$SUBPIN1" ] \
     || fail "the first spawn did not strand the submodule on the pin the old base recorded"
+  release_fixture_task "$id"
 }
 
 test_stale_submodule_pin_explains_itself() {
@@ -720,10 +734,10 @@ test_pool_slot_claim_follows_the_spawn_outcome() {
   out=$(run_spawn "$id" --scout)
   status=$?
   [ "$status" -ne 0 ] || fail "spawn launched a worker on a slot it could not claim"
-  assert_contains "$out" "could not claim Treehouse pool slot" \
+  assert_contains "$out" "carries an existing slot claim" \
     "spawn did not name the unclaimable slot as the reason"
-  assert_contains "$out" "inspect window" \
-    "a non-polytoken unclaimable-slot refusal must keep its window pointer"
+  assert_contains "$out" "retaining Treehouse lease recovery journal" \
+    "an unclaimable-slot refusal must preserve recovery identity"
   assert_not_contains "$out" "is closed on exit" \
     "a non-polytoken refusal must not claim its window was closed"
   [ -d "$SLOT_CLAIM" ] || fail "spawn replaced the directory blocking its slot claim"
@@ -742,9 +756,9 @@ test_pool_slot_claim_follows_the_spawn_outcome() {
   assert_contains "$out" "could not fetch origin" \
     "the aborted spawn did not refuse on its unusable origin"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "the aborted spawn published task metadata"
-  [ ! -e "$SLOT_CLAIM" ] && [ ! -L "$SLOT_CLAIM" ] \
-    || fail "the aborted spawn left a slot claim naming a task with no record: $(cat "$SLOT_CLAIM")"
-  pass "a Treehouse slot claim names the launched task, refuses when unclaimable, and is dropped by a locked abort"
+  [ -f "$SLOT_CLAIM" ] || fail "the aborted spawn lost its recovery claim"
+  [ -s "$HOME_DIR/state/$id.treehouse-acquire/allocation.json" ] || fail "the aborted spawn lost its lease identity"
+  pass "a Treehouse slot claim names the launched task, refuses when unclaimable, and survives with a durable recovery journal on abort"
 }
 
 # A stateful terminal and pool stand-in for the refused-launch sequence. Each
@@ -755,6 +769,13 @@ test_pool_slot_claim_follows_the_spawn_outcome() {
 install_pool_world_tmux() {  # <fakebin> <world-dir> <slot-root>
   local fakebin=$1 world=$2 slots=$3
   mkdir -p "$world"
+  mv "$fakebin/treehouse" "$fakebin/treehouse.lease"
+  cat > "$fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+export FM_FAKE_TREEHOUSE_POOL='$slots'
+exec '$fakebin/treehouse.lease' "\$@"
+SH
+  chmod +x "$fakebin/treehouse"
   cat > "$fakebin/tmux" <<SH
 #!/usr/bin/env bash
 set -u
@@ -806,14 +827,13 @@ case "$cmd" in
     rm -f "$world/$w.id" "$world/$w.path"
     ;;
   send-keys)
-    if [ "$text" = "treehouse get Enter" ]; then
-      w=$(window_name "$target")
-      for slot in "$slots"/*/project; do
-        grep -qxF -- "$slot" "$world"/*.path 2>/dev/null && continue
-        printf '%s\n' "$slot" > "$world/$w.path"
-        break
-      done
-    fi
+    case "$text" in
+      "cd -- "*)
+        w=$(window_name "$target")
+        line=${text% Enter}
+        bash -c "$line && pwd -P" > "$world/$w.path"
+        ;;
+    esac
     ;;
 esac
 exit 0
@@ -864,24 +884,23 @@ SH
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "the refused launch published a task record"
   [ ! -e "$world/fm-$id.id" ] \
     || fail "the refused launch left its window open, still leasing $(cat "$world/fm-$id.path")"
-  [ ! -e "$claim1" ] && [ ! -e "$claim2" ] || fail "the refused launch left a slot claim behind"
+  [ -e "$claim1" ] && [ ! -e "$claim2" ] || fail "the refused launch lost its recovery claim"
   [ ! -e "/tmp/fm-$id" ] || fail "the refused launch left its task temp root behind"
 
   out=$(run_spawn "$id" --harness codex --mode no-mistakes --yolo off)
   status=$?
-  expect_code 0 "$status" "the retry of the refused task should launch"$'\n'"$out"
-  assert_grep "worktree=$slot_root/1/project" "$HOME_DIR/state/$id.meta" \
-    "the retry did not land on the slot the refused launch returned"
+  [ "$status" -ne 0 ] || fail "a retry overwrote an unresolved acquisition"
+  assert_contains "$out" "retained Treehouse acquisition journal" "retry did not name the recovery journal"
 
   out=$(run_spawn "$other" --harness codex --mode no-mistakes --yolo off)
   status=$?
   expect_code 0 "$status" "a second task spawned after the retry should launch"$'\n'"$out"
   assert_grep "worktree=$slot_root/2/project" "$HOME_DIR/state/$other.meta" \
     "the second task was handed the retried task's slot"
-  grep -Fxq -- "task=$id" "$claim1" || fail "slot 1 is not claimed by the retried task: $(cat "$claim1" 2>/dev/null)"
+  grep -Fxq -- "task=$id" "$claim1" || fail "slot 1 lost its retained acquisition claim"
   grep -Fxq -- "task=$other" "$claim2" || fail "slot 2 is not claimed by the second task: $(cat "$claim2" 2>/dev/null)"
   rm -rf "/tmp/fm-$id" "/tmp/fm-$other" "/tmp/fm-$id+"* "/tmp/fm-$other+"*
-  pass "a launch refused after its slot claim leaves the pool for a retry and a second task"
+  pass "a refused launch retains its recovery lease and the next task gets another slot"
 }
 
 # A refused polytoken launch removes its per-id paths only under the per-id
@@ -940,7 +959,7 @@ SH
     "the abort did not report skipping its per-id cleanup"$'\n'"$out"
   [ -d "/tmp/fm-$id" ] || fail "the abort removed the task temp root while another spawn held the per-id lock"
   [ ! -e "$world/fm-$id.id" ] || fail "the contended abort left its window open"
-  [ ! -e "$slot_root/1/.fm-slot-owner" ] || fail "the contended abort left its slot claim behind"
+  [ -e "$slot_root/1/.fm-slot-owner" ] || fail "the contended abort lost its recovery claim"
   rm -rf "/tmp/fm-$id"
   pass "a refused polytoken launch leaves its per-id paths alone while another spawn holds the per-id lock"
 }
@@ -968,7 +987,7 @@ test_non_polytoken_refused_launch_keeps_its_window() {
   assert_contains "$out" "could not fetch origin" "the codex refusal message changed"$'\n'"$out"
   [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "the refused codex launch published a task record"
   [ -e "$world/fm-$id.id" ] || fail "a non-polytoken refusal closed its window, unlike main"
-  [ ! -e "$slot_root/1/.fm-slot-owner" ] || fail "the refused codex launch left its slot claim"
+  [ -e "$slot_root/1/.fm-slot-owner" ] || fail "the refused codex launch lost its recovery claim"
   pass "a non-polytoken launch refused after its slot claim keeps main's abort behavior"
 }
 
@@ -1010,9 +1029,9 @@ test_treehouse_isolation_refusal_points_at_what_survives() {
   out=$(run_spawn "$id" --harness codex --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "a codex spawn whose slot stopped being isolated should refuse"
-  assert_contains "$out" "treehouse get did not yield an isolated worktree" \
+  assert_contains "$out" "treehouse get did not enter an isolated worktree" \
     "the codex spawn did not refuse on the post-poll isolation check"$'\n'"$out"
-  assert_contains "$out" "refusing to launch to avoid tangling the primary checkout. Inspect target firstmate:fm-$id" \
+  assert_contains "$out" "inspect window firstmate:fm-$id" \
     "a non-polytoken isolation refusal must keep main's window pointer"$'\n'"$out"
   assert_not_contains "$out" "is closed on exit" \
     "a non-polytoken isolation refusal must not claim its window was closed"
@@ -1033,9 +1052,9 @@ SH
   out=$(run_spawn "$id" --harness polytoken --model zai/glm-5.3-flash --effort low --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "a polytoken spawn whose slot stopped being isolated should refuse"
-  assert_contains "$out" "treehouse get did not yield an isolated worktree" \
+  assert_contains "$out" "treehouse get did not enter an isolated worktree" \
     "the polytoken spawn did not refuse on the post-poll isolation check"$'\n'"$out"
-  assert_contains "$out" "pool (window firstmate:fm-$id is closed on exit" \
+  assert_contains "$out" "window firstmate:fm-$id is closed on exit" \
     "a fresh polytoken isolation refusal must name the worktree and the closed window"$'\n'"$out"
   assert_not_contains "$out" "Inspect target firstmate:fm-$id" \
     "a fresh polytoken isolation refusal must not point at its closed window"

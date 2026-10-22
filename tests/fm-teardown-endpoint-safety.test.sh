@@ -8,6 +8,11 @@ set -u
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 TMP_ROOT=$(fm_test_tmproot fm-teardown-endpoint-safety)
 REAL_TMUX=$(command -v tmux || true)
+TMUX_SKIP_REASON='tmux not installed'
+if [ "${FM_TEST_MOCK_LIFECYCLE_ONLY:-0}" = 1 ]; then
+  REAL_TMUX=
+  TMUX_SKIP_REASON='mock lifecycle only requested'
+fi
 
 make_case() {  # <name>
   local dir=$1
@@ -26,6 +31,10 @@ exit 0
 SH
   cat > "$TMP_ROOT/$dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+case "$*" in
+  'get --help') echo '--lease --lease-holder --json'; exit 0 ;;
+  'return --help') echo '--if-lease-id --if-lease-holder'; exit 0 ;;
+esac
 printf 'treehouse' >> "${FM_RUNTIME_LOG:?}"
 printf ' <%s>' "$@" >> "${FM_RUNTIME_LOG:?}"
 printf '\n' >> "${FM_RUNTIME_LOG:?}"
@@ -372,7 +381,7 @@ isolated_tmux_window_exists() {  # <dir> <socket> <session> <window>
 test_isolated_tmux_invalid_and_valid_cleanup() {
   local dir socket socket_id session='endpoint safety' target_id=target control=control target=fm-target
   local prefix_target=fm-prefix prefix_survivor=fm-prefix2 rc
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
   dir=$(make_case isolated-real)
   socket=dedicated.sock
   socket_id="$dir/$socket"
@@ -590,6 +599,7 @@ test_sole_slot_record_still_tears_down() {
 
   dir=$(make_case slot-sole)
   mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
@@ -618,6 +628,7 @@ test_recorded_endpoint_that_changed_directory_still_tears_down() {
 
   dir=$(make_case slot-endpoint-moved)
   mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
   mkdir -p "$dir/other-directory"
   # The exact recorded worker may legitimately cd outside its worktree. Its
   # endpoint identity still owns the lifecycle; cwd alone must not brick it.
@@ -748,6 +759,7 @@ test_remote_seeded_home_returns_its_uncontested_slot() {
   local dir id=remote-task rc
   dir=$(make_case remote-home-teardown)
   mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
   write_remote_parent_record "$dir/home"
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
@@ -999,6 +1011,17 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down() {
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   claim_pool_slot "$dir" "$other"
+  cp "$dir/home/state/$other.meta" "$dir/successor.meta"
+  cp "$dir/pool/1/.fm-slot-owner" "$dir/successor.claim"
+  ( cd "$dir/worktree" && exec sleep 60 ) &
+  worker=$!
+  set +e
+  run_case "$dir" "$other" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "owner-first cleanup bypassed the shared-copy refusal"
+  assert_contains "$(cat "$dir/stderr")" "reconcile stale task $id first" "owner refusal did not identify the stale task"
+  [ ! -s "$dir/runtime.log" ] || fail "owner-first refusal touched the runtime"
 
   set +e
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
@@ -1008,6 +1031,11 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down() {
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "stale record beside the claimant's record"
   assert_present "$dir/worktree/sentinel" "records-only teardown reset the claimant's slot"
   assert_present "$dir/home/state/$other.meta" "records-only teardown removed the claimant's record"
+  kill -0 "$worker" 2>/dev/null || fail "stale-first cleanup reaped the successor process"
+  cmp -s "$dir/successor.meta" "$dir/home/state/$other.meta" || fail "stale cleanup rewrote successor metadata"
+  cmp -s "$dir/successor.claim" "$dir/pool/1/.fm-slot-owner" || fail "stale cleanup rewrote successor claim"
+  kill "$worker" 2>/dev/null || true
+  wait "$worker" 2>/dev/null || true
 
   : > "$dir/runtime.log"
   run_case "$dir" "$other" > "$dir/stdout" 2> "$dir/stderr" \
@@ -1045,13 +1073,9 @@ test_own_and_absent_slot_claims_still_tear_down() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" \
-    || fail "teardown of an unclaimed slot failed: $(cat "$dir/stderr")"
-  assert_absent "$dir/home/state/$id.meta" "unclaimed-slot teardown left the task record"
-  grep -Fq "treehouse <return>" "$dir/runtime.log" \
-    || fail "unclaimed-slot teardown did not return its pool slot: $(cat "$dir/runtime.log")"
+  assert_refused_without_mutation "$dir" "$id" "legacy absent claim"
 
-  pass "fm-teardown: a task's own slot claim, and an unclaimed slot, both still tear down"
+  pass "fm-teardown: a task's own claim tears down; absent legacy ownership refuses"
 }
 
 # The tmux shim used by the endpoint-close tests below: every subcommand
@@ -1102,7 +1126,7 @@ write_endpoint_close_meta() {  # <case-dir> <id> <window>
 
 test_failed_endpoint_close_refuses_before_removing_the_record() {
   local dir socket session='close failure' id=strand-task rc
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
   dir=$(make_case close-failure)
   socket=dedicated.sock
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-session -d -s "$session" -n control )
@@ -1162,7 +1186,7 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
 
 test_forced_teardown_continues_past_a_close_it_could_not_make() {
   local dir socket session='forced close failure' id=forced-task rc
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
   dir=$(make_case forced-close-failure)
   socket=dedicated.sock
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-session -d -s "$session" -n control )
@@ -1210,7 +1234,7 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
 
 test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   local dir socket='dedicated.sock' session='unreadable read' id=unreadable-task rc
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
 
   # A close that failed, followed by an inventory read that could not run at
   # all. Nothing here shows the window absent, so treating it as closed would
@@ -1281,7 +1305,7 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
 
 test_forced_secondmate_child_close_failure_still_refuses() {
   local dir socket='dedicated.sock' session='child close failure' mate parent=mate-task child=child-task rc
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
   dir=$(make_case secondmate-child-close-failure)
   mate="$dir/mate"
   mkdir -p "$mate/state" "$mate/data" "$mate/config"
@@ -1351,7 +1375,7 @@ test_orca_close_failure_refuses_even_under_force() {
   set -e
   [ "$rc" -ne 0 ] || fail "a forced Orca cleanup continued past a close that never happened: $(cat "$dir/orca-forced.err")"
   assert_grep "could not be closed" "$dir/orca-forced.err" \
-    "the forced Orca run did not report the close it could not make"
+    "the forced Orca run did not report the close it could not make: $(cat "$dir/orca-forced.err")"
   assert_no_grep "--force authorizes continuing" "$dir/orca-forced.err" \
     "the forced Orca run announced a continue it cannot carry out"
   assert_no_grep "teardown $id complete" "$dir/orca-forced.out" \
@@ -1380,7 +1404,7 @@ test_orca_close_failure_refuses_even_under_force() {
 
 test_already_gone_endpoint_still_completes_without_a_refusal() {
   local dir socket session='already gone' id=gone-task
-  [ -n "$REAL_TMUX" ] || { echo "skip - tmux not installed"; return 0; }
+  [ -n "$REAL_TMUX" ] || { echo "skip - $TMUX_SKIP_REASON"; return 0; }
   dir=$(make_case already-gone)
   socket=dedicated.sock
   ( cd "$dir" && env -u TMUX -u TMUX_PANE "$REAL_TMUX" -S "$socket" new-session -d -s "$session" -n control )
@@ -1420,6 +1444,52 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
   pass "fm-teardown: an already-exited endpoint, and a server that is already gone, still complete cleanup silently"
 }
 
+# No lease mismatch may reach reaping, branch/hook changes, scratch cleanup,
+# or Treehouse return, even when --force was requested for the old task.
+test_lease_mismatch_refuses_before_every_copy_mutation() {
+  local shape dir id=lease-task worker rc head
+  for shape in wrong-id wrong-holder malformed-state absent-claim duplicate-claim; do
+    dir=$(make_case "lease-$shape")
+    mark_case_as_treehouse_pool "$dir"
+    claim_pool_slot "$dir" "$id"
+    fm_write_meta "$dir/home/state/$id.meta" \
+      "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+      "worktree=$dir/worktree" "project=$dir/project" "kind=scout" \
+      "treehouse_lease_id=expected-id" "treehouse_lease_holder=$dir/home/$id/acquisition"
+    jq --arg holder "$dir/home/$id/acquisition" \
+      '.worktrees[0] += {leased:true,lease_id:"expected-id",lease_holder:$holder}' \
+      "$dir/pool/treehouse-state.json" > "$dir/state.new"
+    mv "$dir/state.new" "$dir/pool/treehouse-state.json"
+    case "$shape" in
+      wrong-id) sed 's/expected-id/successor-id/' "$dir/pool/treehouse-state.json" > "$dir/state.new"; mv "$dir/state.new" "$dir/pool/treehouse-state.json" ;;
+      wrong-holder) sed 's|/acquisition|/successor|' "$dir/pool/treehouse-state.json" > "$dir/state.new"; mv "$dir/state.new" "$dir/pool/treehouse-state.json" ;;
+      malformed-state) printf 'broken-json\n' > "$dir/pool/treehouse-state.json" ;;
+      absent-claim) rm "$dir/pool/1/.fm-slot-owner" ;;
+      duplicate-claim) printf 'task=other\n' >> "$dir/pool/1/.fm-slot-owner" ;;
+    esac
+    mkdir -p "$dir/worktree/.claude"
+    printf 'hook sentinel\n' > "$dir/worktree/.claude/settings.local.json"
+    head=$(git -C "$dir/worktree" rev-parse HEAD)
+    cp "$dir/home/state/$id.meta" "$dir/prior.meta"
+    ( cd "$dir/worktree" && exec sleep 60 ) &
+    worker=$!
+    set +e
+    run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "$shape ownership unexpectedly passed"
+    kill -0 "$worker" 2>/dev/null || fail "$shape reaped a process before ownership was proved"
+    assert_present "$dir/worktree/sentinel" "$shape scrubbed the dirty copy"
+    assert_grep 'hook sentinel' "$dir/worktree/.claude/settings.local.json" "$shape edited hooks"
+    [ "$head" = "$(git -C "$dir/worktree" rev-parse HEAD)" ] || fail "$shape changed HEAD"
+    cmp -s "$dir/prior.meta" "$dir/home/state/$id.meta" || fail "$shape rewrote metadata"
+    [ ! -s "$dir/runtime.log" ] || fail "$shape reached a runtime mutation: $(cat "$dir/runtime.log")"
+    kill "$worker" 2>/dev/null || true
+    wait "$worker" 2>/dev/null || true
+  done
+  pass "fm-teardown: mismatched or unknown lease/claim evidence refuses before all process, hook, scratch, and return effects"
+}
+
 test_invalid_endpoint_records_refuse_before_mutation
 test_control_lock_contention_refuses_before_mutation
 test_non_pool_teardown_ignores_task_set_lock
@@ -1441,6 +1511,7 @@ test_cross_home_pool_slot_collision_refuses
 test_sole_slot_record_still_tears_down
 test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot
 test_stale_record_on_claimed_slot_retires_then_claimant_tears_down
+test_lease_mismatch_refuses_before_every_copy_mutation
 test_own_and_absent_slot_claims_still_tear_down
 test_recorded_endpoint_that_changed_directory_still_tears_down
 test_project_lock_anchors_at_the_local_root_across_home_layouts

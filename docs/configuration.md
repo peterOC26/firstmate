@@ -506,6 +506,10 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 
 - Every new task records `endpoint_task_id=` as the cleanup binding between the metadata filename and its opaque runtime endpoint.
 
+- Treehouse-backed ships and scouts additionally record `treehouse_lease_id=` and `treehouse_lease_holder=` for the durable acquisition; [the shared ownership contract](../bin/fm-wake-lib.sh) owns their lifetime, legacy-record preflight, and identity rules.
+  [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release and records-only reconciliation.
+  These fields do not apply to Orca or replace the existing secondmate home-seed lease contract.
+
 - A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
 
 - A zellij task additionally records `zellij_session=`, `zellij_tab_id=`, and `zellij_pane_id=`.
@@ -1524,14 +1528,15 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 
 | Resolved backend | Additional tools |
 | --- | --- |
-| `tmux` | `tmux`, `treehouse` |
+| `tmux` | `tmux`, `jq`, `treehouse` |
 | `herdr` | `herdr`, `jq`, `treehouse` |
 | `zellij` | `zellij`, `jq`, `treehouse` |
 | `orca` | `orca` |
 | `cmux` | `cmux`, `jq`, `treehouse` |
 
-The JSON-emitting adapters (`herdr`, `zellij`, `cmux`) need `jq` because their spawn and liveness paths parse backend JSON.
+All Treehouse-backed worker spawns need `jq` for lease JSON; the JSON-emitting adapters (`herdr`, `zellij`, `cmux`) also parse backend JSON in their spawn and liveness paths.
 Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`) uses `treehouse` for worktrees.
+Ordinary worker allocation requires Treehouse v2.3.0 or newer with JSON lease allocation and identity-conditional return; unsupported installations refuse before allocation or endpoint mutation.
 
 Backend tool availability uses the adapter's own executable resolver, so bootstrap and spawn agree on supported non-`PATH` locations such as cmux's bundled CLI.
 An unknown resolved backend emits `BACKEND_INVALID` and blocks dispatch instead of silently dropping its dependency delta or falling back to tmux.

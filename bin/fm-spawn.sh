@@ -173,22 +173,17 @@
 #   owns it. The refusal names another spawn or forced teardown when the recorded
 #   holder role is known, otherwise another operation. --relaunch is exempt
 #   because the existing task's control lock covers it.
-#   A fresh Treehouse-backed spawn also takes the project-identity lock in the local
-#   root Firstmate home's state directory before slot allocation and holds it through
-#   task metadata publication. Teardown holds that same lock while proving and
-#   returning a slot, so allocation cannot reuse a slot before its owner record
-#   is published. Under that same lock it writes the slot's owner claim, which is
-#   what lets teardown leave a slot reassigned since untouched; bin/fm-wake-lib.sh
-#   owns the claim and bin/fm-teardown.sh owns what it protects. A slot that
-#   cannot be claimed refuses the spawn rather than launching a worker whose slot
-#   could later be released out from under its successor. A spawn that aborts
-#   while it still holds the allocation lock drops its own claim; an abort after
-#   metadata publication has released that lock leaves the claim in place, and
-#   the next spawn's claim replaces it. A fresh polytoken spawn that fails and
-#   leaves no task record restores the pool as it found it: it retakes that lock
-#   once to drop its claim after metadata publication too, and before its launch
-#   is delivered it closes the endpoint whose `treehouse get` shell leases the
-#   slot and removes the wiring, task temp root, and staged launch file it wrote.
+#   Every Treehouse-backed worker spawn/relaunch takes the project-identity
+#   lock through metadata publication. Durable acquisition, retained-record
+#   preflight, immutable lease fields, and claim ownership are owned by
+#   bin/fm-wake-lib.sh. state/<id>.treehouse-acquire/ is created before get:
+#   identity records project and holder, allocation.json captures get's raw
+#   JSON, then identity gains treehouse_lease_id. It survives failures and
+#   successful launches until explicit teardown, so an abort never loses an
+#   acquisition or silently returns a copy holding work. A same-id retry refuses
+#   that journal; other tasks may allocate only after its lease is verified.
+#   Polytoken's failed pre-launch endpoint/wiring cleanup still runs, but never
+#   clears this lease or its claim. No conflicting claim is overwritten.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -1422,7 +1417,9 @@ SPAWN_TASK_SET_LOCK=
 SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-SPAWN_SLOT_CLAIMED=0
+TREEHOUSE_LEASE_ID=
+TREEHOUSE_LEASE_HOLDER=
+TREEHOUSE_ACQUIRE_JOURNAL=
 SPAWN_FRESH_ENDPOINT_OPENED=0
 SPAWN_FRESH_WIRING_PENDING=0
 SPAWN_TASK_TMP_CREATED=0
@@ -1577,9 +1574,9 @@ spawn_abort_cleanup() {
     fm_lock_release "$SPAWN_META_LOCK" || true
   fi
   # A fresh polytoken spawn that fails and leaves no record must leave the pool
-  # as it found it. Before its launch is delivered, the endpoint it opened holds nothing but
-  # the shell whose `treehouse get` leases the slot, so closing it returns the
-  # slot to the pool and leaves no window or tab for a retry to trip over; the
+  # without an endpoint or wiring leak. Before its launch is delivered, closing
+  # the shell leaves no window or tab for recovery to trip over; the durable
+  # lease and acquisition journal remain reserved for reconciliation. The
   # Firstmate wiring, task temp root, and staged launch file it wrote go with it.
   # Once a launch was delivered into an endpoint still open, a worker may be
   # running there, so those stay for the operator, as the refusal says.
@@ -1626,27 +1623,13 @@ spawn_abort_cleanup() {
       fi
     fi
   fi
-  # A spawn that aborts after claiming its slot but before its record survives
-  # must not leave a claim naming a task no record describes. The release is a
-  # read-then-remove, so it runs only while the project lock that wrote the
-  # claim is still held (aborts before metadata publication); a later abort has
-  # already released that lock and leaves the claim for the next spawn's
-  # atomic replacement rather than racing it. A polytoken spawn instead retakes
-  # that lock once for a later failure whose record was rolled back. The
-  # release itself never removes another task's claim.
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
-    fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    SPAWN_SLOT_CLAIMED=0
-    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-    elif [ "${HARNESS:-}" = polytoken ] && [ -n "$SPAWN_TREEHOUSE_PROJECT_LOCK" ] &&
-      fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-      fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
-    else
-      echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
-    fi
+  # Durable acquisitions survive aborts. The journal is written before get,
+  # with its raw response captured directly, so even an interrupted publication
+  # leaves identity evidence. Never drop the claim or unconditionally return a
+  # copy that may already contain work or a delivered launch.
+  if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
+    [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
+    echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
@@ -3529,8 +3512,8 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   SPAWN_PROJECT_CAPACITY=$FM_PROJECT_CAPACITY
   SPAWN_PROJECT_CAPACITY_ANY=$FM_PROJECT_CAPACITY_ANY
 fi
-if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
-  { [ "$BACKEND" != orca ] || [ -n "$SPAWN_PROJECT_CAPACITY_ANY" ]; }; then
+if [ "$KIND" != secondmate ] &&
+  { [ "$BACKEND" != orca ] || { [ "$RELAUNCH" -eq 0 ] && [ -n "$SPAWN_PROJECT_CAPACITY_ANY" ]; }; }; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
@@ -3544,6 +3527,33 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+fi
+if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  fm_treehouse_lease_cli || {
+    echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
+    exit 1
+  }
+  if [ "$RELAUNCH" -eq 1 ]; then
+    if ! fm_treehouse_record_lease "$RELAUNCH_META" ||
+      ! fm_treehouse_lease_matches "$RELAUNCH_WT" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
+      echo "REFUSED: task $ID's recorded durable lease cannot be verified; reconcile its ownership before relaunch" >&2
+      exit 1
+    fi
+    TREEHOUSE_LEASE_ID=$FM_TREEHOUSE_RECORD_LEASE_ID
+    TREEHOUSE_LEASE_HOLDER=$FM_TREEHOUSE_RECORD_LEASE_HOLDER
+    fm_treehouse_slot_owner_state "$RELAUNCH_WT" "$ID" "$FM_HOME"
+    if [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ]; then
+      echo "REFUSED: task $ID's recorded copy is not claimed by this home and task; reconcile its ownership before relaunch" >&2
+      exit 1
+    fi
+    fm_treehouse_record_exclusive "$STATE" "$RELAUNCH_WT" "$RELAUNCH_META" || exit 1
+  else
+    if [ -e "$STATE/$ID.treehouse-acquire" ] || [ -L "$STATE/$ID.treehouse-acquire" ]; then
+      echo "REFUSED: task $ID has a retained Treehouse acquisition journal; reconcile $STATE/$ID.treehouse-acquire before retrying" >&2
+      exit 1
+    fi
+    fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1
+  fi
 fi
 if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
   if ! fm_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
@@ -4986,9 +4996,38 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
+  mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
+  treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
+  TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
+  printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
+  if ! (cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$TREEHOUSE_LEASE_HOLDER" --json) > "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
+    echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    exit 1
+  fi
+  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
+    select(.lease_holder == $holder) | .lease_id |
+    select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
+  ' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  printf 'treehouse_lease_id=%s\n' "$TREEHOUSE_LEASE_ID" >> "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
+  validate_spawn_worktree "treehouse get" "$WT"
+  fm_treehouse_lease_matches "$WT" "$TREEHOUSE_LEASE_ID" "$TREEHOUSE_LEASE_HOLDER" || {
+    echo "REFUSED: allocated Treehouse lease identity does not match pool state; retaining recovery journal" >&2
+    exit 1
+  }
+  fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
+  fm_treehouse_slot_owner_state "$WT" "$ID"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    absent) ;;
+    *) echo "REFUSED: allocated copy $WT carries an existing slot claim; reconcile it before retrying" >&2; exit 1 ;;
+  esac
+  # Enter the exact leased path through the backend-independent cwd helper.
+  spawn_enter_recorded_worktree
+  leased_wt_real=$(real_path_or_raw "$WT")
+  WT=
 
-  # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
+  # Wait for the explicit cd: the endpoint must settle in the exact leased copy.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
   # automatic-rename slips through), display-message -t <bad-name> falls back to the
   # active client's window, which would misread firstmate's OWN pane path as the
@@ -5001,7 +5040,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # A single read that already looks isolated is not proof the pane settled
   # there: on some tmux/WSL setups a brand-new window's pane_current_path
   # transiently reports an unrelated stale path (seen live as another real git
-  # checkout entirely) before the shell catches up with treehouse get's cd. That
+  # checkout entirely) before the shell catches up with the explicit cd. That
   # stale path passes spawn_worktree_isolated too (it resolves to a real,
   # distinct worktree top-level), so accepting it on one read alone silently
   # records the wrong worktree= in state/<id>.meta. Require two consecutive
@@ -5026,7 +5065,8 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   for _ in $(seq 1 60); do
     p=$(spawn_current_path "$WT_TARGET" || true)
     [ -z "$p" ] || last_seen="$p"
-    if [ -n "$p" ] && spawn_worktree_isolated "$p"; then
+    if [ -n "$p" ] && spawn_worktree_isolated "$p" &&
+      [ "$(real_path_or_raw "$p")" = "$leased_wt_real" ]; then
       p_real=$(real_path_or_raw "$p")
       last_reason="it is an isolated worktree, but no second read agreed with it"
       if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
@@ -5051,24 +5091,19 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     validate_spawn_worktree "treehouse get" "$T"
   fi
 
-  # Claim the pool slot for this task. The interactive `treehouse get` sent to
-  # the pane above records only a process lease (Treehouse's durable
-  # `get --lease --lease-holder`, which bin/fm-home-seed.sh uses for secondmate
-  # homes, is not this path), so Treehouse cannot say which task a slot belongs
-  # to once that task's worker exits - and that is exactly when the slot is
-  # handed on and this task's worktree= line goes stale. The claim is what lets
-  # bin/fm-teardown.sh leave a slot that has since been reassigned untouched, so
-  # a slot that cannot be claimed is refused here, at the cheapest point, rather
-  # than launching a worker whose slot teardown could later release out from
-  # under its successor.
-  # Written under the Treehouse project lock held from before slot allocation
-  # through metadata publication, so no other spawn or return sees a half-claim.
+  # Recheck before claim/publication under the same project lock. Never
+  # replace a conflicting claim as an automatic repair.
+  fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
+  fm_treehouse_slot_owner_state "$WT" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || {
+    echo "REFUSED: allocated copy $WT acquired a conflicting slot claim; retaining the lease for reconciliation" >&2
+    exit 1
+  }
   if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
       echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; $(spawn_endpoint_hint)" >&2
       exit 1
     fi
-    SPAWN_SLOT_CLAIMED=1
   fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
@@ -5808,6 +5843,10 @@ preserve_relaunch_meta() {
   echo "window=$META_WINDOW"
   echo "endpoint_task_id=$ID"
   echo "worktree=$WT"
+  if [ "$RELAUNCH" -eq 0 ] && [ -n "$TREEHOUSE_LEASE_ID" ]; then
+    echo "treehouse_lease_id=$TREEHOUSE_LEASE_ID"
+    echo "treehouse_lease_holder=$TREEHOUSE_LEASE_HOLDER"
+  fi
   echo "project=$PROJ_ABS"
   echo "harness=$HARNESS"
   echo "kind=$KIND"

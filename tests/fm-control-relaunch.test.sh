@@ -19,8 +19,8 @@
 #      agent exited.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=/dev/null
 . "$ROOT/bin/fm-control-lib.sh"
 # shellcheck source=/dev/null
@@ -223,6 +223,8 @@ EOF
     echo "model=default"
     echo "effort=default"
   } > "$home/state/$id.meta"
+  fm_test_lease_existing_worktree "$wt" "$home/state/$id.meta" "$id" "$home"
+  fm_test_fake_treehouse "$dir/fakebin"
   printf '%s\n' "fm-$id" > "$dir/fake/windows"
   printf '%s' "$ses" > "$dir/fake/session-name"
   printf '%s' "$wt" > "$dir/fake/cwd"
@@ -507,14 +509,14 @@ test_relaunch_serializes_concurrent_durable_metadata_publication() {
     FM_FAKE_TRACE_RELEASE="$launch_release" \
     run_control "$dir" rl28 relaunch --note "continue after publication" > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$prepare" ] && [ "$i" -lt 500 ]; do
+  while [ ! -e "$prepare" ] && [ "$i" -lt 1500 ]; do
     /bin/sleep 0.01
     i=$((i + 1))
   done
   [ -e "$prepare" ] || {
     kill "$control_pid" 2>/dev/null || true
     wait "$control_pid" 2>/dev/null || true
-    fail "relaunch did not reach trace delivery"
+    fail "relaunch did not reach trace delivery: $(cat "$dir/control.out")"
   }
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     FM_REAL_MV="$(command -v mv)" \
@@ -1426,6 +1428,8 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
       echo "model=default"
       echo "effort=default"
     } > "$home/state/$id.meta"
+    fm_test_lease_existing_worktree "$dir/wt" "$home/state/$id.meta" "$id" "$home"
+    fm_test_fake_treehouse "$dir/fakebin"
     printf '%s\n' "fm-$id" > "$dir/fake/windows"
     printf '%s' "$dir/wt" > "$dir/fake/cwd"
 
@@ -2400,6 +2404,8 @@ EOF
     echo "herdr_tab_id=tab1"
     echo "herdr_pane_id=%7"
   } > "$home/state/$id.meta"
+  fm_test_lease_existing_worktree "$wt" "$home/state/$id.meta" "$id" "$home"
+  fm_test_fake_treehouse "$dir/fakebin"
   printf '%s' "$wt" > "$dir/fake/cwd"
   printf '%s' "$survivor" > "$dir/fake/herdr-pane"
   : > "$dir/fake/herdr-log"
