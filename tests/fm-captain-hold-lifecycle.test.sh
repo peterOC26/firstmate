@@ -4629,6 +4629,104 @@ SH
   pass "marked hold reasons round-trip through public reads, fleet, startup, and return without changing other fields"
 }
 
+test_completion_inventory_survives_done_retention() {
+  local home id call outcome archive
+  for outcome in answered released unanswered held missing live-shadow wrong-origin legacy; do
+    home=$(make_home "archived-inventory-$outcome")
+    id=sample-archived-review
+    call=sample-archived-call
+    [ "$outcome" != legacy ] || call="$id-decision-choice"
+    archive="$home/data/done-archive.md"
+    # Exercise the configured archive, including spaces and a literal #, rather
+    # than accidentally passing because the default file also exists.
+    if [ "$outcome" = released ]; then
+      archive="$home/data/retained calls #1.md"
+      sed "s|data/done-archive.md|data/retained calls #1.md|" "$home/.tasks.toml" > "$home/config.toml"
+      mv "$home/config.toml" "$home/.tasks.toml"
+    fi
+    tasks_in "$home" add "$id" "Review the archived call" --kind scout --repo sample --start >/dev/null \
+      || fail "could not create $outcome origin"
+    write_scout_with_attested_inventory "$home" "$id" "$call"
+    if [ "$outcome" != missing ]; then
+      run_captain "$home" hold "$call" --title "Choose the archived option" \
+        --reason "captain choice pending" --repo sample --origin "$id" >/dev/null \
+        || fail "could not hold $outcome call"
+      case "$outcome" in
+        unanswered|held)
+          tasks_in "$home" 'done' "$call" >/dev/null || fail "could not close unanswered call"
+          ;;
+        *)
+          printf 'Keep the report.\n' > "$home/answer.txt"
+          if [ "$outcome" = released ]; then
+            run_captain "$home" answer "$call" --release --decision-file "$home/answer.txt" >/dev/null \
+              || fail "could not release call"
+            tasks_in "$home" 'done' "$call" >/dev/null || fail "could not finish released call"
+          else
+            run_captain "$home" answer "$call" --decision-file "$home/answer.txt" >/dev/null \
+              || fail "could not answer $outcome call"
+          fi
+          run_captain "$home" complete "$id" "$call" >/dev/null \
+            || fail "live answered $outcome call did not satisfy completion"
+          run_captain "$home" verify "$id" >/dev/null \
+            || fail "live answered $outcome call did not satisfy verification"
+          ;;
+      esac
+      tasks_in "$home" prune --keep 0 >/dev/null || fail "could not prune $outcome call"
+      assert_grep "$call" "$archive" "prune did not archive $outcome call"
+      if tasks_in "$home" show "$call" --full > "$home/live.out" 2>&1; then
+        fail "prune kept $outcome call in the live backlog"
+      fi
+      case "$outcome" in
+        held)
+          # A malformed archived row still bearing a hold is no answer.
+          sed 's/^- \[x\]/- [ ]/' "$archive" > "$home/archive.txt"
+          mv "$home/archive.txt" "$archive"
+          ;;
+        live-shadow)
+          tasks_in "$home" add "$call" "Reopened call without an answer" --repo sample >/dev/null \
+            || fail "could not recreate live call"
+          ;;
+        wrong-origin)
+          sed "s/Captain hold origin: $id/Captain hold origin: another-review/" "$archive" > "$home/archive.txt"
+          mv "$home/archive.txt" "$archive"
+          ;;
+        legacy)
+          printf 'decisions_reviewed=1\ndecision_keys=choice\n' >> "$home/state/$id.meta"
+          ;;
+      esac
+    fi
+    case "$outcome" in
+      answered|released|legacy)
+        run_captain "$home" verify "$id" > "$home/verify.out" 2> "$home/verify.err" \
+          || fail "pruned $outcome call blocked verification: $(cat "$home/verify.err")"
+        run_captain "$home" complete "$id" --none > "$home/complete.out" 2> "$home/complete.err" \
+          || fail "pruned $outcome call blocked completion: $(cat "$home/complete.err")"
+        run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err" \
+          || fail "pruned $outcome call blocked cleanup: $(cat "$home/teardown.err")"
+        assert_absent "$home/state/$id.meta" "successful cleanup retained $outcome metadata"
+        assert_present "$home/data/$id/report.md" "cleanup lost $outcome report"
+        ;;
+      *)
+        if run_captain "$home" verify "$id" > "$home/verify.out" 2> "$home/verify.err"; then
+          fail "$outcome inventory unexpectedly satisfied verification"
+        fi
+        if run_captain "$home" complete "$id" --none > "$home/complete.out" 2> "$home/complete.err"; then
+          fail "$outcome inventory unexpectedly satisfied completion"
+        fi
+        if run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err"; then
+          fail "$outcome inventory unexpectedly allowed cleanup"
+        fi
+        assert_grep "has not passed the captain-call completion gate" "$home/teardown.err" \
+          "$outcome cleanup refused at a different gate"
+        assert_present "$home/state/$id.meta" "refusal lost $outcome metadata"
+        assert_present "$home/data/$id/report.md" "refusal lost $outcome report"
+        ;;
+    esac
+    pass "completion and cleanup preserve $outcome semantics after done retention"
+  done
+}
+
+test_completion_inventory_survives_done_retention
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
 test_historical_self_inventory_has_workable_repair
