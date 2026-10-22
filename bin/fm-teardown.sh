@@ -2497,6 +2497,22 @@ require_exclusive_task_worktree_slot() {
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot"
 }
 
+teardown_missing_copy_recovery_steps() {
+  local meta=$1 worktree=$2 record_id=$3
+  {
+    echo "Manual recovery: pause allocations and cleanup for this project; retain the task metadata, acquisition journal, pool state, and slot claim."
+    printf 'meta=%q\nworktree=%q\n' "$meta" "$worktree"
+    cat <<'RECOVERY'
+Read project=, treehouse_lease_id=, and treehouse_lease_holder= from "$meta"; compare them with the acquisition journal and the pool treehouse-state.json. Do not use treehouse status.
+Restore the original copy at "$worktree" from backup, including its Git metadata and unlanded work; do not create an empty replacement or overwrite another task's copy.
+Verify that pool state still holds the exact recorded lease ID and holder and that .fm-slot-owner names this task and home. Do not fabricate ownership evidence.
+If the original copy or matching ownership cannot be restored, keep the records and lease and obtain operator reconciliation; do not delete the metadata, journal, or claim or return another lease.
+After restoring and verifying the original copy, retry guarded teardown:
+RECOVERY
+    printf '  FM_HOME=%q bash %q %q\n' "$(dirname "$(dirname "$meta")")" "$SCRIPT_DIR/fm-teardown.sh" "$record_id"
+  } >&2
+}
+
 # Positive slot ownership, read from the claim the task that took the slot wrote
 # into the slot itself (bin/fm-wake-lib.sh owns the claim and its states).
 #
@@ -2509,12 +2525,11 @@ require_exclusive_task_worktree_slot() {
 # that allocates it - so a claim naming another task is proof the slot was
 # reassigned after this record was written.
 #
-# A claim naming another task does not refuse: it means the slot is no longer
-# this task's, so the record's own cleanup proceeds and every slot step is
-# skipped (see the script header for why refusing would strand the record and
-# why skipping discards nothing). Returns TEARDOWN_SLOT_REASSIGNED_RC for that
-# state so each caller gates its slot steps on one determination; the claimant
-# stays in FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME.
+# The script header owns the records-only reconciliation rules and the
+# contradictory lease/claim evidence that refuses instead. A records-only
+# determination returns TEARDOWN_SLOT_REASSIGNED_RC so each caller gates its
+# slot steps on one result; the claimant stays in FM_TREEHOUSE_SLOT_OWNER_ID
+# and FM_TREEHOUSE_SLOT_OWNER_HOME.
 #
 # A legacy claimed copy needs verified unleased state; a new copy needs the
 # metadata's exact durable identity and holder.
@@ -2564,6 +2579,9 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
   marker=$(fm_treehouse_slot_owner_marker "$worktree" 2>/dev/null) || marker="beside $worktree"
   echo "REFUSED: task $record_id's recorded worktree $worktree carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed - not even with --force." >&2
   echo "Inspect and reconcile the absent or unsafe claim file at $marker (task= and home= lines), then re-run teardown." >&2
+  if [ ! -d "$worktree" ] && [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
+    teardown_missing_copy_recovery_steps "$meta" "$worktree" "$record_id"
+  fi
   return 1
 }
 
@@ -2580,6 +2598,7 @@ require_owned_task_worktree_slot() {
   if grep -q '^treehouse_lease_' "$META"; then
     slot=$(canonical_existing_dir "$WT") || {
       echo "REFUSED: leased task copy is unavailable; retaining its lease and records" >&2
+      teardown_missing_copy_recovery_steps "$META" "$WT" "$ID"
       return 1
     }
   else

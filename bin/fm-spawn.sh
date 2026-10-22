@@ -282,12 +282,12 @@
 #   Ship/scout spawns refuse to launch unless the resolved task path is a real
 #   git worktree root distinct from both the spawning project and its repository's
 #   primary checkout, including when the spawning project is a linked worktree.
-#   On the backends that discover that path by reading the task pane's own cwd,
-#   the same isolation test screens every read: a pane still showing the project
-#   or the repository primary while `treehouse get` prepares the slot is waited
-#   out as a transient rather than adopted and then refused, so a home that is
-#   itself a linked worktree of the project repository still launches. A pane
-#   that never reaches an isolated worktree refuses at the end of that wait,
+#   For Treehouse-backed spawns, the same isolation test screens every pane cwd
+#   read, which must also match the exact leased path. A pane still showing the
+#   project or repository primary while its shell processes the explicit cd is
+#   waited out as a transient rather than adopted and then refused, so a home
+#   that is itself a linked worktree of the project repository still launches.
+#   A pane that never settles in the leased copy refuses at the end of that wait,
 #   naming the last path seen and why it was rejected.
 #   That placement is proven only at launch. Every ship or scout pane therefore
 #   also receives `export FM_TASK_ID=<task-id>` before the launch command, on
@@ -5128,11 +5128,13 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     echo "REFUSED: allocated copy $WT acquired a conflicting slot claim; retaining the lease for reconciliation" >&2
     exit 1
   }
-  if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-      echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; $(spawn_endpoint_hint)" >&2
-      exit 1
-    fi
+  fm_treehouse_pool_slot "$PROJ_ABS" "$WT" || {
+    echo "REFUSED: leased copy $WT is not a recognized Treehouse pool slot for $PROJ_ABS; retaining the acquisition journal before publication" >&2
+    exit 1
+  }
+  if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
+    echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; $(spawn_endpoint_hint)" >&2
+    exit 1
   fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then

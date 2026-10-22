@@ -1703,6 +1703,7 @@ test_forced_secondmate_dirty_child_return_warns_and_completes() {
   git -C "$case_dir/project" worktree add -q -b fm/child-scout "$child_wt" main
   printf '{"worktrees":[{"name":"6","path":"%s"}]}\n' "$child_wt" \
     > "$case_dir/pool/treehouse-state.json"
+  printf 'task=child-scout\nhome=%s\n' "$home" > "$case_dir/pool/6/.fm-slot-owner"
   fm_write_meta "$home/state/child-scout.meta" \
     "window=firstmate:fm-child-scout" \
     "endpoint_task_id=child-scout" \

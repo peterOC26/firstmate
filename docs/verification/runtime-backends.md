@@ -28,7 +28,7 @@ Selected observed output:
 ```text
 ok - retained records reserve their copies through exit; explicit cleanup releases exactly their lease
 ok - legacy, aliased, cross-home, and unreadable records refuse before allocation or endpoint mutation
-ok - relaunch preserves the acquisition across spawn_gen and rejects stale or cross-home claims before mutation
+ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
 ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy
 ok - fm-teardown: a stale record on a claimed slot retires, then the claimant tears down
 ok - fm-teardown: mismatched or unknown lease/claim evidence refuses before all process, hook, scratch, and return effects
@@ -1939,7 +1939,7 @@ The Herdr refusal when a shell accepts the command but does not move is not exer
 
 Measured 2026-09-10 on macOS aarch64 against Herdr 0.9.0 (protocol 22) and Pi 0.85.1 in an isolated `fm-lab-` session (upstream issue #4115, duplicates #3639, #3487, #2908, #3545).
 
-Herdr keeps a Pi registration after the Pi process has exited to a shell when a nested interactive shell sits under the pane's top shell, which is the crew shape `treehouse get` leaves behind; a plain `/quit` directly under the top shell, and a `kill -9` of Pi, both released it on this version.
+Herdr keeps a Pi registration after the Pi process has exited to a shell when a nested interactive shell sits under the pane's top shell; a plain `/quit` directly under the top shell, and a `kill -9` of Pi, both released it on this version.
 Reproduced in the lab with a nested `zsh` under the pane shell, then `pi` with no prompt, then `/quit`:
 
 ```sh

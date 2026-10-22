@@ -537,6 +537,21 @@ Missing, empty, duplicate, malformed, backend-inconsistent, or task-mismatched e
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.
 
+For a leased task whose copy directory is missing, direct and descendant teardown retain the lease and records and print these manual recovery steps:
+
+1. Pause allocations and cleanup for the project; retain the task metadata, acquisition journal, pool state, and slot claim.
+2. Set `meta` to the task's metadata path and `worktree` to its recorded copy path.
+   Read `project=`, `treehouse_lease_id=`, and `treehouse_lease_holder=` from `"$meta"`; compare them with the acquisition journal and the pool's `treehouse-state.json`.
+   Do not use `treehouse status`.
+3. Restore the original copy at `"$worktree"` from backup, including its Git metadata and unlanded work.
+   Do not create an empty replacement or overwrite another task's copy.
+4. Verify that pool state still holds the exact recorded lease ID and holder and that `.fm-slot-owner` names this task and home.
+   Do not fabricate ownership evidence.
+5. If the original copy or matching ownership cannot be restored, keep the records and lease and obtain operator reconciliation.
+   Do not delete the metadata, journal, or claim or return another lease.
+6. After restoring and verifying the original copy, retry guarded teardown with `FM_HOME=<recorded-home> bash bin/fm-teardown.sh <task-id>`.
+   The refusal prints the exact home, script, and task arguments.
+
 ### Herdr homes and presentation
 
 `FM_HOME` determines Herdr's home label: the primary home uses `firstmate`, and a secondmate home marked by `.fm-secondmate-home` uses `2ndmate-<secondmate-id>`.

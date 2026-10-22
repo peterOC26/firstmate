@@ -53,6 +53,85 @@ read_lease() {
   ' _ "$ROOT" "$HOME_DIR/state/$1.meta"
 }
 
+test_missing_leased_copy_recovery_messages() {
+  local shape out rc task_home run_home task_id
+  for shape in direct child; do
+    make_case "missing-copy-$shape"
+    out=$(spawn_task retained 1); rc=$?
+    expect_code 0 "$rc" "setup spawn failed: $out"
+    task_home=$HOME_DIR
+    run_home=$HOME_DIR
+    task_id=retained
+    if [ "$shape" = child ]; then
+      run_home="$CASE_DIR/parent"
+      mkdir -p "$run_home/state" "$run_home/data" "$run_home/config"
+      printf 'mate
+' > "$task_home/.fm-secondmate-home"
+      fm_write_meta "$run_home/state/mate.meta"         "window=firstmate:fm-mate" "endpoint_task_id=mate" "spawn_gen=fixture"         "worktree=$task_home" "home=$task_home" "project=$task_home"         "kind=secondmate" "mode=secondmate" "harness=echo"
+      task_id=mate
+    fi
+    mv "$POOL/1/project" "$CASE_DIR/saved-copy"
+    cp "$task_home/state/retained.meta" "$CASE_DIR/prior.meta"
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    : > "$CASE_DIR/treehouse.log"
+    : > "$CASE_DIR/mutations"
+    FM_HOME="$run_home" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project"       FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH"       bash "$ROOT/bin/fm-teardown.sh" "$task_id" --force > "$CASE_DIR/refusal" 2>&1; rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape missing leased copy was cleaned up"
+    assert_grep 'Manual recovery: pause allocations and cleanup' "$CASE_DIR/refusal" "missing $shape recovery instructions: $(cat "$CASE_DIR/refusal")"
+    assert_grep 'Read project=, treehouse_lease_id=, and treehouse_lease_holder=' "$CASE_DIR/refusal" "missing identity inspection"
+    assert_grep 'Restore the original copy' "$CASE_DIR/refusal" "missing restore step"
+    assert_grep 'Do not fabricate ownership evidence.' "$CASE_DIR/refusal" "missing ownership verification"
+    assert_grep 'keep the records and lease and obtain operator reconciliation' "$CASE_DIR/refusal" "missing uncertain recovery instruction"
+    assert_grep "FM_HOME=$task_home bash $ROOT/bin/fm-teardown.sh retained" "$CASE_DIR/refusal" "missing exact guarded retry"
+    cmp -s "$CASE_DIR/prior.meta" "$task_home/state/retained.meta" || fail "$shape refusal changed metadata"
+    cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape refusal changed lease"
+    assert_present "$task_home/state/retained.treehouse-acquire" "missing copy refusal removed journal"
+    [ ! -s "$CASE_DIR/treehouse.log" ] && [ ! -s "$CASE_DIR/mutations" ] || fail "$shape refusal mutated pool or endpoint"
+  done
+  pass "missing leased copies retain records and print recovery steps for direct and descendant teardown"
+}
+
+test_unrecognized_leased_copy_refuses_publication() {
+  local out rc
+  make_case unrecognized-copy
+  git -C "$PROJECT" worktree remove "$POOL/1/project"
+  git clone -q "$PROJECT" "$POOL/1/project"
+  git -C "$POOL/1/project" remote set-url origin "$CASE_DIR/different-origin"
+  out=$(spawn_task candidate 1); rc=$?
+  [ "$rc" -ne 0 ] || fail "unrecognized leased copy published"
+  assert_contains "$out" 'not a recognized Treehouse pool slot' "missing pool recognition refusal: $out"
+  assert_absent "$HOME_DIR/state/candidate.meta" "unrecognized copy published metadata"
+  assert_absent "$POOL/1/.fm-slot-owner" "unrecognized copy gained a claim"
+  assert_present "$HOME_DIR/state/candidate.treehouse-acquire/allocation.json" "unrecognized copy lost journal"
+  jq -e '.worktrees[] | select(.path | endswith("/1/project")) | .leased == true' "$POOL/treehouse-state.json" >/dev/null || fail "unrecognized copy lost lease"
+  pass "unrecognized leased copies refuse before claim and publication while retaining recovery evidence"
+}
+
+test_empty_record_fields_name_no_copy() {
+  local field shape out rc
+  for field in worktree home project; do
+    for shape in empty duplicate; do
+      make_case "record-$field-$shape"
+      fm_write_meta "$HOME_DIR/state/recovery.meta" "backend=orca" "$field="
+      [ "$shape" != duplicate ] || printf '%s=
+' "$field" >> "$HOME_DIR/state/recovery.meta"
+      out=$(spawn_task candidate 1); rc=$?
+      if [ "$shape" = duplicate ]; then
+        [ "$rc" -ne 0 ] || fail "duplicate empty $field was accepted"
+        [ ! -s "$CASE_DIR/treehouse.log" ] || fail "duplicate $field reached allocation"
+      else
+        expect_code 0 "$rc" "empty $field blocked allocation or exclusive publication: $out"
+        out=$(FM_MUTATION_LOG="$CASE_DIR/mutations" fm_test_run_spawn "$HOME_DIR" "$POOL/1/project" "$FAKEBIN" candidate --relaunch); rc=$?
+        expect_code 0 "$rc" "empty $field blocked relaunch: $out"
+        FM_HOME="$HOME_DIR" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project"           FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH"           bash "$ROOT/bin/fm-teardown.sh" candidate --force > "$CASE_DIR/cleanup" 2>&1           || fail "empty $field blocked teardown exclusivity: $(cat "$CASE_DIR/cleanup")"
+        assert_absent "$HOME_DIR/state/candidate.meta" "empty $field stranded candidate"
+      fi
+      assert_present "$HOME_DIR/state/recovery.meta" "record scan removed recovery record"
+    done
+  done
+  pass "empty path fields permit allocation relaunch and cleanup; duplicate empty fields still refuse"
+}
+
 test_reservation_survives_worker_exit_and_releases_at_cleanup() {
   local out rc before after
   make_case reserved
@@ -422,3 +501,7 @@ test_separate_clones_share_the_origin_pool_reservation
 test_acquisition_journals_are_project_scoped
 
 test_legacy_unclaimed_ship_preserves_unlanded_work
+
+test_missing_leased_copy_recovery_messages
+test_unrecognized_leased_copy_refuses_publication
+test_empty_record_fields_name_no_copy

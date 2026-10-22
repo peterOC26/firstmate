@@ -1796,7 +1796,7 @@ fm_treehouse_record_paths_safe() {  # <meta>
   [ -f "$1" ] && [ ! -L "$1" ] && [ -r "$1" ] || return 1
   awk -F= '
     $1 == "worktree" || $1 == "home" || $1 == "project" {
-      if (++seen[$1] > 1 || length($0) <= length($1)+1) bad=1
+      if (++seen[$1] > 1) bad=1
     }
     END { exit bad }
   ' "$1"
