@@ -509,26 +509,7 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 - Treehouse-backed ships and scouts additionally record `treehouse_lease_id=` and `treehouse_lease_holder=` for the durable acquisition; [the shared ownership contract](../bin/fm-wake-lib.sh) owns their lifetime, legacy-record preflight, and identity rules.
   [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release and records-only reconciliation.
   These fields do not apply to Orca or replace the existing secondmate home-seed lease contract.
-
-For manual recovery of an aborted acquisition, pause allocations and cleanup for its project and inspect `state/<id>.treehouse-acquire/identity`, `allocation.json`, retained task records, the pool's `treehouse-state.json`, and the slot's `.fm-slot-owner`.
-Set `journal` to that journal directory and `worktree`, `lease_id`, and `lease_holder` to the allocation's verified values, checking the project and holder against `identity` and the lease against pool state.
-If the allocation response is incomplete, recover the path and lease ID from the pool entry matching the exact holder in `identity`; never guess or use `treehouse status`.
-Preserve unlanded work and reconcile retained records first; stop if another task owns the claim or lease.
-Run:
-
-```bash
-treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
-```
-
-Only after return succeeds, with the slot claim confirmed to belong to this acquisition or absent, remove that claim and journal:
-
-```bash
-rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
-rm -rf -- "$journal"
-```
-
-Keep both if return fails or ownership remains uncertain.
-An unclaimed legacy record with no `treehouse_lease_*` fields can instead use ordinary teardown for records-only cleanup when no other local task record names its copy; teardown leaves the copy untouched.
+  For an aborted acquisition, follow the manual recovery instructions printed by spawn or a refused same-task retry; `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns that procedure.
 
 - A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
 

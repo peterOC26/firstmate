@@ -1073,9 +1073,21 @@ test_own_and_absent_slot_claims_still_tear_down() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
-  assert_refused_without_mutation "$dir" "$id" "legacy absent claim"
+  cp "$dir/pool/treehouse-state.json" "$dir/pool-before.json"
+  printf 'preserve legacy wiring\n' > "$dir/worktree/.fm-grok-turnend"
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "records-only cleanup of an unclaimed legacy copy failed: $(cat "$dir/stderr")"
+  assert_absent "$dir/home/state/$id.meta" "unclaimed legacy cleanup left the task record"
+  assert_present "$dir/worktree/sentinel" "unclaimed legacy cleanup changed the copy"
+  assert_grep 'preserve legacy wiring' "$dir/worktree/.fm-grok-turnend" \
+    "unclaimed legacy cleanup removed the copy's wiring"
+  cmp -s "$dir/pool-before.json" "$dir/pool/treehouse-state.json" \
+    || fail "unclaimed legacy cleanup changed pool state"
+  assert_no_grep 'treehouse <return>' "$dir/runtime.log" "unclaimed legacy cleanup returned the copy"
+  assert_grep 'was not returned and is left untouched' "$dir/stdout" \
+    "unclaimed legacy completion incorrectly claimed a return"
 
-  pass "fm-teardown: a task's own claim tears down; absent legacy ownership refuses"
+  pass "fm-teardown: an owned claim returns its copy; an unclaimed legacy record retires without touching its copy"
 }
 
 # The tmux shim used by the endpoint-close tests below: every subcommand

@@ -141,13 +141,21 @@
 # the pool handed the slot on. Refusing instead would strand the record, because
 # bin/fm-backend.sh's endpoint validation refuses an empty or missing worktree=
 # unconditionally, so there is no line an operator could clear to get past it.
-# Absent, unreadable, or contradictory ownership refuses before all slot
-# mutations. Durable identities are checked before reaping, hook/branch edits,
+# Unreadable ownership or contradictory lease/claim evidence refuses before
+# all slot mutations.
+# An unclaimed legacy record with no treehouse_lease_* fields can retire
+# records-only when no other local task record names its copy. It still passes
+# the normal completion and landed-work gates unless --force bypasses them
+# under explicit discard authority; inspection disables optional Git locks, and a blocking Git
+# lock refuses without removing it. The copy is never modified, reaped, reset,
+# or returned on that path. tests/fm-spawn-slot-ownership.test.sh pins these
+# legacy exclusivity and unlanded-work boundaries.
+# Durable identities are checked before reaping, hook/branch edits,
 # and scratch cleanup, and both identity and holder constrain every return
 # attempt. A re-run after an earlier run already released the lease cleans
 # up records only. Legacy claimed copies can return only with verified
-# unleased pool state. The shared
-# ownership/lease contract is owned by bin/fm-wake-lib.sh.
+# unleased pool state. The shared ownership/lease contract is owned by
+# bin/fm-wake-lib.sh.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
 # before cleanup. Its current working directory is only incidental process
@@ -2511,7 +2519,7 @@ require_exclusive_task_worktree_slot() {
 # A legacy claimed copy needs verified unleased state; a new copy needs the
 # metadata's exact durable identity and holder.
 TEARDOWN_SLOT_REASSIGNED_RC=3
-require_owned_worktree_slot_record() {  # <task-id> <worktree>
+require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
   local record_id=$1 worktree=$2 marker meta=${3:-} expected_home=
   [ -z "$meta" ] || expected_home=$(dirname "$(dirname "$meta")")
   fm_treehouse_slot_owner_state "$worktree" "$record_id" "$expected_home"
@@ -2560,8 +2568,9 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
 }
 
 # The one ownership determination for this task's recorded slot. Every later
-# step that would read or touch $WT consults teardown_owns_worktree, so a
-# reassigned slot is skipped consistently rather than by each step's own guess.
+# step that would mutate $WT consults teardown_owns_worktree, so a records-only
+# slot is skipped consistently rather than by each step's own guess. The
+# legacy-unclaimed path still runs the read-only landed-work gate.
 TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_LEGACY_UNCLAIMED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
