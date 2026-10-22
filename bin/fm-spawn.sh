@@ -3534,13 +3534,21 @@ if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     exit 1
   }
   if [ "$RELAUNCH" -eq 1 ]; then
-    if ! fm_treehouse_record_lease "$RELAUNCH_META" ||
+    if ! grep -q '^treehouse_lease_' "$RELAUNCH_META"; then
+      # A record from before durable leases keeps relaunching into its own
+      # claimed copy; fresh-spawn preflight keeps that copy out of allocation.
+      fm_treehouse_legacy_unleased "$RELAUNCH_WT" || {
+        echo "REFUSED: task $ID's recorded copy has no verifiable pool reservation; reconcile its ownership before relaunch" >&2
+        exit 1
+      }
+    elif ! fm_treehouse_record_lease "$RELAUNCH_META" ||
       ! fm_treehouse_lease_matches "$RELAUNCH_WT" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
       echo "REFUSED: task $ID's recorded durable lease cannot be verified; reconcile its ownership before relaunch" >&2
       exit 1
+    else
+      TREEHOUSE_LEASE_ID=$FM_TREEHOUSE_RECORD_LEASE_ID
+      TREEHOUSE_LEASE_HOLDER=$FM_TREEHOUSE_RECORD_LEASE_HOLDER
     fi
-    TREEHOUSE_LEASE_ID=$FM_TREEHOUSE_RECORD_LEASE_ID
-    TREEHOUSE_LEASE_HOLDER=$FM_TREEHOUSE_RECORD_LEASE_HOLDER
     fm_treehouse_slot_owner_state "$RELAUNCH_WT" "$ID" "$FM_HOME"
     if [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ]; then
       echo "REFUSED: task $ID's recorded copy is not claimed by this home and task; reconcile its ownership before relaunch" >&2

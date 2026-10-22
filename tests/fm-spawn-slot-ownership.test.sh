@@ -113,14 +113,23 @@ test_legacy_alias_cross_home_and_unreadable_refuse_before_get() {
 
 test_relaunch_keeps_acquisition_and_rejects_stale_claim() {
   local out rc before after shape marker
-  for shape in owned stale other-home; do
+  for shape in owned stale other-home legacy-owned legacy-stale; do
     make_case "relaunch-$shape"
     out=$(spawn_task retained 1); rc=$?
     expect_code 0 "$rc" "setup spawn failed: $out"
-    before=$(read_lease retained)
     marker="$POOL/1/.fm-slot-owner"
     case "$shape" in
-      stale) printf 'task=successor\nhome=%s\n' "$HOME_DIR" > "$marker" ;;
+      legacy-*)
+        # A record from before durable leases: no lease fields, unleased pool entry.
+        sed -i '/^treehouse_lease_/d' "$HOME_DIR/state/retained.meta"
+        rm -rf "$HOME_DIR/state/retained.treehouse-acquire"
+        jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+        mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+        ;;
+    esac
+    before=$(read_lease retained)
+    case "$shape" in
+      stale|legacy-stale) printf 'task=successor\nhome=%s\n' "$HOME_DIR" > "$marker" ;;
       other-home)
         mkdir -p "$CASE_DIR/other-home"
         printf 'task=retained\nhome=%s\n' "$CASE_DIR/other-home" > "$marker"
@@ -131,7 +140,11 @@ test_relaunch_keeps_acquisition_and_rejects_stale_claim() {
     : > "$CASE_DIR/treehouse.log"
     out=$(FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" \
       fm_test_run_spawn "$HOME_DIR" "$POOL/1/project" "$FAKEBIN" retained --relaunch); rc=$?
-    if [ "$shape" = owned ]; then
+    if [ "$shape" = legacy-owned ]; then
+      expect_code 0 "$rc" "a legacy record could not relaunch into its own claimed copy: $out"
+      assert_grep "worktree=$POOL/1/project" "$HOME_DIR/state/retained.meta" "legacy relaunch moved its copy"
+      ! grep -q '^treehouse_lease_' "$HOME_DIR/state/retained.meta" || fail "legacy relaunch invented a lease identity"
+    elif [ "$shape" = owned ]; then
       expect_code 0 "$rc" "owned relaunch failed: $out"
       after=$(read_lease retained)
       [ "$before" = "$after" ] || fail "relaunch replaced the immutable acquisition"
@@ -145,7 +158,38 @@ test_relaunch_keeps_acquisition_and_rejects_stale_claim() {
     fi
     [ ! -s "$CASE_DIR/treehouse.log" ] || fail "relaunch acquired or returned a lease"
   done
-  pass "relaunch preserves the acquisition across spawn_gen and rejects stale or cross-home claims before mutation"
+  pass "relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation"
+}
+
+test_cleanup_rerun_after_released_lease_is_records_only() {
+  local shape out rc
+  for shape in released held; do
+    make_case "rerun-$shape"
+    out=$(spawn_task retained 1); rc=$?
+    expect_code 0 "$rc" "setup spawn failed: $out"
+    # An earlier cleanup returned the copy and dropped its claim, then failed.
+    rm -f "$POOL/1/.fm-slot-owner"
+    if [ "$shape" = released ]; then
+      jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+      mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+    fi
+    : > "$POOL/1/project/dirty-sentinel"
+    : > "$CASE_DIR/treehouse.log"
+    FM_HOME="$HOME_DIR" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project" \
+      FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH" \
+      bash "$ROOT/bin/fm-teardown.sh" retained --force > "$CASE_DIR/cleanup" 2>&1; rc=$?
+    if [ "$shape" = released ]; then
+      expect_code 0 "$rc" "a re-run after the lease was released was stranded: $(cat "$CASE_DIR/cleanup")"
+      assert_absent "$HOME_DIR/state/retained.meta" "the re-run left its task record"
+      assert_grep 'already released' "$CASE_DIR/cleanup" "the re-run did not name the released lease"
+    else
+      [ "$rc" -ne 0 ] || fail "an unclaimed copy still holding this lease was cleaned up"
+      assert_present "$HOME_DIR/state/retained.meta" "a refused cleanup removed its task record"
+    fi
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape cleanup returned a copy it could not prove was its own"
+    assert_present "$POOL/1/project/dirty-sentinel" "$shape cleanup touched the copy"
+  done
+  pass "a cleanup re-run after its lease was released retires records only; an unclaimed held lease still refuses"
 }
 
 test_unsupported_cli_and_failed_acquisition_preserve_reservations() {
@@ -241,6 +285,7 @@ test_separate_clones_share_the_origin_pool_reservation() {
 test_reservation_survives_worker_exit_and_releases_at_cleanup
 test_legacy_alias_cross_home_and_unreadable_refuse_before_get
 test_relaunch_keeps_acquisition_and_rejects_stale_claim
+test_cleanup_rerun_after_released_lease_is_records_only
 test_unsupported_cli_and_failed_acquisition_preserve_reservations
 test_another_project_record_does_not_block_this_pool
 test_separate_clones_share_the_origin_pool_reservation

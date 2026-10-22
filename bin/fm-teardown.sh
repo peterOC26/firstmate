@@ -144,8 +144,9 @@
 # Absent, unreadable, or contradictory ownership refuses before all slot
 # mutations. Durable identities are checked before reaping, hook/branch edits,
 # and scratch cleanup, and both identity and holder constrain every return
-# attempt. Legacy claimed copies can return only with verified unleased pool
-# state; legacy copies without a claim require reconciliation. The shared
+# attempt. A re-run after an earlier run already released the lease cleans
+# up records only. Legacy claimed copies can return only with verified
+# unleased pool state; legacy copies without a claim require reconciliation. The shared
 # ownership/lease contract is owned by bin/fm-wake-lib.sh.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
@@ -2507,8 +2508,10 @@ require_exclusive_task_worktree_slot() {
 # state so each caller gates its slot steps on one determination; the claimant
 # stays in FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME.
 #
-# Absent claims refuse. A legacy claimed copy needs verified unleased state;
-# a new copy needs the metadata's exact durable identity and holder.
+# Absent claims refuse, except a leased record whose readable pool state proves
+# its lease was already released: that copy is skipped like a reassigned one.
+# A legacy claimed copy needs verified unleased state; a new copy needs the
+# metadata's exact durable identity and holder.
 TEARDOWN_SLOT_REASSIGNED_RC=3
 require_owned_worktree_slot_record() {  # <task-id> <worktree>
   local record_id=$1 worktree=$2 marker meta=${3:-} expected_home=
@@ -2531,6 +2534,11 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
     elif fm_treehouse_lease_matches "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
       echo "REFUSED: lease and slot claim contradict each other for $record_id; nothing was changed" >&2
       return 1
+    elif [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] &&
+      fm_treehouse_lease_released "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID"; then
+      # An earlier run returned this copy and dropped its claim, then failed.
+      echo "warning: task $record_id's durable lease on $worktree was already released, so its copy is left untouched and only $record_id's own cleanup runs." >&2
+      return "$TEARDOWN_SLOT_REASSIGNED_RC"
     fi
   elif [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! fm_treehouse_legacy_unleased "$worktree"; then
     echo "REFUSED: task $record_id has no verified identity for the copy's pool reservation; nothing was changed" >&2
@@ -4014,6 +4022,8 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT)"
+elif [ -z "$TEARDOWN_SLOT_REASSIGNED_TO" ]; then
+  echo "teardown $ID complete (window ${T:-none}; pool slot $WT was already released, so it was left untouched)"
 else
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi

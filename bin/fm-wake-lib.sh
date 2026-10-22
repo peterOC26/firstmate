@@ -1602,7 +1602,9 @@ fm_treehouse_same_project() {  # <project-dir> <worktree>
 # acquisition, independently of spawn_gen (which changes on relaunch). The
 # holder binds canonical home, task id, and an acquisition nonce. Before get,
 # retained local records must all have matching leases; legacy records without
-# one require explicit reconciliation, regardless of status or live processes.
+# one block new allocation until reconciled, regardless of status or live
+# processes, though such a record may still relaunch into its own claimed,
+# unleased copy.
 # The claim remains independent positive evidence for records-only cleanup of
 # legacy records whose slot was reassigned. Never use `treehouse status` to
 # inspect ownership: it can heal and mutate the pool state.
@@ -1752,6 +1754,15 @@ fm_treehouse_legacy_unleased() {  # <worktree>
     (.leased == null or .leased == false) and (.destroying != true) and
     ((.lease_id // "") == "") and ((.lease_holder // "") == "")
   ' >/dev/null 2>&1
+}
+
+# True only when readable pool state proves this acquisition is no longer held,
+# such as after a return whose later teardown steps failed.
+fm_treehouse_lease_released() {  # <worktree> <lease-id>
+  local entry
+  [ -n "$2" ] || return 1
+  entry=$(fm_treehouse_pool_entry "$1") || return 1
+  printf '%s\n' "$entry" | jq -e --arg id "$2" '.lease_id != $id' >/dev/null 2>&1
 }
 
 fm_treehouse_lease_matches() {  # <worktree> <lease-id> <holder>
