@@ -1,0 +1,188 @@
+$ tmux -L fm-lab new-session -d -s checks -n guard -x 120 -y 40 -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9 bash --noprofile --norc
+[exit=0]
+
+SCENARIO: Relaunch refuses stale leases, claims, duplicate ownership and unreadable local-home records before endpoint mutation
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-lease-mismatch -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-lease-mismatch --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-lease-mismatch's recorded durable lease cannot be verified; reconcile its ownership before relaunch
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+[exit=0]
+lease-mismatch: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-stale-claim -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-stale-claim --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: task task-stale-claim's recorded copy is not claimed by this home and task; reconcile its ownership before relaunch
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+[exit=0]
+stale-claim: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-shared-record -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-shared-record --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: pool copy /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project is still named by task record /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/home/state/stale.meta; reconcile that record first
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+[exit=0]
+shared-record: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-missing-home -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-missing-home --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: registered local Firstmate home is unavailable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/mate; cannot verify exclusive record ownership
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+[exit=0]
+missing-home: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-missing-state -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+@5|fm-task-missing-state|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/pool/1/project|325638
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-missing-state --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: missing or unreadable local state directory /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/mate/state; cannot verify retained task records
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+@5|fm-task-missing-state|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/pool/1/project|325638
+[exit=0]
+missing-state: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/home
+[exit=0]
+$ tmux -L fm-lab new-window -d -t checks: -n fm-task-ambiguous -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/pool/1/project bash --noprofile --norc
+[exit=0]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+@5|fm-task-missing-state|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/pool/1/project|325638
+@6|fm-task-ambiguous|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/pool/1/project|330292
+[exit=0]
+$ bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/bin/fm-spawn.sh task-ambiguous --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: unreadable or ambiguous task record /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/home/state/bad.meta; cannot verify exclusive record ownership
+[exit=1]
+$ tmux -L fm-lab list-windows -t checks -F #{window_id}|#{window_name}|#{pane_current_path}|#{pane_pid}
+@0|guard|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9|312435
+@1|fm-task-lease-mismatch|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-lease-mismatch/pool/1/project|312527
+@2|fm-task-stale-claim|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-stale-claim/pool/1/project|315812
+@3|fm-task-shared-record|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-shared-record/pool/1/project|319865
+@4|fm-task-missing-home|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-home/pool/1/project|322671
+@5|fm-task-missing-state|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-missing-state/pool/1/project|325638
+@6|fm-task-ambiguous|/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.ldydfdu5u/relaunch-ambiguous/pool/1/project|330292
+[exit=0]
+ambiguous: relaunch refused with cause; metadata, lease, claim, dirty copy, pane PID and cwd unchanged
+OBSERVED: scenario assertions satisfied
+$ tmux -L fm-lab kill-server
+[exit=0]
+CLEANUP: private tmux server stopped; all disposable lab homes and Git copies removed

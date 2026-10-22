@@ -1,0 +1,33 @@
+FM_TEST_BEGIN 2026-10-22T15:21:00Z tests/fm-teardown-endpoint-safety.test.sh family=backend-dispatch expected_gate_skip=none
+ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
+ok - fm-teardown: a concurrent lifecycle action refuses before mutation
+ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
+ok - fm-teardown: destructive cleanup serializes with metadata writers
+ok - cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses
+ok - cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses
+ok - tmux backend: direct empty target returns nonzero without invoking tmux
+ok - process cleanup: creation-time PID identity removes only the exact child and preserves the control child
+skip - mock lifecycle only requested
+skip - mock lifecycle only requested
+skip - mock lifecycle only requested
+skip - mock lifecycle only requested
+skip - mock lifecycle only requested
+ok - fm-teardown: an Orca close its missing CLI never attempted refuses even under --force, keeping the record naming the terminal
+skip - mock lifecycle only requested
+ok - Treehouse locking resolves a bare local origin against its source project, matching the provisioned clone
+ok - fm-teardown: a pool slot named by a second task record is never returned, killed, or reset
+ok - fm-teardown: a pool slot held by another firstmate home is never returned
+ok - fm-teardown: a task that solely holds its slot still returns it
+ok - fm-teardown: a pool slot claimed by another task is left alone while the task's own cleanup finishes
+ok - fm-teardown: a stale record on a claimed slot retires, then the claimant tears down
+ok - fm-teardown: mismatched or unknown lease/claim evidence refuses before all process, hook, scratch, and return effects
+ok - fm-teardown: an owned claim returns its copy; an unclaimed legacy record retires without touching its copy
+ok - fm-teardown: an exact recorded endpoint still tears down after changing cwd outside its worktree
+ok - Treehouse project locking anchors at the local root for main-home, local-secondmate, and remote-seeded layouts
+ok - fm-teardown: a remote-seeded secondmate home returns its own uncontested pool slot
+ok - fm-teardown: slot ownership across a remote-seeded home and its local child still refuses
+ok - Treehouse project locking still serializes two homes across the remote-seeded boundary
+FM_TEST_END 2026-10-22T15:22:27Z tests/fm-teardown-endpoint-safety.test.sh exit=0 duration_ms=86478 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=86559
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=86478 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-teardown-endpoint-safety.test.sh duration_ms=86478

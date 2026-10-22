@@ -1,0 +1,20 @@
+FM_TEST_BEGIN 2026-10-22T15:19:53Z tests/fm-spawn-slot-ownership.test.sh family=backend-dispatch expected_gate_skip=none
+ok - retained records reserve their copies through exit; explicit cleanup releases exactly their lease
+ok - legacy, aliased, cross-home, and unreadable records refuse before allocation or endpoint mutation
+ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
+ok - a cleanup re-run after its lease was released retires records only; an unclaimed held lease still refuses
+ok - unsupported CLIs refuse before mutation; interrupted acquisitions retain exact lease evidence and block unsafe reuse
+ok - retained copies of another repository do not block this project's allocation
+ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy
+ok - partial journals block their own project; unknown and unsafe journals diagnose refusal across local homes
+ok - unclaimed legacy ships retain dirty and unpushed work; clean copies retire records without return
+ok - missing leased copies retain records and print recovery steps for direct and descendant teardown
+ok - unrecognized leased copies refuse before claim and publication while retaining recovery evidence
+ok - empty path fields permit allocation relaunch and cleanup; duplicate empty fields still refuse
+ok - never-acquired and orphan-claim refusals explain manual recovery without clearing evidence
+ok - both record scans diagnose missing local and registered state directories
+ok - record scans diagnose registry, record, and path resolution refusals
+FM_TEST_END 2026-10-22T15:22:15Z tests/fm-spawn-slot-ownership.test.sh exit=0 duration_ms=142276 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=142346
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=142276 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-slot-ownership.test.sh duration_ms=142276

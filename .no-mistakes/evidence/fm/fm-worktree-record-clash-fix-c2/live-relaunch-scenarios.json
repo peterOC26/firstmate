@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Relaunch refuses stale leases, claims, duplicate ownership and unreadable local-home records before endpoint mutation",
+    "result": "fail",
+    "live": true,
+    "evidence": "live-relaunch-transcript.log",
+    "reason": "('shared-record', 'fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.lo3u74hjq/relaunch-shared-record/home\\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\n\u25cf  WATCHER DOWN - SUPERVISION IS OFF\\n\u25cf  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).\\n\u25cf  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.\\n\u25cf  This is a supervision warning only; the guarded operation WILL still run.\\n\u25cf  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.\\n\u25cf\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\\nREFUSED: pool copy /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.lo3u74hjq/relaunch-shared-record/pool/1/project is still named by task record /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.lo3u74hjq/relaunch-shared-record/home/state/stale.meta; reconcile that record first\\n')"
+  },
+  {
+    "name": "Forced cleanup validates the exact lease before killing an endpoint or changing hooks and scratch files",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-relaunch-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Records-only cleanup of an unclaimed legacy ship still refuses dirty unlanded work",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-relaunch-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "The installed Treehouse version supports JSON leases and identity-conditional return",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-relaunch-transcript.log",
+    "reason": ""
+  }
+]

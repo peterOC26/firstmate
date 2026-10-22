@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Relaunch refuses stale leases, claims, duplicate ownership and unreadable local-home records before endpoint mutation",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-relaunch-rerun-transcript.log",
+    "reason": ""
+  }
+]

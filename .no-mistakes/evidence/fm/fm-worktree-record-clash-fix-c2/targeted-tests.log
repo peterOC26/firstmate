@@ -1,4 +1,4 @@
-FM_TEST_BEGIN 2026-10-22T10:20:56Z tests/fm-spawn-slot-ownership.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-22T15:15:43Z tests/fm-spawn-slot-ownership.test.sh family=backend-dispatch expected_gate_skip=none
 ok - retained records reserve their copies through exit; explicit cleanup releases exactly their lease
 ok - legacy, aliased, cross-home, and unreadable records refuse before allocation or endpoint mutation
 ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
@@ -8,8 +8,24 @@ ok - retained copies of another repository do not block this project's allocatio
 ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy
 ok - partial journals block their own project; unknown and unsafe journals diagnose refusal across local homes
 ok - unclaimed legacy ships retain dirty and unpushed work; clean copies retire records without return
-FM_TEST_END 2026-10-22T10:22:09Z tests/fm-spawn-slot-ownership.test.sh exit=0 duration_ms=72679 gate_skip=false
-FM_TEST_BEGIN 2026-10-22T10:22:09Z tests/fm-spawn-pool-base-freshen.test.sh family=standalone expected_gate_skip=none
+not ok - missing child recovery instructions: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: unsafe secondmate home removal target /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5J1J041ZAMEAPEMVEM4AYB9/.test-validation-tmp/fm-spawn-slot-ownership.A0qcrr/missing-copy-child/home is inside the firstmate repo
+FM_TEST_END 2026-10-22T15:17:22Z tests/fm-spawn-slot-ownership.test.sh exit=1 duration_ms=98725 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T15:17:22Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+ok - a single transient stale pane_current_path read is not accepted as the worktree
+ok - an already-settled pane confirms on the next read, not a whole extra cycle
+ok - a transient primary-checkout pane read is not accepted as the worktree
+ok - a pane stuck on the primary checkout fails loudly at the deadline
+ok - a project with an unborn HEAD is refused at once with its cause named
+# all fm-spawn-worktree-settle tests passed
+FM_TEST_END 2026-10-22T15:17:37Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=14397 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T15:17:37Z tests/fm-spawn-pool-base-freshen.test.sh family=standalone expected_gate_skip=none
 ok - a remote-seeded secondmate home allocates and launches from its Treehouse pool
 ok - a Treehouse slot claim names the launched task, refuses when unclaimable, and survives with a durable recovery journal on abort
 ok - a refused launch retains its recovery lease and the next task gets another slot
@@ -192,48 +208,48 @@ hint:
 hint: 	git branch -m <name>
 ok - a stale pin beside other dirt yields the conservative refusal alone, with no stale-pin line
 # all fm-spawn-pool-base-freshen tests passed
-FM_TEST_END 2026-10-22T10:24:01Z tests/fm-spawn-pool-base-freshen.test.sh exit=0 duration_ms=112246 gate_skip=false
-FM_TEST_BEGIN 2026-10-22T10:24:01Z tests/fm-teardown-endpoint-safety.test.sh family=backend-dispatch expected_gate_skip=none
+FM_TEST_END 2026-10-22T15:19:40Z tests/fm-spawn-pool-base-freshen.test.sh exit=0 duration_ms=123353 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T15:19:40Z tests/fm-teardown-endpoint-safety.test.sh family=backend-dispatch expected_gate_skip=none
 ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
 ok - fm-teardown: a concurrent lifecycle action refuses before mutation
 ok - fm-teardown: non-pool cleanup ignores unrelated task publication locks
-FM_TEST_END 2026-10-22T10:24:37Z tests/fm-teardown-endpoint-safety.test.sh exit=1 duration_ms=35830 gate_skip=false
-FM_TEST_BEGIN 2026-10-22T10:24:37Z tests/fm-control-relaunch.test.sh family=backend-dispatch expected_gate_skip=none
-ok - the away branch relaunches an existing In-flight task through fm-control at the spend cap
-ok - a fresh away branch spawn still refuses an In-flight backlog item
-ok - the away branch relaunch still refuses a held In-flight backlog item
-ok - fm-spawn --relaunch: tracked opencode wiring is retired as on main
-ok - fm-control removes the dialog file after exit and after relaunch
-ok - fm-control exit removes the dialog file before it releases the control lock
-ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
-ok - fm-control relaunch: pending composer text refuses before the exit command is typed
-ok - fm-control relaunch: an unreadable composer fails safe before the exit command is typed
-ok - fm-control relaunch: a linked spawning home preserves committed and unfinished work in the recorded copy
-ok - fm-control relaunch: durable task metadata survives replacement launch publication
-ok - fm-control relaunch: delivery and concurrent task metadata publication serialize
-ok - fm-control relaunch: disabling tracing clears metadata and pane context
-ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
-ok - fm-control relaunch: the progress note's inbox listing is silent on an empty inbox
-ok - fm-control relaunch: a ship task refuses without the progress note its replacement needs
-ok - fm-control relaunch: switching harness is one ordinary relaunch, and the old wiring goes with the old agent
-ok - fm-control relaunch: a refused relaunch onto polytoken keeps the project's own hook layer and the running agent
-ok - fm-control relaunch: a refused polytoken profile leaves the running agent untouched
-ok - fm-spawn --relaunch: retiring a raw polytoken launch's wiring keeps the project's own layers
-ok - fm-control relaunch: a harness switch resets model and effort unless they are named too
-ok - fm-control relaunch: a prefixed recorded harness can switch adapters transactionally
-ok - fm-control relaunch: a prefixed command requires an explicit replacement harness
-ok - fm-control relaunch: a same-harness relaunch keeps the profile axes it was running with
-ok - native Ultra relaunch preserves its profile and rejects an unsupported model before stopping
-ok - fm-control relaunch: a signed-out worker account pin refuses before the old agent stops
-ok - fm-control relaunch: the replacement follows the home's current worker account pin
-not ok - the secondmate should relaunch on its claude pin: error: secondmate home cannot be inside the firstmate repo: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HG3T4R8EZNC83GMRF3JYZE/.test-tmp/fm-control-relaunch.Az2IRW/sm-account-claude-26976/wt
-error: the replacement agent for rl-sm-acct could not be launched on claude
-error: rl-sm-acct's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5HG3T4R8EZNC83GMRF3JYZE/.test-tmp/fm-control-relaunch.Az2IRW/sm-account-claude-26976/wt: expected exit 0, got 1
-FM_TEST_END 2026-10-22T10:25:44Z tests/fm-control-relaunch.test.sh exit=1 duration_ms=66860 gate_skip=false
-FM_TEST_SUMMARY total=4 failed=2 skipped_gate=0 duration_ms=287764
-FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=175369 failed=2
-FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=112246 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-pool-base-freshen.test.sh duration_ms=112246
-FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-slot-ownership.test.sh duration_ms=72679
-FM_TEST_SLOWEST rank=3 script=tests/fm-control-relaunch.test.sh duration_ms=66860
-FM_TEST_SLOWEST rank=4 script=tests/fm-teardown-endpoint-safety.test.sh duration_ms=35830
+FM_TEST_END 2026-10-22T15:20:16Z tests/fm-teardown-endpoint-safety.test.sh exit=1 duration_ms=36167 gate_skip=false
+FM_TEST_BEGIN 2026-10-22T15:20:16Z tests/fm-bootstrap.test.sh family=session-bootstrap expected_gate_skip=none
+ok - bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts
+ok - bootstrap enforces no-mistakes minimum version
+ok - bootstrap enforces gh-axi minimum version
+ok - bootstrap preserves legacy Lavish boards while recommending synchronous reply support
+ok - bootstrap enforces tasks-axi minimum version
+ok - bootstrap enforces quota-axi minimum version
+ok - bootstrap requires git with an install instruction
+ok - bootstrap: backend=orca gates the Orca CLI without requiring it on the default backend
+ok - bootstrap: session-provider backends require their own CLI + jq + treehouse, never tmux
+ok - bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement
+ok - bootstrap: Herdr manual-install guidance is never executed as a shell command
+ok - bootstrap: the bundled cmux CLI satisfies the active backend dependency
+ok - bootstrap: unknown resolved backends fail closed with an actionable diagnostic
+ok - bootstrap: JSON-emitting backends require jq (their genuine dep), never tmux
+ok - bootstrap: the treehouse lease check follows the resolved backend's worktree provider
+ok - bootstrap computes a fleet-size-aware default timeout and preserves partial fleet-sync output
+ok - bootstrap keeps the quick 20s default for small fleets
+ok - bootstrap preserves FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT as an explicit override
+ok - bootstrap treats a blank timeout override as unset
+ok - bootstrap computes the timeout before launching fleet sync
+ok - bootstrap keeps routine tasks-axi, harness, dispatch, and already-live liveness confirmations silent
+ok - bootstrap routine contract runs under system /bin/bash
+ok - bootstrap: FM_BOOTSTRAP_NETWORK partitions one run into local and network halves
+ok - bootstrap: every deferred mutating sweep rechecks fleet-lock ownership
+ok - bootstrap: each deferred network phase, secondmate, and clone records its own elapsed time
+ok - bootstrap: the tasks-axi compatibility verdict travels exactly one process hop
+ok - bootstrap surfaces active crew-dispatch rules only as verbose BOOTSTRAP_INFO
+ok - bootstrap gates resolver fields and additive harnesses on the typed key
+FM_TEST_END 2026-10-22T15:21:41Z tests/fm-bootstrap.test.sh exit=0 duration_ms=85012 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=2 skipped_gate=0 duration_ms=357895
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=3 duration_ms=149289 failed=2
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=85012 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=123353 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-pool-base-freshen.test.sh duration_ms=123353
+FM_TEST_SLOWEST rank=2 script=tests/fm-spawn-slot-ownership.test.sh duration_ms=98725
+FM_TEST_SLOWEST rank=3 script=tests/fm-bootstrap.test.sh duration_ms=85012
+FM_TEST_SLOWEST rank=4 script=tests/fm-teardown-endpoint-safety.test.sh duration_ms=36167
+FM_TEST_SLOWEST rank=5 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=14397

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Spawn refuses before allocation when a finished, aliased, or registered-home record names an unleased copy",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Spawn explains missing local-home state and ambiguous records before allocation",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Retry with an unresolved acquisition journal refuses and prints never-acquired and orphan-claim recovery",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Forced cleanup of a missing leased copy preserves ownership records and prints exact recovery steps",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Owner-first cleanup refuses, then stale-record cleanup leaves the successor copy, process, endpoint, claim and lease untouched",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Forced cleanup cannot bypass an unreadable slot-owner claim",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  }
+]
