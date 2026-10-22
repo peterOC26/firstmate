@@ -3599,10 +3599,13 @@ fi
 
 if { teardown_owns_worktree || [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; } &&
   [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
-  if GIT_OPTIONAL_LOCKS=0 validate_worktree_teardown_safety; then
-    :
+  safety_rc=0
+  if [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+    GIT_OPTIONAL_LOCKS=0 validate_worktree_teardown_safety || safety_rc=$?
   else
-    safety_rc=$?
+    validate_worktree_teardown_safety || safety_rc=$?
+  fi
+  if [ "$safety_rc" -ne 0 ]; then
     if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ] &&
       [ "$TEARDOWN_LEGACY_UNCLAIMED" != 1 ]; then
       cleanup_stale_lock_for_safety_check "$WT" || exit 1
