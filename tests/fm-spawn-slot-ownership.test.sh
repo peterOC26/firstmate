@@ -198,6 +198,7 @@ test_cleanup_rerun_after_released_lease_is_records_only() {
         assert_grep 'already released' "$CASE_DIR/cleanup" "the re-run did not name the released lease"
       else
         assert_grep 'records-only cleanup' "$CASE_DIR/cleanup" "legacy cleanup did not name its records-only scope"
+        assert_grep 'was not returned and is left untouched' "$CASE_DIR/cleanup" "legacy completion incorrectly claimed release"
       fi
     else
       [ "$rc" -ne 0 ] || fail "an unclaimed copy still holding this lease was cleaned up"
@@ -209,6 +210,57 @@ test_cleanup_rerun_after_released_lease_is_records_only() {
     cmp -s "$CASE_DIR/pool-before.json" "$POOL/treehouse-state.json" || fail "$shape cleanup changed pool state"
   done
   pass "a cleanup re-run after its lease was released retires records only; an unclaimed held lease still refuses"
+}
+
+test_legacy_unclaimed_ship_preserves_unlanded_work() {
+  local shape out rc before
+  for shape in dirty unpushed clean; do
+    make_case "legacy-safety-$shape"
+    out=$(spawn_task retained 1); rc=$?
+    expect_code 0 "$rc" "setup spawn failed: $out"
+    sed -i '/^treehouse_lease_/d; s/^kind=scout$/kind=ship/; /^mode=/d' "$HOME_DIR/state/retained.meta"
+    printf 'mode=local-only\n' >> "$HOME_DIR/state/retained.meta"
+    rm -rf "$HOME_DIR/state/retained.treehouse-acquire"
+    rm -f "$POOL/1/.fm-slot-owner"
+    jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+    mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+    case "$shape" in
+      dirty) printf 'unfinished
+' > "$POOL/1/project/unfinished" ;;
+      unpushed)
+        printf 'unlanded
+' > "$POOL/1/project/unlanded"
+        git -C "$POOL/1/project" add unlanded
+        git -C "$POOL/1/project" -c user.name=Test -c user.email=test@example.invalid commit -qm 'Unlanded work' || fail "could not create unlanded commit"
+        ;;
+    esac
+    before=$(git -C "$POOL/1/project" rev-parse HEAD)
+    cp "$HOME_DIR/state/retained.meta" "$CASE_DIR/prior.meta"
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    : > "$CASE_DIR/mutations"
+    : > "$CASE_DIR/treehouse.log"
+    FM_HOME="$HOME_DIR" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project"       FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH"       bash "$ROOT/bin/fm-teardown.sh" retained > "$CASE_DIR/cleanup" 2>&1; rc=$?
+    if [ "$shape" = clean ]; then
+      expect_code 0 "$rc" "clean legacy cleanup failed: $(cat "$CASE_DIR/cleanup")"
+      assert_absent "$HOME_DIR/state/retained.meta" "clean legacy record was stranded"
+      assert_grep 'was not returned and is left untouched' "$CASE_DIR/cleanup" "clean legacy completion claimed release"
+    else
+      [ "$rc" -ne 0 ] || fail "$shape legacy copy lost its record without --force"
+      assert_grep 'REFUSED: local-only worktree' "$CASE_DIR/cleanup" "$shape legacy cleanup missed its safety refusal: $(cat "$CASE_DIR/cleanup")"
+      cmp -s "$CASE_DIR/prior.meta" "$HOME_DIR/state/retained.meta" || fail "$shape refusal changed its record"
+      [ ! -s "$CASE_DIR/mutations" ] || fail "$shape refusal changed the endpoint"
+      if [ "$shape" = dirty ]; then
+        assert_grep unfinished "$POOL/1/project/unfinished" "dirty work was modified"
+      else
+        assert_grep 'commits not yet on' "$CASE_DIR/cleanup" "unpushed refusal did not identify unlanded commits"
+        assert_grep unlanded "$POOL/1/project/unlanded" "unpushed work was modified"
+      fi
+    fi
+    [ "$before" = "$(git -C "$POOL/1/project" rev-parse HEAD)" ] || fail "$shape cleanup changed HEAD"
+    cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape cleanup changed pool state"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape cleanup returned its copy"
+  done
+  pass "unclaimed legacy ships retain dirty and unpushed work; clean copies retire records without return"
 }
 
 test_unsupported_cli_and_failed_acquisition_preserve_reservations() {
@@ -362,3 +414,5 @@ test_another_project_record_does_not_block_this_pool
 test_separate_clones_share_the_origin_pool_reservation
 
 test_acquisition_journals_are_project_scoped
+
+test_legacy_unclaimed_ship_preserves_unlanded_work

@@ -2563,6 +2563,7 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
 # step that would read or touch $WT consults teardown_owns_worktree, so a
 # reassigned slot is skipped consistently rather than by each step's own guess.
 TEARDOWN_SLOT_REASSIGNED=0
+TEARDOWN_LEGACY_UNCLAIMED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
 require_owned_task_worktree_slot() {
@@ -2580,6 +2581,9 @@ require_owned_task_worktree_slot() {
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
       TEARDOWN_SLOT_REASSIGNED=1
+      if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && ! grep -q '^treehouse_lease_' "$META"; then
+        TEARDOWN_LEGACY_UNCLAIMED=1
+      fi
       TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
       TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
       return 0
@@ -3593,12 +3597,14 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] &&
   ORCA_PATH_MATCH_VERIFIED=1
 fi
 
-if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
-  if validate_worktree_teardown_safety; then
+if { teardown_owns_worktree || [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; } &&
+  [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
+  if GIT_OPTIONAL_LOCKS=0 validate_worktree_teardown_safety; then
     :
   else
     safety_rc=$?
-    if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ]; then
+    if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ] &&
+      [ "$TEARDOWN_LEGACY_UNCLAIMED" != 1 ]; then
       cleanup_stale_lock_for_safety_check "$WT" || exit 1
       validate_worktree_teardown_safety || exit 1
     else
@@ -4020,6 +4026,8 @@ if [ -d "$STATE" ]; then
 fi
 if [ "$TEARDOWN_POOL_SLOT_LOST" = 1 ]; then
   echo "teardown $ID finished its cleanup and removed its task record, but a returned pool slot did not come back clean (see the warning above); clear those paths so the pool can reuse the slot" >&2
+elif [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+  echo "teardown $ID complete (window ${T:-none}; unclaimed legacy copy $WT was not returned and is left untouched)"
 elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif teardown_owns_worktree; then
