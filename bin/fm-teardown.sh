@@ -3611,6 +3611,10 @@ if { teardown_owns_worktree || [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; } &&
       cleanup_stale_lock_for_safety_check "$WT" || exit 1
       validate_worktree_teardown_safety || exit 1
     else
+      if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ] &&
+        [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+        echo "REFUSED: a Git lock blocks inspection of legacy unclaimed copy $WT; the copy is left untouched. Clear the Git lock in that copy, or use --force only after an explicit OK to discard, then re-run teardown." >&2
+      fi
       exit 1
     fi
   fi
