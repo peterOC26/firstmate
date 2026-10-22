@@ -471,6 +471,60 @@ test_record_scans_name_missing_state_directories() {
   pass "both record scans diagnose missing local and registered state directories"
 }
 
+test_record_scan_refusal_causes() {
+  local scan shape out rc expected slot
+  for scan in reserved exclusive; do
+    for shape in missing-home malformed-registry ambiguous unreadable path; do
+      make_case "refusal-$scan-$shape"
+      slot="$POOL/1/project"
+      case "$shape" in
+        missing-home)
+          printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' "$CASE_DIR/missing" > "$HOME_DIR/data/secondmates.md"
+          expected="REFUSED: registered local Firstmate home is unavailable: $CASE_DIR/missing"
+          ;;
+        malformed-registry)
+          printf -- '- invalid\n' > "$HOME_DIR/data/secondmates.md"
+          expected="REFUSED: malformed local Firstmate registry entry in $HOME_DIR/data/secondmates.md"
+          ;;
+        ambiguous)
+          fm_write_meta "$HOME_DIR/state/bad.meta" "worktree=$slot" "worktree=$slot"
+          expected="REFUSED: unreadable or ambiguous task record $HOME_DIR/state/bad.meta"
+          ;;
+        unreadable)
+          mkdir "$HOME_DIR/state/bad.meta"
+          expected="REFUSED: unreadable or ambiguous task record $HOME_DIR/state/bad.meta"
+          ;;
+        path)
+          if [ "$scan" = exclusive ]; then
+            slot="$CASE_DIR/missing-copy"
+            expected="REFUSED: cannot resolve pool copy $slot"
+          else
+            fm_write_meta "$HOME_DIR/state/bad.meta" "worktree=$slot"
+            expected="REFUSED: cannot resolve worktree path in task record $HOME_DIR/state/bad.meta"
+          fi
+          ;;
+      esac
+      out=$(FM_HOME="$HOME_DIR" bash -c '
+        . "$1/bin/fm-wake-lib.sh"
+        . "$1/bin/fm-backend.sh"
+        . "$1/bin/fm-secondmate-registry-lib.sh"
+        if [ "$4" = reserved ]; then
+          if [ "$5" = path ]; then
+            fm_treehouse_pool_slot() { return 1; }
+            fm_treehouse_same_project() { mv "$2" "$2.moved"; }
+          fi
+          fm_treehouse_records_reserved "$2" "$FM_HOME/state"
+        else
+          fm_treehouse_record_exclusive "$FM_HOME/state" "$3"
+        fi
+      ' _ "$ROOT" "$PROJECT" "$slot" "$scan" "$shape" 2>&1); rc=$?
+      [ "$rc" -ne 0 ] || fail "$scan accepted $shape"
+      assert_contains "$out" "$expected" "$scan omitted $shape refusal cause"
+    done
+  done
+  pass "record scans diagnose registry, record, and path resolution refusals"
+}
+
 test_another_project_record_does_not_block_this_pool() {
   local out rc other="$TMP_ROOT/foreign-project"
   make_case unrelated-project
@@ -579,3 +633,5 @@ test_empty_record_fields_name_no_copy
 
 test_manual_recovery_for_unacquired_and_orphaned_slots
 test_record_scans_name_missing_state_directories
+
+test_record_scan_refusal_causes

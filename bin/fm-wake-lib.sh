@@ -1830,7 +1830,10 @@ fm_treehouse_records_reserved() {  # <project> <state>
         if ! fm_treehouse_pool_slot "$project" "$path"; then
           [ -d "$path" ] || continue
           fm_treehouse_same_project "$project" "$path" || continue
-          path=$(CDPATH='' cd -- "$path" && pwd -P) || return 1
+          path=$(CDPATH='' cd -- "$path" && pwd -P) || {
+            echo "REFUSED: cannot resolve $field path in task record $meta; no Treehouse allocation was attempted" >&2
+            return 1
+          }
           pool_state="$(dirname "$(dirname "$path")")/treehouse-state.json"
           if [ -e "$pool_state" ] || [ -L "$pool_state" ]; then
             echo "REFUSED: cannot verify pool ownership for retained task $id at $path; no allocation was attempted" >&2
@@ -1892,8 +1895,14 @@ fm_treehouse_records_reserved() {  # <project> <state>
 # relaunch before endpoint or wiring mutation. No status can exempt a record.
 fm_treehouse_record_exclusive() {  # <state> <worktree> [own-meta]
   local state=$1 worktree=$2 own=${3:-} slot dir meta field path real
-  slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || return 1
-  fm_local_firstmate_state_dirs "$state" || return 1
+  slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || {
+    echo "REFUSED: cannot resolve pool copy $worktree; cannot verify exclusive record ownership" >&2
+    return 1
+  }
+  fm_local_firstmate_state_dirs "$state" || {
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; cannot verify exclusive record ownership" >&2
+    return 1
+  }
   for dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     [ -d "$dir" ] && [ -r "$dir" ] && [ -x "$dir" ] || {
       echo "REFUSED: missing or unreadable local state directory $dir; cannot verify retained task records" >&2
@@ -1901,7 +1910,10 @@ fm_treehouse_record_exclusive() {  # <state> <worktree> [own-meta]
     }
     for meta in "$dir"/*.meta; do
       [ -e "$meta" ] || [ -L "$meta" ] || continue
-      fm_treehouse_record_paths_safe "$meta" || return 1
+      fm_treehouse_record_paths_safe "$meta" || {
+        echo "REFUSED: unreadable or ambiguous task record $meta; cannot verify exclusive record ownership" >&2
+        return 1
+      }
       if [ -n "$own" ] && [ "${meta##*/}" = "${own##*/}" ] && [ "$meta" -ef "$own" ]; then
         continue
       fi
