@@ -1,0 +1,12 @@
+Live checks used the actual fm-spawn CLI, Treehouse v2.3.0, real clone-backed pools, and private 120x40 tmux terminals.
+Workers were supervised raw bash/sleep allocation probes, not model harnesses or mocked CLIs.
+Seeded legacy records included a stopped clean branch, a dirty copy in a registered child home, an aliased reference, and a running heartbeat process.
+The failing mkfifo function was targeted fault injection; allocator and backend remained real.
+Fresh scout and local-only ship launches received separate durable leases and emitted ALLOCATION_WORKER_READY in their real panes.
+Legacy state snapshots were byte-identical after both successful allocation and pool exhaustion; the running heartbeat advanced.
+Official Treehouse v3.1.5 was downloaded into this worktree, checksum-verified (SHA-256 69f83270056650b1049d95229e8348153f7052f11b9d3fd634acb0f368abd14f), and tested against a pool created by the real v2.3.0 binary.
+That unverified release refused before allocation, journal creation, or worker endpoint creation.
+The initial offline invocation with TMPDIR inside the repository hit an unrelated secondmate removal safety guard; the standard temporary-directory rerun passed.
+Initial live setup attempts were corrected for isolated-home pool ownership and existing-brief/endpoint retry semantics before the final successful run.
+All disposable homes, pools, private tmux servers, downloaded binaries, and generated worktree files were removed.
+No Herdr session, model login, production fleet home, or source file was modified.

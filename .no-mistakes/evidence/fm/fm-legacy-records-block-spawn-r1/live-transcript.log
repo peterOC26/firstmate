@@ -1,0 +1,55 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/child
+REAL_TOOLS treehouse=v2.3.0 tmux=tmux 3.5a
+NO_LEGACY first=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/n-project-d38f00/1/n-project second=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/n-project-d38f00/2/n-project; both have durable lease identities
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/state/empty-home.meta:treehouse_lease_id=ccae2a055b6f3e1b6cafb717bf8c87f0
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/state/empty-home.meta:treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/empty-home/a1792767421.3909716.8874
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/state/durable-only.meta:treehouse_lease_id=dc3f7549ef5adefccb26f63a954b0fff
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/state/durable-only.meta:treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/n/durable-only/a1792767426.3914502.987
+HOLD_REFUSAL journal_absent=true
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+INJECTED_FIFO_FAILURE
+REFUSED: cannot prepare holds for legacy task copies; no Treehouse allocation was attempted
+error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure
+treehouse_lease_id=970945c832f6aba23b86781ad7d8e436
+treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/retry/a1792767434.3936063.13174
+FRESH_retry allocated=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/4/project ready=true
+treehouse_lease_id=d471ee73d03cd83893ebe2f78951785d
+treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/ship/a1792767439.3949857.8896
+FRESH_ship allocated=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/project ready=true
+PRESERVATION branches_heads_dirty_bytes_claims_pool_entries_records=unchanged running_pid=3908807 heartbeat_advanced=true
+EXHAUSTED no_worker_published=true acquisition_journal_retained=true legacy_copies_unchanged=true
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+A new version of treehouse is available: v2.3.0 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+all 5 worktrees are in use or dirty (max_trees = 5). Run 'treehouse status' to see details, or increase max_trees in treehouse.toml
+error: durable Treehouse acquisition failed; retain /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire for reconciliation
+warning: retaining Treehouse lease recovery journal /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire; reconcile this acquisition before retrying task exhausted
+Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything.
+journal=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+LIVE_SCENARIOS_COMPLETE

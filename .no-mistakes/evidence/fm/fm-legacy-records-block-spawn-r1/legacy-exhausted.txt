@@ -1,0 +1,20 @@
+COPY=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/1/project
+BRANCH=fm/legacy-paused
+HEAD=f4a6d83256b9ce4c0eb7044d6d87577ac3cd9fc5
+task=legacy1
+home=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/1/project","leased":null,"lease_id":null,"lease_holder":null}
+COPY=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/2/project
+BRANCH=fm/legacy-dirty
+HEAD=f4a6d83256b9ce4c0eb7044d6d87577ac3cd9fc5
+?? unfinished.txt
+ec789d4800ef44a2379a7e77eb6e47047c5fd260bb4c91418f6a94af13e70ea6  /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/2/project/unfinished.txt
+task=legacy2
+home=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/child
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/2/project","leased":null,"lease_id":null,"lease_holder":null}
+COPY=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/3/project
+BRANCH=fm/legacy-running
+HEAD=f4a6d83256b9ce4c0eb7044d6d87577ac3cd9fc5
+task=legacy3
+home=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/3/project","leased":null,"lease_id":null,"lease_holder":null}

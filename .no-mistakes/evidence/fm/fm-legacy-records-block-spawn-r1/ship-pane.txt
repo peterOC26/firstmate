@@ -1,0 +1,40 @@
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/project$ cd -- '/home/zabi/.no-mist
+akes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/project'
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/pr
+oject$ cd -- '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c
+3/5/project'
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/pr
+oject$ export GOTMPDIR=/tmp/fm-ship/gotmp
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/pr
+oject$ export COMPACT_ADVISER_DISABLE=1
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/pr
+oject$ export FM_TASK_ID=ship
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/pool/.treehouse/project-6481c3/5/pr
+oject$ . '/tmp/fm-ship+5cf42709b1de19b51e5640416f38124df3403b2aeeaf4f5caf1dee3f746d2dad/launch.s1792767441.3949857.13083
+.sh'
+ALLOCATION_WORKER_READY
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

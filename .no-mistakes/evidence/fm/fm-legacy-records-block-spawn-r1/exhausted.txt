@@ -1,0 +1,25 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+A new version of treehouse is available: v2.3.0 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+all 5 worktrees are in use or dirty (max_trees = 5). Run 'treehouse status' to see details, or increase max_trees in treehouse.toml
+error: durable Treehouse acquisition failed; retain /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire for reconciliation
+warning: retaining Treehouse lease recovery journal /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire; reconcile this acquisition before retrying task exhausted
+Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything.
+journal=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/h/state/exhausted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.

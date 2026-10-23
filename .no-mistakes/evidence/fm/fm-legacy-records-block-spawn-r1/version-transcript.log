@@ -1,0 +1,12 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/v
+REAL_UNVERIFIED_TREEHOUSE=v3.1.5
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MJPW8RN2VW0AFEACSQK5GC/.l/v
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: Treehouse version 'v3.1.5' is not verified to protect legacy-named pool copies; verify in-use copy exclusion before adding it to verified_in_use_versions (docs/verification/runtime-backends.md; Treehouse v2.3.0 internal/pool/pool.go acquire and internal/process/detect.go). No Treehouse allocation was attempted.
+VERSION_REFUSAL pool_state_records_branch_dirty_bytes=unchanged acquisition_journal=absent worker_endpoint=absent
