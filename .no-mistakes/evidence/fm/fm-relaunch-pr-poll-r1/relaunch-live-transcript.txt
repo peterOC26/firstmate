@@ -1,0 +1,63 @@
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle
+exit=0
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/repo
+
+exit=0
+$ git add README.md
+
+exit=0
+$ git -c user.name=Lab -c user.email=lab@example.invalid commit -qm initial
+
+exit=0
+$ git clone --bare -q /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/repo /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/origin.git
+
+exit=0
+$ git remote add origin /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/origin.git
+
+exit=0
+$ treehouse get --lease --lease-holder /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/a-live/live-validation --json --no-fetch
+A new version of treehouse is available: v2.3.0 → v3.1.5
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo' to release it.
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo","lease_id":"86d911e383605a01e85ea6ce373349ad","lease_holder":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/a-live/live-validation","leased_at":"2026-10-23T18:49:16.145536195+02:00"}
+exit=0
+Treehouse lease: {"path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo", "lease_id": "86d911e383605a01e85ea6ce373349ad", "lease_holder": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/a-live/live-validation", "leased_at": "2026-10-23T18:49:16.145536195+02:00"}
+$ git switch -c fm/a-live
+Switched to a new branch 'fm/a-live'
+exit=0
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/s new-session -d -s relaunch-lab -n fm-a-live -x 120 -y 40 -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo
+
+exit=0
+$ bash -c . "$1/bin/fm-wake-lib.sh"; fm_treehouse_slot_owner_claim "$2" a-live "$3" bash /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo-f83914/1/repo /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle
+
+exit=0
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/s send-keys -t relaunch-lab:fm-a-live -l codex --dangerously-bypass-approvals-and-sandbox --disable hooks "Reply READY and wait. Do not use tools or modify files. This is a disposable CLI lifecycle check."
+
+exit=0
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/s send-keys -t relaunch-lab:fm-a-live Enter
+
+exit=0
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/s capture-pane -p -t relaunch-lab:fm-a-live -S -80
+Folder access
+  /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/pool/.treehouse/repo
+  -f83914/1/repo
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the repository root:
+  /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/lifecycle/repo
+
+  Trust this folder? Codex can read, edit, and run files here, subject to your permission settings. Folder settings
+  can run code automatically, even without a model request. Continue only if you trust these files. Your trust
+  decision will be saved.
+
+› 1. Trust and continue
+  2. Quit
+
+  enter continue · esc quit
+exit=0
+BLOCKER: Codex is blocked at folder trust. Continuing saves trust in user tool configuration outside the worktree, which the workspace boundary forbids. Provide a pretrusted authenticated disposable CODEX_HOME inside the worktree, or authorize saving trust for this fixture.
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/s kill-server
+
+exit=0

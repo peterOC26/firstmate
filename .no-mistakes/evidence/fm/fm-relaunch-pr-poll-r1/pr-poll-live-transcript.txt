@@ -1,0 +1,115 @@
+=== baseline-after ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+$ FM_HOME=<lab> base/bin/fm-watch.sh
+check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/baseline-after/state/a-pr.check.sh
+exit=0
+poll retained; no merge notification published
+durable wake queue:
+1792773926	1	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/baseline-after/state/a-pr.check.sh
+
+=== target-after ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/target-after/state/a-pr.check.sh: merged
+exit=0
+persisted canonical merge notification:
+fm-pr-poll-merge-notified-v1
+github
+github.com
+peterOC26/firstmate
+33
+poll artifacts retired: yes
+durable wake queue:
+1792773933	1	check	merged-a-pr-https://github.com/peterOC26/firstmate/pull/33	check: merge landed: a-pr https://github.com/peterOC26/firstmate/pull/33 external
+
+=== target-before ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+control_relaunch_tx=12345.20261023T120000Z.6789
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/target-before/state/a-pr.check.sh: merged
+exit=0
+persisted canonical merge notification:
+fm-pr-poll-merge-notified-v1
+github
+github.com
+peterOC26/firstmate
+33
+poll artifacts retired: yes
+durable wake queue:
+1792773940	1	check	merged-a-pr-https://github.com/peterOC26/firstmate/pull/33	check: merge landed: a-pr https://github.com/peterOC26/firstmate/pull/33 external
+
+=== unknown-key ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+unrelated=value
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/unknown-key/state/a-pr.check.sh
+exit=0
+poll retained; no merge notification published
+durable wake queue:
+1792773948	1	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/unknown-key/state/a-pr.check.sh
+
+=== forged-key ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+control_relaunch_tx_forged=value
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/forged-key/state/a-pr.check.sh
+exit=0
+poll retained; no merge notification published
+durable wake queue:
+1792773954	1	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/forged-key/state/a-pr.check.sh
+
+=== duplicate-pr ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+pr=https://github.com/peterOC26/firstmate/pull/33
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/duplicate-pr/state/a-pr.check.sh
+exit=0
+poll retained; no merge notification published
+durable wake queue:
+1792773960	1	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/duplicate-pr/state/a-pr.check.sh
+
+=== invalid-head ===
+$ FM_HOME=<lab> bin/fm-pr-check.sh a-pr https://github.com/peterOC26/firstmate/pull/33
+exit=0
+persisted PR identity and relaunch transaction:
+pr=https://github.com/peterOC26/firstmate/pull/33
+pr_head=f1f2394b7b114aae1618716720ab3ee9705ba612
+control_relaunch_tx=12345.20261023T120000Z.6789
+pr_head=not-a-commit
+$ FM_HOME=<lab> target/bin/fm-watch.sh
+check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/invalid-head/state/a-pr.check.sh
+exit=0
+poll retained; no merge notification published
+durable wake queue:
+1792773967	1	check	unauthenticated-state-checks	check: rejected unauthenticated state checks: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M5MT6K4CYJM29EYMY18ZSE8S/.nm-test-pr/invalid-head/state/a-pr.check.sh
+
+private tmux server stopped; no default socket used
