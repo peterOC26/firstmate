@@ -176,7 +176,9 @@
 #   Every Treehouse-backed worker spawn/relaunch takes the project-identity
 #   lock through metadata publication. Durable acquisition, retained-record
 #   preflight, immutable lease fields, and claim ownership are owned by
-#   bin/fm-wake-lib.sh. state/<id>.treehouse-acquire/ is created before get:
+#   bin/fm-wake-lib.sh, including how get runs while copies named by records
+#   from before durable leases are held out of allocation.
+#   state/<id>.treehouse-acquire/ is created before get:
 #   identity records project and holder, allocation.json captures get's raw
 #   JSON, then identity gains treehouse_lease_id. It survives failures and
 #   successful launches until explicit teardown, so an abort never loses an
@@ -5029,12 +5031,15 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+  # Re-scan under the same project lock, before this journal exists, so the
+  # legacy copies held during get are current.
+  fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1
   TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
   mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
   treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
   TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
   printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-  if ! (cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$TREEHOUSE_LEASE_HOLDER" --json) > "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
+  if ! fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
     echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
     exit 1
   fi

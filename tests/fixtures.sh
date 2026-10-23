@@ -325,6 +325,9 @@ fm_test_lease_existing_worktree() {  # <worktree> <meta> <id> <home>
 }
 
 # A lease-aware fake allocator, using the supplied path or the pane-path env.
+# With FM_FAKE_TREEHOUSE_POOL it scans like Treehouse v2.3.0: the first entry
+# that is unleased and has no process whose cwd is inside it. Set
+# FM_FAKE_TREEHOUSE_RESET=1 to also reset the picked copy as get does.
 fm_test_fake_treehouse() {  # <fakebin> [worktree]
   cat > "$1/treehouse" <<SH
 #!/usr/bin/env bash
@@ -350,7 +353,32 @@ while [ "$#" -gt 0 ]; do
 done
 if [ "$cmd" = get ]; then
   if [ -n "${FM_FAKE_TREEHOUSE_POOL:-}" ]; then
-    path=$(jq -er '.worktrees[] | select(.leased != true) | .path' "$FM_FAKE_TREEHOUSE_POOL/treehouse-state.json" | head -n 1)
+    in_use() {
+      local copy proc cwd
+      copy=$(cd "$1" && pwd -P) || return 1
+      if [ -d /proc/self ]; then
+        for proc in /proc/[0-9]*; do
+          cwd=$(readlink "$proc/cwd" 2>/dev/null) || continue
+          case "$cwd/" in "$copy"/*) return 0 ;; esac
+        done
+        return 1
+      fi
+      command -v lsof >/dev/null || { echo "fake treehouse: cannot detect processes in $copy" >&2; exit 1; }
+      lsof -a -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | while IFS= read -r cwd; do
+        case "$cwd/" in "$copy"/*) echo in-use; break ;; esac
+      done | grep -q in-use
+    }
+    path=
+    while IFS= read -r candidate; do
+      [ -d "$candidate" ] || continue
+      in_use "$candidate" && continue
+      path=$candidate
+      break
+    done < <(jq -r '.worktrees[] | select(.leased != true) | .path' "$FM_FAKE_TREEHOUSE_POOL/treehouse-state.json")
+    if [ -n "$path" ] && [ "${FM_FAKE_TREEHOUSE_RESET:-}" = 1 ]; then
+      git -C "$path" checkout -q --detach
+      git -C "$path" clean -fdq
+    fi
   else
     path=${FM_FAKE_TREEHOUSE_PATH:-${FM_FAKE_PANE_PATH:-}}
   fi

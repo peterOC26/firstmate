@@ -1601,10 +1601,11 @@ fm_treehouse_same_project() {  # <project-dir> <worktree>
 # treehouse_lease_id and treehouse_lease_holder in their metadata identify that
 # acquisition, independently of spawn_gen (which changes on relaunch). The
 # holder binds canonical home, task id, and an acquisition nonce. Before get,
-# retained local records must all have matching leases; legacy records without
-# one block new allocation until reconciled, regardless of status or live
-# processes, though such a record may still relaunch into its own claimed,
-# unleased copy.
+# retained local records must all have matching leases or be legacy records
+# without lease fields whose copy is unleased; get then runs while each such
+# legacy copy is held out of allocation (fm_treehouse_lease_get), regardless of
+# status or live processes, and such a record may still relaunch into its own
+# claimed, unleased copy.
 # The claim remains independent positive evidence for records-only cleanup of
 # legacy records whose slot was reassigned. Never use `treehouse status` to
 # inspect ownership: it can heal and mutate the pool state.
@@ -1802,12 +1803,16 @@ fm_treehouse_record_paths_safe() {  # <meta>
   ' "$1"
 }
 
-# Under the project lock, refuse legacy/unverifiable retained references BEFORE
-# get can reset them. New leased references simply remain unavailable to get.
+# Under the project lock, refuse unverifiable retained references BEFORE get
+# can reset them. New leased references simply remain unavailable to get. A
+# legacy record (no treehouse_lease_* field) naming an unleased copy is listed
+# in FM_TREEHOUSE_LEGACY_COPIES for fm_treehouse_lease_get to hold instead.
 # An acquisition journal survives failed spawns, even without a .meta record;
 # it is never automatically returned, overwritten, or forgotten on retry.
+# shellcheck disable=SC2034 # FM_TREEHOUSE_LEGACY_COPIES is read by fm_treehouse_lease_get.
 fm_treehouse_records_reserved() {  # <project> <state>
   local project=$1 state=$2 dir meta id path field journal journal_project paths pool_state
+  FM_TREEHOUSE_LEGACY_COPIES=()
   fm_local_firstmate_state_dirs "$state" || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; no Treehouse allocation was attempted" >&2
     return 1
@@ -1851,6 +1856,13 @@ fm_treehouse_records_reserved() {  # <project> <state>
         elif fm_treehouse_record_lease "$meta" &&
           fm_treehouse_lease_matches "$path" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
           continue
+        elif ! grep -q '^treehouse_lease_' "$meta" && fm_treehouse_legacy_unleased "$path"; then
+          path=$(CDPATH='' cd -- "$path" && pwd -P) || {
+            echo "REFUSED: cannot resolve $field path in task record $meta; no Treehouse allocation was attempted" >&2
+            return 1
+          }
+          FM_TREEHOUSE_LEGACY_COPIES+=("$path")
+          continue
         fi
         echo "REFUSED: retained task $id ($meta) names pool copy $path without a verified matching durable lease; reconcile its ownership and run guarded cleanup before spawning again. No Treehouse allocation was attempted." >&2
         return 1
@@ -1889,6 +1901,54 @@ fm_treehouse_records_reserved() {  # <project> <state>
       fi
     done
   done
+}
+
+# Durable get for a fresh worker while every copy in FM_TREEHOUSE_LEGACY_COPIES
+# is held out of allocation. Treehouse v2.3.0 has no command that leases an
+# existing copy in place, and its get resets the first idle, unleased, clean,
+# merged copy it scans. It never hands out a copy with a live process whose cwd
+# is inside it, so one hold process sits in each legacy copy for exactly the get
+# call. Holds read a FIFO whose only writer is this shell, so they also end if
+# the caller dies; any hold that cannot be confirmed refuses before get.
+# fm_treehouse_record_exclusive after get remains the backstop.
+fm_treehouse_lease_get() {  # <project> <holder> <allocation-json>
+  local project=$1 holder=$2 out=$3 dir path reply status=0 pid
+  local -a holds=()
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-treehouse-hold.XXXXXX") || return 1
+  if ! mkfifo "$dir/hold" "$dir/ready" || ! exec 6<>"$dir/hold" 7<>"$dir/ready"; then
+    exec 6>&- 7>&-
+    rm -rf "$dir"
+    echo "REFUSED: cannot prepare holds for legacy task copies; no Treehouse allocation was attempted" >&2
+    return 1
+  fi
+  for path in ${FM_TREEHOUSE_LEGACY_COPIES[@]+"${FM_TREEHOUSE_LEGACY_COPIES[@]}"}; do
+    (
+      exec 6>&- 7>&-
+      if exec < "$dir/hold" && CDPATH='' cd -- "$path" && [ "$(pwd -P)" = "$path" ]; then
+        printf 'held\n' > "$dir/ready"
+        exec cat > /dev/null 2>&1
+      fi
+      printf 'failed\n' > "$dir/ready"
+    ) &
+    holds+=("$!")
+    reply=
+    IFS= read -r -t 10 reply <&7 || reply=
+    if [ "$reply" != held ]; then
+      echo "REFUSED: could not hold legacy task copy $path out of allocation; no Treehouse allocation was attempted" >&2
+      status=1
+      break
+    fi
+  done
+  if [ "$status" -eq 0 ]; then
+    (cd "$project" && treehouse get --lease --lease-holder "$holder" --json) > "$out" 6>&- 7>&- || status=$?
+  fi
+  exec 6>&- 7>&-
+  for pid in ${holds[@]+"${holds[@]}"}; do
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+  done
+  rm -rf "$dir"
+  return "$status"
 }
 
 # Defense in depth after get and before claim/publication; also used for a

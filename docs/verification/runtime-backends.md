@@ -12,6 +12,12 @@ Verified on 2026-10-22 with Treehouse v2.3.0 on Linux amd64, using offline pool 
 The installed CI pin was checksum-verified with `bash bin/fm-install-treehouse.sh <temporary-directory>`; its `get --help` advertises `--lease`, `--lease-holder`, and `--json`, and its `return --help` advertises `--if-lease-id` and `--if-lease-holder`.
 No real pool status, acquisition, return, or lifecycle operation was used for this verification.
 
+Holding copies named by records from before durable leases was verified on 2026-10-23 against the Treehouse v2.3.0 source (tag `v2.3.0`, `internal/pool/pool.go` `acquire` and `internal/process/detect.go`).
+That release has no command that leases an existing copy in place.
+Its `get` resets and hands out the first entry that is not leased, not destroying, has no live owner reservation, has no process whose working directory is inside it, is clean, and has a HEAD merged into the reset target.
+A copy with such a process is skipped before any reset, so a fresh spawn runs `get` while one hold process sits in each copy a pre-lease record names.
+The offline fixture allocator models that scan and, in the hold cases, resets the copy it picks.
+
 Refresh the behavioral evidence with:
 
 ```sh
@@ -27,7 +33,9 @@ Selected observed output:
 
 ```text
 ok - retained records reserve their copies through exit; explicit cleanup releases exactly their lease
-ok - legacy, aliased, cross-home, and unreadable records refuse before allocation or endpoint mutation
+ok - legacy, aliased, and cross-home pre-lease records keep their copies untouched while a fresh spawn leases another
+ok - when every free copy is named by a legacy record, get hands out nothing and both copies stay untouched
+ok - unreadable, contradictory, partial-lease, and leased-elsewhere records refuse before allocation or endpoint mutation
 ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
 ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy
 ok - fm-teardown: a stale record on a claimed slot retires, then the claimant tears down
