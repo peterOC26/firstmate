@@ -158,28 +158,171 @@ test_reservation_survives_worker_exit_and_releases_at_cleanup() {
   pass "retained records reserve their copies through exit; explicit cleanup releases exactly their lease"
 }
 
-test_legacy_alias_cross_home_and_unreadable_refuse_before_get() {
-  local shape out rc home meta
-  for shape in legacy alias registered unreadable contradictory; do
-    make_case "$shape"
+copy_in_use() {  # <copy>
+  local proc cwd copy
+  copy=$(cd "$1" && pwd -P)
+  for proc in /proc/[0-9]*; do
+    cwd=$(readlink "$proc/cwd" 2>/dev/null) || continue
+    case "$cwd/" in "$copy"/*) return 0 ;; esac
+  done
+  return 1
+}
+# A stopped pre-lease task: its own branch, unfinished files, and slot claim.
+make_legacy_copy() {  # <slot> <id> <home>
+  git -C "$POOL/$1/project" checkout -q -b "fm/$2"
+  printf 'unfinished\n' > "$POOL/$1/project/work-in-progress"
+  printf 'task=%s\nhome=%s\n' "$2" "$3" > "$POOL/$1/.fm-slot-owner"
+}
+legacy_copy_snapshot() {  # <slot>
+  printf '%s|%s|%s|%s\n' "$(git -C "$POOL/$1/project" symbolic-ref -q HEAD)" \
+    "$(cat "$POOL/$1/project/work-in-progress" 2>/dev/null)" \
+    "$(tr '\n' ' ' < "$POOL/$1/.fm-slot-owner" 2>/dev/null)" \
+    "$(jq -c --arg p "$POOL/$1/project" '.worktrees[] | select(.path == $p)' "$POOL/treehouse-state.json")"
+}
+
+test_legacy_records_hold_their_copies_during_fresh_get() {
+  local shape out rc home path before after
+  for shape in legacy alias registered; do
+    make_case "hold-$shape"
     home=$HOME_DIR
     if [ "$shape" = registered ]; then
       home="$CASE_DIR/mate"
       mkdir -p "$home/state" "$home/data" "$home/config"
       printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' "$home" > "$HOME_DIR/data/secondmates.md"
     fi
-    meta="$home/state/retained.meta"
-    if [ "$shape" = unreadable ]; then
-      mkdir "$meta"
-    else
-      path="$POOL/1/project"
-      if [ "$shape" = alias ]; then
-        ln -s "$path" "$CASE_DIR/alias"
-        path="$CASE_DIR/alias"
-      fi
-      fm_write_meta "$meta" "worktree=$path" "project=$PROJECT" "kind=scout"
-      [ "$shape" != contradictory ] || printf 'worktree=%s\n' "$POOL/2/project" >> "$meta"
+    path="$POOL/1/project"
+    if [ "$shape" = alias ]; then
+      ln -s "$path" "$CASE_DIR/alias"
+      path="$CASE_DIR/alias"
     fi
+    fm_write_meta "$home/state/retained.meta" "worktree=$path" "project=$PROJECT" "kind=ship" "status=paused"
+    make_legacy_copy 1 retained "$home"
+    before=$(legacy_copy_snapshot 1)
+    cp "$home/state/retained.meta" "$CASE_DIR/prior.meta"
+    out=$(FM_FAKE_TREEHOUSE_RESET=1 spawn_task candidate 2); rc=$?
+    expect_code 0 "$rc" "$shape legacy record still blocked a fresh spawn: $out"
+    [ "$(awk -F= '$1 == "worktree" { print substr($0, 10) }' "$HOME_DIR/state/candidate.meta")" = "$POOL/2/project" ] ||
+      fail "$shape fresh spawn did not get a different copy: $out"
+    after=$(legacy_copy_snapshot 1)
+    [ "$before" = "$after" ] || fail "$shape legacy copy changed: before=$before after=$after"
+    assert_grep 'task=candidate' "$POOL/2/.fm-slot-owner" "$shape fresh copy lacks its claim"
+    ! copy_in_use "$POOL/1/project" || fail "$shape left a hold process in the legacy copy"
+    cmp -s "$CASE_DIR/prior.meta" "$home/state/retained.meta" || fail "$shape rewrote the legacy record"
+  done
+  pass "legacy, aliased, and cross-home pre-lease records keep their copies untouched while a fresh spawn leases another"
+}
+
+test_unverified_legacy_hold_versions_refuse() {
+  local version out rc before
+  for version in v2.4.0 '' unreadable; do
+    make_case "version-${version:-empty}"
+    fm_write_meta "$HOME_DIR/state/retained.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=ship"
+    make_legacy_copy 1 retained "$HOME_DIR"
+    before=$(legacy_copy_snapshot 1)
+    out=$(FM_FAKE_TREEHOUSE_VERSION="$version" FM_FAKE_TREEHOUSE_VERSION_STATUS=$([ "$version" != unreadable ] && echo 0 || echo 1) spawn_task candidate 2); rc=$?
+    [ "$rc" -ne 0 ] || fail "unverified version admitted a legacy copy: $out"
+    assert_contains "$out" "Treehouse version '${version:-unreadable}'" "missing detected version: $out"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "unverified version invoked allocation"
+    [ "$before" = "$(legacy_copy_snapshot 1)" ] || fail "unverified version changed legacy copy"
+    assert_absent "$HOME_DIR/state/candidate.treehouse-acquire" "version refusal created journal"
+    ! copy_in_use "$POOL/1/project" || fail "version refusal left a hold"
+  done
+  pass "unverified, empty, and unreadable Treehouse versions refuse legacy admission before allocation"
+}
+
+test_no_legacy_copies_need_no_holds() {
+  local out rc id slot=0
+  make_case no-legacy-holds
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FAKEBIN/mkfifo"
+  chmod +x "$FAKEBIN/mkfifo"
+  for id in first second; do
+    slot=$((slot + 1))
+    out=$(spawn_task "$id" "$slot"); rc=$?
+    expect_code 0 "$rc" "spawn without legacy copies required a FIFO: $out"
+    read_lease "$id" >/dev/null || fail "spawn without holds failed to record its durable lease"
+    assert_grep "worktree=$POOL/$slot/project" "$HOME_DIR/state/$id.meta" "spawn without holds used the wrong copy"
+  done
+  pass "fresh spawns with no records or only durable leases succeed when mkfifo fails"
+}
+
+test_hold_failure_leaves_no_journal() {
+  local shape out rc before real_tool tool
+  for shape in mktemp mkfifo confirmation; do
+    make_case "hold-failure-$shape"
+    fm_write_meta "$HOME_DIR/state/retained.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=ship"
+    make_legacy_copy 1 retained "$HOME_DIR"
+    before=$(legacy_copy_snapshot 1)
+    tool=$shape
+    [ "$shape" != confirmation ] || tool='mkfifo'
+    real_tool=$(command -v "$tool")
+    {
+      printf '#!/usr/bin/env bash\n'
+      if [ "$shape" = confirmation ]; then
+        # shellcheck disable=SC2016 # The generated script expands its own arguments.
+        printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then %q "$1"; ln -s /dev/null "$2"; exit; fi\n' "$real_tool"
+      else
+        printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then exit 1; fi\n'
+      fi
+      printf 'exec %q "$@"\n' "$real_tool"
+    } > "$FAKEBIN/$tool"
+    chmod +x "$FAKEBIN/$tool"
+    out=$(spawn_task candidate 2); rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape hold failure succeeded: $out"
+    assert_contains "$out" 'hold failed before Treehouse acquisition' "missing pre-get failure: $out"
+    assert_absent "$HOME_DIR/state/candidate.treehouse-acquire" "$shape stranded journal"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape ran get"
+    [ "$before" = "$(legacy_copy_snapshot 1)" ] || fail "$shape changed legacy copy"
+    ! copy_in_use "$POOL/1/project" || fail "$shape left a hold"
+    rm "$FAKEBIN/$tool"
+    out=$(spawn_task retry 2); rc=$?
+    expect_code 0 "$rc" "$shape blocked retry: $out"
+  done
+  pass "hold preparation and confirmation failures leave no journal and allow a successful retry"
+}
+
+test_legacy_held_pool_exhaustion_allocates_nothing() {
+  local out rc before1 before2
+  make_case hold-exhausted
+  fm_write_meta "$HOME_DIR/state/first.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=ship"
+  fm_write_meta "$HOME_DIR/state/second.meta" "worktree=$POOL/2/project" "project=$PROJECT" "kind=scout"
+  make_legacy_copy 1 first "$HOME_DIR"
+  make_legacy_copy 2 second "$HOME_DIR"
+  before1=$(legacy_copy_snapshot 1)
+  before2=$(legacy_copy_snapshot 2)
+  out=$(FM_FAKE_TREEHOUSE_RESET=1 spawn_task candidate 2); rc=$?
+  [ "$rc" -ne 0 ] || fail "a spawn with every copy held by legacy records succeeded: $out"
+  assert_contains "$out" 'durable Treehouse acquisition failed' "missing acquisition failure: $out"
+  [ "$before1" = "$(legacy_copy_snapshot 1)" ] && [ "$before2" = "$(legacy_copy_snapshot 2)" ] ||
+    fail "exhausted pool touched a legacy copy"
+  assert_absent "$HOME_DIR/state/candidate.meta" "exhausted pool published a record"
+  [ -d "$HOME_DIR/state/candidate.treehouse-acquire" ] || fail "failed get lost its recovery journal"
+  if copy_in_use "$POOL/1/project" || copy_in_use "$POOL/2/project"; then
+    fail "failed get left hold processes"
+  fi
+  pass "when every free copy is named by a legacy record, get hands out nothing and both copies stay untouched"
+}
+
+test_unverifiable_records_refuse_before_get() {
+  local shape out rc meta
+  for shape in unreadable contradictory partial-lease leased-elsewhere; do
+    make_case "$shape"
+    meta="$HOME_DIR/state/retained.meta"
+    case "$shape" in
+      unreadable) mkdir "$meta" ;;
+      contradictory)
+        fm_write_meta "$meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=scout"
+        printf 'worktree=%s\n' "$POOL/2/project" >> "$meta"
+        ;;
+      partial-lease)
+        fm_write_meta "$meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=scout" "treehouse_lease_id=orphan"
+        ;;
+      leased-elsewhere)
+        fm_write_meta "$meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=scout"
+        jq --arg p "$POOL/1/project" '.worktrees |= map(if .path == $p then .leased = true | .lease_id = "other" | .lease_holder = "other" else . end)' \
+          "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+        mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+        ;;
+    esac
     : > "$POOL/1/project/dirty-sentinel"
     out=$(spawn_task candidate 2); rc=$?
     [ "$rc" -ne 0 ] || fail "$shape ownership was ignored"
@@ -187,7 +330,7 @@ test_legacy_alias_cross_home_and_unreadable_refuse_before_get() {
     [ ! -s "$CASE_DIR/mutations" ] || fail "$shape changed an endpoint: $out"
     assert_present "$POOL/1/project/dirty-sentinel" "$shape reset a referenced copy"
   done
-  pass "legacy, aliased, cross-home, and unreadable records refuse before allocation or endpoint mutation"
+  pass "unreadable, contradictory, partial-lease, and leased-elsewhere records refuse before allocation or endpoint mutation"
 }
 
 test_relaunch_keeps_acquisition_and_rejects_stale_claim() {
@@ -366,7 +509,7 @@ FAKE
 #!/usr/bin/env bash
 "$(dirname "$0")/treehouse.base" "$@" || exit
 # Model a failed/interrupted drive after Treehouse committed the allocation.
-[ "$*" != "get --help" ] && [ "$1" = get ] && exit 23
+[ "$*" != "get --help" ] && [ "$1" = get ] && exit 2
 exit 0
 FAKE
   chmod +x "$FAKEBIN/treehouse"
@@ -582,7 +725,7 @@ test_acquisition_journals_are_project_scoped() {
 }
 
 test_separate_clones_share_the_origin_pool_reservation() {
-  local shape out rc clone original
+  local shape out rc clone original before
   for shape in legacy leased; do
     make_case "separate-clone-$shape"
     original=$PROJECT
@@ -593,10 +736,14 @@ test_separate_clones_share_the_origin_pool_reservation() {
     git clone -q "file://$CASE_DIR/origin.git" "$clone"
     if [ "$shape" = legacy ]; then
       fm_write_meta "$HOME_DIR/state/retained.meta" "worktree=$POOL/1/project" "project=$original" "kind=scout"
+      make_legacy_copy 1 retained "$HOME_DIR"
+      before=$(legacy_copy_snapshot 1)
       PROJECT=$clone
-      out=$(spawn_task candidate 2); rc=$?
-      [ "$rc" -ne 0 ] || fail "a second clone bypassed a retained legacy pool reference"
-      [ ! -s "$CASE_DIR/treehouse.log" ] && [ ! -s "$CASE_DIR/mutations" ] || fail "a second clone reached get before legacy reconciliation: $out"
+      out=$(FM_FAKE_TREEHOUSE_RESET=1 spawn_task candidate 2); rc=$?
+      expect_code 0 "$rc" "a second clone could not lease a copy beside a legacy reference: $out"
+      [ "$(awk -F= '$1 == "worktree" { print substr($0, 10) }' "$HOME_DIR/state/candidate.meta")" = "$POOL/2/project" ] ||
+        fail "a second clone was handed the legacy copy: $out"
+      [ "$before" = "$(legacy_copy_snapshot 1)" ] || fail "a second clone touched the legacy copy"
     else
       out=$(spawn_task retained 1); rc=$?
       expect_code 0 "$rc" "first clone spawn failed: $out"
@@ -616,7 +763,12 @@ test_separate_clones_share_the_origin_pool_reservation() {
 }
 
 test_reservation_survives_worker_exit_and_releases_at_cleanup
-test_legacy_alias_cross_home_and_unreadable_refuse_before_get
+test_legacy_records_hold_their_copies_during_fresh_get
+test_legacy_held_pool_exhaustion_allocates_nothing
+test_unverified_legacy_hold_versions_refuse
+test_hold_failure_leaves_no_journal
+test_no_legacy_copies_need_no_holds
+test_unverifiable_records_refuse_before_get
 test_relaunch_keeps_acquisition_and_rejects_stale_claim
 test_cleanup_rerun_after_released_lease_is_records_only
 test_unsupported_cli_and_failed_acquisition_preserve_reservations

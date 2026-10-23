@@ -176,11 +176,15 @@
 #   Every Treehouse-backed worker spawn/relaunch takes the project-identity
 #   lock through metadata publication. Durable acquisition, retained-record
 #   preflight, immutable lease fields, and claim ownership are owned by
-#   bin/fm-wake-lib.sh. state/<id>.treehouse-acquire/ is created before get:
+#   bin/fm-wake-lib.sh, including how get runs while copies named by records
+#   from before durable leases are held out of allocation.
+#   state/<id>.treehouse-acquire/ is created before get:
 #   identity records project and holder, allocation.json captures get's raw
-#   JSON, then identity gains treehouse_lease_id. It survives failures and
-#   successful launches until explicit teardown, so an abort never loses an
-#   acquisition or silently returns a copy holding work. A same-id retry refuses
+#   JSON, then identity gains treehouse_lease_id. A legacy-copy hold refusal
+#   before get removes only this attempt's never-acquired journal. Once get
+#   may have run, it survives failures and successful launches until explicit
+#   teardown, so an abort never loses an acquisition or silently returns a
+#   copy holding work. A same-id retry refuses
 #   that journal; other tasks may allocate only after its lease is verified.
 #   Polytoken's failed pre-launch endpoint/wiring cleanup still runs, but never
 #   clears this lease or its claim. No conflicting claim is overwritten.
@@ -5034,8 +5038,17 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
   TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
   printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-  if ! (cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$TREEHOUSE_LEASE_HOLDER" --json) > "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
-    echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+  if fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
+    :
+  else
+    treehouse_acquire_status=$?
+    if [ "$treehouse_acquire_status" -eq 2 ]; then
+      rm -rf "$TREEHOUSE_ACQUIRE_JOURNAL"
+      TREEHOUSE_ACQUIRE_JOURNAL=
+      echo "error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure" >&2
+    else
+      echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    fi
     exit 1
   fi
   WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
