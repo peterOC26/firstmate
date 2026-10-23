@@ -253,11 +253,12 @@ test_hold_failure_leaves_no_journal() {
     make_legacy_copy 1 retained "$HOME_DIR"
     before=$(legacy_copy_snapshot 1)
     tool=$shape
-    [ "$shape" != confirmation ] || tool=mkfifo
+    [ "$shape" != confirmation ] || tool='mkfifo'
     real_tool=$(command -v "$tool")
     {
       printf '#!/usr/bin/env bash\n'
       if [ "$shape" = confirmation ]; then
+        # shellcheck disable=SC2016 # The generated script expands its own arguments.
         printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then %q "$1"; ln -s /dev/null "$2"; exit; fi\n' "$real_tool"
       else
         printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then exit 1; fi\n'
