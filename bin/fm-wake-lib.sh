@@ -1602,10 +1602,11 @@ fm_treehouse_same_project() {  # <project-dir> <worktree>
 # acquisition, independently of spawn_gen (which changes on relaunch). The
 # holder binds canonical home, task id, and an acquisition nonce. Before get,
 # retained local records must all have matching leases or be legacy records
-# without lease fields whose copy is unleased; get then runs while each such
-# legacy copy is held out of allocation (fm_treehouse_lease_get), regardless of
-# status or live processes, and such a record may still relaunch into its own
-# claimed, unleased copy.
+# without lease fields whose copy is unleased and whose installed Treehouse
+# version passes fm_treehouse_legacy_holds_supported. Get then runs while each
+# such legacy copy is held out of allocation (fm_treehouse_lease_get), regardless
+# of status or live processes, and such a record may still relaunch into its
+# own claimed, unleased copy.
 # The claim remains independent positive evidence for records-only cleanup of
 # legacy records whose slot was reassigned. Never use `treehouse status` to
 # inspect ownership: it can heal and mutate the pool state.
@@ -1818,8 +1819,7 @@ fm_treehouse_record_paths_safe() {  # <meta>
 # can reset them. New leased references simply remain unavailable to get. A
 # legacy record (no treehouse_lease_* field) naming an unleased copy is listed
 # in FM_TREEHOUSE_LEGACY_COPIES for fm_treehouse_lease_get to hold instead.
-# An acquisition journal survives failed spawns, even without a .meta record;
-# it is never automatically returned, overwritten, or forgotten on retry.
+# bin/fm-spawn.sh's header owns acquisition-journal retention and retry rules.
 # shellcheck disable=SC2034 # FM_TREEHOUSE_LEGACY_COPIES is read by fm_treehouse_lease_get.
 fm_treehouse_records_reserved() {  # <project> <state>
   local project=$1 state=$2 dir meta id path field journal journal_project paths pool_state
@@ -1925,6 +1925,8 @@ fm_treehouse_records_reserved() {  # <project> <state>
 # call. Holds read a FIFO whose only writer is this shell, so they also end if
 # the caller dies; any hold that cannot be confirmed refuses before get.
 # fm_treehouse_record_exclusive after get remains the backstop.
+# Return 2 only when holds refuse before get; return 1 for any get failure,
+# even if Treehouse itself exits 2, so the caller retains acquisition evidence.
 fm_treehouse_lease_get() {  # <project> <holder> <allocation-json>
   local project=$1 holder=$2 out=$3 dir path reply status=0 pid
   local -a holds=()

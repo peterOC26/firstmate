@@ -16,7 +16,7 @@ Holding copies named by records from before durable leases was verified on 2026-
 That release has no command that leases an existing copy in place.
 Its `get` resets and hands out the first entry that is not leased, not destroying, has no live owner reservation, has no process whose working directory is inside it, is clean, and has a HEAD merged into the reset target.
 A copy with such a process is skipped before any reset, so a fresh spawn runs `get` while one hold process sits in each copy a pre-lease record names.
-The offline fixture allocator models that scan and, in the hold cases, resets the copy it picks.
+The offline fixture allocator models the lease and process-in-use selection checks and, in the hold cases, resets the copy it picks.
 The `verified_in_use_versions` list beside the CLI capability gate admits only v2.3.0; other or unreadable versions refuse legacy-copy admission before holds or allocation.
 The focused offline regression command is `bash tests/fm-spawn-slot-ownership.test.sh`.
 

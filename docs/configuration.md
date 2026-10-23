@@ -1554,6 +1554,7 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 All Treehouse-backed worker spawns need `jq` for lease JSON; the JSON-emitting adapters (`herdr`, `zellij`, `cmux`) also parse backend JSON in their spawn and liveness paths.
 Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`) uses `treehouse` for worktrees.
 Ordinary worker allocation requires Treehouse v2.3.0 or newer with JSON lease allocation and identity-conditional return; unsupported installations refuse before allocation or endpoint mutation.
+Fresh allocation alongside retained pre-lease task records naming pool copies of the same project additionally requires a version verified to exclude copies in use; [the shared ownership contract](../bin/fm-wake-lib.sh) owns this admission gate and its verified-version list, with source and regression evidence in [runtime backend verification](verification/runtime-backends.md#durable-task-copy-reservations).
 
 Backend tool availability uses the adapter's own executable resolver, so bootstrap and spawn agree on supported non-`PATH` locations such as cmux's bundled CLI.
 An unknown resolved backend emits `BACKEND_INVALID` and blocks dispatch instead of silently dropping its dependency delta or falling back to tmux.

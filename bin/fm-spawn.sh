@@ -180,9 +180,11 @@
 #   from before durable leases are held out of allocation.
 #   state/<id>.treehouse-acquire/ is created before get:
 #   identity records project and holder, allocation.json captures get's raw
-#   JSON, then identity gains treehouse_lease_id. It survives failures and
-#   successful launches until explicit teardown, so an abort never loses an
-#   acquisition or silently returns a copy holding work. A same-id retry refuses
+#   JSON, then identity gains treehouse_lease_id. A legacy-copy hold refusal
+#   before get removes only this attempt's never-acquired journal. Once get
+#   may have run, it survives failures and successful launches until explicit
+#   teardown, so an abort never loses an acquisition or silently returns a
+#   copy holding work. A same-id retry refuses
 #   that journal; other tasks may allocate only after its lease is verified.
 #   Polytoken's failed pre-launch endpoint/wiring cleanup still runs, but never
 #   clears this lease or its claim. No conflicting claim is overwritten.
