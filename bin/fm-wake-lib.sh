@@ -1928,6 +1928,10 @@ fm_treehouse_records_reserved() {  # <project> <state>
 fm_treehouse_lease_get() {  # <project> <holder> <allocation-json>
   local project=$1 holder=$2 out=$3 dir path reply status=0 pid
   local -a holds=()
+  if [ -z "${FM_TREEHOUSE_LEGACY_COPIES[*]-}" ]; then
+    (cd "$project" && treehouse get --lease --lease-holder "$holder" --json) > "$out" || return 1
+    return 0
+  fi
   dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-treehouse-hold.XXXXXX") || return 2
   if ! mkfifo "$dir/hold" "$dir/ready" || ! exec 6<>"$dir/hold" 7<>"$dir/ready"; then
     exec 6>&- 7>&-

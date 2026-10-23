@@ -39,6 +39,7 @@ ok - legacy, aliased, and cross-home pre-lease records keep their copies untouch
 ok - when every free copy is named by a legacy record, get hands out nothing and both copies stay untouched
 ok - unverified, empty, and unreadable Treehouse versions refuse legacy admission before allocation
 ok - hold preparation and confirmation failures leave no journal and allow a successful retry
+ok - fresh spawns with no records or only durable leases succeed when mkfifo fails
 ok - unreadable, contradictory, partial-lease, and leased-elsewhere records refuse before allocation or endpoint mutation
 ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
 ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy

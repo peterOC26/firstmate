@@ -230,6 +230,21 @@ test_unverified_legacy_hold_versions_refuse() {
   pass "unverified, empty, and unreadable Treehouse versions refuse legacy admission before allocation"
 }
 
+test_no_legacy_copies_need_no_holds() {
+  local out rc id slot=0
+  make_case no-legacy-holds
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FAKEBIN/mkfifo"
+  chmod +x "$FAKEBIN/mkfifo"
+  for id in first second; do
+    slot=$((slot + 1))
+    out=$(spawn_task "$id" "$slot"); rc=$?
+    expect_code 0 "$rc" "spawn without legacy copies required a FIFO: $out"
+    read_lease "$id" >/dev/null || fail "spawn without holds failed to record its durable lease"
+    assert_grep "worktree=$POOL/$slot/project" "$HOME_DIR/state/$id.meta" "spawn without holds used the wrong copy"
+  done
+  pass "fresh spawns with no records or only durable leases succeed when mkfifo fails"
+}
+
 test_hold_failure_leaves_no_journal() {
   local shape out rc before real_tool tool
   for shape in mktemp mkfifo confirmation; do
@@ -751,6 +766,7 @@ test_legacy_records_hold_their_copies_during_fresh_get
 test_legacy_held_pool_exhaustion_allocates_nothing
 test_unverified_legacy_hold_versions_refuse
 test_hold_failure_leaves_no_journal
+test_no_legacy_copies_need_no_holds
 test_unverifiable_records_refuse_before_get
 test_relaunch_keeps_acquisition_and_rejects_stale_claim
 test_cleanup_rerun_after_released_lease_is_records_only
