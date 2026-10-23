@@ -17,6 +17,8 @@ That release has no command that leases an existing copy in place.
 Its `get` resets and hands out the first entry that is not leased, not destroying, has no live owner reservation, has no process whose working directory is inside it, is clean, and has a HEAD merged into the reset target.
 A copy with such a process is skipped before any reset, so a fresh spawn runs `get` while one hold process sits in each copy a pre-lease record names.
 The offline fixture allocator models that scan and, in the hold cases, resets the copy it picks.
+The `verified_in_use_versions` list beside the CLI capability gate admits only v2.3.0; other or unreadable versions refuse legacy-copy admission before holds or allocation.
+The focused offline regression command is `bash tests/fm-spawn-slot-ownership.test.sh`.
 
 Refresh the behavioral evidence with:
 
@@ -35,6 +37,8 @@ Selected observed output:
 ok - retained records reserve their copies through exit; explicit cleanup releases exactly their lease
 ok - legacy, aliased, and cross-home pre-lease records keep their copies untouched while a fresh spawn leases another
 ok - when every free copy is named by a legacy record, get hands out nothing and both copies stay untouched
+ok - unverified, empty, and unreadable Treehouse versions refuse legacy admission before allocation
+ok - hold preparation and confirmation failures leave no journal and allow a successful retry
 ok - unreadable, contradictory, partial-lease, and leased-elsewhere records refuse before allocation or endpoint mutation
 ok - relaunch preserves the acquisition across spawn_gen, keeps legacy owners relaunchable, and rejects stale or cross-home claims before mutation
 ok - separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy

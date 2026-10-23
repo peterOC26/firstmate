@@ -336,6 +336,7 @@ SH
   cat >> "$1/treehouse" <<'SH'
 set -eu
 case "$*" in
+  '--version') printf '%s\n' "${FM_FAKE_TREEHOUSE_VERSION-v2.3.0}"; exit "${FM_FAKE_TREEHOUSE_VERSION_STATUS:-0}" ;;
   'get --help') echo '--lease --lease-holder --json'; exit 0 ;;
   'return --help') echo '--if-lease-id --if-lease-holder'; exit 0 ;;
 esac

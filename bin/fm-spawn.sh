@@ -5031,16 +5031,22 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  # Re-scan under the same project lock, before this journal exists, so the
-  # legacy copies held during get are current.
-  fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1
   TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
   mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
   treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
   TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
   printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-  if ! fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
-    echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+  if fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
+    :
+  else
+    treehouse_acquire_status=$?
+    if [ "$treehouse_acquire_status" -eq 2 ]; then
+      rm -rf "$TREEHOUSE_ACQUIRE_JOURNAL"
+      TREEHOUSE_ACQUIRE_JOURNAL=
+      echo "error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure" >&2
+    else
+      echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    fi
     exit 1
   fi
   WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1

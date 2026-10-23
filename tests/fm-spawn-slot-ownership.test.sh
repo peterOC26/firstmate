@@ -212,6 +212,58 @@ test_legacy_records_hold_their_copies_during_fresh_get() {
   pass "legacy, aliased, and cross-home pre-lease records keep their copies untouched while a fresh spawn leases another"
 }
 
+test_unverified_legacy_hold_versions_refuse() {
+  local version out rc before
+  for version in v2.4.0 '' unreadable; do
+    make_case "version-${version:-empty}"
+    fm_write_meta "$HOME_DIR/state/retained.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=ship"
+    make_legacy_copy 1 retained "$HOME_DIR"
+    before=$(legacy_copy_snapshot 1)
+    out=$(FM_FAKE_TREEHOUSE_VERSION="$version" FM_FAKE_TREEHOUSE_VERSION_STATUS=$([ "$version" != unreadable ] && echo 0 || echo 1) spawn_task candidate 2); rc=$?
+    [ "$rc" -ne 0 ] || fail "unverified version admitted a legacy copy: $out"
+    assert_contains "$out" "Treehouse version '${version:-unreadable}'" "missing detected version: $out"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "unverified version invoked allocation"
+    [ "$before" = "$(legacy_copy_snapshot 1)" ] || fail "unverified version changed legacy copy"
+    assert_absent "$HOME_DIR/state/candidate.treehouse-acquire" "version refusal created journal"
+    ! copy_in_use "$POOL/1/project" || fail "version refusal left a hold"
+  done
+  pass "unverified, empty, and unreadable Treehouse versions refuse legacy admission before allocation"
+}
+
+test_hold_failure_leaves_no_journal() {
+  local shape out rc before real_tool tool
+  for shape in mktemp mkfifo confirmation; do
+    make_case "hold-failure-$shape"
+    fm_write_meta "$HOME_DIR/state/retained.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=ship"
+    make_legacy_copy 1 retained "$HOME_DIR"
+    before=$(legacy_copy_snapshot 1)
+    tool=$shape
+    [ "$shape" != confirmation ] || tool=mkfifo
+    real_tool=$(command -v "$tool")
+    {
+      printf '#!/usr/bin/env bash\n'
+      if [ "$shape" = confirmation ]; then
+        printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then %q "$1"; ln -s /dev/null "$2"; exit; fi\n' "$real_tool"
+      else
+        printf 'if [[ "$*" == *fm-treehouse-hold.* ]]; then exit 1; fi\n'
+      fi
+      printf 'exec %q "$@"\n' "$real_tool"
+    } > "$FAKEBIN/$tool"
+    chmod +x "$FAKEBIN/$tool"
+    out=$(spawn_task candidate 2); rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape hold failure succeeded: $out"
+    assert_contains "$out" 'hold failed before Treehouse acquisition' "missing pre-get failure: $out"
+    assert_absent "$HOME_DIR/state/candidate.treehouse-acquire" "$shape stranded journal"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape ran get"
+    [ "$before" = "$(legacy_copy_snapshot 1)" ] || fail "$shape changed legacy copy"
+    ! copy_in_use "$POOL/1/project" || fail "$shape left a hold"
+    rm "$FAKEBIN/$tool"
+    out=$(spawn_task retry 2); rc=$?
+    expect_code 0 "$rc" "$shape blocked retry: $out"
+  done
+  pass "hold preparation and confirmation failures leave no journal and allow a successful retry"
+}
+
 test_legacy_held_pool_exhaustion_allocates_nothing() {
   local out rc before1 before2
   make_case hold-exhausted
@@ -227,6 +279,7 @@ test_legacy_held_pool_exhaustion_allocates_nothing() {
   [ "$before1" = "$(legacy_copy_snapshot 1)" ] && [ "$before2" = "$(legacy_copy_snapshot 2)" ] ||
     fail "exhausted pool touched a legacy copy"
   assert_absent "$HOME_DIR/state/candidate.meta" "exhausted pool published a record"
+  [ -d "$HOME_DIR/state/candidate.treehouse-acquire" ] || fail "failed get lost its recovery journal"
   if copy_in_use "$POOL/1/project" || copy_in_use "$POOL/2/project"; then
     fail "failed get left hold processes"
   fi
@@ -440,7 +493,7 @@ FAKE
 #!/usr/bin/env bash
 "$(dirname "$0")/treehouse.base" "$@" || exit
 # Model a failed/interrupted drive after Treehouse committed the allocation.
-[ "$*" != "get --help" ] && [ "$1" = get ] && exit 23
+[ "$*" != "get --help" ] && [ "$1" = get ] && exit 2
 exit 0
 FAKE
   chmod +x "$FAKEBIN/treehouse"
@@ -696,6 +749,8 @@ test_separate_clones_share_the_origin_pool_reservation() {
 test_reservation_survives_worker_exit_and_releases_at_cleanup
 test_legacy_records_hold_their_copies_during_fresh_get
 test_legacy_held_pool_exhaustion_allocates_nothing
+test_unverified_legacy_hold_versions_refuse
+test_hold_failure_leaves_no_journal
 test_unverifiable_records_refuse_before_get
 test_relaunch_keeps_acquisition_and_rejects_stale_claim
 test_cleanup_rerun_after_released_lease_is_records_only

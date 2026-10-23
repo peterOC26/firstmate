@@ -1707,6 +1707,17 @@ fm_treehouse_lease_cli() {
   command -v jq >/dev/null 2>&1
 }
 
+fm_treehouse_legacy_holds_supported() {
+  local version verified
+  local -a verified_in_use_versions=(v2.3.0)
+  version=$(treehouse --version 2>/dev/null) || version=unreadable
+  for verified in "${verified_in_use_versions[@]}"; do
+    [ "$version" != "$verified" ] || return 0
+  done
+  echo "REFUSED: Treehouse version '${version:-unreadable}' is not verified to protect legacy-named pool copies; verify in-use copy exclusion before adding it to verified_in_use_versions (docs/verification/runtime-backends.md; Treehouse v2.3.0 internal/pool/pool.go acquire and internal/process/detect.go). No Treehouse allocation was attempted." >&2
+  return 1
+}
+
 # Read only the pool JSON, never a Treehouse command. Match physical paths so
 # aliases cannot hide two records naming the same copy. Refuse ambiguous,
 # malformed, unreadable, or identity-less leases. Output globals are valid only
@@ -1901,6 +1912,9 @@ fm_treehouse_records_reserved() {  # <project> <state>
       fi
     done
   done
+  if [ -n "${FM_TREEHOUSE_LEGACY_COPIES[*]-}" ]; then
+    fm_treehouse_legacy_holds_supported || return 1
+  fi
 }
 
 # Durable get for a fresh worker while every copy in FM_TREEHOUSE_LEGACY_COPIES
@@ -1914,12 +1928,12 @@ fm_treehouse_records_reserved() {  # <project> <state>
 fm_treehouse_lease_get() {  # <project> <holder> <allocation-json>
   local project=$1 holder=$2 out=$3 dir path reply status=0 pid
   local -a holds=()
-  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-treehouse-hold.XXXXXX") || return 1
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-treehouse-hold.XXXXXX") || return 2
   if ! mkfifo "$dir/hold" "$dir/ready" || ! exec 6<>"$dir/hold" 7<>"$dir/ready"; then
     exec 6>&- 7>&-
     rm -rf "$dir"
     echo "REFUSED: cannot prepare holds for legacy task copies; no Treehouse allocation was attempted" >&2
-    return 1
+    return 2
   fi
   for path in ${FM_TREEHOUSE_LEGACY_COPIES[@]+"${FM_TREEHOUSE_LEGACY_COPIES[@]}"}; do
     (
@@ -1935,12 +1949,12 @@ fm_treehouse_lease_get() {  # <project> <holder> <allocation-json>
     IFS= read -r -t 10 reply <&7 || reply=
     if [ "$reply" != held ]; then
       echo "REFUSED: could not hold legacy task copy $path out of allocation; no Treehouse allocation was attempted" >&2
-      status=1
+      status=2
       break
     fi
   done
   if [ "$status" -eq 0 ]; then
-    (cd "$project" && treehouse get --lease --lease-holder "$holder" --json) > "$out" 6>&- 7>&- || status=$?
+    (cd "$project" && treehouse get --lease --lease-holder "$holder" --json) > "$out" 6>&- 7>&- || status=1
   fi
   exec 6>&- 7>&-
   for pid in ${holds[@]+"${holds[@]}"}; do
