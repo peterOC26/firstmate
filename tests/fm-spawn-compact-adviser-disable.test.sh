@@ -322,6 +322,8 @@ test_relaunch_rebuilds_the_switch() {
       echo "model=default"
       echo "effort=default"
     } > "$home/state/$id.meta"
+    fm_test_lease_existing_worktree "$wt" "$home/state/$id.meta" "$id" "$home"
+    fm_test_fake_treehouse "$dir/fakebin"
 
     mkdir -p "$dir/user-home"
     out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$home" FM_FAKE_DIR="$dir/fake" \

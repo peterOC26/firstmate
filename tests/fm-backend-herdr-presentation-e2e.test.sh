@@ -145,7 +145,7 @@ if [ "${1:-} ${2:-}" = "pane get" ] && [ -d "$ACTIVE_SEEDED_CONTROL" ] \
 fi
 before=
 [ -z "$mutation" ] || before=$(focus_snapshot || printf ambiguous/ambiguous)
-if out=$(env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"); then
+if out=$(env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@" 2>&1); then
   status=0
 else
   status=$?
@@ -186,6 +186,17 @@ if [ "$status" -eq 0 ] && [ "${1:-} ${2:-}" = "pane get" ] && [ -d "$POST_CREATE
     break
   done
 fi
+# Observe confirmed removal through either explicit close or idle-shell death.
+if [ "${1:-} ${2:-}" = "pane get" ] && [ -d "$POST_CREATE_ABORT_CONTROL" ] \
+   && printf '%s' "$out" | jq -e '.error.code == "pane_not_found"' >/dev/null 2>&1; then
+  for task_dir in "$POST_CREATE_ABORT_CONTROL"/abort-*; do
+    [ -d "$task_dir" ] || continue
+    [ "${3:-}" = "$(cat "$task_dir/task-pane" 2>/dev/null || true)" ] || continue
+    if mkdir "$task_dir/gone" 2>/dev/null; then
+      printf 'pane-gone\t\t\t%s\n' "$3" >> "$FOCUS_AUDIT_LOG"
+    fi
+  done
+fi
 if [ -n "$mutation" ]; then
   after=$(focus_snapshot || printf ambiguous/ambiguous)
   printf '%s\t%s\t%s\t%s\n' "$mutation" "$before" "$after" "$mutation_target" >> "$FOCUS_AUDIT_LOG"
@@ -194,7 +205,9 @@ if [ "$refusal_probe" -eq 1 ]; then
   refusal_after=$(focus_snapshot || printf ambiguous/ambiguous)
   printf 'seeded-prune-refusal\t%s\t%s\t%s\n' "$refusal_before" "$refusal_after" "${3:-}" >> "$FOCUS_AUDIT_LOG"
 fi
-[ -z "$out" ] || printf '%s\n' "$out"
+if [ -n "$out" ]; then
+  if [ "$status" -eq 0 ]; then printf '%s\n' "$out"; else printf '%s\n' "$out" >&2; fi
+fi
 exit "$status"
 SH
 
@@ -205,14 +218,16 @@ set -u
   first=1
   for arg in "$@"; do
     [ "$first" -eq 0 ] && printf '\t'
-    printf '%s' "$arg"
+    if [ "${previous:-}" = --lease-holder ]; then
+      printf '<acquisition-holder>'
+    else
+      printf '%s' "$arg"
+    fi
+    previous=$arg
     first=0
   done
   printf '\n'
 } >> "$TREEHOUSE_CALL_LOG"
-if [ -d "$POST_CREATE_ABORT_CONTROL" ] && [ "${1:-}" = get ]; then
-  exit 0
-fi
 # Treehouse's pool allocator is outside the Herdr concurrency contract under
 # test. Serialize its calls so simultaneous recovery spawns cannot race for
 # one pool slot before reaching the Herdr session lock exercised below.
@@ -458,6 +473,33 @@ teardown_task() {  # <id> <home>
     "$ROOT/bin/fm-teardown.sh" "$id" --force
 }
 
+# Return a fixture copy whose task record is already retired or torn down.
+# Nothing else removes that copy's slot claim, and a stale claim refuses the
+# next spawn that Treehouse allocates the released copy to.
+return_retired_copy() {  # <worktree>
+  [ -n "$1" ] || return 0
+  "$REAL_TREEHOUSE" return --force "$1" >/dev/null 2>&1 || true
+  rm -f "$(dirname "$1")/.fm-slot-owner"
+}
+
+# Model an orphaned presentation after stopping its placeholder worker: only
+# the retained acquisition journal that refuses a same-id spawn is retired.
+# The record stays for the reclaim to read, and the copy stays leased until the
+# suite's own returns: a Treehouse return terminates processes in the copy,
+# which would kill the restored husk shell the reclaim under test must find.
+retire_stopped_acquisition() {  # <meta>
+  local meta=$1 wt lease_id holder id
+  [ -f "$meta" ] || return 0
+  wt=$(sed -n 's/^worktree=//p' "$meta")
+  lease_id=$(sed -n 's/^treehouse_lease_id=//p' "$meta")
+  holder=$(sed -n 's/^treehouse_lease_holder=//p' "$meta")
+  id=$(basename "$meta" .meta)
+  [ -n "$wt" ] && [ -n "$lease_id" ] && [ -n "$holder" ] \
+    || fail "orphan presentation fixture has no acquisition identity: $meta"
+  RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
+  rm -rf "$(dirname "$meta")/$id.treehouse-acquire"
+}
+
 finish_concurrent_teardown() {  # <id> <status> <stdout> <stderr>
   local id=$1 status=$2 out=$3 err=$4
   [ "$status" -ne 0 ] || return 0
@@ -476,6 +518,8 @@ normalize_meta() {  # <meta>
     -e 's|^herdr_tab_id=.*$|herdr_tab_id=<herdr-container-id>|' \
     -e 's|^herdr_pane_id=.*$|herdr_pane_id=<herdr-container-id>|' \
     -e 's|^spawn_gen=.*$|spawn_gen=<spawn-incarnation>|' \
+    -e 's|^treehouse_lease_id=.*$|treehouse_lease_id=<acquisition-id>|' \
+    -e 's|^treehouse_lease_holder=.*$|treehouse_lease_holder=<acquisition-holder>|' \
     "$1"
 }
 
@@ -771,7 +815,7 @@ PROJECTION_ORDER_START=$(log_line_count)
 normalize_meta "$OFF_META" > "$TMP_ROOT/off.meta.normalized"
 normalize_meta "$ON_META" > "$TMP_ROOT/on.meta.normalized"
 cmp -s "$TMP_ROOT/off.meta.normalized" "$TMP_ROOT/on.meta.normalized" \
-  || fail "metadata changed beyond Herdr container IDs between opted-out and projected paths"
+  || fail "metadata changed beyond endpoint and acquisition identities between opted-out and projected paths"
 
 # Two real primary spawns begin concurrently.
 # The fresh-spawn task-set lock may fail closed for one while the other
@@ -876,8 +920,8 @@ ABORT_B_PANE=$(cat "$POST_CREATE_ABORT_CONTROL/abort-b/task-pane")
 ABORT_SEQUENCE=$(sed -n "$((ABORT_FOCUS_START + 1)),\$p" "$FOCUS_AUDIT_LOG" | awk -F '\t' -v a="$ABORT_A_PANE" -v b="$ABORT_B_PANE" '
   $1 == "workspace-create" && $4 ~ /^└ abort-a · p:/ { print "create-a" }
   $1 == "workspace-create" && $4 ~ /^└ abort-b · p:/ { print "create-b" }
-  $1 == "pane-close" && $4 == a { print "close-a" }
-  $1 == "pane-close" && $4 == b { print "close-b" }
+  $1 == "pane-gone" && $4 == a { print "close-a" }
+  $1 == "pane-gone" && $4 == b { print "close-b" }
 ')
 case "$ABORT_SEQUENCE" in
   $'create-a\nclose-a\ncreate-b\nclose-b'|$'create-b\nclose-b\ncreate-a\nclose-a') ;;
@@ -899,6 +943,15 @@ for ABORT_PANE in "$ABORT_A_PANE" "$ABORT_B_PANE"; do
 done
 [ ! -e "$HOME_DIR/state/abort-a.meta" ] && [ ! -e "$HOME_DIR/state/abort-b.meta" ] \
   || fail "post-create abort fixtures published task metadata before launch"
+for ABORT_ID in abort-a abort-b; do
+  ABORT_ALLOCATION="$HOME_DIR/state/$ABORT_ID.treehouse-acquire/allocation.json"
+  ABORT_WT=$(jq -er .path "$ABORT_ALLOCATION") || fail "aborted spawn lost its acquired path"
+  ABORT_LEASE_ID=$(jq -er .lease_id "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease id"
+  ABORT_HOLDER=$(jq -er .lease_holder "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease holder"
+  "$REAL_TREEHOUSE" return --force --if-lease-id "$ABORT_LEASE_ID" --if-lease-holder "$ABORT_HOLDER" "$ABORT_WT" \
+    || fail "could not release the aborted fixture's exact reservation"
+  rm -rf "$HOME_DIR/state/$ABORT_ID.treehouse-acquire"
+done
 rm -rf "$POST_CREATE_ABORT_CONTROL"
 rm -f "$HOME_DIR/state/abort-a.herdr-presentation" "$HOME_DIR/state/abort-b.herdr-presentation"
 pass "real Herdr lab: concurrent post-create abort cleanup stays serialized with exact focus restoration"
@@ -908,7 +961,7 @@ teardown_task shape "$HOME_DIR" > "$TMP_ROOT/on-teardown.out" 2> "$TMP_ROOT/on-t
   || fail "projected teardown failed: $(cat "$TMP_ROOT/on-teardown.err")"
 assert_focus_is "$CAPTAIN_FOCUS" "projected teardown"
 assert_cleanup_focus_preserved "$SHAPE_CLEANUP_AUDIT_START" "$PROJECTED_PANE" "$CAPTAIN_FOCUS"
-pass "real Herdr lab: Treehouse commands and metadata shape are byte-identical except for endpoint IDs and spawn incarnation"
+pass "real Herdr lab: Treehouse commands and metadata shape agree apart from endpoint, spawn, and acquisition identities"
 if lab workspace get "$PROJECTED_WSID" >/dev/null 2>&1; then
   fail "closing the exact projected task pane did not remove its last-tab workspace"
 fi
@@ -1216,8 +1269,10 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
     || fail "could not reprovision the isolated session for $RESTART_ID validation"
   # Stopping the whole Herdr session also ends the anchor's agent. Its restored
   # shell remains useful as the durable layout anchor, but its task record no
-  # longer represents a live slot owner and must not poison later slot reuse.
+  # longer represents a live slot owner.
+  retire_stopped_acquisition "$ANCHOR_META"
   rm -f "$ANCHOR_META"
+  retire_stopped_acquisition "$RESTART_META"
   lab pane get "$OLD_RESTART_PANE" >/dev/null 2>&1 \
     || fail "$RESTART_ID restart did not preserve the projected pane structurally"
   if lab agent get "$OLD_RESTART_PANE" >/dev/null 2>&1; then
@@ -1249,6 +1304,7 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
       || fail "could not reprovision the isolated session for idempotent reclaim"
     PRIOR_RESTART_WT=$NEW_RESTART_WT
     PRIOR_RESTART_PANE=$NEW_RESTART_PANE
+    retire_stopped_acquisition "$RESTART_META"
     spawn_task "$RESTART_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/$RESTART_ID-idempotent.out" 2> "$TMP_ROOT/$RESTART_ID-idempotent.err" \
       || fail "$RESTART_ID repeated reclaim failed: $(cat "$TMP_ROOT/$RESTART_ID-idempotent.err")"
     NEW_RESTART_WT=$(remember_meta_worktree "$RESTART_META")
@@ -1259,7 +1315,7 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
     [ "$NEW_RESTART_PANE" != "$PRIOR_RESTART_PANE" ] \
       || fail "$RESTART_ID repeated reclaim reused the prior husk pane"
     if [ "$PRIOR_RESTART_WT" != "$NEW_RESTART_WT" ]; then
-      "$REAL_TREEHOUSE" return --force "$PRIOR_RESTART_WT" >/dev/null 2>&1 || true
+      return_retired_copy "$PRIOR_RESTART_WT"
     fi
   fi
 
@@ -1267,8 +1323,8 @@ for RESTART_ID in fm-hibit-resume-r1 wheelhouse-healing-r1; do
     || fail "$RESTART_ID teardown after reclaim failed: $(cat "$TMP_ROOT/$RESTART_ID-teardown.err")"
   [ ! -e "$HOME_DIR/state/$RESTART_ID.herdr-presentation" ] \
     || fail "$RESTART_ID exact reclaimed teardown did not retire its journal"
-  "$REAL_TREEHOUSE" return --force "$OLD_RESTART_WT" >/dev/null 2>&1 || true
-  "$REAL_TREEHOUSE" return --force "$NEW_RESTART_WT" >/dev/null 2>&1 || true
+  return_retired_copy "$OLD_RESTART_WT"
+  return_retired_copy "$NEW_RESTART_WT"
 done
 pass "real Herdr lab: Hi Bit and Wheelhouse-style same-identity restarts reclaim one nested space with exact focus and idempotence"
 
@@ -1292,6 +1348,7 @@ PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/
   || fail "could not stop the isolated session for cross-home restart"
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
   || fail "could not reprovision the isolated session for cross-home restart"
+retire_stopped_acquisition "$CROSS_RESTART_META"
 spawn_task "$CROSS_RESTART_ID" "$SECOND_HOME_A" "$RECOVERY_PROJECT_DIR" > "$TMP_ROOT/cross-restart-resume.out" 2> "$TMP_ROOT/cross-restart-resume.err" \
   || fail "cross-home same-identity reclaim failed: $(cat "$TMP_ROOT/cross-restart-resume.err")"
 CROSS_NEW_WT=$(remember_meta_worktree "$CROSS_RESTART_META")
@@ -1303,8 +1360,8 @@ CROSS_NEW_PANE=$(grep '^herdr_pane_id=' "$CROSS_RESTART_META" | cut -d= -f2-)
   || fail "cross-home reclaim changed the secondmate child's presentation label"
 teardown_task "$CROSS_RESTART_ID" "$SECOND_HOME_A" > "$TMP_ROOT/cross-restart-teardown.out" 2> "$TMP_ROOT/cross-restart-teardown.err" \
   || fail "cross-home reclaimed teardown failed: $(cat "$TMP_ROOT/cross-restart-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$CROSS_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$CROSS_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$CROSS_OLD_WT"
+return_retired_copy "$CROSS_NEW_WT"
 pass "real Herdr lab: secondmate restart binding and reclaim stay isolated to the exact child home and parent"
 
 # Two homes recovering concurrently serialize on the named session lock and
@@ -1331,6 +1388,8 @@ PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" \
   || fail "could not reprovision the isolated session for concurrent recovery"
 CONCURRENT_RECOVERY_FOCUS=$(focus_snapshot)
+retire_stopped_acquisition "$HOME_DIR/state/$PRIMARY_WAVE_ID.meta"
+retire_stopped_acquisition "$SECOND_HOME_B/state/$BRAVO_WAVE_ID.meta"
 spawn_task "$PRIMARY_WAVE_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" --herdr-resume-lock-wait > "$TMP_ROOT/primary-wave-resume.out" 2> "$TMP_ROOT/primary-wave-resume.err" &
 PRIMARY_WAVE_PID=$!
 spawn_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" "$RECOVERY_PROJECT_DIR" --herdr-resume-lock-wait > "$TMP_ROOT/bravo-wave-resume.out" 2> "$TMP_ROOT/bravo-wave-resume.err" &
@@ -1356,10 +1415,10 @@ teardown_task "$PRIMARY_WAVE_ID" "$HOME_DIR" > "$TMP_ROOT/primary-wave-teardown.
   || fail "concurrent primary recovery teardown failed: $(cat "$TMP_ROOT/primary-wave-teardown.err")"
 teardown_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" > "$TMP_ROOT/bravo-wave-teardown.out" 2> "$TMP_ROOT/bravo-wave-teardown.err" \
   || fail "concurrent secondmate recovery teardown failed: $(cat "$TMP_ROOT/bravo-wave-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$BRAVO_WAVE_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$PRIMARY_WAVE_NEW_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$BRAVO_WAVE_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$PRIMARY_WAVE_OLD_WT"
+return_retired_copy "$BRAVO_WAVE_OLD_WT"
+return_retired_copy "$PRIMARY_WAVE_NEW_WT"
+return_retired_copy "$BRAVO_WAVE_NEW_WT"
 pass "real Herdr lab: concurrent cross-home recoveries replace exact husks under one session lock with no focus drift"
 
 # Exact-resume presentation-lock contention refuses by default. Hold the
@@ -1393,6 +1452,7 @@ LOCK_REFUSE_HOLDER_PID=$!
 while [ ! -e "$LOCK_REFUSE_READY" ] && kill -0 "$LOCK_REFUSE_HOLDER_PID" 2>/dev/null; do sleep 0.01; done
 [ -e "$LOCK_REFUSE_READY" ] || fail "could not hold the session presentation lock for resume lock-refuse"
 
+retire_stopped_acquisition "$LOCK_REFUSE_META"
 LOCK_REFUSE_FOCUS=$(focus_snapshot)
 if spawn_task "$LOCK_REFUSE_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" \
     > "$TMP_ROOT/lock-refuse-resume.out" 2> "$TMP_ROOT/lock-refuse-resume.err"; then
@@ -1411,11 +1471,11 @@ LOCK_REFUSE_HOLDER_PID=
   || fail "default resumed identity returned success under contention"
 grep -F "refusing a concurrent resume" "$TMP_ROOT/lock-refuse-resume.err" >/dev/null 2>&1 \
   || fail "default resume under contention did not refuse with the concurrent-resume message: $(cat "$TMP_ROOT/lock-refuse-resume.err")"
-# Fixture metadata and husk must be unchanged after the refused resume.
-[ "$(grep '^herdr_pane_id=' "$LOCK_REFUSE_META" | cut -d= -f2-)" = "$LOCK_REFUSE_OLD_PANE" ] \
+# The orphan's projection journal and husk must survive the refused resume.
+[ "$(grep '^pane_id=' "$HOME_DIR/state/$LOCK_REFUSE_ID.herdr-presentation" | cut -d= -f2-)" = "$LOCK_REFUSE_OLD_PANE" ] \
   || fail "refused resume mutated the recorded pane id"
 assert_focus_is "$LOCK_REFUSE_FOCUS" "resume lock-refuse"
-# Leave the journal/meta in place so the opt-in wait path below can resume the
+# Leave the projection journal in place so the opt-in wait path can resume the
 # same identity after another stop/reprovision cycle.
 pass "real Herdr lab: default resumed identity refuses session lock contention"
 
@@ -1481,8 +1541,8 @@ fi
 assert_focus_is "$LOCK_WAIT_FOCUS" "resume lock-wait"
 teardown_task "$LOCK_WAIT_ID" "$HOME_DIR" > "$TMP_ROOT/lock-wait-teardown.out" 2> "$TMP_ROOT/lock-wait-teardown.err" \
   || fail "resume lock-wait fixture teardown failed: $(cat "$TMP_ROOT/lock-wait-teardown.err")"
-"$REAL_TREEHOUSE" return --force "$LOCK_WAIT_OLD_WT" >/dev/null 2>&1 || true
-"$REAL_TREEHOUSE" return --force "$LOCK_WAIT_NEW_WT" >/dev/null 2>&1 || true
+return_retired_copy "$LOCK_WAIT_OLD_WT"
+return_retired_copy "$LOCK_WAIT_NEW_WT"
 pass "real Herdr lab: --herdr-resume-lock-wait waits out session lock contention instead of refusing"
 
 # Seed a legacy old-format primary projection and a flat secondmate tab; correction must not migrate them.

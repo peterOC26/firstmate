@@ -21,8 +21,8 @@
 # when herdr or jq is missing.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 fail() { printf 'not ok - %s\n' "$1" >&2; exit 1; }
 pass() { printf 'ok - %s\n' "$1"; }
@@ -135,6 +135,7 @@ EOF
   echo "herdr_tab_id=$TAB_ID"
   echo "herdr_pane_id=$PANE_ID"
 } > "$HOME_DIR/state/hsmoke.meta"
+fm_test_lease_existing_worktree "$WT" "$HOME_DIR/state/hsmoke.meta" hsmoke "$HOME_DIR"
 
 run_control() {
   env FM_HOME="$HOME_DIR" HERDR_SESSION="$SESSION" FM_SPAWN_NO_GUARD=1 \
@@ -191,6 +192,7 @@ pass "real herdr $HERDR_VERSION: a gone session reads recoverable while a live p
 
 FAKEBIN="$SCRATCH/fakebin"
 mkdir -p "$FAKEBIN"
+fm_test_fake_treehouse "$FAKEBIN"
 cat > "$FAKEBIN/codex" <<EOF
 #!/usr/bin/env bash
 : > "$SCRATCH/codex-launched"

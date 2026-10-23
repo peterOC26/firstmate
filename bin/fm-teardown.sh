@@ -141,15 +141,21 @@
 # the pool handed the slot on. Refusing instead would strand the record, because
 # bin/fm-backend.sh's endpoint validation refuses an empty or missing worktree=
 # unconditionally, so there is no line an operator could clear to get past it.
-# A claim that cannot be read proves nothing either way and refuses; inspect or
-# repair the claim file at the printed path and re-run - never remove it, since
-# an absent claim proceeds and would return a slot that may be another task's. An
-# absent claim - a slot taken before claims existed, or already returned - keeps
-# exactly the record-scan protection it had before, because refusing it would
-# strand every task in flight across that change on no evidence at all.
-# Why Treehouse's own state cannot answer this for crewmate slots, and why the
-# claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
-# claim comment.
+# Unreadable ownership or contradictory lease/claim evidence refuses before
+# all slot mutations.
+# An unclaimed legacy record with no treehouse_lease_* fields can retire
+# records-only when no other local task record names its copy. It still passes
+# the normal completion and landed-work gates unless --force bypasses them
+# under explicit discard authority; inspection disables optional Git locks, and a blocking Git
+# lock refuses without removing it. The copy is never modified, reaped, reset,
+# or returned on that path. tests/fm-spawn-slot-ownership.test.sh pins these
+# legacy exclusivity and unlanded-work boundaries.
+# Durable identities are checked before reaping, hook/branch edits,
+# and scratch cleanup, and both identity and holder constrain every return
+# attempt. A re-run after an earlier run already released the lease cleans
+# up records only. Legacy claimed copies can return only with verified
+# unleased pool state. The shared ownership/lease contract is owned by
+# bin/fm-wake-lib.sh.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
 # before cleanup. Its current working directory is only incidental process
@@ -259,9 +265,10 @@
 # removal so the operator can see what happened.
 #
 # Pre-teardown cleanup sequence (runs once every landed/discard-work safety
-# refusal above has already passed, and BEFORE any worktree return, branch
-# delete, or backend kill below - a still-active run or a leaked process may
-# own live work in that worktree):
+# refusal above has already passed, and before any worktree return or branch
+# delete - a still-active run or a leaked process may own live work in that
+# worktree). Herdr's locked pane close runs between Fix 1 and Fix 2 so process
+# reaping cannot remove its workspace before focus is preserved:
 #   Fix 1 - conclude the task's own no-mistakes run. A ship task's worktree can
 #     be torn down while its no-mistakes pipeline run is still PARKED at a gate
 #     (awaiting_approval/fix_review/any awaiting_agent field), with no worker
@@ -1855,11 +1862,20 @@ cleanup_stale_lock_for_safety_check() {
 # stale git index.lock left by a killed crew process. See the script header.
 teardown_treehouse_return() {
   local dir=$1 cd_dir=$2 label=$3 post_cleanup_check=${4:-}
-  local out lock attempt=0 max_retries lock_desc
+  local out lock attempt=0 max_retries lock_desc meta=${5:-}
+  local -a lease_args=()
+  if [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
+    if ! fm_treehouse_record_lease "$meta" ||
+      ! fm_treehouse_lease_matches "$dir" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
+      echo "REFUSED: durable lease no longer matches $meta; keeping its records and lease" >&2
+      return 1
+    fi
+    lease_args=(--if-lease-id "$FM_TREEHOUSE_RECORD_LEASE_ID" --if-lease-holder "$FM_TREEHOUSE_RECORD_LEASE_HOLDER")
+  fi
 
   # Capture stdout+stderr so non-lock failures stay visible and lock failures can
   # be matched by signature even when the lock file is already gone mid-check.
-  if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
+  if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" "${lease_args[@]+"${lease_args[@]}"}" ) 2>&1 ); then
     [ -n "$out" ] && printf '%s\n' "$out"
     return 0
   fi
@@ -1884,7 +1900,7 @@ teardown_treehouse_return() {
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
-    if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
+    if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" "${lease_args[@]+"${lease_args[@]}"}" ) 2>&1 ); then
       [ -n "$out" ] && printf '%s\n' "$out"
       echo "teardown: $label return succeeded on retry; lock cleared on its own" >&2
       return 0
@@ -1911,7 +1927,7 @@ teardown_treehouse_return() {
           return 1
         fi
       fi
-      if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
+      if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" "${lease_args[@]+"${lease_args[@]}"}" ) 2>&1 ); then
         [ -n "$out" ] && printf '%s\n' "$out"
         echo "teardown: $label return succeeded after stale-lock cleanup" >&2
         return 0
@@ -2442,12 +2458,16 @@ require_exclusive_worktree_slot_record() {
   # teardown is records-only and touches nothing under it; another record naming
   # the slot is then no hazard, and refusing would strand this stale record and
   # block the claimant's own teardown behind it.
-  fm_treehouse_slot_owner_state "$slot" "$record_id"
+  fm_treehouse_slot_owner_state "$slot" "$record_id" "$(dirname "$record_state")"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != other ] || return 0
   collect_local_firstmate_states "$record_state" || return 1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
-      [ -f "$other" ] && [ ! -L "$other" ] || continue
+      [ -e "$other" ] || [ -L "$other" ] || continue
+      fm_treehouse_record_paths_safe "$other" || {
+        echo "REFUSED: unreadable or ambiguous retained task record $other; nothing was changed" >&2
+        return 1
+      }
       # Identity, not spelling: the same record reached through a differently
       # resolved state dir (e.g. a symlinked $FM_HOME) is still this record. A
       # differently named hardlink is another task's record, so the name must
@@ -2461,7 +2481,11 @@ require_exclusive_worktree_slot_record() {
         [ "$other_slot" = "$slot" ] || continue
         echo "REFUSED: task $record_id's recorded worktree $slot is also task $other_id's recorded $field." >&2
         echo "Returning that pool slot would kill $other_id's processes and reset its copy, so nothing was changed - not even with --force." >&2
-        echo "Reconcile whichever record is wrong (bin/fm-crew-state.sh $record_id; bin/fm-crew-state.sh $other_id), then re-run teardown." >&2
+        if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then
+          echo "The slot claim names $record_id; reconcile stale task $other_id first with guarded teardown, then retry $record_id." >&2
+        else
+          echo "Reconcile whichever record is wrong (bin/fm-crew-state.sh $record_id; bin/fm-crew-state.sh $other_id), then re-run teardown." >&2
+        fi
         return 1
       done
     done
@@ -2472,6 +2496,22 @@ require_exclusive_task_worktree_slot() {
   local slot
   slot=$(teardown_live_slot_path) || return 0
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot"
+}
+
+teardown_missing_copy_recovery_steps() {
+  local meta=$1 worktree=$2 record_id=$3
+  {
+    echo "Manual recovery: pause allocations and cleanup for this project; retain the task metadata, acquisition journal, pool state, and slot claim."
+    printf 'meta=%q\nworktree=%q\n' "$meta" "$worktree"
+    cat <<'RECOVERY'
+Read project=, treehouse_lease_id=, and treehouse_lease_holder= from "$meta"; compare them with the acquisition journal and the pool treehouse-state.json. Do not use treehouse status.
+Restore the original copy at "$worktree" from backup, including its Git metadata and unlanded work; do not create an empty replacement or overwrite another task's copy.
+Verify that pool state still holds the exact recorded lease ID and holder and that .fm-slot-owner names this task and home. Do not fabricate ownership evidence.
+If the original copy or matching ownership cannot be restored, keep the records and lease and obtain operator reconciliation; do not delete the metadata, journal, or claim or return another lease.
+After restoring and verifying the original copy, retry guarded teardown:
+RECOVERY
+    printf '  FM_HOME=%q bash %q %q\n' "$(dirname "$(dirname "$meta")")" "$SCRIPT_DIR/fm-teardown.sh" "$record_id"
+  } >&2
 }
 
 # Positive slot ownership, read from the claim the task that took the slot wrote
@@ -2486,23 +2526,52 @@ require_exclusive_task_worktree_slot() {
 # that allocates it - so a claim naming another task is proof the slot was
 # reassigned after this record was written.
 #
-# A claim naming another task does not refuse: it means the slot is no longer
-# this task's, so the record's own cleanup proceeds and every slot step is
-# skipped (see the script header for why refusing would strand the record and
-# why skipping discards nothing). Returns TEARDOWN_SLOT_REASSIGNED_RC for that
-# state so each caller gates its slot steps on one determination; the claimant
-# stays in FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME.
+# The script header owns the records-only reconciliation rules and the
+# contradictory lease/claim evidence that refuses instead. A records-only
+# determination returns TEARDOWN_SLOT_REASSIGNED_RC so each caller gates its
+# slot steps on one result; the claimant stays in FM_TREEHOUSE_SLOT_OWNER_ID
+# and FM_TREEHOUSE_SLOT_OWNER_HOME.
 #
-# An absent claim proceeds as the slot's owner: a slot taken before claims
-# existed, or already returned to the pool, carries none, and refusing those
-# would strand every task in flight across the change for no evidence at all.
-# Those keep exactly the record-scan protection they had before.
+# A legacy claimed copy needs verified unleased state; a new copy needs the
+# metadata's exact durable identity and holder.
 TEARDOWN_SLOT_REASSIGNED_RC=3
-require_owned_worktree_slot_record() {  # <task-id> <worktree>
-  local record_id=$1 worktree=$2 marker
-  fm_treehouse_slot_owner_state "$worktree" "$record_id"
+require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
+  local record_id=$1 worktree=$2 marker meta=${3:-} expected_home=
+  [ -z "$meta" ] || expected_home=$(dirname "$(dirname "$meta")")
+  fm_treehouse_slot_owner_state "$worktree" "$record_id" "$expected_home"
+  if [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
+    fm_treehouse_record_lease "$meta" || {
+      echo "REFUSED: malformed durable lease identity in $meta; nothing was changed" >&2
+      return 1
+    }
+    if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then
+      fm_treehouse_lease_cli || {
+        echo "REFUSED: Treehouse lacks JSON leases or conditional return support; upgrade before cleanup" >&2
+        return 1
+      }
+      fm_treehouse_lease_matches "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER" || {
+        echo "REFUSED: durable lease identity or holder does not match task $record_id; nothing was changed" >&2
+        return 1
+      }
+    elif fm_treehouse_lease_matches "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
+      echo "REFUSED: lease and slot claim contradict each other for $record_id; nothing was changed" >&2
+      return 1
+    elif [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] &&
+      fm_treehouse_lease_released "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID"; then
+      # An earlier run returned this copy and dropped its claim, then failed.
+      echo "warning: task $record_id's durable lease on $worktree was already released, so its copy is left untouched and only $record_id's own cleanup runs." >&2
+      return "$TEARDOWN_SLOT_REASSIGNED_RC"
+    fi
+  elif [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && [ -n "$meta" ]; then
+    require_exclusive_worktree_slot_record "$meta" "$record_id" "$(dirname "$meta")" "$worktree" || return 1
+    echo "warning: legacy task $record_id has no slot claim and no other record names $worktree; leaving the copy untouched and running records-only cleanup." >&2
+    return "$TEARDOWN_SLOT_REASSIGNED_RC"
+  elif [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! fm_treehouse_legacy_unleased "$worktree"; then
+    echo "REFUSED: task $record_id has no verified identity for the copy's pool reservation; nothing was changed" >&2
+    return 1
+  fi
   case "$FM_TREEHOUSE_SLOT_OWNER" in
-    mine|absent) return 0 ;;
+    mine) return 0 ;;
     other)
       echo "warning: task $record_id's recorded worktree $worktree was reassigned to task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, which claimed that pool slot after this record was written; that slot is no longer $record_id's, so its processes, copy, and claim are left untouched and only $record_id's own cleanup runs." >&2
       return "$TEARDOWN_SLOT_REASSIGNED_RC"
@@ -2510,24 +2579,40 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
   esac
   marker=$(fm_treehouse_slot_owner_marker "$worktree" 2>/dev/null) || marker="beside $worktree"
   echo "REFUSED: task $record_id's recorded worktree $worktree carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed - not even with --force." >&2
-  echo "Inspect or repair the claim file at $marker (task= and home= lines), then re-run teardown." >&2
+  echo "Inspect and reconcile the absent or unsafe claim file at $marker (task= and home= lines), then re-run teardown." >&2
+  if [ ! -d "$worktree" ] && [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
+    teardown_missing_copy_recovery_steps "$meta" "$worktree" "$record_id"
+  fi
   return 1
 }
 
 # The one ownership determination for this task's recorded slot. Every later
-# step that would read or touch $WT consults teardown_owns_worktree, so a
-# reassigned slot is skipped consistently rather than by each step's own guess.
+# step that would mutate $WT consults teardown_owns_worktree, so a records-only
+# slot is skipped consistently rather than by each step's own guess. The
+# legacy-unclaimed path still runs the read-only landed-work gate.
 TEARDOWN_SLOT_REASSIGNED=0
+TEARDOWN_LEGACY_UNCLAIMED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
 require_owned_task_worktree_slot() {
   local slot rc=0
-  slot=$(teardown_live_slot_path) || return 0
-  require_owned_worktree_slot_record "$ID" "$slot" || rc=$?
+  if grep -q '^treehouse_lease_' "$META"; then
+    slot=$(canonical_existing_dir "$WT") || {
+      echo "REFUSED: leased task copy is unavailable; retaining its lease and records" >&2
+      teardown_missing_copy_recovery_steps "$META" "$WT" "$ID"
+      return 1
+    }
+  else
+    slot=$(teardown_live_slot_path) || return 0
+  fi
+  require_owned_worktree_slot_record "$ID" "$slot" "$META" || rc=$?
   case "$rc" in
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
       TEARDOWN_SLOT_REASSIGNED=1
+      if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && ! grep -q '^treehouse_lease_' "$META"; then
+        TEARDOWN_LEGACY_UNCLAIMED=1
+      fi
       TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
       TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
       return 0
@@ -3061,13 +3146,13 @@ preflight_descendant_treehouse_slots() {
     if [ "$kind" = secondmate ] || [ "$backend" = orca ]; then
       continue
     fi
-    if ! fm_treehouse_pool_slot "$project" "$worktree"; then
+    if ! fm_treehouse_pool_slot "$project" "$worktree" && ! grep -q '^treehouse_lease_' "$meta"; then
       continue
     fi
     fm_backend_validate_task_endpoint "$meta" "$task_id" || return 1
     require_exclusive_worktree_slot_record "$meta" "$task_id" "$state" "$worktree" || return 1
     owner_rc=0
-    require_owned_worktree_slot_record "$task_id" "$worktree" || owner_rc=$?
+    require_owned_worktree_slot_record "$task_id" "$worktree" "$meta" || owner_rc=$?
     case "$owner_rc" in
       0|"$TEARDOWN_SLOT_REASSIGNED_RC") ;;
       *) return 1 ;;
@@ -3349,13 +3434,13 @@ cleanup_firstmate_home_children() {
       # or return, so only its records are cleaned up. The preflight above
       # already named the reassignment on stderr under the same lock.
       child_owner_rc=0
-      if fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
+      if fm_treehouse_pool_slot "$child_proj" "$child_wt" || grep -q '^treehouse_lease_' "$child_meta"; then
+        require_owned_worktree_slot_record "$child_id" "$child_wt" "$child_meta" 2>/dev/null || child_owner_rc=$?
       fi
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
         :
       elif [ "$child_owner_rc" -ne 0 ]; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
+        require_owned_worktree_slot_record "$child_id" "$child_wt" "$child_meta" || return 1
       else
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
@@ -3365,7 +3450,7 @@ cleanup_firstmate_home_children() {
           teardown_scrub_scratch_copy "$child_wt" || return 1
           child_pool_slot=0
           fm_treehouse_pool_slot "$child_proj" "$child_wt" && child_pool_slot=1
-          if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree"; then
+          if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "" "$child_meta"; then
             [ "$child_pool_slot" = 0 ] || teardown_note_dirty_return "$child_wt"
             fm_treehouse_slot_owner_release "$child_wt" "$child_id"
           else
@@ -3373,9 +3458,16 @@ cleanup_firstmate_home_children() {
             if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ]; then
               return "$child_return_rc"
             fi
+            if grep -q '^treehouse_lease_' "$child_meta"; then
+              return "$child_return_rc"
+            fi
             safe_rm_rf_child_worktree "$child_wt" "$child_proj"
           fi
         else
+          if grep -q '^treehouse_lease_' "$child_meta"; then
+            echo "REFUSED: cannot conditionally return child $child_id's lease; retaining its records" >&2
+            return 1
+          fi
           safe_rm_rf_child_worktree "$child_wt" "$child_proj"
         fi
       fi
@@ -3534,15 +3626,24 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] &&
   ORCA_PATH_MATCH_VERIFIED=1
 fi
 
-if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
-  if validate_worktree_teardown_safety; then
-    :
+if { teardown_owns_worktree || [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; } &&
+  [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
+  safety_rc=0
+  if [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+    GIT_OPTIONAL_LOCKS=0 validate_worktree_teardown_safety || safety_rc=$?
   else
-    safety_rc=$?
-    if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ]; then
+    validate_worktree_teardown_safety || safety_rc=$?
+  fi
+  if [ "$safety_rc" -ne 0 ]; then
+    if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ] &&
+      [ "$TEARDOWN_LEGACY_UNCLAIMED" != 1 ]; then
       cleanup_stale_lock_for_safety_check "$WT" || exit 1
       validate_worktree_teardown_safety || exit 1
     else
+      if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ] &&
+        [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+        echo "REFUSED: a Git lock blocks inspection of legacy unclaimed copy $WT; the copy is left untouched. Clear the Git lock in that copy, or use --force only after an explicit OK to discard, then re-run teardown." >&2
+      fi
       exit 1
     fi
   fi
@@ -3643,14 +3744,107 @@ else
 fi
 
 # Every landed/discard-work refusal above has now passed (or --force skipped
-# them). Fix 1 and Fix 2 (see script header) run here, unconditionally on
-# --force, and before ANY destructive step below - a still-parked run or a
-# leaked process can own live work in this exact worktree. Not for
+# them). Conclude the task's run before closing its endpoint or reaping its
+# processes, including under --force. Not for
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   conclude_task_no_mistakes_run "$WT"
+fi
+
+# Reaping and pool return can terminate the pane shell. Close Herdr's endpoint
+# first, while its workspace and exact focus still exist for the locked close.
+HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
+# teardown_herdr_journal_orphaned: true when the task's own journal names
+# nothing the session-start sweep could still close - a version 1 attempt whose
+# token-bearing projected workspace is confirmed gone, or a version 2 binding of
+# exactly the recorded pane this teardown proves gone. Unreadable, malformed, or
+# otherwise-bound journals, and a version 1 workspace still present or
+# unreadable, are not orphans.
+teardown_herdr_journal_orphaned() {
+  fm_backend_source herdr || return 1
+  fm_backend_herdr_projection_journal_snapshot "$HERDR_PRESENTATION_JOURNAL" "$ID" || return 1
+  if [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 1 ]; then
+    fm_backend_herdr_projection_token_workspace_gone \
+      "$TEARDOWN_HERDR_SESSION" "$HERDR_PRESENTATION_JOURNAL" "$ID"
+  else
+    [ "$FM_BACKEND_HERDR_JOURNAL_SESSION:$FM_BACKEND_HERDR_JOURNAL_PANE_ID" = "$T" ]
+  fi
+}
+HERDR_PRESENTATION_RETIRE_CANDIDATE=0
+HERDR_PRESENTATION_SESSION=
+HERDR_PRESENTATION_PANE=
+if [ "$BACKEND" = herdr ] \
+   && { [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; }; then
+  fm_backend_source herdr || true
+  HERDR_PRESENTATION_SESSION=$(meta_value "$META" herdr_session)
+  HERDR_PRESENTATION_WORKSPACE=$(meta_value "$META" herdr_workspace_id)
+  HERDR_PRESENTATION_PANE=$(meta_value "$META" herdr_pane_id)
+  if [ -n "$HERDR_PRESENTATION_SESSION" ] \
+     && [ -n "$HERDR_PRESENTATION_WORKSPACE" ] \
+     && [ -n "$HERDR_PRESENTATION_PANE" ] \
+     && [ "$T" = "$HERDR_PRESENTATION_SESSION:$HERDR_PRESENTATION_PANE" ] \
+     && fm_backend_herdr_projection_endpoint_matches_journal \
+       "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_WORKSPACE" \
+       "$HERDR_PRESENTATION_JOURNAL" "$ID"; then
+    HERDR_PRESENTATION_RETIRE_CANDIDATE=1
+  fi
+fi
+
+if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
+  # The presentation lock was acquired during preflight; a contended lock
+  # already refused this teardown while everything was intact.
+  if teardown_herdr_session_lock_held "$HERDR_PRESENTATION_SESSION"; then
+    # stderr is deliberately NOT discarded here. This is the highest-frequency
+    # projected-close call site, and the helper's only stderr output is a real
+    # warning - unverifiable workspace.move support, a refused focus-unsafe
+    # close, an unconfirmed repositioned-workspace removal, or a failed exact
+    # restore.
+    # Swallowing them left a wrong active workspace with no operator-visible
+    # signal at all. The close stays non-fatal exactly as before: the presence
+    # gate below is what decides whether any durable record may be removed.
+    fm_backend_herdr_projection_close_pane_focus_preserving \
+      "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_PANE" || true
+  else
+    echo "warning: herdr presentation focus lock unavailable; refusing a concurrent focus-unsafe pane close" >&2
+  fi
+elif [ "$BACKEND" = herdr ]; then
+  if teardown_herdr_session_lock_held "$TEARDOWN_HERDR_SESSION"; then
+    fm_backend_herdr_kill_serialized "$TEARDOWN_HERDR_SESSION" "$TEARDOWN_HERDR_PANE" 2>/dev/null || true
+  else
+    echo "warning: herdr session presentation lock path is unavailable; skipping the pane close rather than closing unlocked" >&2
+  fi
+fi
+if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
+  if [ "$(fm_backend_herdr_pane_agent_state "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_PANE")" = dead ]; then
+    rm -f "$HERDR_PRESENTATION_JOURNAL"
+  else
+    echo "warning: exact herdr task-pane close could not be confirmed for $ID; retaining the presentation journal and attempting no workspace cleanup" >&2
+  fi
+elif [ "$BACKEND" = herdr ] \
+     && { [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; }; then
+  echo "warning: herdr presentation journal for $ID was not retired by its close; no workspace cleanup was attempted" >&2
+fi
+# A refused, skipped, or failed Herdr close must never erase a live task's
+# durable endpoint identity: unless the exact pane is confirmed gone, retain
+# every record and stop before any removal below so a later rerun can retry
+# the locked close. Only a structured not-found proves the pane gone; unknown
+# presence, missing or malformed endpoint identity, and missing confirmation
+# machinery all refuse.
+if [ "$BACKEND" = herdr ]; then
+  fm_backend_source herdr || true
+  if ! declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1; then
+    echo "error: herdr endpoint confirmation is unavailable for $ID; retaining every durable task record" >&2
+    exit 1
+  fi
+  if ! fm_backend_herdr_endpoint_confirmed_gone "$T"; then
+    echo "error: herdr pane $T for $ID is not confirmed gone after its close was refused, skipped, or failed; retaining every durable task record - rerun teardown once the close can run under the session lock" >&2
+    exit 1
+  fi
+fi
+
+if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
@@ -3714,7 +3908,7 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   fi
   wt_pool_slot=0
   fm_treehouse_pool_slot "$PROJ" "$WT" && wt_pool_slot=1
-  teardown_treehouse_return "$WT" "$PROJ" "worktree" "$post_lock_cleanup_check" || {
+  teardown_treehouse_return "$WT" "$PROJ" "worktree" "$post_lock_cleanup_check" "$META" || {
     echo "error: treehouse return failed for worktree $WT; teardown aborted" >&2
     exit 1
   }
@@ -3726,96 +3920,9 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   fm_treehouse_slot_owner_release "$WT" "$ID"
 fi
 
-HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
-# teardown_herdr_journal_orphaned: true when the task's own journal names
-# nothing the session-start sweep could still close - a version 1 attempt whose
-# token-bearing projected workspace is confirmed gone, or a version 2 binding of
-# exactly the recorded pane this teardown proves gone. Unreadable, malformed, or
-# otherwise-bound journals, and a version 1 workspace still present or
-# unreadable, are not orphans.
-teardown_herdr_journal_orphaned() {
-  fm_backend_source herdr || return 1
-  fm_backend_herdr_projection_journal_snapshot "$HERDR_PRESENTATION_JOURNAL" "$ID" || return 1
-  if [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 1 ]; then
-    fm_backend_herdr_projection_token_workspace_gone \
-      "$TEARDOWN_HERDR_SESSION" "$HERDR_PRESENTATION_JOURNAL" "$ID"
-  else
-    [ "$FM_BACKEND_HERDR_JOURNAL_SESSION:$FM_BACKEND_HERDR_JOURNAL_PANE_ID" = "$T" ]
-  fi
-}
-HERDR_PRESENTATION_RETIRE_CANDIDATE=0
-HERDR_PRESENTATION_SESSION=
-HERDR_PRESENTATION_PANE=
-if [ "$BACKEND" = herdr ] \
-   && { [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; }; then
-  fm_backend_source herdr || true
-  HERDR_PRESENTATION_SESSION=$(meta_value "$META" herdr_session)
-  HERDR_PRESENTATION_WORKSPACE=$(meta_value "$META" herdr_workspace_id)
-  HERDR_PRESENTATION_PANE=$(meta_value "$META" herdr_pane_id)
-  if [ -n "$HERDR_PRESENTATION_SESSION" ] \
-     && [ -n "$HERDR_PRESENTATION_WORKSPACE" ] \
-     && [ -n "$HERDR_PRESENTATION_PANE" ] \
-     && [ "$T" = "$HERDR_PRESENTATION_SESSION:$HERDR_PRESENTATION_PANE" ] \
-     && fm_backend_herdr_projection_endpoint_matches_journal \
-       "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_WORKSPACE" \
-       "$HERDR_PRESENTATION_JOURNAL" "$ID"; then
-    HERDR_PRESENTATION_RETIRE_CANDIDATE=1
-  fi
-fi
-
-if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
-  # The presentation lock was acquired before the worktree return above; a
-  # contended lock already refused this teardown while everything was intact.
-  if teardown_herdr_session_lock_held "$HERDR_PRESENTATION_SESSION"; then
-    # stderr is deliberately NOT discarded here. This is the highest-frequency
-    # projected-close call site, and the helper's only stderr output is a real
-    # warning - unverifiable workspace.move support, a refused focus-unsafe
-    # close, an unconfirmed repositioned-workspace removal, or a failed exact
-    # restore.
-    # Swallowing them left a wrong active workspace with no operator-visible
-    # signal at all. The close stays non-fatal exactly as before: the presence
-    # gate below is what decides whether any durable record may be removed.
-    fm_backend_herdr_projection_close_pane_focus_preserving \
-      "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_PANE" || true
-  else
-    echo "warning: herdr presentation focus lock unavailable; refusing a concurrent focus-unsafe pane close" >&2
-  fi
-elif [ "$BACKEND" = herdr ]; then
-  if teardown_herdr_session_lock_held "$TEARDOWN_HERDR_SESSION"; then
-    fm_backend_herdr_kill_serialized "$TEARDOWN_HERDR_SESSION" "$TEARDOWN_HERDR_PANE" 2>/dev/null || true
-  else
-    echo "warning: herdr session presentation lock path is unavailable; skipping the pane close rather than closing unlocked" >&2
-  fi
-elif [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
+if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
   fm_backend_kill "$BACKEND" "$T" "$(meta_value "$META" zellij_tab_id)" "fm-$ID" \
     || endpoint_close_refusal "$ID" "$BACKEND" "$T" 1 || exit 1
-fi
-if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
-  if [ "$(fm_backend_herdr_pane_agent_state "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_PANE")" = dead ]; then
-    rm -f "$HERDR_PRESENTATION_JOURNAL"
-  else
-    echo "warning: exact herdr task-pane close could not be confirmed for $ID; retaining the presentation journal and attempting no workspace cleanup" >&2
-  fi
-elif [ "$BACKEND" = herdr ] \
-     && { [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; }; then
-  echo "warning: herdr presentation journal for $ID was not retired by its close; no workspace cleanup was attempted" >&2
-fi
-# A refused, skipped, or failed Herdr close must never erase a live task's
-# durable endpoint identity: unless the exact pane is confirmed gone, retain
-# every record and stop before any removal below so a later rerun can retry
-# the locked close. Only a structured not-found proves the pane gone; unknown
-# presence, missing or malformed endpoint identity, and missing confirmation
-# machinery all refuse.
-if [ "$BACKEND" = herdr ]; then
-  fm_backend_source herdr || true
-  if ! declare -F fm_backend_herdr_endpoint_confirmed_gone >/dev/null 2>&1; then
-    echo "error: herdr endpoint confirmation is unavailable for $ID; retaining every durable task record" >&2
-    exit 1
-  fi
-  if ! fm_backend_herdr_endpoint_confirmed_gone "$T"; then
-    echo "error: herdr pane $T for $ID is not confirmed gone after its close was refused, skipped, or failed; retaining every durable task record - rerun teardown once the close can run under the session lock" >&2
-    exit 1
-  fi
 fi
 if [ "$KIND" != secondmate ]; then
   if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
@@ -3903,7 +4010,7 @@ chmod u+w "$STATE/$ID.git-hooks" 2>/dev/null || true
 # mirrored worker config and the versioned session tree the launch wrote
 # beside its sessions root), so they are removed recursively with the inbox
 # and the git-hooks dir rather than the flat file list above.
-rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/$ID.push-guard" \
+rm -rf "$STATE/$ID.treehouse-acquire" "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/$ID.push-guard" \
   "$STATE/$ID.polytoken-config" \
   "$STATE/$ID.polytoken-sessions" "$STATE/$ID.polytoken-sessions-v1"
 # A presentation journal the close path left behind is orphaned once the
@@ -3961,10 +4068,14 @@ if [ -d "$STATE" ]; then
 fi
 if [ "$TEARDOWN_POOL_SLOT_LOST" = 1 ]; then
   echo "teardown $ID finished its cleanup and removed its task record, but a returned pool slot did not come back clean (see the warning above); clear those paths so the pool can reuse the slot" >&2
+elif [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
+  echo "teardown $ID complete (window ${T:-none}; unclaimed legacy copy $WT was not returned and is left untouched)"
 elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT)"
+elif [ -z "$TEARDOWN_SLOT_REASSIGNED_TO" ]; then
+  echo "teardown $ID complete (window ${T:-none}; pool slot $WT was already released, so it was left untouched)"
 else
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi

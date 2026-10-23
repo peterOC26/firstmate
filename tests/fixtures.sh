@@ -307,15 +307,91 @@ Exercise the spawn behavior under test.
 EOF
 }
 
+# Model a retained acquisition for suites starting from an existing task.
+fm_test_lease_existing_worktree() {  # <worktree> <meta> <id> <home>
+  local worktree=$1 meta=$2 id=$3 home=$4 state holder
+  worktree=$(cd "$worktree" && pwd -P)
+  home=$(cd "$home" && pwd -P)
+  holder="$home/$id/fixture-acquisition"
+  state="$(dirname "$(dirname "$worktree")")/treehouse-state.json"
+  [ -f "$state" ] || printf '{"worktrees":[]}\n' > "$state"
+  jq --arg path "$worktree" --arg id "fixture-$id" --arg holder "$holder" '
+    .worktrees = ([.worktrees[] | select(.path != $path)] +
+      [{path:$path,leased:true,lease_id:$id,lease_holder:$holder}])
+  ' "$state" > "$state.tmp"
+  mv "$state.tmp" "$state"
+  printf 'task=%s\nhome=%s\n' "$id" "$home" > "$(dirname "$worktree")/.fm-slot-owner"
+  printf 'treehouse_lease_id=fixture-%s\ntreehouse_lease_holder=%s\n' "$id" "$holder" >> "$meta"
+}
+
+# A lease-aware fake allocator, using the supplied path or the pane-path env.
+fm_test_fake_treehouse() {  # <fakebin> [worktree]
+  cat > "$1/treehouse" <<SH
+#!/usr/bin/env bash
+export FM_FAKE_TREEHOUSE_PATH=\${FM_FAKE_TREEHOUSE_PATH:-$(printf '%q' "${2:-}")}
+SH
+  cat >> "$1/treehouse" <<'SH'
+set -eu
+case "$*" in
+  'get --help') echo '--lease --lease-holder --json'; exit 0 ;;
+  'return --help') echo '--if-lease-id --if-lease-holder'; exit 0 ;;
+esac
+[ -z "${FM_FAKE_TREEHOUSE_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_TREEHOUSE_LOG"
+cmd=$1; shift
+holder= expected_id= expected_holder= path=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --lease-holder) holder=$2; shift 2 ;;
+    --if-lease-id) expected_id=$2; shift 2 ;;
+    --if-lease-holder) expected_holder=$2; shift 2 ;;
+    --*) shift ;;
+    *) path=$1; shift ;;
+  esac
+done
+if [ "$cmd" = get ]; then
+  if [ -n "${FM_FAKE_TREEHOUSE_POOL:-}" ]; then
+    path=$(jq -er '.worktrees[] | select(.leased != true) | .path' "$FM_FAKE_TREEHOUSE_POOL/treehouse-state.json" | head -n 1)
+  else
+    path=${FM_FAKE_TREEHOUSE_PATH:-${FM_FAKE_PANE_PATH:-}}
+  fi
+  [ -n "$path" ] && [ -d "$path" ] || exit 1
+  path=$(cd "$path" && pwd -P)
+  state="$(dirname "$(dirname "$path")")/treehouse-state.json"
+  [ -f "$state" ] || printf '{"worktrees":[]}\n' > "$state"
+  id="fake.$$.${RANDOM}"
+  jq --arg path "$path" --arg id "$id" --arg holder "$holder" '
+    if any(.worktrees[]; .path == $path and .leased == true) then error("already leased") else
+    .worktrees = ([.worktrees[] | select(.path != $path)] +
+      [{path:$path, leased:true, lease_id:$id, lease_holder:$holder}]) end
+  ' "$state" > "$state.tmp"
+  mv "$state.tmp" "$state"
+  jq -cn --arg path "$path" --arg id "$id" --arg holder "$holder" \
+    '{path:$path, lease_id:$id, lease_holder:$holder, leased_at:"2026-10-22T00:00:00Z"}'
+elif [ "$cmd" = return ]; then
+  path=$(cd "$path" && pwd -P)
+  state="$(dirname "$(dirname "$path")")/treehouse-state.json"
+  jq --arg path "$path" --arg id "$expected_id" --arg holder "$expected_holder" '
+    if any(.worktrees[]; .path == $path and
+      ($id == "" or .lease_id == $id) and ($holder == "" or .lease_holder == $holder)) then
+      .worktrees |= map(if .path == $path then del(.leased,.lease_id,.lease_holder) else . end)
+    else error("lease precondition failed") end
+  ' "$state" > "$state.tmp"
+  mv "$state.tmp" "$state"
+fi
+SH
+  chmod +x "$1/treehouse"
+}
+
 # fm_test_make_spawn_fakebin <dir> [extra-exit0-tool...]
-# Creates <dir>/fakebin with the spawn tmux stub, a no-op treehouse, and any
+# Creates <dir>/fakebin with the spawn tmux stub, a leased fake pool, and any
 # extra exit-0 tools. Echoes the fakebin path.
 fm_test_make_spawn_fakebin() {
   local dir=$1 fakebin
   shift
   fakebin=$(fm_fakebin "$dir")
   fm_test_fake_tmux_spawn "$fakebin"
-  fm_fake_exit0 "$fakebin" treehouse "$@"
+  fm_fake_exit0 "$fakebin" "$@"
+  fm_test_fake_treehouse "$fakebin"
   printf '%s\n' "$fakebin"
 }
 

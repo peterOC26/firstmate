@@ -226,7 +226,7 @@ test_fake_gh_and_gh_axi() {
 }
 
 test_spawn_tmux_and_fakebin() {
-  local fakebin out log
+  local fakebin out log wt lease_id
   fakebin=$(make_spawn_fakebin "$TMP_ROOT/spawn" gh-axi)
   log="$TMP_ROOT/spawn/launch.log"
   : > "$log"
@@ -240,8 +240,22 @@ test_spawn_tmux_and_fakebin() {
   assert_grep 'codex --yolo' "$log" "send-keys -l payload was not logged"
   [ -x "$fakebin/treehouse" ] || fail "spawn fakebin should include treehouse"
   [ -x "$fakebin/gh-axi" ] || fail "extra exit-0 tools should land in the spawn fakebin"
-  "$fakebin/treehouse" get
-  expect_code 0 $? "fake treehouse should exit 0"
+  wt="$TMP_ROOT/spawn/pool/1/repo"
+  fm_git_worktree "$TMP_ROOT/spawn/project" "$wt" fixture-lease
+  out=$(FM_FAKE_TREEHOUSE_PATH="$wt" "$fakebin/treehouse" get --lease --lease-holder fixture-holder --json) \
+    || fail "fake treehouse should acquire a durable lease"
+  lease_id=$(printf '%s\n' "$out" | jq -er --arg path "$wt" \
+    'select(.path == $path and .lease_holder == "fixture-holder") | .lease_id') \
+    || fail "fake treehouse returned an invalid lease identity"
+  jq -e --arg id "$lease_id" '.worktrees[0] | .leased == true and .lease_id == $id' \
+    "$TMP_ROOT/spawn/pool/treehouse-state.json" >/dev/null || fail "fake pool did not retain its lease"
+  if "$fakebin/treehouse" return --if-lease-id wrong --if-lease-holder fixture-holder "$wt" 2>/dev/null; then
+    fail "fake treehouse released a different lease"
+  fi
+  "$fakebin/treehouse" return --if-lease-id "$lease_id" --if-lease-holder fixture-holder "$wt" \
+    || fail "fake treehouse should release the matching lease"
+  jq -e '.worktrees[0] | .leased != true and .lease_id == null and .lease_holder == null' \
+    "$TMP_ROOT/spawn/pool/treehouse-state.json" >/dev/null || fail "fake pool retained the returned lease"
   pass "spawn fakebin answers pane path, logs -l payloads, and installs extra tools"
 }
 

@@ -53,8 +53,8 @@
 #          A TANGLE line means the firstmate primary checkout (FM_ROOT) is stranded
 #          on a feature branch instead of its default branch - a crewmate's work
 #          landed in the primary instead of its own worktree; restore it per the line.
-#          treehouse is also MISSING when its installed version lacks
-#          "treehouse get --lease" support.
+#          treehouse is also MISSING when it fails the lease CLI contract
+#          owned by fm_treehouse_lease_cli in bin/fm-wake-lib.sh.
 #          no-mistakes is also MISSING when its installed version is older than
 #          1.46.0 (structured pipeline attestation floor; see CONTRIBUTING.md).
 #          The AXI-family floor policy is owned beside GH_AXI_MIN and
@@ -903,9 +903,12 @@ GH_AXI_MIN=0.1.29
 LAVISH_AXI_MIN=0.1.80
 LAVISH_AXI_BOARD_MIN=0.1.77
 
-treehouse_supports_lease() {
-  treehouse get --help 2>&1 | grep -Eq '(^|[^[:alnum:]_-])--lease([^[:alnum:]_-]|$)'
-}
+treehouse_supports_lease() (
+  # This capability probe intentionally discards the wake library globals.
+  # shellcheck source=/dev/null
+  FM_STATE_OVERRIDE="$SCRIPT_DIR" . "$SCRIPT_DIR/fm-wake-lib.sh"
+  fm_treehouse_lease_cli
+)
 
 # Shared semantic-version floor for the tool gates below. A version string that
 # cannot be parsed into exactly one major.minor.patch triple is incompatible,

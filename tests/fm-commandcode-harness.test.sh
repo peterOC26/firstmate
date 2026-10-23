@@ -147,15 +147,19 @@ fakebin=$(make_spawn_fakebin "$case_dir/fake" claude)
 fm_fake_exit0 "$fakebin" commandcode
 home="$case_dir/home"
 proj="$case_dir/project"
-wt="$case_dir/wt"
 fm_test_spawn_home "$home" commandcode
-fm_git_worktree "$proj" "$wt" commandcode-test
+fm_git_init_commit "$proj"
+fm_git_add_origin "$proj" "$proj.origin.git"
 spawn_case() {  # <id> <model> <effort>
+  local copy="$case_dir/$1/wt"
+  mkdir -p "$(dirname "$copy")"
+  git -C "$proj" worktree add --quiet --detach "$copy" || return 1
   fm_test_spawn_brief "$home" "$1"
-  FM_FAKE_LAUNCH_LOG="$case_dir/$1.launch" fm_test_run_spawn "$home" "$wt" "$fakebin" "$1" "$proj" \
+  FM_FAKE_LAUNCH_LOG="$case_dir/$1.launch" fm_test_run_spawn "$home" "$copy" "$fakebin" "$1" "$proj" \
     --scout --harness commandcode --model "$2" --effort "$3" 2>&1
 }
 out=$(spawn_case cc-low deepseek/deepseek-v4.1-flash low) || fail "spawn failed: $out"
+wt="$case_dir/cc-low/wt"
 launch=$(cat "$case_dir/cc-low.launch")
 gen=$(cat "$home/state/cc-low.busy-gen")
 assert_contains "$launch" '--yolo --trust --skip-onboarding --no-auto-update' 'autonomy/trust flags missing'
