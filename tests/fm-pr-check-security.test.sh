@@ -3602,6 +3602,44 @@ SH
   pass "device re-record publication waits without rewriting its registration"
 }
 
+test_relaunch_metadata_keeps_poll_authenticated() {
+  local dir state order line
+  dir=$(make_case relaunch-metadata-poll)
+  state="$dir/home/state"
+  write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+  seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_artifacts_valid "$state" task-a "$POLL" \
+    || fail "poll was not authenticated before relaunch"
+
+  for order in before after; do
+    write_poll_meta "$state" task-a https://github.com/o/r/pull/1
+    if [ "$order" = before ]; then
+      write_poll_meta "$state" task-a https://github.com/o/r/pull/1 \
+        'control_relaunch_tx=12345.20261023T120000Z.6789'
+    fi
+    printf 'pr_head=0123456789abcdef0123456789abcdef01234567\n' >> "$state/task-a.meta"
+    if [ "$order" = after ]; then
+      printf 'control_relaunch_tx=12345.20261023T120000Z.6789\n' >> "$state/task-a.meta"
+    fi
+    fm_pr_poll_artifacts_content_valid "$state" task-a "$POLL" \
+      || fail "relaunch marker $order PR identity invalidated poll content"
+    fm_pr_poll_artifacts_valid "$state" task-a "$POLL" \
+      || fail "relaunch marker $order PR identity invalidated poll authentication"
+  done
+
+  cp "$state/task-a.meta" "$dir/relaunch.meta"
+  for line in 'unrelated=value' 'control_relaunch_tx_forged=value'; do
+    cp "$dir/relaunch.meta" "$state/task-a.meta"
+    printf '%s\n' "$line" >> "$state/task-a.meta"
+    ! fm_pr_poll_artifacts_content_valid "$state" task-a "$POLL" \
+      || fail "unknown metadata after PR identity was accepted: $line"
+    ! fm_pr_poll_artifacts_valid "$state" task-a "$POLL" \
+      || fail "unknown metadata after PR identity authenticated the poll: $line"
+  done
+  pass "relaunch metadata preserves poll authentication in either order and unknown keys stay refused"
+}
+
+test_relaunch_metadata_keeps_poll_authenticated
 test_parser_matrix
 test_gitlab_merge_watch
 test_forgejo_merge_watch

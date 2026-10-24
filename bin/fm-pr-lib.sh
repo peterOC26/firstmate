@@ -424,6 +424,10 @@ fm_pr_metadata_identity_parse() {
         ;;
       x_request=*|x_request_ts=*|x_followups=*|x_platform=*|x_reply_max_chars=*)
         ;;
+      control_relaunch_tx=*)
+        # fm-spawn.sh appends this transaction marker after preserved PR fields.
+        # It carries no PR identity; keep every unrelated trailing key refused.
+        ;;
       *)
         [ "$seen_pr" -eq 0 ] || post_pr_invalid=1
         ;;
