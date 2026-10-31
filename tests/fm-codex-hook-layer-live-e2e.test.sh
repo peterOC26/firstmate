@@ -16,8 +16,10 @@
 # guard fails naming the harness and version instead of letting the modal
 # silently come back.
 #
-# It spends no model tokens (`codex features list` resolves configuration only),
-# so it runs by default wherever codex is installed.
+# The service-tier probe reads effective configuration through app-server's
+# config/read method against a temporary Codex home with a Fast preference.
+# Both probes resolve configuration without spending model tokens, so the guard
+# runs by default wherever codex and python3 are installed.
 set -u
 
 # shellcheck source=tests/fixtures.sh
