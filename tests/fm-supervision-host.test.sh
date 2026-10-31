@@ -425,8 +425,12 @@ test_branch_outcomes_stay_unread_when_the_drain_cannot_print() {
   pass "drain: branch outcomes stay unread when the drain cannot print them"
 }
 
-# One store row exactly as bin/fm-branch-outcome.sh append writes it, at a
-# chosen epoch, so a case can hold outcomes recorded days before the drain.
+# The cutover a home made when this section first shipped: its away return
+# briefs had shown every outcome without advancing the read cursor, so the
+# first drain on the new code found days-old outcomes unread. They are still
+# presented and never adopted as processed, but each says how long ago it was
+# recorded and the section asks for the current state first, so a PR that was
+# merged since cannot read as newly ready.
 test_branch_outcomes_date_a_legacy_backlog_without_adopting_it() {
   local home now drained
   home="$TMP_ROOT/drain-legacy"
@@ -524,9 +528,9 @@ test_branch_outcomes_keep_an_unshown_outcome_until_acknowledged() {
   pass "drain: an outcome nothing has shown is presented until acknowledged, and a repeated acknowledgement changes nothing"
 }
 
-# A host home whose drain has presented a captain outcome twice without an
-# acknowledgement: the read cursor is past it and the processed marker is
-# still absent. Sets PRESENTED_HOME.
+# A switch to Pi runs processed-init before reading unprocessed rows. The row
+# the host drain presented but main never acknowledged must stay unprocessed
+# rather than being adopted from the read cursor.
 test_branch_outcomes_keep_a_drain_presented_outcome_across_a_switch_to_pi() {
   present_unacknowledged_outcome_twice drain-switch-to-pi
   FM_HOME="$PRESENTED_HOME" "$ROOT/bin/fm-branch-outcome.sh" processed-init \
@@ -764,9 +768,6 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
 # decision is recorded) while the successor starts: the turn meets the offer
 # rule again, so the close reaches main exactly as the arm printed it and no
 # engine turn runs on the stale offer.
-# Change the task immediately before the second offer computation, rather
-# than racing the successor startup. The first offer accepts the close; the
-# turn-boundary offer must see the new main-owned decision.
 test_attended_close_that_turns_main_only_before_its_turn_passes_to_main() {
   local home
   home=$(make_home attended-turns-main-only attended)
@@ -796,9 +797,10 @@ test_attended_close_that_turns_main_only_before_its_turn_passes_to_main() {
 
 # --- the Claude re-arm owner around the host ----------------------------------
 
-# A fixture home that is also a genuine primary checkout whose bin is this
-# repo's, so the real Claude Stop hook (bin/fm-claude-stop-autoarm.sh) runs the
-# real host in it.
+# The live failure (2026-09-27): a main-only pass-through confirmed a handling
+# handoff before the close reached main's re-arm owner, so the Stop hook's
+# rewake commit refused and it exited 0 in silence. An idle primary was never
+# woken, and the detached successor's own later close reached no reader.
 test_claude_stop_hook_delivers_a_main_only_pass_through() {
   local home
   home=$(make_primary_home hook-main-only)
@@ -1067,9 +1069,6 @@ test_pass_through_successor_survives_the_hook_process_group_teardown() {
   pass "host+hook: the successor a pass-through leaves for main survives the hook's process group teardown"
 }
 
-# The arm processes running from <home>'s bin, one "<pid> <ppid>" per line.
-# A command substitution inside an arm is a forked copy that shows the same
-# command line, so a process whose parent is itself an arm is not counted.
 test_next_park_takes_over_the_cycle_a_pass_through_left_for_main() {
   local home left_watcher left_arm
   home=$(make_primary_home hook-takeover)
@@ -1127,6 +1126,10 @@ test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park() {
   pass "host+hook: a park stopped mid take-over leaves the take-over to the next park"
 }
 
+# A successor the host cannot record for the next park's take-over (here the
+# record path is a directory the record would land inside) must not be left
+# running: the host stops it on exit, the close still reaches main unchanged,
+# and main's next turn end owns a fresh cycle with no orphan beside it.
 test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
   local home
   home=$(make_primary_home hook-successor-unrecorded)
@@ -1189,11 +1192,6 @@ SH
   pass "host: a decision close accepted away whose turn starts attended still reaches main unchanged"
 }
 
-# Grok and OpenCode have no mirror writer, because they cannot record a
-# session's first captain prompt, and neither Codex nor omp has a proven one,
-# so none of them has a verified dialog mirror: every attended close reaches
-# main as without the host, while the away posture, which needs no mirror,
-# still runs on the engine.
 test_park_exit_probe_uses_half_second_child_sleeps() {
   local home host_pid
   home=$(make_home park-cadence attended)

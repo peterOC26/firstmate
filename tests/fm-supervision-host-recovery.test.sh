@@ -341,7 +341,6 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   pass "host: the first cycle's status streams once, --restart replaces a stale watcher, and an owner predecessor makes a handling successor"
 }
 
-# Main's side of a handed-back wake: drain, then run the printed acknowledgement.
 test_latch_trips_after_two_engine_errors_then_probes_and_recovers() {
   local home
   home=$(make_home away-latch away)

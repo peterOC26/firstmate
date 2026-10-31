@@ -302,17 +302,16 @@ append_status() {  # <home> <text>
 
 # --- report surface -----------------------------------------------------------
 
+# One store row exactly as bin/fm-branch-outcome.sh append writes it, at a
+# chosen epoch, so a case can hold outcomes recorded days before the drain.
 outcome_row() {  # <seq> <epoch> <task> <verdict> <summary>
   printf '{"seq":%s,"epoch":%s,"task":"%s","wake":"signal: %s.status","verdict":"%s","summary":"%s","silent":false,"statusEndpoint":0,"statusIdent":"-"}\n' \
     "$1" "$2" "$3" "$3" "$4" "$5"
 }
 
-# The cutover a home made when this section first shipped: its away return
-# briefs had shown every outcome without advancing the read cursor, so the
-# first drain on the new code found days-old outcomes unread. They are still
-# presented and never adopted as processed, but each says how long ago it was
-# recorded and the section asks for the current state first, so a PR that was
-# merged since cannot read as newly ready.
+# A host home whose drain has presented a captain outcome twice without an
+# acknowledgement: the read cursor is past it and the processed marker is
+# still absent. Sets PRESENTED_HOME.
 present_unacknowledged_outcome_twice() {  # <name>
   local drained
   PRESENTED_HOME="$TMP_ROOT/$1"
@@ -328,9 +327,9 @@ present_unacknowledged_outcome_twice() {  # <name>
   assert_absent "$PRESENTED_HOME/state/.branch-outcomes-processed" "fixture: nothing acknowledged the outcome"
 }
 
-# A switch to Pi runs processed-init before reading unprocessed rows. The row
-# the host drain presented but main never acknowledged must stay unprocessed
-# rather than being adopted from the read cursor.
+# Change the task immediately before the second offer computation, rather
+# than racing the successor startup. The first offer accepts the close; the
+# turn-boundary offer must see the new main-owned decision.
 turn_main_only_at_second_offer() {  # <home> [quiet|snapshot]
   local real_node turn snapshot=':'
   real_node=$(command -v node)
@@ -363,6 +362,9 @@ SH
   chmod +x "$1/fakebin/node"
 }
 
+# A fixture home that is also a genuine primary checkout whose bin is this
+# repo's, so the real Claude Stop hook (bin/fm-claude-stop-autoarm.sh) runs the
+# real host in it.
 make_primary_home() {  # <name>
   local home
   home=$(make_home "$1" attended)
@@ -426,10 +428,6 @@ assert_rewoke_main() {  # <home> <label>
   assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=rewake ' "$1/state/.claude-autoarm-epoch" "$2: the auto-arm ledger must record the rewake"
 }
 
-# The live failure (2026-09-27): a main-only pass-through confirmed a handling
-# handoff before the close reached main's re-arm owner, so the Stop hook's
-# rewake commit refused and it exited 0 in silence. An idle primary was never
-# woken, and the detached successor's own later close reached no reader.
 assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() {
   local status=$1 home real_mktemp successor
   home=$(make_primary_home "hook-successor-restore-fails-$status")
@@ -473,6 +471,9 @@ SH
     "the failed hand-back must be committed"
 }
 
+# The arm processes running from <home>'s bin, one "<pid> <ppid>" per line.
+# A command substitution inside an arm is a forked copy that shows the same
+# command line, so a process whose parent is itself an arm is not counted.
 home_arms() {  # <home>
   ps -A -o pid= -o ppid= -o command= 2>/dev/null \
     | awk -v arm="$1/bin/fm-watch-arm.sh" '
@@ -534,15 +535,12 @@ leave_a_cycle_for_main_and_restart() {  # <home>
 
 no_home_arms() { [ -z "$(home_arms "$1")" ]; }
 
-# A successor the host cannot record for the next park's take-over (here the
-# record path is a directory the record would land inside) must not be left
-# running: the host stops it on exit, the close still reaches main unchanged,
-# and main's next turn end owns a fresh cycle with no orphan beside it.
 mode_of() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
 
-# Every file carrying the captain's dialog is owner-only, even under an open
-# umask and when a readable copy was already there. The feed is removed before
-# the engine starts, so a node wrapper records its mode as the wake renders.
+# The resurface pass-through leaves its successor running. Stop that watcher
+# and acknowledge the downtime its exit records, so the next park starts a
+# watcher it owns. Attaching instead would not observe the exit until the
+# beacon went stale, and this fixture's turn budget would already be gone.
 quiet_pass_through_successor() {  # <home>
   local home=$1 pid i gen
   pid=$(cat "$home/state/.watch.lock/pid" 2>/dev/null || true)
@@ -565,6 +563,10 @@ quiet_pass_through_successor() {  # <home>
     || fail "fixture: could not acknowledge the successor downtime"
 }
 
+# Park again after a host was stopped mid-park: the new cycle's first close is
+# the watcher's downtime resurface, which main drains before the next park.
+# That close can end the park before its cycle is ever seen live, so this
+# waits for the exit itself.
 park_after_stop() {  # <home>
   rm -f "$1/host.rc"
   : > "$1/park.go"
@@ -575,11 +577,6 @@ park_after_stop() {  # <home>
   park_again "$1"
 }
 
-# Dialog counts as delivered only once the turn that carried it is accepted
-# with its report. A host that reaches its park boundary after feeding the
-# mirror but before the turn, or is stopped mid-turn, leaves the conversation
-# resumable without it, so the next turn must still carry it; a turn with no
-# report starts a new conversation, which must carry it too.
 # shellcheck disable=SC2034 # PARK_OUTCOME is consumed by the sourcing suite.
 park_outcome() {  # <name> <park-seconds>; sets PARK_OUTCOME to boundary or handled
   local home
@@ -600,6 +597,7 @@ park_outcome() {  # <name> <park-seconds>; sets PARK_OUTCOME to boundary or hand
   fi
 }
 
+# Main's side of a handed-back wake: drain, then run the printed acknowledgement.
 main_drain_and_ack() {  # <home>
   local out ack
   out=$(FM_HOME="$1" "$ROOT/bin/fm-wake-drain.sh" 2>&1)

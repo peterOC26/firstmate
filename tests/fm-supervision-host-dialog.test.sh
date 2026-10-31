@@ -7,6 +7,11 @@ set -u
 # shellcheck source=tests/supervision-host-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/supervision-host-helpers.sh"
 
+# Grok and OpenCode have no mirror writer, because they cannot record a
+# session's first captain prompt, and neither Codex nor omp has a proven one,
+# so none of them has a verified dialog mirror: every attended close reaches
+# main as without the host, while the away posture, which needs no mirror,
+# still runs on the engine.
 test_primary_without_a_verified_mirror_runs_away_only() {
   local home harness
   for harness in grok opencode omp codex; do
@@ -58,6 +63,9 @@ test_attended_wake_carries_the_dialog_mirror() {
   pass "host: each wake carries the captain's dialog since the last wake, without operational input"
 }
 
+# Every file carrying the captain's dialog is owner-only, even under an open
+# umask and when a readable copy was already there. The feed is removed before
+# the engine starts, so a node wrapper records its mode as the wake renders.
 test_dialog_bearing_files_are_owner_only() {
   local home old
   home=$(make_home attended-private attended)
@@ -91,14 +99,11 @@ SH
   pass "host: the dialog mirror, its feed, and the wake file are owner-only"
 }
 
-# Park again after a host was stopped mid-park: the new cycle's first close is
-# the watcher's downtime resurface, which main drains before the next park.
-# That close can end the park before its cycle is ever seen live, so this
-# waits for the exit itself.
-# The resurface pass-through leaves its successor running. Stop that watcher
-# and acknowledge the downtime its exit records, so the next park starts a
-# watcher it owns. Attaching instead would not observe the exit until the
-# beacon went stale, and this fixture's turn budget would already be gone.
+# Dialog counts as delivered only once the turn that carried it is accepted
+# with its report. A host that reaches its park boundary after feeding the
+# mirror but before the turn, or is stopped mid-turn, leaves the conversation
+# resumable without it, so the next turn must still carry it; a turn with no
+# report starts a new conversation, which must carry it too.
 test_undelivered_dialog_is_fed_again_on_the_next_turn() {
   local home real_node second third fourth
   home=$(make_home mirror-boundary attended)
