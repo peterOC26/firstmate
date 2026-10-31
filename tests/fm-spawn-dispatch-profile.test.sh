@@ -456,6 +456,8 @@ test_active_dispatch_profile_allows_explicit_harness() {
   assert_contains "$out" "spawned $id harness=codex" "spawn did not report explicit codex harness"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "-c 'service_tier=\"default\"'" "Codex launch must explicitly select regular service"
+  assert_no_grep 'service_tier=' "$HOME_DIR/state/$id.meta" "Codex service tier must not become task metadata"
   assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
     "explicit harness launch did not thread model and effort"
   pass "active crew-dispatch profile allows an explicit resolved harness"
@@ -712,6 +714,8 @@ test_codex_secondmate_launch_keeps_the_hook_layer() {
   status=$?
   expect_code 0 "$status" "codex secondmate spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "-c 'service_tier=\"default\"'" "Codex launch must explicitly select regular service"
+  assert_no_grep 'service_tier=' "$HOME_DIR/state/$id.meta" "Codex service tier must not become task metadata"
   assert_not_contains "$launch" "--disable hooks" \
     "codex secondmate launch disabled the project hooks its own primary supervision depends on"
   pass "a codex secondmate keeps the project hook layer its primary session runs on"

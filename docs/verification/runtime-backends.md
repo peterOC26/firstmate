@@ -844,8 +844,32 @@ $ ls "$TURNEND"
 
 `tests/fm-codex-hook-layer-live-e2e.test.sh` is the command that refreshes this record.
 It captures the launch `bin/fm-spawn.sh` actually builds, replays those exact flags against the installed Codex, and fails naming the harness and version if the hook layer comes back on.
-It spends no model tokens, so it runs by default wherever Codex is installed.
+It spends no model tokens, so it runs by default wherever Codex and Python 3 are installed.
 The portable half, `tests/fm-spawn-dispatch-profile.test.sh`, pins the split the launch template makes: a crewmate launches hook-free while a secondmate, which runs a primary session on this repository's own project hooks, keeps them.
+
+## Codex regular service tier
+
+Verified on 2026-10-31 with `codex-cli 0.160.0` on Linux amd64.
+`codex --help` documents `-c key=value` as a TOML configuration override.
+`codex app-server generate-json-schema --out <temporary-directory>` publishes `Config.service_tier` as a string or null, consistent with the [official configuration reference](https://developers.openai.com/codex/config-reference/).
+
+Refresh the installed-CLI evidence with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-codex-hook-layer-live-e2e.test.sh
+```
+
+Selected observed output:
+
+```text
+ok - codex codex-cli 0.160.0 overrides a Fast preference with regular service
+```
+
+The guard captures the real spawn command, supplies a temporary Codex home configured for Fast service, and reads effective configuration through the installed CLI's app-server `config/read` method without submitting a model turn.
+Its baseline resolves to `fast` and the pinned launch resolves to `default`.
+Portable behavior coverage lives in `tests/fm-spawn-dispatch-profile.test.sh`.
+The Codex template is built before the shared tmux, Herdr, Zellij, cmux, and Orca launch transport; other harness templates and backend lifecycle mechanics are unchanged.
+This evidence verifies configuration resolution and mocked delivery, without claiming a live backend lifecycle run or model response tier.
 
 ## Grok approval-mode composer
 

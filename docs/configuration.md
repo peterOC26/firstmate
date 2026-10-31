@@ -938,6 +938,8 @@ A Claude worker's launch brief is published as an operational record in the rece
 Other harnesses retain the typed operational-marker launch path.
 
 Pi-family launches adapt the regular-TUI safeguard to the installed CLI's capabilities; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact version-safe launch mechanics.
+Codex crewmate, scout, and secondmate launches select regular service (`service_tier="default"`) even when Codex configuration prefers Fast.
+This launch setting is fixed; [runtime backend verification](verification/runtime-backends.md#codex-regular-service-tier) owns the installed-CLI evidence and refresh command.
 Enabled primary-session turn-end guard integrations are tracked as repo-level hook files and documented in [`docs/turnend-guard.md`](turnend-guard.md).
 
 Kimi remains outside the primary turn-end guard integrations; [`docs/turnend-guard.md`](turnend-guard.md#compatibility-limits) owns its separate captain-approved crew wake hook.
