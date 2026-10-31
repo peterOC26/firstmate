@@ -264,6 +264,72 @@ comms_classify_agent "$SESSION:launcher" \
   || fail "the launcher's harness child must be visible in the foreground process group"
 pass "tmux liveness: a launcher whose own identity reads as a bare shell classifies alive from its harness child"
 
+# --- a relaunched worker exits inside the Treehouse wrapper -----------------
+# A native wrapper preserves the real foreground shape without acquiring a
+# pool slot: bash -> treehouse -> bash -> codex. The wrapper and nested shell
+# survive the agent's exit, just as they do after fm-control relaunch.
+if [ -n "$CC_BIN" ]; then
+  cat > "$LAB/wrapper.c" <<'C'
+#include <sys/wait.h>
+#include <unistd.h>
+int main(int argc, char **argv) {
+  if (argc != 3) return 2;
+  pid_t child = fork();
+  if (child < 0) return 3;
+  if (child == 0) {
+    execl("/bin/bash", "bash", "--noprofile", "--norc", argv[1], argv[2], (char *)0);
+    _exit(4);
+  }
+  return waitpid(child, 0, 0) < 0;
+}
+C
+  "$CC_BIN" -o "$LAB/bin/treehouse" "$LAB/wrapper.c" \
+    || fail "could not compile the native Treehouse wrapper fixture"
+  ln -s "$STANDIN_BIN" "$LAB/bin/codex"
+  cat > "$LAB/nested-shell" <<'SH'
+"$1/bin/codex" 900 &
+printf '%s\n' "$!" > "$1/agent.pid"
+wait
+# Keep the nested shell reading the terminal in the wrapper's process group.
+read -r _
+SH
+  # Both the executable basename and the rewritten `treehouse get` title
+  # occur in process-name surfaces. Exercise each as a real native process.
+  for wrapper in treehouse 'treehouse get'; do
+    [ "$wrapper" = treehouse ] || cp "$LAB/bin/treehouse" "$LAB/bin/$wrapper"
+    rm -f "$LAB/agent.pid"
+    # shellcheck disable=SC2016 # The pane's Bash expands its own positional arguments.
+    new_window wrapped /bin/bash --noprofile --norc -c \
+      '"$1" "$2" "$3"; :' bash "$LAB/bin/$wrapper" "$LAB/nested-shell" "$LAB"
+    wait_for_state "$SESSION:wrapped" alive \
+      || fail "a Treehouse-wrapped live Codex child must classify alive"
+    wrapper_comms=$(fm_backend_tmux_foreground_comms "$SESSION:wrapped")
+    printf '%s\n' "$wrapper_comms" | grep -Fq "$wrapper" \
+      || fail "the real foreground group did not expose the wrapper name '$wrapper'"
+    printf '%s\n' "$wrapper_comms" | grep -Fq bash \
+      || fail "the wrapper's nested shell was absent from the foreground group"
+    wrapped_pid=$(cat "$LAB/agent.pid")
+    kill "$wrapped_pid" || fail "could not stop the fixture's own Codex child"
+    wait_for_state "$SESSION:wrapped" dead \
+      || fail "a relaunched-then-exited Treehouse-wrapped worker must classify dead"
+    wrapper_comms=$(fm_backend_tmux_foreground_comms "$SESSION:wrapped")
+    printf '%s\n' "$wrapper_comms" | grep -Fq "$wrapper" \
+      || fail "the wrapper disappeared, making the exited-worker assertion vacuous"
+    "$REAL_TMUX" -L "$SOCKET" kill-window -t "$SESSION:wrapped"
+  done
+  pass "tmux liveness: Treehouse wrappers stay alive with Codex and read dead after its exit"
+  for decoy in treehouse-helper treehouse-get 'treehouse get-other'; do
+    ln -s "$STANDIN_BIN" "$LAB/bin/$decoy"
+    new_window wrapper-decoy "$LAB/bin/$decoy" 900
+    wait_for_state "$SESSION:wrapper-decoy" ambiguous \
+      || fail "unrelated wrapper-like name '$decoy' must stay ambiguous"
+    "$REAL_TMUX" -L "$SOCKET" kill-window -t "$SESSION:wrapper-decoy"
+  done
+  pass "tmux liveness: unrelated Treehouse-like names stay ambiguous"
+else
+  echo "skip: no C compiler, so the native Treehouse wrapper case cannot build"
+fi
+
 # --- an idle shell is still confidently dead --------------------------------
 
 wait_for_state "$SESSION:idle" dead \

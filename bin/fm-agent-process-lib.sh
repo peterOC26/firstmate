@@ -23,7 +23,7 @@ unset _FM_AGENT_PROCESS_LIB_DIR
 
 # fm_agent_process_classify_name: the single owner of the process-name
 # vocabulary shared by every liveness signal - `agent` for a verified harness,
-# `shell` for an idle login/interactive shell, `other` for anything else.
+# `shell` for a shell or its Treehouse wrapper, `other` for anything else.
 # Keeping one classifier means independent name sources (a kernel process
 # name, an argv[0], a rendered pane title) can never drift into disagreeing
 # about what a given name means.
@@ -56,6 +56,10 @@ fm_agent_process_classify_name() {  # <path> [argv0] -> agent|shell|other
     # daemon), so a `*polytoken*` glob never claims an unrelated command.
     agy|devin|command-code|polytoken) printf 'agent' ;;
     zsh|bash|sh|dash|ash|ksh|mksh|tcsh|csh|fish) printf 'shell' ;;
+    # Treehouse waits for the nested worktree shell after a relaunched agent
+    # exits. Like a shell launcher, it cannot by itself prove a live agent;
+    # callers still inspect the other foreground members for one.
+    treehouse|'treehouse get') printf 'shell' ;;
     *)
       if fm_harness_path_name "$path" >/dev/null || fm_harness_path_name "$argv0" >/dev/null; then
         printf 'agent'

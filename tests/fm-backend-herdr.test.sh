@@ -537,6 +537,39 @@ test_stale_registration_over_a_shell_only_pane_is_agent_free() {
   pass "herdr stale registration: a shell-only pane with a lingering Pi record is agent-free with an explicit reason"
 }
 
+test_treehouse_wrapped_worker_is_dead_only_after_agent_exit() {
+  local shell_pid wrapper foreground info out case_id=0
+  sleep 300 &
+  shell_pid=$!
+  for wrapper in treehouse 'treehouse get' /usr/local/bin/treehouse; do
+    case_id=$((case_id + 1))
+    foreground=$(jq -nc --arg name "$wrapper" --argjson pid "$shell_pid" \
+      '[{pid:$pid,name:$name,argv0:$name},{pid:$pid,name:"bash",argv0:"bash"}]')
+    info=$(jq -nc --argjson pid "$shell_pid" --argjson fg "$foreground" \
+      '{result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",shell_pid:$pid,foreground_processes:$fg}}}')
+    out=$(FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+      stale_registration_case "wrapped-exited-$case_id" idle "$info")
+    [ "$out" = "stale-agent dead refused" ] \
+      || { kill "$shell_pid"; fail "Treehouse plus an agent-free shell must recover as dead, got '$out'"; }
+    # Keep the wrapper unchanged and restore the foreground Codex process.
+    info=$(printf '%s' "$info" | jq \
+      '.result.process_info.foreground_processes += [{pid:4243,name:"codex",argv0:"codex"}]')
+    out=$(stale_registration_case "wrapped-live-$case_id" idle "$info")
+    [ "$out" = "live alive refused" ] \
+      || { kill "$shell_pid"; fail "Treehouse plus a live Codex child must stay alive, got '$out'"; }
+  done
+  for wrapper in treehouse-helper treehouse-get 'treehouse get-other' git; do
+    info=$(jq -nc --arg name "$wrapper" --argjson pid "$shell_pid" \
+      '{result:{type:"pane_process_info",process_info:{pane_id:"w1:p2",shell_pid:$pid,foreground_processes:[{pid:$pid,name:"treehouse",argv0:"treehouse"},{pid:$pid,name:$name,argv0:$name}]}}}')
+    out=$(FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS=1 \
+      stale_registration_case "wrapped-other-$wrapper" idle "$info")
+    [ "$out" = "live alive refused" ] \
+      || { kill "$shell_pid"; fail "an unrelated foreground process must prevent recovery, got '$out'"; }
+  done
+  kill "$shell_pid" 2>/dev/null || true
+  pass "herdr Treehouse wrapper: exited workers read dead; live Codex and unrelated tools still prevent recovery"
+}
+
 test_stale_registration_ignores_status_and_reads_the_process() {
   local sleep_bin shell_pid out status
   sleep_bin=$(command -v sleep) || fail "sleep not found"
@@ -5954,6 +5987,7 @@ test_cli_helper_sets_env_and_appends_trailing_session_flag
 test_agent_state_bypasses_a_stale_client_shadowing_a_compatible_one
 test_recovery_grade_read_widens_only_at_its_own_boundary
 test_stale_registration_over_a_shell_only_pane_is_agent_free
+test_treehouse_wrapped_worker_is_dead_only_after_agent_exit
 test_stale_registration_ignores_status_and_reads_the_process
 test_pane_agent_session_ref_reports_a_resumable_reference_with_its_agent
 test_pane_agent_session_ref_degrades_to_nothing_when_not_resumable
