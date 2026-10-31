@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live guard for the codex crewmate launch's hook posture.
+# Live guard for the codex crewmate launch's hook and service-tier posture.
 #
 # The verdict here comes from the installed codex, not from a stub: a stub can
 # only confirm the assumption already written into it, and what this guard
@@ -23,7 +23,7 @@ set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
-fm_live_gate default-on FM_CODEX_HOOK_LAYER_LIVE codex
+fm_live_gate default-on FM_CODEX_HOOK_LAYER_LIVE codex python3
 
 CODEX_VERSION=$(codex --version 2>&1)
 TMP_ROOT=$(fm_test_tmproot fm-codex-hook-layer-live)
@@ -91,7 +91,74 @@ test_installed_codex_still_reports_the_hook_feature() {
   printf 'ok - codex %s still publishes the hook feature flag firstmate disables\n' "$CODEX_VERSION"
 }
 
+# Resolve real configuration without submitting a model turn. A hostile Fast
+# preference makes the default arm non-vacuous: it must override that setting,
+# while the explicit per-task arm must remain Fast.
+test_installed_codex_resolves_the_captured_service_tier() {
+  local codex_home launch flags tier effective
+  codex_home="$TMP_ROOT/tier-config"
+  mkdir -p "$codex_home"
+  printf 'service_tier = "fast"\n' > "$codex_home/config.toml"
+  for tier in baseline default fast; do
+    flags=
+    case "$tier" in
+      default) launch=$(capture_codex_launch tier-default --mode no-mistakes --yolo off); flags=$(codex_global_flags "$launch") ;;
+      fast) launch=$(capture_codex_launch tier-fast --mode no-mistakes --yolo off --service-tier fast); flags=$(codex_global_flags "$launch") ;;
+    esac
+    effective=$(CODEX_HOME="$codex_home" FM_TEST_CODEX_FLAGS="$flags" python3 - <<'PY'
+import json
+import os
+import shlex
+import signal
+import subprocess
+
+def timed_out(_signal, _frame):
+    raise TimeoutError("Codex configuration probe exceeded 20 seconds")
+
+signal.signal(signal.SIGALRM, timed_out)
+signal.alarm(20)
+command = ["codex", "--no-daemon", *shlex.split(os.environ["FM_TEST_CODEX_FLAGS"]), "app-server"]
+process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                           stderr=subprocess.DEVNULL, text=True)
+try:
+    requests = [
+        {"id": 1, "method": "initialize", "params": {"clientInfo": {"name": "firstmate-tier-guard", "version": "1"}}},
+        {"id": 2, "method": "config/read", "params": {"includeLayers": False}},
+    ]
+    for request in requests:
+        process.stdin.write(json.dumps(request) + "\n")
+        process.stdin.flush()
+        while True:
+            line = process.stdout.readline()
+            if not line:
+                raise RuntimeError("Codex closed before returning configuration")
+            message = json.loads(line)
+            if message.get("id") == request["id"]:
+                break
+        if "error" in message:
+            raise RuntimeError(message["error"])
+        if request["id"] == 2:
+            print(message["result"]["config"]["service_tier"])
+finally:
+    signal.alarm(0)
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+PY
+    ) || fail "codex $CODEX_VERSION could not resolve the $tier service tier"
+    case "$tier:$effective" in
+      baseline:fast|default:default|fast:fast) ;;
+      *) fail "codex $CODEX_VERSION resolved $tier service tier to '$effective'" ;;
+    esac
+  done
+  printf 'ok - codex %s overrides a Fast preference with regular service and honors an explicit task tier\n' "$CODEX_VERSION"
+}
+
 test_installed_codex_still_reports_the_hook_feature
 test_installed_codex_disables_hooks_for_the_captured_crewmate_launch
+test_installed_codex_resolves_the_captured_service_tier
 
 echo "# all fm-codex-hook-layer-live-e2e tests passed"

@@ -175,6 +175,8 @@ freeze_parent_session
 remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate >/dev/null 2>&1 \
   || fail "default-off remote secondmate spawn failed"
 assert_present "$PARENT/state/ios.meta" "default-off remote spawn published no parent metadata"
+assert_grep 'service_tier=default' "$PARENT/state/ios.meta" "remote Codex spawn lost its regular service tier"
+assert_contains "$(remote_staged_launch)" "-c 'service_tier=\"default\"'" "remote Codex launch did not pin regular service"
 ! grep -q '^traceparent=' "$PARENT/state/ios.meta" \
   || fail "default-off remote spawn must not record a traceparent= line"
 ! grep -q 'export TRACEPARENT=' "$HERDR_LOG" \
@@ -312,5 +314,18 @@ try_flag 'requires a non-empty value' \
   "an empty carrier must be refused rather than silently ignored" \
   --secondmate --traceparent=
 pass "delivery: a parent-supplied carrier is accepted only for a secondmate launch and only as a strict W3C value"
+
+# The optional Codex tier must survive the same remote argument transport even
+# when no trace carrier is present to occupy its preceding optional argument.
+rm -f "$PARENT/config/trace-context"
+freeze_parent_session
+reset_remote_herdr_fixture "$HERDR_STATE"
+: > "$HERDR_LOG"
+remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --service-tier fast >/dev/null 2>&1 \
+  || fail "remote Codex service-tier override failed"
+assert_grep 'service_tier=fast' "$PARENT/state/ios.meta" "parent lost the confirmed remote tier"
+assert_grep 'service_tier=fast' "$REMOTE_HOME/state/parent-route/ios.meta" "remote task lost its tier"
+assert_contains "$(remote_staged_launch)" "-c 'service_tier=\"fast\"'" "remote Codex launch lost its explicit tier"
+pass "remote Codex launch defaults to regular service and forwards an explicit task tier without a trace carrier"
 
 echo "ALL TESTS PASSED"

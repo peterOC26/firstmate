@@ -456,6 +456,8 @@ test_active_dispatch_profile_allows_explicit_harness() {
   assert_contains "$out" "spawned $id harness=codex" "spawn did not report explicit codex harness"
   assert_meta_profile "$HOME_DIR/state/$id.meta" codex gpt-5 high
   launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "-c 'service_tier=\"default\"'" "Codex spawn must explicitly select regular service"
+  assert_grep 'service_tier=default' "$HOME_DIR/state/$id.meta" "Codex service tier must be recorded"
   assert_contains "$launch" "codex --model 'gpt-5' -c 'model_reasoning_effort=\"high\"' --dangerously-bypass-approvals-and-sandbox" \
     "explicit harness launch did not thread model and effort"
   pass "active crew-dispatch profile allows an explicit resolved harness"
@@ -712,9 +714,52 @@ test_codex_secondmate_launch_keeps_the_hook_layer() {
   status=$?
   expect_code 0 "$status" "codex secondmate spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "-c 'service_tier=\"default\"'" "Codex secondmate must explicitly select regular service"
   assert_not_contains "$launch" "--disable hooks" \
     "codex secondmate launch disabled the project hooks its own primary supervision depends on"
   pass "a codex secondmate keeps the project hook layer its primary session runs on"
+}
+
+test_codex_service_tier_override_and_scout_default() {
+  local rec id out status launch
+  id=codex-tier-override
+  rec=$(make_spawn_case codex-tier-override codex "$id")
+  read_case_record "$rec"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --service-tier fast)
+  status=$?
+  expect_code 0 "$status" "explicit Codex service tier must launch"$'\n'"$out"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" "-c 'service_tier=\"fast\"'" "explicit service tier did not reach Codex"
+  assert_not_contains "$launch" 'service_tier="default"' "default must not override the task's explicit tier"
+  assert_grep 'service_tier=fast' "$HOME_DIR/state/$id.meta" "explicit service tier must be recorded"
+
+  rec=$(make_spawn_case codex-tier-scout codex codex-tier-scout)
+  read_case_record "$rec"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" codex-tier-scout "$PROJ_DIR" --scout)
+  status=$?
+  expect_code 0 "$status" "Codex scout must launch"$'\n'"$out"
+  assert_contains "$(cat "$LAUNCH_LOG")" "-c 'service_tier=\"default\"'" "a separate scout must default to regular service"
+  pass "Codex honors an explicit task service tier and defaults a separate scout to regular service"
+}
+
+test_service_tier_refuses_invalid_or_non_codex_launches() {
+  local rec id out status tier
+  id=codex-tier-refusal
+  rec=$(make_spawn_case codex-tier-refusal codex "$id")
+  read_case_record "$rec"
+  for tier in '' 'fast";notify=[]'; do
+    out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --service-tier="$tier")
+    status=$?
+    expect_code 1 "$status" "empty or malformed tier must refuse"
+    assert_contains "$out" '--service-tier requires a non-empty tier name' "tier refusal must explain the option"
+  done
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness claude --service-tier fast)
+  status=$?
+  expect_code 1 "$status" "a Codex tier option must refuse on Claude"
+  assert_contains "$out" '--service-tier requires the canonical --harness codex launch' "wrong-harness tier refusal must explain the option"
+  [ ! -s "$LAUNCH_LOG" ] || fail "an invalid service tier must launch nothing"
+  assert_absent "$HOME_DIR/state/$id.meta" "invalid service tier must publish no task"
+  pass "service-tier input refuses malformed values and other harnesses before launching"
 }
 
 test_grok_threads_model_and_reasoning_effort() {
@@ -1540,14 +1585,17 @@ test_batch_forwards_shared_profile_flags() {
   prepare_batch_pool
 
   out=$(FM_FAKE_TREEHOUSE_POOL="$CASE_DIR/pool" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high)
+    "$id1=$PROJ_DIR" "$id2=$PROJ_DIR" --harness codex --model gpt-5 --effort high --service-tier=fast)
   status=$?
   expect_code 0 "$status" "batch spawn with shared profile flags should succeed"
   assert_contains "$out" "spawned $id1 harness=codex" "first batch task did not use shared harness"
   assert_contains "$out" "spawned $id2 harness=codex" "second batch task did not use shared harness"
   assert_meta_profile "$HOME_DIR/state/$id1.meta" codex gpt-5 high
   assert_meta_profile "$HOME_DIR/state/$id2.meta" codex gpt-5 high
-  pass "batch dispatch forwards shared --harness, --model, and --effort to every pair"
+  assert_grep 'service_tier=fast' "$HOME_DIR/state/$id1.meta" "first batch tier lost"
+  assert_grep 'service_tier=fast' "$HOME_DIR/state/$id2.meta" "second batch tier lost"
+  assert_contains "$(cat "$LAUNCH_LOG")" "-c 'service_tier=\"fast\"'" "batch launch lost the explicit service tier"
+  pass "batch dispatch forwards shared --harness, --model, --effort, and --service-tier to every pair"
 }
 
 test_claude_forwards_firstmate_config_dir_when_set() {
@@ -2329,6 +2377,8 @@ test_codex_threads_model_and_max_effort
 test_codex_omits_max_effort_for_unsupported_model
 test_codex_crewmate_launch_disables_the_hook_layer
 test_codex_secondmate_launch_keeps_the_hook_layer
+test_codex_service_tier_override_and_scout_default
+test_service_tier_refuses_invalid_or_non_codex_launches
 test_grok_threads_model_and_reasoning_effort
 test_grok_omits_invalid_max_reasoning_effort
 test_grok_omits_invalid_xhigh_reasoning_effort
