@@ -1,0 +1,40 @@
+bash-5.2$ cd -- '/home/zabi/.no-mistakes/evidence/01M691RDTZQKJTBP1EPEQSTMY0/lab space/pool/.treehouse/sample-64821e/1/s
+ample'
+bash-5.2$ export GOTMPDIR=/tmp/fm-lvc4910415/gotmp
+bash-5.2$ export COMPACT_ADVISER_DISABLE=1
+bash-5.2$ export FM_TASK_ID=lvc4910415
+bash-5.2$ . '/tmp/fm-lvc4910415+db7311489cb220a86d23183727095907add859beb662f9102372608214169d6f/launch.s1793453241.1030
+225.11696.sh'
+Token usage: total=18,421 input=18,134 (+ 26,752 cached) output=287
+To continue this session, run:
+  codex resume 01a19224-c1e8-7aa2-922a-7e4f3e017225
+Or run codex resume and select Follow crewmate role contract.
+bash-5.2$ cd -- '/home/zabi/.no-mistakes/evidence/01M691RDTZQKJTBP1EPEQSTMY0/lab space/pool/.treehouse/sample-64821e/1/s
+ample'
+bash-5.2$ export GOTMPDIR=/tmp/fm-lvc4910415/gotmp
+bash-5.2$ export COMPACT_ADVISER_DISABLE=1
+bash-5.2$ export FM_TASK_ID=lvc4910415
+bash-5.2$ . '/tmp/fm-lvc4910415+db7311489cb220a86d23183727095907add859beb662f9102372608214169d6f/launch.s1793453262.1060
+525.2271.sh'
+Token usage: total=16,063 input=15,363 (+ 94,336 cached) output=700 (reasoning 28)
+To continue this session, run:
+  codex resume 01a19225-0e33-7fb0-9677-e7205ff623df
+Or run codex resume and select Read launch brief.
+bash-5.2$ cd -- '/home/zabi/.no-mistakes/evidence/01M691RDTZQKJTBP1EPEQSTMY0/lab space/pool/.treehouse/sample-64821e/1/s
+ample'
+bash-5.2$ export GOTMPDIR=/tmp/fm-lvc4910415/gotmp
+bash-5.2$ export COMPACT_ADVISER_DISABLE=1
+bash-5.2$ export FM_TASK_ID=lvc4910415
+bash-5.2$ . '/tmp/fm-lvc4910415+db7311489cb220a86d23183727095907add859beb662f9102372608214169d6f/launch.s1793453294.1103
+199.14962.sh'
+
+
+
+
+
+
+
+
+
+
+
