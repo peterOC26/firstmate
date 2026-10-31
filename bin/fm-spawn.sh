@@ -57,6 +57,14 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
+#   Codex launches encode the complete brief inline up to 65536 bytes (64 KiB).
+#   Above that size, codex-launch-prompt.md beside the brief carries a short
+#   instruction to read its absolute path and apply its current role contract
+#   before project instructions. The pointer is staged atomically with umask
+#   077; a staging failure refuses launch. The complete brief, including intent
+#   and accumulated progress notes, remains intact on disk, keeping the launch
+#   argument below Linux's per-argument limit without manual note archiving.
+#   tests/fm-control-relaunch.test.sh covers inline and oversized delivery.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>]
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
@@ -427,7 +435,8 @@
 #   Pins are never inherited; remote per-mate overrides refuse locally.
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
-#     __BRIEF__    absolute path to data/<task-id>/brief.md
+#     __BRIEF__    absolute path to the rendered brief, or the Codex pointer
+#                  described above
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
 #     __CLAUDEADDDIRS__ quoted --add-dir flags granting exactly this task's
 #                  Firstmate channel directories (claude_add_dirs_flag below;
@@ -6041,6 +6050,21 @@ fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
+# Linux limits each exec argument to 128 KiB independently of ARG_MAX.
+# Keep the encoded Codex prompt comfortably below that limit, including its
+# operational envelope, without trimming intent or accumulated progress notes.
+if [ "$HARNESS" = codex ] && [ "$(wc -c < "$BRIEF")" -gt 65536 ]; then
+  CODEX_PROMPT_FILE="$BRIEF_DIR_REAL/codex-launch-prompt.md"
+  CODEX_PROMPT_TMP="$CODEX_PROMPT_FILE.${BASHPID:-$$}.tmp"
+  # shellcheck disable=SC2016 # Backticks delimit the brief path in the prompt.
+  if ! (umask 077 && printf 'Read the complete launch brief at `%s` and follow it exactly. Its current role contract establishes your role before project instructions.\n' \
+      "$BRIEF_REAL" > "$CODEX_PROMPT_TMP" && mv -f "$CODEX_PROMPT_TMP" "$CODEX_PROMPT_FILE"); then
+    rm -f -- "$CODEX_PROMPT_TMP"
+    echo "error: could not stage the Codex launch brief pointer for $ID" >&2
+    exit 1
+  fi
+  sq_brief=$(shell_quote "$CODEX_PROMPT_FILE")
+fi
 sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")

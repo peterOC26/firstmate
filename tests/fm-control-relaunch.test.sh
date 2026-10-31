@@ -82,6 +82,9 @@ case "${1:-}" in
           [ -z "${FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP:-}" ] || exit 1
           ;;
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*)
+          if [ -f "$D/execute-launch" ]; then
+            bash -c "$payload" || exit $?
+          fi
           cat "$D/becomes" > "$D/command"
           [ -z "${FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START:-}" ] || exit 1
           ;;
@@ -611,6 +614,46 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   assert_grep 'do not reject it as another home' "$launch_brief" \
     "the Firstmate-worktree relaunch did not distinguish its inbox from cross-home state"
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
+}
+
+test_codex_relaunch_delivers_large_brief_without_an_oversized_argument() {
+  local dir out rc prompt brief size
+  dir=$(new_case 'large brief' rlbig)
+  add_ship_task "$dir" rlbig codex
+  printf codex > "$dir/fake/command"
+  printf codex > "$dir/fake/becomes"
+  : > "$dir/fake/execute-launch"
+  cat > "$dir/fakebin/codex" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  printf '%s' "$arg" > "$FM_FAKE_DIR/codex-prompt"
+done
+SH
+  chmod +x "$dir/fakebin/codex"
+  brief="$dir/home/data/rlbig/brief.md"
+  out=$(run_control "$dir" rlbig relaunch --note "small checkpoint"); rc=$?
+  expect_code 0 "$rc" "a small Codex relaunch must still execute successfully"$'\n'"$out"
+  assert_grep 'Exercise relaunch behavior for rlbig.' "$dir/fake/codex-prompt" "small briefs must keep their inline delivery"
+  assert_grep 'small checkpoint' "$dir/fake/codex-prompt" "small briefs must include their latest note"
+  # Repeated progress is deliberately large enough to hit Linux MAX_ARG_STRLEN.
+  awk 'BEGIN { for (i=0; i<5000; i++) print "Older relaunch progress retained verbatim." }' >> "$brief"
+  cp "$brief" "$dir/expected-brief"
+  size=$(wc -c < "$brief")
+  [ "$size" -gt 131072 ] || fail "the regression fixture must exceed the argument limit"
+  out=$(run_control "$dir" rlbig relaunch --note "latest checkpoint"); rc=$?
+  expect_code 0 "$rc" "a large Codex relaunch must execute successfully"$'\n'"$out"
+  [ -f "$dir/fake/codex-prompt" ] || fail "the Codex executable was never reached"
+  size=$(wc -c < "$dir/fake/codex-prompt")
+  [ "$size" -lt 65536 ] || fail "Codex must receive a bounded prompt"
+  prompt=$(cat "$dir/fake/codex-prompt")
+  [ "$(printf '%s' "$prompt" | "$ROOT/bin/fm-operational-input.sh" kind)" = launch-brief ] \
+    || fail "the bounded prompt must retain its operational launch-brief envelope"
+  assert_contains "$prompt" "$dir/home/data/rlbig/launch-brief.md" "the prompt must name the complete launch brief"
+  head -c "$(wc -c < "$dir/expected-brief")" "$brief" > "$dir/actual-brief"
+  cmp "$dir/expected-brief" "$dir/actual-brief" || fail "original brief and intent must stay byte-for-byte intact"
+  assert_grep 'latest checkpoint' "$dir/home/data/rlbig/launch-brief.md" "the pointer target must include the latest note"
+  assert_grep '# Current worker role contract' "$dir/home/data/rlbig/launch-brief.md" "the pointer target must include the worker identity"
+  pass "fm-control relaunch: Codex executes with a bounded pointer to an intact oversized brief"
 }
 
 test_relaunch_note_inbox_listing_is_safe_on_empty_inbox() {
@@ -2863,6 +2906,7 @@ test_relaunch_preserves_durable_task_metadata
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions
+test_codex_relaunch_delivers_large_brief_without_an_oversized_argument
 test_relaunch_note_inbox_listing_is_safe_on_empty_inbox
 test_relaunch_requires_a_note_for_a_ship_task
 test_harness_switch_moves_the_record_and_clears_prior_wiring
