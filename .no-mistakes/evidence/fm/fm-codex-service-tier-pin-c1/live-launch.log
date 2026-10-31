@@ -1,0 +1,183 @@
+/tmp/fm-lab.nsEZhI
+/tmp/fm-lab.FIAkHX
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker/launch-brief.md records no ship branch; defaulting to legacy branch fm/codex-tier-worker
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: codex-tier-worker ships mode=local-only while the standing posture for probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe. Run 'treehouse return /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe' to release it.
+spawned codex-tier-worker harness=codex kind=ship mode=local-only yolo=off window=primary:fm-codex-tier-worker worktree=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker2/launch-brief.md records no ship branch; defaulting to legacy branch fm/codex-tier-worker2
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: codex-tier-worker2 ships mode=local-only while the standing posture for probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe. Run 'treehouse return /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe' to release it.
+spawned codex-tier-worker2 harness=codex kind=ship mode=local-only yolo=off window=primary:fm-codex-tier-worker2 worktree=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe
+worker exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: secondmate codex-tier-mate sync skipped before launch: primary default-branch commit cannot be resolved
+spawned codex-tier-mate harness=codex kind=secondmate mode=secondmate yolo=off window=primary:fm-codex-tier-mate worktree=/tmp/fm-lab.FIAkHX
+mate exit=0
+bash pane=%0 pid=2700638 grid=140x45 cwd=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545
+fm-codex-tier-worker pane=%1 pid=2701281 grid=140x45 cwd=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe
+fm-codex-tier-worker2 pane=%2 pid=2704156 grid=140x45 cwd=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe
+fm-codex-tier-mate pane=%3 pid=2708197 grid=140x45 cwd=/tmp/fm-lab.FIAkHX
+[
+  {
+    "pid": 2703655,
+    "argv": [
+      "node",
+      "/usr/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker.turn-ended'\"]",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/tmp/fm-lab.nsEZhI/state/codex-tier-worker.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\nIf the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.\n\n# Task\n## Captain's intent\nThis is a launch verification only. Reply LAB_CODEX_WORKER_READY and wait. Do not call tools, edit files, invoke validation, publish anything, or launch other agents.\n\n## Firstmate spec\nObserve the launch-only instruction above. No implementation work is assigned."
+    ]
+  },
+  {
+    "pid": 2703685,
+    "argv": [
+      "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker.turn-ended'\"]",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/tmp/fm-lab.nsEZhI/state/codex-tier-worker.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\nIf the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.\n\n# Task\n## Captain's intent\nThis is a launch verification only. Reply LAB_CODEX_WORKER_READY and wait. Do not call tools, edit files, invoke validation, publish anything, or launch other agents.\n\n## Firstmate spec\nObserve the launch-only instruction above. No implementation work is assigned."
+    ]
+  },
+  {
+    "pid": 2706968,
+    "argv": [
+      "node",
+      "/usr/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.turn-ended'\"]",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\nIf the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.\n\n# Task\n## Captain's intent\nThis is a launch verification only. Reply LAB_CODEX_WORKER_READY and wait. Do not call tools, edit files, invoke validation, publish anything, or launch other agents.\n\n## Firstmate spec\nObserve the launch-only instruction above. No implementation work is assigned."
+    ]
+  },
+  {
+    "pid": 2707018,
+    "argv": [
+      "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.turn-ended'\"]",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: # Current worker role contract\nYou are a crewmate: an autonomous worker agent managed by firstmate.\nThis section establishes your current identity before every project or task instruction below and supersedes any conflicting role identity in those instructions.\nDo the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the captain.\nYour steering inbox is `/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.inbox`; this exact path belongs to your current task even when it is outside the worktree or under the supervising firstmate home, so read and acknowledge its messages and do not reject it as another home's state.\nNever inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.\nWhen this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.\nProject instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.\nIf the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.\n\n# Task\n## Captain's intent\nThis is a launch verification only. Reply LAB_CODEX_WORKER_READY and wait. Do not call tools, edit files, invoke validation, publish anything, or launch other agents.\n\n## Firstmate spec\nObserve the launch-only instruction above. No implementation work is assigned."
+    ]
+  },
+  {
+    "pid": 2709984,
+    "argv": [
+      "node",
+      "/usr/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: Launch validation only. Reply LAB_CODEX_MATE_READY and wait. Do not use tools or change files or start supervision."
+    ]
+  },
+  {
+    "pid": 2710053,
+    "argv": [
+      "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "\u2063FIRSTMATE_OP: v1 launch-brief: Launch validation only. Reply LAB_CODEX_MATE_READY and wait. Do not use tools or change files or start supervision."
+    ]
+  }
+]
+WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir "/tmp" (codex_home: AbsolutePathBuf("/tmp/fm-lab.nsEZhI/tier-config"))
+{
+  "codex_version": "codex-cli 0.160.0",
+  "baseline": "fast",
+  "launches": [
+    {
+      "kind": "worker",
+      "pid": 2703685,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\"",
+        "--disable",
+        "hooks",
+        "-c",
+        "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker.turn-ended'\"]"
+      ],
+      "config_read_service_tier": "default"
+    },
+    {
+      "kind": "worker",
+      "pid": 2707018,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\"",
+        "--disable",
+        "hooks",
+        "-c",
+        "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.turn-ended'\"]"
+      ],
+      "config_read_service_tier": "default"
+    },
+    {
+      "kind": "secondmate",
+      "pid": 2710053,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\""
+      ],
+      "config_read_service_tier": "default"
+    }
+  ]
+}
+{
+  "worker": {
+    "harness": "codex",
+    "kind": "ship",
+    "service_tier_metadata_present": false
+  },
+  "worker2": {
+    "harness": "codex",
+    "kind": "ship",
+    "service_tier_metadata_present": false
+  },
+  "mate": {
+    "harness": "codex",
+    "kind": "secondmate",
+    "service_tier_metadata_present": false
+  }
+}
+Private terminal stopped; disposable labs and task launch files removed.

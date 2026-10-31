@@ -1,0 +1,17 @@
+{
+  "worker": {
+    "harness": "codex",
+    "kind": "ship",
+    "service_tier_metadata_present": false
+  },
+  "worker2": {
+    "harness": "codex",
+    "kind": "ship",
+    "service_tier_metadata_present": false
+  },
+  "mate": {
+    "harness": "codex",
+    "kind": "secondmate",
+    "service_tier_metadata_present": false
+  }
+}

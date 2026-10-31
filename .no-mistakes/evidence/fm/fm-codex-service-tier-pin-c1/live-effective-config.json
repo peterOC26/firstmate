@@ -1,0 +1,44 @@
+{
+  "codex_version": "codex-cli 0.160.0",
+  "baseline": "fast",
+  "launches": [
+    {
+      "kind": "worker",
+      "pid": 2703685,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\"",
+        "--disable",
+        "hooks",
+        "-c",
+        "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker.turn-ended'\"]"
+      ],
+      "config_read_service_tier": "default"
+    },
+    {
+      "kind": "worker",
+      "pid": 2707018,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\"",
+        "--disable",
+        "hooks",
+        "-c",
+        "notify=[\"bash\",\"-c\",\"touch '/tmp/fm-lab.nsEZhI/state/codex-tier-worker2.turn-ended'\"]"
+      ],
+      "config_read_service_tier": "default"
+    },
+    {
+      "kind": "secondmate",
+      "pid": 2710053,
+      "actual_process_flags": [
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "service_tier=\"default\""
+      ],
+      "config_read_service_tier": "default"
+    }
+  ]
+}

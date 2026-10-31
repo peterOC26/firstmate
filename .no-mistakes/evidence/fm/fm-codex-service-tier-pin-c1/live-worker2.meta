@@ -1,0 +1,15 @@
+window=primary:fm-codex-tier-worker2
+endpoint_task_id=codex-tier-worker2
+worktree=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe
+treehouse_lease_id=93c83f96d900b95ddabe24e530b85155
+treehouse_lease_holder=/tmp/fm-lab.nsEZhI/codex-tier-worker2/a1793454978.2703668.24478
+project=/tmp/fm-lab.nsEZhI/projects/probe
+harness=codex
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/codex-tier-worker2
+tasktmp=/tmp/fm-codex-tier-worker2
+model=default
+effort=default
+spawn_gen=s1793454979.2703668.20928

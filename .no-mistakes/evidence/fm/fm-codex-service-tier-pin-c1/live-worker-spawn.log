@@ -1,0 +1,21 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker/launch-brief.md records no ship branch; defaulting to legacy branch fm/codex-tier-worker
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: codex-tier-worker ships mode=local-only while the standing posture for probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe. Run 'treehouse return /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe' to release it.
+spawned codex-tier-worker harness=codex kind=ship mode=local-only yolo=off window=primary:fm-codex-tier-worker worktree=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.nsEZhI
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker2/launch-brief.md records no ship branch; defaulting to legacy branch fm/codex-tier-worker2
+warning: /tmp/fm-lab.nsEZhI/data/codex-tier-worker2/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: codex-tier-worker2 ships mode=local-only while the standing posture for probe is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe. Run 'treehouse return /tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe' to release it.
+spawned codex-tier-worker2 harness=codex kind=ship mode=local-only yolo=off window=primary:fm-codex-tier-worker2 worktree=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe

@@ -1,0 +1,4 @@
+bash pane=%0 pid=2700638 grid=140x45 cwd=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M692VAWS4BNY1S3C7BH8G545
+fm-codex-tier-worker pane=%1 pid=2701281 grid=140x45 cwd=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/1/probe
+fm-codex-tier-worker2 pane=%2 pid=2704156 grid=140x45 cwd=/tmp/fm-lab.nsEZhI/pool/.treehouse/probe-28e660/2/probe
+fm-codex-tier-mate pane=%3 pid=2708197 grid=140x45 cwd=/tmp/fm-lab.FIAkHX
