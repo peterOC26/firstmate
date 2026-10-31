@@ -116,6 +116,9 @@ init_changed_fixture_repo() {
     fm-pi-watch-extension.test.sh \
     fm-pi-windows-shell-invocation.test.sh \
     fm-afk-return.test.sh \
+    fm-supervision-host.test.sh \
+    fm-supervision-host-dialog.test.sh \
+    fm-supervision-host-recovery.test.sh \
     fm-bearings-snapshot.test.sh \
     fm-backend-cmux.test.sh \
     fm-backend-zellij.test.sh \
@@ -125,6 +128,7 @@ init_changed_fixture_repo() {
     chmod +x "$repo/tests/$script"
   done
   : >"$repo/tests/lib.sh"
+  : >"$repo/tests/supervision-host-helpers.sh"
   : >"$repo/tests/fm-backend-herdr-eventwait.test.py"
   : >"$repo/bin/fm-supervisor-target-lib.sh"
   : >"$repo/bin/fm-control-lib.sh"
@@ -238,6 +242,28 @@ test_task_marker_refuses_the_primary_checkout() {
 
   rm -rf "$tmp"
   pass "a task marker refuses execution in the primary checkout and leaves worktrees and inspection alone"
+}
+
+test_supervision_host_split_selection() {
+  local tmp repo listed expected suite
+  tmp=$(fm_test_tmproot fm-test-run-host-split)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  expected=$(printf '%s\n' tests/fm-supervision-host.test.sh \
+    tests/fm-supervision-host-dialog.test.sh tests/fm-supervision-host-recovery.test.sh \
+    | LC_ALL=C sort)
+
+  # A shared fixture change reaches each split suite, without selecting every
+  # AFK suite or silently dropping the cases moved out of the original file.
+  printf '\n' >>"$repo/tests/supervision-host-helpers.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD | LC_ALL=C sort)
+  [ "$listed" = "$expected" ] \
+    || fail "shared host fixture must select exactly the split suites: $listed"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
+  while IFS= read -r suite; do
+    assert_contains "$listed" "$suite" "split host suite must retain the AFK family"
+  done <<<"$expected"
+  pass "shared supervision-host fixtures select all split suites and retain their family"
 }
 
 test_changed_runner_surfaces_select_their_family() {
@@ -1831,6 +1857,7 @@ test_family_selection
 test_single_script_selection
 test_changed_file_selection_is_conservative
 test_task_marker_refuses_the_primary_checkout
+test_supervision_host_split_selection
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
 test_changed_dependency_selection_and_unmapped_failure
