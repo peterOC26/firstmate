@@ -1,0 +1,40 @@
+Live validation: installed Codex 0.160.0, Treehouse 2.3.0, tmux 3.5a and Herdr 0.9.0.
+
+Isolation: disposable repository/pool/home; private tmux socket with 120x40 grid; named non-default Herdr lab through fm-herdr-lab.sh. Real installed binaries were used. A noninteractive Bash launch preserved the reported foreground process group. The initial legacy endpoint record was seeded; subsequent replacements used fm-control and fm-spawn.
+
+TMUX PRODUCT OUTPUT
+LIVE CODEX: state=alive
+error: task wrapped's endpoint reads 'alive'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh wrapped exit)
+AFTER EXIT: state=dead
+pre-fix state=ambiguous
+unrelated tool state=ambiguous
+error: task wrapped's endpoint reads 'ambiguous'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh wrapped exit)
+error: task wrapped's endpoint reads 'ambiguous' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint
+relaunched wrapped harness=codex from=codex model=default effort=default backend=tmux endpoint=lab:fm-wrapped worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M691YBCJ6J85RWW6JJRBTYM0/.fm-live-validation/pool/.treehouse/repo-06b112/1/repo
+relaunched wrapped harness=codex from=codex model=default effort=default backend=tmux endpoint=lab:fm-wrapped worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M691YBCJ6J85RWW6JJRBTYM0/.fm-live-validation/pool/.treehouse/repo-06b112/1/repo
+spawned wrapped harness=codex kind=scout window=lab:fm-wrapped worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M691YBCJ6J85RWW6JJRBTYM0/.fm-live-validation/pool/.treehouse/repo-06b112/1/repo
+preserve this uncommitted work
+state: unknown · source: pane · harness state unavailable (unknown codex-unverified)
+cycle 3 stale: lab:fm-wrapped (idle 1s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+1793453961	4	stale	lab:fm-wrapped	stale: lab:fm-wrapped (idle 1s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)
+dead-report marker: dead 76207b14fb3f94319d470f2d24b36bfc
+[2026-10-31T14:39:24+0100] absorbed non-terminal stale (agent dead, already reported once, idle 3s): lab:fm-wrapped
+[2026-10-31T14:39:26+0100] absorbed non-terminal stale (agent dead, already reported once, idle 2s): lab:fm-wrapped
+[2026-10-31T14:39:28+0100] absorbed non-terminal stale (agent dead, already reported once, idle 1s): lab:fm-wrapped
+[2026-10-31T14:39:30+0100] absorbed non-terminal stale (agent dead, already reported once, idle 1s): lab:fm-wrapped
+All live tmux checks completed.
+
+HERDR PRODUCT OUTPUT
+foreground process names: bash, treehouse, bash
+Herdr wrapped Codex running: alive
+foreground process names: bash, treehouse, bash, node, codex
+Herdr after Codex exit, with registry retained: dead
+retained registry: agent=codex state=idle
+foreground process names: bash, treehouse, bash
+Herdr non-agent foreground must refuse recovery:
+foreground process names: bash, treehouse, bash, sleep
+state=alive
+
+Both live drivers exited 0. Herdr teardown verified the unchanged default-session tripwire. Both disposable labs were removed; git diff --exit-code and git status --short confirmed no source changes or transient files remained.
+
+The existing fm-crew-state semantic busy-state limitation (unknown codex-unverified) remains visible. Recovery-grade endpoint classification, repeated relaunches and watcher duplicate suppression were verified independently against real processes.

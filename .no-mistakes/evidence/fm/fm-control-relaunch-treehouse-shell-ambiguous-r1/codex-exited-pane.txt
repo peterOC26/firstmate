@@ -1,0 +1,40 @@
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M691YBCJ6J85RWW6JJRBTYM0/.fm-live-validation/pool/.treeho
+use/repo-06b112/1/repo. Type 'exit' to return.
+export CODEX_HOME='/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M691YBCJ6J85RWW6JJRBTYM0/.fm-live-validation/codex-h
+ome'
+codex --dangerously-bypass-approvals-and-sandbox -c features.codex_hooks=false -c check_for_update_on_startup=false
+Session ID: 01a1922e-3ec7-7e00-8444-84d0dd46de2b
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
