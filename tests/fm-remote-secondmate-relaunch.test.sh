@@ -92,7 +92,6 @@ printf 'herdr_session=fm-remote\n'
 printf 'harness=%s\n' "$harness"
 printf 'model=%s\n' "$model"
 printf 'effort=%s\n' "$effort"
-[ "$harness" != codex ] || printf 'service_tier=default\n'
 SH
 chmod +x "$FAKEBIN/fake-ssh"
 
@@ -137,17 +136,6 @@ assert_grep 'model=claude-opus-5-5' "$HOME_DIR/state/ios.meta" \
 assert_no_grep 'harness=default' "$HOME_DIR/state/ios.meta" \
   "the parent record must not keep the unresolved request"
 pass "a remote relaunch records the identity the host confirmed"
-
-reset_meta
-printf 'service_tier=fast\n' >> "$HOME_DIR/state/ios.meta"
-OUT=$(run_relaunch ios codex default default); RC=$?
-expect_code 0 "$RC" "confirmed Codex tier must be recorded"$'\n'"$OUT"
-assert_grep 'service_tier=default' "$HOME_DIR/state/ios.meta" "parent lost the confirmed Codex service tier"
-assert_no_grep 'service_tier=fast' "$HOME_DIR/state/ios.meta" "parent kept a stale Codex tier"
-OUT=$(run_relaunch ios claude default default); RC=$?
-expect_code 0 "$RC" "switching away from Codex must succeed"$'\n'"$OUT"
-assert_no_grep 'service_tier=' "$HOME_DIR/state/ios.meta" "Codex tier leaked into another harness's record"
-pass "a remote relaunch records the confirmed Codex tier and clears it when switching harnesses"
 
 # --- a refused relaunch leaves the parent's record untouched -----------------
 reset_meta

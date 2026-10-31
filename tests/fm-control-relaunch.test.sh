@@ -920,51 +920,6 @@ test_same_harness_relaunch_keeps_the_profile_axes() {
   pass "fm-control relaunch: a same-harness relaunch keeps the profile axes it was running with"
 }
 
-test_codex_relaunch_service_tier() {
-  local dir id mode out rc expected prior
-  for mode in legacy preserve override switch; do
-    id="codex-tier-$mode"
-    dir=$(new_case "$id" "$id")
-    prior=codex
-    [ "$mode" != switch ] || prior=claude
-    add_ship_task "$dir" "$id" "$prior"
-    printf '%s' "$prior" > "$dir/fake/command"
-    printf '%s' codex > "$dir/fake/becomes"
-    expected=default
-    case "$mode" in
-      preserve|override) printf 'service_tier=fast\n' >> "$dir/home/state/$id.meta" ;;
-    esac
-    case "$mode" in
-      preserve) expected=fast; out=$(run_control "$dir" "$id" relaunch --note 'continue'); rc=$? ;;
-      override) out=$(run_control "$dir" "$id" relaunch --service-tier default --note 'regular service'); rc=$? ;;
-      switch) out=$(run_control "$dir" "$id" relaunch --harness codex --note 'switch runtime'); rc=$? ;;
-      *) out=$(run_control "$dir" "$id" relaunch --note 'continue'); rc=$? ;;
-    esac
-    expect_code 0 "$rc" "Codex $mode relaunch must succeed"$'\n'"$out"
-    assert_contains "$(cat "$dir/fake/literal")" "-c 'service_tier=\"$expected\"'" "Codex $mode relaunch lost its service tier"
-    [ "$(meta_field "$dir" "$id" service_tier)" = "$expected" ] || fail "Codex $mode metadata lost its tier"
-  done
-  printf '%s' claude > "$dir/fake/becomes"
-  : > "$dir/fake/literal"
-  out=$(run_control "$dir" "$id" relaunch --harness claude --note 'switch runtime'); rc=$?
-  expect_code 0 "$rc" "switching away from Codex must succeed"$'\n'"$out"
-  assert_not_contains "$(cat "$dir/fake/literal")" service_tier "Codex tier leaked into another harness's launch"
-  assert_no_grep 'service_tier=' "$dir/home/state/$id.meta" "Codex tier leaked into another harness's record"
-  pass "Codex relaunch defaults legacy and switched tasks to regular service, preserves explicit tiers, and accepts a replacement override"
-}
-
-test_codex_tier_refusal_preserves_the_running_agent() {
-  local dir out rc
-  dir=$(new_case codex-tier-refusal tier-refusal)
-  add_ship_task "$dir" tier-refusal claude
-  out=$(run_control "$dir" tier-refusal relaunch --service-tier fast --note 'continue'); rc=$?
-  expect_code 1 "$rc" "Codex service-tier option must refuse another harness"
-  assert_contains "$out" '--service-tier requires the canonical --harness codex launch' "refusal must name the option"
-  [ "$(cat "$dir/fake/command")" = claude ] || fail "tier refusal stopped the running agent"
-  [ ! -s "$dir/fake/literal" ] || fail "tier refusal sent input to the running agent"
-  pass "a Codex tier option on another harness refuses before stopping the agent"
-}
-
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop() {
   local dir out rc id=rl-ultra
   dir=$(new_case native-ultra "$id")
@@ -2962,8 +2917,6 @@ test_harness_switch_does_not_carry_the_old_profile_axes
 test_harness_switch_resolves_a_prefixed_recorded_harness
 test_prefixed_recorded_harness_requires_explicit_replacement
 test_same_harness_relaunch_keeps_the_profile_axes
-test_codex_relaunch_service_tier
-test_codex_tier_refusal_preserves_the_running_agent
 test_native_ultra_relaunch_preserves_profile_and_rejects_before_stop
 test_signed_out_worker_account_pin_refuses_before_stop
 test_worker_account_pin_follows_the_relaunch

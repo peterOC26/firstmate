@@ -91,19 +91,15 @@ test_installed_codex_still_reports_the_hook_feature() {
   printf 'ok - codex %s still publishes the hook feature flag firstmate disables\n' "$CODEX_VERSION"
 }
 
-# Resolve real configuration without submitting a model turn. A hostile Fast
-# preference makes the default arm non-vacuous: it must override that setting,
-# while the explicit per-task arm must remain Fast.
 test_installed_codex_resolves_the_captured_service_tier() {
   local codex_home launch flags tier effective
   codex_home="$TMP_ROOT/tier-config"
   mkdir -p "$codex_home"
   printf 'service_tier = "fast"\n' > "$codex_home/config.toml"
-  for tier in baseline default fast; do
+  for tier in baseline default; do
     flags=
     case "$tier" in
       default) launch=$(capture_codex_launch tier-default --mode no-mistakes --yolo off); flags=$(codex_global_flags "$launch") ;;
-      fast) launch=$(capture_codex_launch tier-fast --mode no-mistakes --yolo off --service-tier fast); flags=$(codex_global_flags "$launch") ;;
     esac
     effective=$(CODEX_HOME="$codex_home" FM_TEST_CODEX_FLAGS="$flags" python3 - <<'PY'
 import json
@@ -150,11 +146,11 @@ finally:
 PY
     ) || fail "codex $CODEX_VERSION could not resolve the $tier service tier"
     case "$tier:$effective" in
-      baseline:fast|default:default|fast:fast) ;;
+      baseline:fast|default:default) ;;
       *) fail "codex $CODEX_VERSION resolved $tier service tier to '$effective'" ;;
     esac
   done
-  printf 'ok - codex %s overrides a Fast preference with regular service and honors an explicit task tier\n' "$CODEX_VERSION"
+  printf 'ok - codex %s overrides a Fast preference with regular service\n' "$CODEX_VERSION"
 }
 
 test_installed_codex_still_reports_the_hook_feature

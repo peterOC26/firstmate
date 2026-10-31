@@ -5,7 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
-#                                         [--effort <level>] [--service-tier <tier>]
+#                                         [--effort <level>]
 #                                         (--note <text> | --note-file <path>)
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
@@ -70,8 +70,6 @@
 #              plus its optional model and effort tokens) exactly as any other
 #              respawn does, while a ship or scout keeps the exact adapter
 #              already recorded for it.
-#              Codex service-tier selection follows bin/fm-spawn.sh's option
-#              contract; --service-tier overrides it for the replacement.
 #              A prefixed raw-command basename cannot reconstruct its launch
 #              command, so relaunch requires an explicit --harness for it.
 #              A replacement Claude or Pi profile must also pass this home's
@@ -247,11 +245,9 @@ fi
 NEW_HARNESS=
 NEW_MODEL=
 NEW_EFFORT=
-NEW_SERVICE_TIER=
 HARNESS_SET=0
 MODEL_SET=0
 EFFORT_SET=0
-SERVICE_TIER_SET=0
 NOTE=
 NOTE_SET=0
 control_want_value=
@@ -264,7 +260,6 @@ for control_arg in "$@"; do
       harness) NEW_HARNESS=$control_arg; HARNESS_SET=1 ;;
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
-      service-tier) NEW_SERVICE_TIER=$control_arg; SERVICE_TIER_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -282,8 +277,6 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
-    --service-tier) control_want_value=service-tier ;;
-    --service-tier=*) NEW_SERVICE_TIER=${control_arg#--service-tier=}; SERVICE_TIER_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -301,8 +294,8 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$SERVICE_TIER_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
-    || die "--harness, --model, --effort, --service-tier, and --note apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] \
+    || die "--harness, --model, --effort, and --note apply to 'relaunch' only"
 fi
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
@@ -311,11 +304,6 @@ case "$NEW_EFFORT" in
   ''|default|low|medium|high|xhigh|max|ultra) ;;
   *) die "--effort must be one of default, low, medium, high, xhigh, max, ultra" ;;
 esac
-if [ "$SERVICE_TIER_SET" = 1 ]; then
-  case "$NEW_SERVICE_TIER" in
-    ''|*[!a-zA-Z0-9_-]*) die "--service-tier requires a non-empty tier name (letters, digits, underscore, or dash)" ;;
-  esac
-fi
 
 # --- exact task-id resolution ----------------------------------------------
 
@@ -823,7 +811,6 @@ PRIOR_EFFORT=
 TARGET_HARNESS=$HARNESS
 TARGET_MODEL=
 TARGET_EFFORT=
-TARGET_SERVICE_TIER=
 
 journal_write() {  # <phase> [extra-line]...
   local phase=$1
@@ -843,7 +830,6 @@ journal_write() {  # <phase> [extra-line]...
     echo "to_harness=$TARGET_HARNESS"
     echo "to_model=$TARGET_MODEL"
     echo "to_effort=$TARGET_EFFORT"
-    [ -z "$TARGET_SERVICE_TIER" ] || echo "to_service_tier=$TARGET_SERVICE_TIER"
     local line
     for line in "$@"; do
       echo "$line"
@@ -991,21 +977,6 @@ resolve_relaunch_profile() {
     TARGET_EFFORT=$PRIOR_EFFORT
   else
     TARGET_EFFORT=default
-  fi
-  if [ "$SERVICE_TIER_SET" = 1 ] && [ "$TARGET_HARNESS" != codex ]; then
-    die "--service-tier requires the canonical --harness codex launch"
-  fi
-  TARGET_SERVICE_TIER=
-  if [ "$TARGET_HARNESS" = codex ]; then
-    if [ "$SERVICE_TIER_SET" = 1 ]; then
-      TARGET_SERVICE_TIER=$NEW_SERVICE_TIER
-    elif [ "$PRIOR_HARNESS" = codex ]; then
-      TARGET_SERVICE_TIER=$(fm_meta_get "$META" service_tier)
-    fi
-    TARGET_SERVICE_TIER=${TARGET_SERVICE_TIER:-default}
-    case "$TARGET_SERVICE_TIER" in
-      *[!a-zA-Z0-9_-]*) die "invalid recorded Codex service_tier" ;;
-    esac
   fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
@@ -1190,7 +1161,6 @@ do_relaunch() {
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
-  [ -z "$TARGET_SERVICE_TIER" ] || spawn_args+=(--service-tier "$TARGET_SERVICE_TIER")
   if FM_CONTROL_RELAUNCH_TX="$RELAUNCH_TX" \
       "$SCRIPT_DIR/fm-spawn.sh" "${spawn_args[@]}" >/dev/null; then
     RELAUNCH_META_PUBLISHED=1
