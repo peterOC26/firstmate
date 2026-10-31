@@ -427,7 +427,8 @@
 #   Pins are never inherited; remote per-mate overrides refuse locally.
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
-#     __BRIEF__    absolute path to data/<task-id>/brief.md
+#     __BRIEF__    absolute path to the rendered brief; for Codex briefs over
+#                  64 KiB, a short pointer file beside that brief instead
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
 #     __CLAUDEADDDIRS__ quoted --add-dir flags granting exactly this task's
 #                  Firstmate channel directories (claude_add_dirs_flag below;
@@ -6041,6 +6042,21 @@ fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
+# Linux limits each exec argument to 128 KiB independently of ARG_MAX.
+# Keep the encoded Codex prompt comfortably below that limit, including its
+# operational envelope, without trimming intent or accumulated progress notes.
+if [ "$HARNESS" = codex ] && [ "$(wc -c < "$BRIEF")" -gt 65536 ]; then
+  CODEX_PROMPT_FILE="$BRIEF_DIR_REAL/codex-launch-prompt.md"
+  CODEX_PROMPT_TMP="$CODEX_PROMPT_FILE.${BASHPID:-$$}.tmp"
+  # shellcheck disable=SC2016 # Backticks delimit the brief path in the prompt.
+  if ! (umask 077 && printf 'Read the complete launch brief at `%s` and follow it exactly. Its current role contract establishes your role before project instructions.\n' \
+      "$BRIEF_REAL" > "$CODEX_PROMPT_TMP" && mv -f "$CODEX_PROMPT_TMP" "$CODEX_PROMPT_FILE"); then
+    rm -f -- "$CODEX_PROMPT_TMP"
+    echo "error: could not stage the Codex launch brief pointer for $ID" >&2
+    exit 1
+  fi
+  sq_brief=$(shell_quote "$CODEX_PROMPT_FILE")
+fi
 sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")
