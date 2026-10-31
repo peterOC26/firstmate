@@ -1,16 +1,13 @@
-# Codex regular-service live validation
+Codex regular-service live validation
 
-Installed product: `codex-cli 0.160.0`.
+Installed CLI: codex-cli 0.160.0.
 
-The evidence driver ran the current `bin/fm-spawn.sh` against real tmux and Treehouse, with marked disposable lab homes and a private `fm-lab` socket. Every Codex terminal had a 140 × 45 grid before the TUI started.
+Two real batch workers and one real scout were launched by bin/fm-spawn.sh through real Treehouse leases into a private tmux server. All three had 120x40 terminals and the fixed service_tier="default" argument in their running Codex process. Persisted task metadata contained no configurable service tier. The lab and its private tmux server were removed after capture.
 
-| User action | Observed result |
-| --- | --- |
-| Start a Codex-only batch with two workers | Both native Codex processes received `-c service_tier="default"`. |
-| Start a Codex second mate | The native Codex process received the same fixed pin. |
-| Start with an existing Fast preference | Real Codex app-server `config/read` returned `fast` without launch flags, and `default` for the exact flags captured from each of the three running processes. |
-| Inspect the resulting task records | All three recorded Codex as their tool and contained no saved `service_tier` setting. |
+The real Codex app-server config/read API resolved those observed process flags against a temporary Fast configuration. All three resolved to default; removing only the service-tier override resolved to fast. The actual features interface reported hooks disabled for workers.
 
-The TUI reached its folder-trust prompt. Trust was not approved, user configuration was not edited, and no model turn was submitted. The measured outcome is process launch and effective CLI configuration, not API billing or response speed. The temporary configuration home used by the config/read probes held no credentials and required no login.
+Secondmate launch construction used the repository's mock-transport fixture. Its generated flags were then passed to the real Codex app-server and features interfaces: service tier default, hooks enabled. This is live configuration evidence, not a claim of a live secondmate lifecycle.
 
-Driver: `bash live-launch.sh` from the gate worktree. Driver setup errors (process selection and batch syntax) and read-only hook-directory cleanup were corrected, then the complete proof was re-driven successfully. `live-effective-config.json` and `live-metadata-check.json` contain the final observations; `live-process-argv.json`, the spawn logs, and pane captures retain their provenance. The private terminal server, lab homes, and task launch directories were removed afterward.
+The worker TUIs reached the folder-trust prompt. It was left unanswered to preserve user-level trust configuration. No model response or provider billing tier was asserted. This change affects CLI configuration, not visual layout; process arguments and API responses are the primary product evidence.
+
+Validation command completed successfully: bash bin/fm-test-run.sh --jobs 1 tests/fm-codex-hook-layer-live-e2e.test.sh tests/fm-spawn-dispatch-profile.test.sh. No source changes were made.

@@ -1,0 +1,35 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/data/tier-batch-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/tier-batch-a
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/data/tier-batch-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tier-batch-a ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/1/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/1/project' to release it.
+spawned tier-batch-a harness=codex kind=ship mode=local-only yolo=off window=lab-host:fm-tier-batch-a worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/1/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/data/tier-batch-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/tier-batch-b
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/data/tier-batch-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: tier-batch-b ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/2/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/2/project' to release it.
+spawned tier-batch-b harness=codex kind=ship mode=local-only yolo=off window=lab-host:fm-tier-batch-b worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/2/project
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 8s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/3/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/3/project' to release it.
+spawned tier-scout harness=codex kind=scout window=lab-host:fm-tier-scout worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/3/project

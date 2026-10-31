@@ -1,0 +1,125 @@
+[
+  {
+    "task": "tier-batch-a",
+    "harness": "codex",
+    "backend": "tmux",
+    "window": "lab-host:fm-tier-batch-a",
+    "grid": "120x40",
+    "processes": [
+      {
+        "pid": 3529076,
+        "argv": [
+          "node",
+          "/usr/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-a.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/1/project"
+      },
+      {
+        "pid": 3529128,
+        "argv": [
+          "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-a.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/1/project"
+      }
+    ],
+    "saved_service_tier": null
+  },
+  {
+    "task": "tier-batch-b",
+    "harness": "codex",
+    "backend": "tmux",
+    "window": "lab-host:fm-tier-batch-b",
+    "grid": "120x40",
+    "processes": [
+      {
+        "pid": 3540289,
+        "argv": [
+          "node",
+          "/usr/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-b.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/2/project"
+      },
+      {
+        "pid": 3540386,
+        "argv": [
+          "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-b.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/2/project"
+      }
+    ],
+    "saved_service_tier": null
+  },
+  {
+    "task": "tier-scout",
+    "harness": "codex",
+    "backend": "tmux",
+    "window": "lab-host:fm-tier-scout",
+    "grid": "120x40",
+    "processes": [
+      {
+        "pid": 3551466,
+        "argv": [
+          "node",
+          "/usr/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-scout.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/3/project"
+      },
+      {
+        "pid": 3551568,
+        "argv": [
+          "/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex",
+          "--dangerously-bypass-approvals-and-sandbox",
+          "-c",
+          "service_tier=\"default\"",
+          "--disable",
+          "hooks",
+          "-c",
+          "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-scout.turn-ended'\"]",
+          "<launch brief omitted; flags retained verbatim>"
+        ],
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/pool/.treehouse/project-e33652/3/project"
+      }
+    ],
+    "saved_service_tier": null
+  }
+]

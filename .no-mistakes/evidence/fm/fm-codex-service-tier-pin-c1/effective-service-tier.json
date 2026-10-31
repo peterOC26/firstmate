@@ -1,0 +1,156 @@
+[
+  {
+    "scenario": "Fast preference without launch pin",
+    "hooks_enabled": true,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "fast"
+        }
+      }
+    },
+    "launch_flags": []
+  },
+  {
+    "scenario": "tier-batch-a",
+    "hooks_enabled": false,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "default"
+        }
+      }
+    },
+    "launch_flags": [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-a.turn-ended'\"]"
+    ]
+  },
+  {
+    "scenario": "tier-batch-b",
+    "hooks_enabled": false,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "default"
+        }
+      }
+    },
+    "launch_flags": [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-b.turn-ended'\"]"
+    ]
+  },
+  {
+    "scenario": "tier-scout",
+    "hooks_enabled": false,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "default"
+        }
+      }
+    },
+    "launch_flags": [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\"",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-scout.turn-ended'\"]"
+    ]
+  },
+  {
+    "scenario": "same worker launch without the pin (counterfactual)",
+    "hooks_enabled": false,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "fast"
+        }
+      }
+    },
+    "launch_flags": [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "--disable",
+      "hooks",
+      "-c",
+      "notify=[\"bash\",\"-c\",\"touch '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M69FH37Q1230T52YRHMGY8AD/.tier-live.G16ZuH/home/state/tier-batch-a.turn-ended'\"]"
+    ]
+  },
+  {
+    "scenario": "secondmate generated launch flags (mock transport; real Codex configuration)",
+    "hooks_enabled": true,
+    "request": {
+      "id": 2,
+      "method": "config/read",
+      "params": {
+        "includeLayers": false
+      }
+    },
+    "response": {
+      "id": 2,
+      "result": {
+        "config": {
+          "service_tier": "default"
+        }
+      }
+    },
+    "launch_flags": [
+      "--dangerously-bypass-approvals-and-sandbox",
+      "-c",
+      "service_tier=\"default\""
+    ]
+  }
+]

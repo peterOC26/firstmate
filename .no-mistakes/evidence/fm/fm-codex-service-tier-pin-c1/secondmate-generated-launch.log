@@ -1,0 +1,2 @@
+warning: secondmate tier-secondmate-proof sync skipped before launch: primary default-branch commit cannot be resolved
+spawned tier-secondmate-proof harness=codex kind=secondmate mode=secondmate yolo=off window=firstmate:fm-tier-secondmate-proof worktree=/tmp/tier-secondmate-config.CjvREZ/secondmate
