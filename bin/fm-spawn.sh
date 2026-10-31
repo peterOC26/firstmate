@@ -57,6 +57,14 @@
 #   first in the private launch-brief overlay, including the exact task-owned
 #   steering inbox. This never rewrites a project's instruction files or a
 #   secondmate's charter.
+#   Codex launches encode the complete brief inline up to 65536 bytes (64 KiB).
+#   Above that size, codex-launch-prompt.md beside the brief carries a short
+#   instruction to read its absolute path and apply its current role contract
+#   before project instructions. The pointer is staged atomically with umask
+#   077; a staging failure refuses launch. The complete brief, including intent
+#   and accumulated progress notes, remains intact on disk, keeping the launch
+#   argument below Linux's per-argument limit without manual note archiving.
+#   tests/fm-control-relaunch.test.sh covers inline and oversized delivery.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>]
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
@@ -427,8 +435,8 @@
 #   Pins are never inherited; remote per-mate overrides refuse locally.
 #   bin/fm-worker-account-lib.sh owns parsing, the check, and the shed list.
 #   Launch templates live in launch_template() below; placeholders replaced before launch:
-#     __BRIEF__    absolute path to the rendered brief; for Codex briefs over
-#                  64 KiB, a short pointer file beside that brief instead
+#     __BRIEF__    absolute path to the rendered brief, or the Codex pointer
+#                  described above
 #     __CLAUDEPERMFLAG__ the claude permission flag selected by config/claude-permission-mode
 #     __CLAUDEADDDIRS__ quoted --add-dir flags granting exactly this task's
 #                  Firstmate channel directories (claude_add_dirs_flag below;
