@@ -478,7 +478,7 @@ EOF
   fi
 
   # A readable foreground process group settles the negative verdicts: only a
-  # group that is nothing but shells is confidently agent-free.
+  # group classified entirely as `shell` is confidently agent-free.
   if [ "$fg_seen" -eq 1 ]; then
     if [ "$fg_other" -eq 0 ] && [ "$fg_shell" -eq 1 ]; then
       printf 'dead'

@@ -2118,7 +2118,7 @@ fm_backend_herdr_explicit_close_pane_confirmed() {  # <session> <pane_id>
 #                a verified harness is still a descendant of the pane shell
 #                outside the foreground group (suspended or backgrounded). A
 #                registered agent whose process still exists is never demoted.
-#   shell      - every foreground process is a recognized shell AND no
+#   shell      - every foreground process is classified as `shell` AND no
 #                descendant of the pane shell is a verified harness: positive
 #                proof the pane is shell-only. The descendant walk is what makes
 #                this safe even when a nested interactive shell sits under
