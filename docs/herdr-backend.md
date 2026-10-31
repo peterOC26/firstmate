@@ -804,12 +804,12 @@ In that case `agent get` still reports `agent=pi` with its last status.
 The [runtime verification record](verification/runtime-backends.md) documents the nested-shell reproduction under "Stale agent registration".
 
 So before a registered agent counts as live, the pane classifier reads `pane process-info` and the real process table.
-It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, the same rule the tmux adapter proves liveness with:
+It uses the shared [harness-process classifier](../bin/fm-agent-process-lib.sh), including the [Treehouse wrapper handling used by tmux](tmux-backend.md#agent-liveness-probe):
 
 | What the process view shows | Verdict |
 | --- | --- |
 | A harness in the foreground process group, or still a descendant of the pane shell | The registration stays live. |
-| A foreground that is nothing but shells, with no harness descendant | A `stale-agent` pane: agent-free, with that explicit reason. |
+| A foreground classified entirely as `shell`, with no harness descendant | A `stale-agent` pane: agent-free, with that explicit reason. |
 | A foreground holding anything else | The registration stays live, but only after the same bounded settle window the idle-shell proof uses. |
 | An unreadable process view | The pane is `unknown`, trusting neither the registration nor its absence. |
 

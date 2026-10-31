@@ -183,6 +183,44 @@ zsh
 A persistent parent shell waiting for a child remained reported as the parent process, while a shell that directly execed a simple command changed identity with the process itself.
 Pi and pi-signed 0.82.0 were reverified on 2026-07-27 through real isolated `fm-spawn.sh` launches.
 
+### Treehouse wrapper recovery
+
+Verified on 2026-10-31 on Linux with tmux 3.5a using native wrapper fixtures on a private socket and offline Herdr CLI fixtures backed by the real process table.
+The tmux case keeps the wrapper and nested Bash in the foreground after the Codex-named process exits, and tests both the executable basename and the `treehouse get` process title.
+The Herdr case exercises the same identities and an absolute executable path with a stale registration, while retaining refusal for live Codex and unrelated foreground tools.
+This is classifier evidence; it does not claim a live Herdr relaunch or use a Treehouse pool operation.
+
+Refresh with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-tmux-agent-liveness.test.sh tests/fm-backend-herdr.test.sh
+```
+
+The focused cases report:
+
+```text
+ok - tmux liveness: Treehouse wrappers stay alive with Codex and read dead after its exit
+ok - tmux liveness: unrelated Treehouse-like names stay ambiguous
+ok - herdr Treehouse wrapper: exited workers read dead; live Codex and unrelated tools still prevent recovery
+```
+
+The token-free installed-harness guard also passed on the same date:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-harness-liveness-drift-live-e2e.test.sh
+```
+
+```text
+# claude 2.1.289 (Claude Code): title='claude' foreground=[claude ]
+# codex codex-cli 0.160.0: title='node' foreground=[node codex ]
+# pi 1.0.3: title='pi' foreground=[pi ]
+# grok grok 1.0.46 (2765805b9442) [stable]: title='grok' foreground=[grok ]
+# checked 4 installed harness(es)
+```
+
+All four classified `alive` and were identified by the ancestry walk at comm strength.
+OpenCode, pi-signed, Kimi, Cursor, and Muse were absent and remain unverified by this run.
+
 ### Agent liveness name sources
 
 The earlier record that every harness is observed under its own `#{pane_current_command}` no longer holds and has been replaced by the per-harness evidence below.
