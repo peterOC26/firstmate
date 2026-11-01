@@ -1,0 +1,69 @@
+fm-herdr-lab: tripwire already exists for 'fm-lab-grok-exit-test-4123750-14729'; refusing ambiguous ownership
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh name grok-composer
+fm-lab-grok-composer-4167258-23444
+
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/.test-tmp/fm-lab.bi37dph3
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/.test-tmp/fm-lab.bi37dph3
+
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh provision fm-lab-grok-composer-4167258-23444
+
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh run fm-lab-grok-composer-4167258-23444 workspace create --cwd /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9 --no-focus --env FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/.test-tmp/fm-lab.bi37dph3 --env GROK_PROMPT_SUGGESTIONS=1
+{"id":"cli:workspace:create","result":{"root_pane":{"agent_status":"unknown","cwd":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9","focused":true,"foreground_cwd":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9","pane_id":"w1:p1","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":40},"tab_id":"w1:t1","terminal_id":"term_65f3d7f9ae2611","workspace_id":"w1"},"tab":{"agent_status":"unknown","focused":true,"label":"1","number":1,"pane_count":1,"tab_id":"w1:t1","workspace_id":"w1"},"type":"workspace_created","workspace":{"active_tab_id":"w1:t1","agent_status":"unknown","focused":true,"label":"01M6CE2V3S2K05SQ401JZWGCA9","number":1,"pane_count":1,"tab_count":1,"workspace_id":"w1"}}}
+
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh run fm-lab-grok-composer-4167258-23444 pane run w1:p1 env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE grok --model grok-4.7 --reasoning-effort low --always-approve --leader-socket /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/.test-tmp/fm-lab.bi37dph3/grok.sock --session-id 7412fa80-18d4-4af5-a7d1-9c3cddbde8af
+
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh run fm-lab-grok-composer-4167258-23444 pane read w1:p1 --source visible --format ansi
+
+  [0m[2m detached worktree [0m~/.n/w/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9
+
+
+
+
+                                                    ⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄
+                                                    ⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀
+                                                    ⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀
+                                                    ⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀
+                                                    ⠀⠀⢹⣷⠀⠀⠀⠀⠀⢀⣴⡿⠀⠀
+                                                    ⠀⢀⠞⠁⠠⢶⣶⣶⣶⠿⠋⠀⠀⠀
+                                                    ⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+
+
+                                     Do you trust the contents of this directory?
+                       /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9
+
+                               Grok Build may run or modify contents in this directory,
+                                                posing security risks.
+
+                                             [0m[1mYes, proceed                 [0my
+                                             [0m[1mNo, quit                     [0mn
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                          [0m[1mGrok Build  [0m1.0.46 [stable]
+rc=0
+$ bash -c . bin/fm-composer-lib.sh; fm_composer_classify_screen "styled=1
+cursor=0
+identity=1
+rows=40" "$FM_LIVE_SCREEN"
+unknown
+rc=0
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE2V3S2K05SQ401JZWGCA9/bin/fm-herdr-lab.sh teardown fm-lab-grok-composer-4167258-23444
+
+rc=0

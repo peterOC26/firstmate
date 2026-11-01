@@ -1,0 +1,47 @@
+Behavioral classifier checks on constructed reported-screen fixtures. NOT LIVE GROK CAPTURES.
+Base: f89b73c5457bea9d17ae26a91e6cc19c0c4ec88a; head: 6b3e02c4d9a66c657104ce5822be004a658e0c06
+
+Reported placeholder, idle footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ Build anything                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=empty expected=empty
+
+Reported dim accepted suggestion, adjacent footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ \x1b[2m: Firstmate instruction waiting\x1b[0m                                        │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=empty expected=empty
+
+Reported dark truecolor suggestion, adjacent footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ \x1b[38;2;90;90;90m: Firstmate instruction waiting\x1b[0m                                        │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=empty expected=empty
+
+Bright doorbell on suggestion footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ : Firstmate instruction waiting                                        │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=pending expected=pending
+
+Typed exact placeholder with send hint
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ Build anything                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Enter:send │ Shift+Enter/Alt+Enter:newline │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=pending expected=pending
+
+Typed ordinary draft with idle footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ deploy the fix                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=pending expected=pending
+
+Typed prefix with dim completion
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ deploy \x1b[2mthe fix\x1b[0m                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=pending expected=pending
+
+Misleading suggestion-only footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ Build anything                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Tab/→:accept suggestion'
+base=unknown head=unknown expected=unknown
+
+Misleading prose footer
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯ Build anything                                                         │\n  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\nsee the accept suggestion │ docs'
+base=unknown head=unknown expected=unknown
+
+Unrecognised oversized title, empty body
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯                                                                        │\n  ╰────────────────────────────────────────────────────────── Grok 9.9 (some-very-long-title) ─╯\n  Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=unknown expected=unknown
+
+Mismatched bottom indent, empty body
+'  ╭──────────────────────────────────────────────────────────────────────────╮\n  │ ❯                                                                        │\n   ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯\n  Shift+Tab:mode │ Ctrl+.:shortcuts'
+base=unknown head=unknown expected=unknown
+
