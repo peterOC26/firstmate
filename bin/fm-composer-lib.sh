@@ -1272,13 +1272,6 @@ _fm_composer_row_is_grok_footer() {  # <trimmed-row>
   local row=$1
   [ -n "$row" ] || return 1
   case "$row" in
-    *'accept suggestion'*)
-      case "$row" in
-        *'Shift+Tab'*|*'│'*|*'Tab/'*) return 0 ;;
-      esac
-      ;;
-  esac
-  case "$row" in
     *'Shift+Tab:mode'*) ;;
     *) return 1 ;;
   esac

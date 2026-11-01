@@ -1140,6 +1140,25 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   pass "matrix: grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
 }
 
+test_matrix_grok_suggestion_mentions_are_not_footers() {
+  local footer screen box caps text
+  for text in ' Build anything' ' deploy the fix'; do
+    box=$(grok_idle_screen "$(grok_idle_row "$text")" none)
+    for footer in 'Tab/→:accept suggestion' 'see the accept suggestion │ docs' 'accept suggestion Shift+Tab'; do
+      screen=$(printf '%s\n%s\n' "$box" "$footer")
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "adjacent suggestion mention invalidates cursorless box" unknown "$caps" "$screen"
+      done
+      assert_screen "suggestion mention cannot clear cursor-anchored text" pending "$CAPS_TMUX" "$screen" 1
+      screen=$(printf '%s\n\n%s\n' "$box" "$footer")
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN" "$CAPS_TMUX"; do
+        assert_screen "separated suggestion mention cannot clear text" pending "$caps" "$screen" 1
+      done
+    done
+  done
+  pass "matrix: suggestion mentions without the mode hint are not Grok footers"
+}
+
 test_matrix_grok_footer_preserves_ambiguous_geometry() {
   local geometry body mode row screen expected caps
   for geometry in title indent; do
@@ -1516,6 +1535,7 @@ test_matrix_opencode_leftbar_cwd_furniture
 test_matrix_opencode_leftbar_abs_cwd_furniture
 test_matrix_grok_titled_bottom_border
 test_matrix_grok_idle_placeholder_and_suggestion_ghost
+test_matrix_grok_suggestion_mentions_are_not_footers
 test_matrix_grok_footer_preserves_ambiguous_geometry
 test_matrix_grok_1046_real_key_bar
 test_matrix_claude_titled_top_rule
