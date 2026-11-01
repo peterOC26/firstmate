@@ -68,8 +68,12 @@
 #                          two recovery-grade verdicts license it, and every other
 #                          verdict escalates unchanged. A delivered terminal
 #                          status on that same gone endpoint takes this once-report
-#                          instead of a bare stale for every new pane hash; a live
-#                          agent keeps the bare stale.
+#                          instead of a bare stale for every new pane hash. The
+#                          report is keyed on the busy generation when one is
+#                          readable, and otherwise on the delivered status
+#                          identity, so a footer tick is not a new report.
+#                          A live agent keeps the bare stale, and a probe that
+#                          is not dead or missing clears that once-report.
 #                          Where config/wedge-evidence-guards lists operator
 #                          guards, a live pane about to escalate whose guard
 #                          answers CRITICAL defers a bounded run of windows
@@ -1488,6 +1492,40 @@ terminal_status_already_delivered() {  # <task>
   [ "$rc" -eq 1 ]
 }
 
+# Fallback id for wedge_dead_record when no busy generation is readable.
+# It is the delivered status identity, <size>@<file-ident>, from the span the
+# heartbeat has already classified.
+# A footer tick does not change it, and a new delivered line does.
+# The classified endpoint byte is the last resort when that identity cannot be
+# formed.
+# Returns 1 unless the span read is a clean delivery, so a failed or undelivered
+# read keeps the bare stale instead of a once-only report this cannot key.
+delivered_terminal_dead_id() {  # <task>
+  local task=$1 record rc size rest ident offset
+  [ -n "$task" ] || return 1
+  terminal_status_already_delivered "$task" || return 1
+  offset=$(hb_surfaced_offset "$task") || return 1
+  record=$(status_span_first_actionable_record "$STATE/$task.status" "$offset")
+  rc=$?
+  [ "$rc" -eq 1 ] || return 1
+  size=${record%%$'\t'*}
+  rest=${record#*$'\t'}
+  ident=${rest%%$'\t'*}
+  case "$size" in
+    ''|*[!0-9]*) ;;
+    *)
+      case "$ident" in
+        ''|*$'\n'*|*$'\t'*) ;;
+        *) printf '%s@%s' "$size" "$ident"; return 0 ;;
+      esac
+      ;;
+  esac
+  case "$offset" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf 'offset:%s' "$offset"
+}
+
 # The question the wedge timer never asked before it alarmed: is there still an
 # agent here to BE wedged? A wedge is something stuck that might recover, so
 # re-alarming it earns its cost; an agent that is gone never moves again, its pane
@@ -1510,20 +1548,24 @@ terminal_status_already_delivered() {  # <task>
 # for different things.
 #
 # The marker is owned entirely by this function and records the verdict together
-# with the agent incarnation it was reported for: the task's per-incarnation busy
-# gen (bin/fm-busy-lib.sh, state/<id>.busy-gen), which changes exactly when the
-# agent is replaced, so a repeat is absorbed only while BOTH still match, a read
-# that stops being gone still drops it, and no other reset site has to know this
-# file exists. The incarnation half re-arms a relaunch: a successor's own later
-# death is reported in full even when its dead display hashes identically to the
-# reported one. Only when no incarnation token is readable for the task does the
-# pane hash stand in as the discriminator - an unreadable token must never mean
-# re-report on every threshold, so that fallback keeps today's hash-keyed absorb,
-# with the residual that a record-less successor dying into a byte-identical dead
-# display stays absorbed. Under one unchanged incarnation a dead pane's static
-# display absorbs on every threshold either way.
+# with the identity it was reported for.
+# A readable busy generation (bin/fm-busy-lib.sh, state/<id>.busy-gen) is that
+# identity, and it changes exactly when the agent is replaced, so a relaunch
+# re-arms a successor's death even when the dead display hashes identically.
+# A repeat is absorbed only while the verdict and that identity still match.
+# A read that is not dead or missing drops the marker.
+# When no generation is readable the fifth argument stands in.
+# The wedge timer passes the pane hash, so that path keeps today's hash-keyed
+# absorb, including the residual that a record-less successor dying into a
+# byte-identical dead display stays absorbed and a changed hash reports again.
+# A delivered terminal line passes its status identity instead, so a footer tick
+# is not a new report.
+# The reason names that identity bound.
+# It does not claim that the agent staying dead is enough on its own.
+# Under one unchanged incarnation a dead pane's static display absorbs on every
+# threshold either way.
 # Returns 0 when it has handled the window, 1 to escalate on the unchanged path.
-wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-hash> <task>
+wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <fallback-id> <task>
   local win=$1 since_file=$2 label=$3 age=$4 hash=$5 task=$6 key marker agent_state detail reason gen id
   key=$(window_key "$win")
   marker="$STATE/.dead-reported-$key"
@@ -1544,7 +1586,7 @@ wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-h
     triage_log "absorbed $label (agent $agent_state, already reported once, idle ${age}s): $win"
     return 0
   fi
-  reason="stale: $win (idle ${age}s, agent $agent_state - $detail, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)"
+  reason="stale: $win (idle ${age}s, agent $agent_state - $detail, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)"
   # Append before the marker, for the reason stale_wait_record gives: a marker
   # written ahead of a failed append outlives it, and the next sighting would then
   # absorb the retry - the one way this bound could swallow the report outright
@@ -3340,20 +3382,33 @@ EOF
             else
               # A gone endpoint whose terminal line was already delivered is not
               # a new stale per footer tick. wedge_dead_record reports it once
-              # and absorbs the repeat; a live or unproven agent keeps the bare
-              # stale below. The report path exits through wake, so only the
-              # already-reported absorb reaches the bookkeeping under it.
+              # for the busy generation when one is readable, and otherwise for
+              # the delivered status identity, so a pane hash change is absorbed
+              # and a new delivered line still reports. A live or unproven agent
+              # keeps the bare stale below and drops the once-only marker here:
+              # this branch does not call wedge_dead_record for those verdicts,
+              # and that function is what otherwise clears the marker.
+              # The report path exits through wake, so only the already-reported
+              # absorb reaches the bookkeeping under it.
               dead_reported=1
               terminal_agent_state=$(fm_backend_agent_state "$(window_backend "$w")" "$w" 2>/dev/null) || terminal_agent_state=unreadable
               case "$terminal_agent_state" in
                 dead|missing)
-                  if terminal_status_already_delivered "$task" \
-                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" 0 "$h" "$task"; then
+                  if dead_id=$(delivered_terminal_dead_id "$task") \
+                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" 0 "$dead_id" "$task"; then
                     printf '%s' "$h" > "$sf"
+                    # wedge_dead_record arms the idle timer on the absorb too.
+                    # Leaving it set sends the next poll of this same hash
+                    # through wedge_timer_check, which passes the pane hash and
+                    # would report again whenever that hash is not the identity.
+                    rm -f "$ssf"
                     clear_write_tracking "$key"
-                    triage_log "absorbed stale (delivered terminal status, agent $terminal_agent_state already reported once): $w"
+                    triage_log "absorbed stale (delivered terminal status, agent $terminal_agent_state already reported for this identity): $w"
                     dead_reported=0
                   fi
+                  ;;
+                *)
+                  rm -f "$STATE/.dead-reported-$key"
                   ;;
               esac
               if [ "$dead_reported" -ne 0 ]; then
