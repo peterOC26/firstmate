@@ -1,0 +1,7 @@
+Control: original fm-watch.sh at base commit, all other tools at target.
+$ bin/fm-inbox.sh note --json "q1599 t"
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793542534-9l9BGg","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/negative-lab/state/inbox/1793542534-9l9BGg.note"}
+After five seconds and multiple polls, the original handling successor is still running and has emitted no close.
+Persisted queue:
+1793542534	1	check	inbox:1793542534-9l9BGg	check: captain inbox note 1793542534-9l9BGg - q1599 t
+The same live CLI scenario on target emitted the answer close after approximately one second; see inbox-live-transcript.txt.

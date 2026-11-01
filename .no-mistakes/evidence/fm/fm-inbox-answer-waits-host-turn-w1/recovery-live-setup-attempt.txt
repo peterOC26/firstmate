@@ -1,0 +1,28 @@
+$ fm-inbox.sh note --json q1603 a
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793542687-K5QtKL","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/recovery-lab/state/inbox/1793542687-K5QtKL.note"}
+
+closed-consumer exit=1
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/bin/fm-push-transition-lib.sh: line 100: echo: write error: Broken pipe
+
+Closed stdout consumer did not commit a delivery marker or consume the answer.
+replayed-answer exit=0
+check: captain inbox note 1793542687-K5QtKL
+
+$ fm-wake-drain.sh
+1793542687	1	check	inbox:1793542687-K5QtKL	check: captain inbox note 1793542687-K5QtKL - q1603 a
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 1910634.1793542687.lmmXtW
+
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 1910634.1793542687.lmmXtW
+
+$ fm-inbox.sh drain --ack 1793542687-K5QtKL
+acked 1793542687-K5QtKL
+
+The next real watcher replayed the same answer successfully.
+$ fm-procevent-when.sh arm delivery-proof --interval 0.2 --stable 1 --deadline 10 --condition /usr/bin/true --action /usr/bin/printf local completion reached firstmate
+
+error: argv elements cannot contain newlines
+
+$ fm-procevent.sh sweep-home
+swept: attempted=0
+
+Stopped owned processes and removed disposable home.

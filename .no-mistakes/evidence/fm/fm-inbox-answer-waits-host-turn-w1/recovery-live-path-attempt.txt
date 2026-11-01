@@ -1,0 +1,38 @@
+$ fm-inbox.sh note --json q1603 a
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793542714-Tt9tnV","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/recovery-lab/state/inbox/1793542714-Tt9tnV.note"}
+
+closed-consumer exit=1
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/bin/fm-push-transition-lib.sh: line 100: echo: write error: Broken pipe
+
+Closed stdout consumer did not commit a delivery marker or consume the answer.
+replayed-answer exit=0
+check: captain inbox note 1793542714-Tt9tnV
+
+$ fm-wake-drain.sh
+1793542714	1	check	inbox:1793542714-Tt9tnV	check: captain inbox note 1793542714-Tt9tnV - q1603 a
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 1917998.1793542714.47lr0c
+
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 1917998.1793542714.47lr0c
+
+$ fm-inbox.sh drain --ack 1793542714-Tt9tnV
+acked 1793542714-Tt9tnV
+
+The next real watcher replayed the same answer successfully.
+$ fm-procevent-when.sh arm delivery-proof --interval 0.2 --stable 1 --deadline 10 --condition /usr/bin/true --action /usr/bin/printf %s local completion reached firstmate
+armed: when-delivery-proof
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+
+process-event-close exit=0
+check: process-event result captured: procevent:when-delivery-proof:1
+
+$ fm-wake-drain.sh
+1793542718	3	check	procevent:when-delivery-proof:1	check: procevent when when-delivery-proof 1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 1920511.1793542718.FeYTGu
+
+$ fm-wake-drain.sh --ack-through 3 --recovery-generation 1920511.1793542718.FeYTGu
+
+$ fm-procevent.sh sweep-home
+swept: attempted=0
+
+Stopped owned processes and removed disposable home.

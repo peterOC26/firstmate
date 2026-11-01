@@ -1,0 +1,1 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/bin/fm-push-transition-lib.sh: line 100: echo: write error: Broken pipe

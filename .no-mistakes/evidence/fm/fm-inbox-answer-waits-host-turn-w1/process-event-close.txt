@@ -1,0 +1,1 @@
+check: process-event result captured: procevent:when-delivery-proof:1

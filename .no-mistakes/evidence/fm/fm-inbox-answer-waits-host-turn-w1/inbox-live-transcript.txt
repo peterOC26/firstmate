@@ -1,0 +1,71 @@
+15:14:04 $ FM_HOME=<disposable lab> FM_WATCH_HANDLING_SUCCESSOR=1 bin/fm-watch.sh [inbox-first-close]
+15:14:05 $ fm-inbox.sh note --json --request-id live-first q1599 t
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793542444-lPl7jw","request_id":"live-first","saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab/state/inbox/1793542444-lPl7jw.note"}
+
+15:14:05 inbox-first-close exit=0
+check: captain inbox note 1793542444-lPl7jw
+
+15:14:05 Observed answer close in 1.02 seconds after submission.
+15:14:08 $ fm-wake-drain.sh
+1793542444	1	check	inbox:1793542444-lPl7jw	check: captain inbox note 1793542444-lPl7jw - q1599 t
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 1366726.1793542445.uoIvsm
+
+15:14:08 $ fm-inbox.sh receipts --all-pending
+{"schema":"fm-inbox-receipts.v1","home":"01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab","generated":"2026-11-01T14:14:08Z","pending":[{"id":"1793542444-lPl7jw","at":"2026-11-01T14:14:04Z","source":"text","request_id":"live-first","body":"q1599 t","acknowledged":false,"announced":true,"reply":null}],"handled":[],"replies":[],"reply_cursor":"","omitted":[]}
+
+15:14:08 $ FM_HOME=<disposable lab> FM_WATCH_HANDLING_SUCCESSOR=1 bin/fm-watch.sh [inbox-no-repeat]
+15:14:11 Watcher stayed running across multiple polls; no repeated close.
+15:14:11 $ fm-inbox.sh note --json --request-id live-first q1599 t
+{"schema":"fm-inbox-note.v1","outcome":"replay","id":"1793542444-lPl7jw","request_id":"live-first","saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab/state/inbox/1793542444-lPl7jw.note"}
+
+15:14:14 Watcher stayed running across multiple polls; no repeated close.
+15:14:15 $ fm-inbox.sh note --json --request-id live-second q1600 y
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1793542454-Gbqu0S","request_id":"live-second","saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab/state/inbox/1793542454-Gbqu0S.note"}
+
+15:14:15 inbox-no-repeat exit=0
+check: captain inbox note 1793542454-Gbqu0S
+
+15:14:15 A new answer closed the successor; replay of the first answer did not.
+15:14:17 $ fm-wake-drain.sh
+1793542444	1	check	inbox:1793542444-lPl7jw	check: captain inbox note 1793542444-lPl7jw - q1599 t
+1793542455	2	check	inbox:1793542454-Gbqu0S	check: captain inbox note 1793542454-Gbqu0S - q1600 y
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 1366726.1793542445.uoIvsm
+
+15:14:17 $ fm-wake-drain.sh --ack-through 2 --recovery-generation 1366726.1793542445.uoIvsm
+
+15:14:17 $ fm-inbox.sh drain
+1793542444-lPl7jw
+    q1599 t
+1793542454-Gbqu0S
+    q1600 y
+
+Ack with: fm-inbox.sh drain --ack <id>...
+
+15:14:17 $ fm-inbox.sh drain --ack 1793542444-lPl7jw 1793542454-Gbqu0S
+acked 1793542444-lPl7jw
+acked 1793542454-Gbqu0S
+
+15:14:17 $ FM_HOME=<disposable lab> FM_WATCH_HANDLING_SUCCESSOR=1 bin/fm-watch.sh [inbox-after-ack]
+15:14:20 Watcher stayed running across multiple polls; no repeated close.
+15:14:20 $ fm-inbox.sh receipts --all-pending --all-handled
+{"schema":"fm-inbox-receipts.v1","home":"01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab","generated":"2026-11-01T14:14:20Z","pending":[],"handled":[{"id":"1793542454-Gbqu0S","at":"2026-11-01T14:14:14Z","source":"text","request_id":"live-second","body":"q1600 y","acknowledged":true,"announced":true,"reply":null},{"id":"1793542444-lPl7jw","at":"2026-11-01T14:14:04Z","source":"text","request_id":"live-first","body":"q1599 t","acknowledged":true,"announced":true,"reply":null}],"replies":[],"reply_cursor":"","omitted":[]}
+
+15:14:20 Both acknowledged answers remain in receipts; delivery markers were pruned.
+15:14:20 $ FM_HOME=<disposable lab> FM_WATCH_HANDLING_SUCCESSOR=1 bin/fm-watch.sh [inbox-task-signal]
+15:14:22 inbox-task-signal exit=0
+signal: /home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab/state/inbox-triage-w1.status
+
+15:14:23 $ fm-wake-drain.sh
+1793542462	4	signal	inbox-triage-w1.status	signal: /home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/inbox-lab/state/inbox-triage-w1.status
+wake annotation: latest wake-EVENT observed at drain, not current state: inbox-triage-w1.status: done [at=1793542460]: disposable fixture finished
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+inbox-triage-w1 done [at=1793542460]: disposable fixture finished
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 1408696.1793542462.XdhAvL
+
+15:14:24 $ fm-wake-drain.sh --ack-through 4 --recovery-generation 1408696.1793542462.XdhAvL
+
+15:14:24 $ FM_HOME=<disposable lab> FM_WATCH_HANDLING_SUCCESSOR=1 bin/fm-watch.sh [inbox-task-no-repeat]
+15:14:27 Watcher stayed running across multiple polls; no repeated close.
+15:14:27 Inbox-prefixed task signal was delivered once; inbox pruning preserved its status marker.
+15:14:27 ALL LIVE CLI SCENARIOS PASSED
+15:14:27 Stopped owned watcher processes and removed disposable home.

@@ -1,0 +1,11 @@
+ok - inbox marker failure releases the queue lock and permits proactive replay
+ok - a captured process-event result wakes a healthy watcher proactively, with no manual drain
+ok - an unacknowledged process-event result re-drains until handling is acknowledged
+ok - process-event queue keys surface under their own headlines
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 1760813.1793542593.NfDtBq
+ok - queue revalidation, proactive output, and marker commit serialize with drain
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/bin/fm-push-transition-lib.sh: line 100: echo: write error: Broken pipe
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/tests/wake-helpers.sh: line 329: 1766958 Killed                  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ/tests/wake-helpers.sh: line 329: 1772096 Killed                  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+ok - surfacing failures replay until post-handling acknowledgement
+ok - marker failure exits through the shared wake owner, releases its lock, and replays later

@@ -1,0 +1,22 @@
+{
+  "command": [
+    "tmux",
+    "-L",
+    "fm-lab",
+    "new-session",
+    "-d",
+    "-s",
+    "primary",
+    "-x",
+    "160",
+    "-y",
+    "45",
+    "-c",
+    "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6BPZF5TNYKZ47B19PMT18QZ",
+    "-e",
+    "FM_HOME=/home/zabi/.no-mistakes/evidence/01M6BPZF5TNYKZ47B19PMT18QZ/L",
+    "claude --model haiku --effort low --permission-mode auto --setting-sources project"
+  ],
+  "exit": 0,
+  "stderr": ""
+}
