@@ -66,7 +66,14 @@
 #                          not a wedge and is reported ONCE instead of escalating
 #                          on that cadence forever (wedge_dead_record); only the
 #                          two recovery-grade verdicts license it, and every other
-#                          verdict escalates unchanged.
+#                          verdict escalates unchanged. A delivered terminal or paused
+#                          status on an idle ordinary crew endpoint takes this once-report
+#                          instead of a bare stale for every new pane hash. The
+#                          report is keyed on the busy generation when one is
+#                          readable, and otherwise on the delivered status
+#                          identity, so a footer tick is not a new report.
+#                          A live agent keeps the bare stale, and a probe that
+#                          is not dead or missing clears that once-report.
 #                          Where config/wedge-evidence-guards lists operator
 #                          guards, a live pane about to escalate whose guard
 #                          answers CRITICAL defers a bounded run of windows
@@ -387,12 +394,10 @@ SECONDMATE_LIVENESS_WINDOW_SECS=${FM_SECONDMATE_LIVENESS_WINDOW_SECS:-}
 case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WINDOW_SECS=3600 ;; esac
 # A crew that declared a pause is idling on a known external wait, so its stale
 # pane is absorbed rather than wedge-escalated.
-# A captain-held or paused crew whose agent has confidently exited uses the same
-# bounded cadence, while a live or ambiguously read agent surfaces on first sight
-# and is then held to that same cadence; a secondmate earns the cadence on its
-# declaration alone, because its endpoint liveness is deliberately never read
-# (pause_state_class owns that split).
-# These cases re-surface once for a recheck every PAUSE_RESURFACE_SECS - far
+# An idle ordinary crew whose agent has exited and whose paused line was delivered is reported once, then absorbed.
+# A captain-held crew, an undelivered pause, or a live or ambiguously read agent retains the bounded cadence.
+# A secondmate earns the cadence on its declaration alone, because this path never reads its endpoint liveness (pause_state_class owns that split).
+# The bounded cases re-surface once for a recheck every PAUSE_RESURFACE_SECS - far
 # longer than the wedge threshold, but finite so a forgotten wait cannot rot
 # invisibly - except an item held for the captain while the away-posture record
 # exists, which is never rechecked (away_record_present below).
@@ -1472,6 +1477,48 @@ clear_write_tracking() {  # <window-key>
   rm -f "$STATE/.writing-since-$key" "$STATE/.writing-resurfaced-$key" "$STATE/.guard-deferrals-$key"
 }
 
+# 0 when <task>'s status log has no captain-relevant event past the offset the
+# heartbeat backstop already classified. That is a delivered terminal line: the
+# signal path marked it when it woke, and a later pane-hash change is not a new
+# delivery. An absent marker reads as offset 0, so an undelivered line stays
+# undelivered. A read failure is not delivery.
+terminal_status_already_delivered() {  # <task>
+  local task=$1 rc
+  [ -n "$task" ] || return 1
+  status_span_first_actionable_record "$STATE/$task.status" "$(hb_surfaced_offset "$task")" >/dev/null
+  rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+# Fallback id for wedge_dead_record when no busy generation is readable.
+# It is the delivered status identity, <size>@<file-ident>, from the span the
+# heartbeat has already classified.
+# A footer tick does not change it, and a new delivered line does.
+# Returns 1 unless the span read is a clean delivery, so a failed or undelivered
+# read keeps the bare stale instead of a once-only report this cannot key.
+delivered_terminal_dead_id() {  # <task>
+  local task=$1 record rc size rest ident offset
+  [ -n "$task" ] || return 1
+  terminal_status_already_delivered "$task" || return 1
+  offset=$(hb_surfaced_offset "$task") || return 1
+  record=$(status_span_first_actionable_record "$STATE/$task.status" "$offset")
+  rc=$?
+  [ "$rc" -eq 1 ] || return 1
+  size=${record%%$'\t'*}
+  rest=${record#*$'\t'}
+  ident=${rest%%$'\t'*}
+  case "$size" in
+    ''|*[!0-9]*) ;;
+    *)
+      case "$ident" in
+        ''|*$'\n'*|*$'\t'*) ;;
+        *) printf '%s@%s' "$size" "$ident"; return 0 ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
 # The question the wedge timer never asked before it alarmed: is there still an
 # agent here to BE wedged? A wedge is something stuck that might recover, so
 # re-alarming it earns its cost; an agent that is gone never moves again, its pane
@@ -1487,27 +1534,31 @@ clear_write_tracking() {  # <window-key>
 # escalate and never how loudly the ones that still do.
 #
 # Deliberately NOT a deferral like the two above it. They restart the idle timer
-# because the pane might still be working; this is terminal for as long as the
-# endpoint stays gone, because there is nothing left to re-probe on a cadence and a
-# repeat is exactly the noise it exists to stop. WHICH verdict fired is named for
+# because the pane might still be working; this absorbs a repeat while the
+# verdict and report identity still match, because that repeat is exactly the
+# noise it exists to stop. WHICH verdict fired is named for
 # the same reason wedge_wait_evidence names its kind of wait: the two ask the supervisor
 # for different things.
 #
 # The marker is owned entirely by this function and records the verdict together
-# with the agent incarnation it was reported for: the task's per-incarnation busy
-# gen (bin/fm-busy-lib.sh, state/<id>.busy-gen), which changes exactly when the
-# agent is replaced, so a repeat is absorbed only while BOTH still match, a read
-# that stops being gone still drops it, and no other reset site has to know this
-# file exists. The incarnation half re-arms a relaunch: a successor's own later
-# death is reported in full even when its dead display hashes identically to the
-# reported one. Only when no incarnation token is readable for the task does the
-# pane hash stand in as the discriminator - an unreadable token must never mean
-# re-report on every threshold, so that fallback keeps today's hash-keyed absorb,
-# with the residual that a record-less successor dying into a byte-identical dead
-# display stays absorbed. Under one unchanged incarnation a dead pane's static
-# display absorbs on every threshold either way.
+# with the identity it was reported for.
+# A readable busy generation (bin/fm-busy-lib.sh, state/<id>.busy-gen) is that
+# identity, and it changes exactly when the agent is replaced, so a relaunch
+# re-arms a successor's death even when the dead display hashes identically.
+# A repeat is absorbed only while the verdict and that identity still match.
+# A read that is not dead or missing drops the marker.
+# When no generation is readable the fifth argument stands in.
+# The wedge timer passes the pane hash, so that path keeps today's hash-keyed
+# absorb, including the residual that a record-less successor dying into a
+# byte-identical dead display stays absorbed and a changed hash reports again.
+# A delivered terminal line passes its status identity instead, so a footer tick
+# is not a new report.
+# The reason names that identity bound.
+# It does not claim that the agent staying dead is enough on its own.
+# Under one unchanged incarnation a dead pane's static display absorbs on every
+# threshold either way.
 # Returns 0 when it has handled the window, 1 to escalate on the unchanged path.
-wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-hash> <task>
+wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <fallback-id> <task>
   local win=$1 since_file=$2 label=$3 age=$4 hash=$5 task=$6 key marker agent_state detail reason gen id
   key=$(window_key "$win")
   marker="$STATE/.dead-reported-$key"
@@ -1528,7 +1579,7 @@ wedge_dead_record() {  # <window> <since-file> <triage-label> <idle-age> <pane-h
     triage_log "absorbed $label (agent $agent_state, already reported once, idle ${age}s): $win"
     return 0
   fi
-  reason="stale: $win (idle ${age}s, agent $agent_state - $detail, so this is not a wedge; reported once and not re-escalated while it stays that way - reconcile this record, and check for unlanded work before any cleanup)"
+  reason="stale: $win (idle ${age}s, agent $agent_state - $detail, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)"
   # Append before the marker, for the reason stale_wait_record gives: a marker
   # written ahead of a failed append outlives it, and the next sighting would then
   # absorb the retry - the one way this bound could swallow the report outright
@@ -1737,8 +1788,8 @@ busy_turn_over_age() {  # <task>
 # captain themself for a verified hold. Only the captain-held verb takes the second
 # wording; a caller that reached the bounded cadence off pause tracking alone, with
 # no declaring verb left on the log, keeps the external-wait wording it always had.
-handle_paused_stale() {  # <window> <task> <hash>
-  local win=$1 task=$2 h=$3 key statusf mtime age detail reason declaration last until now min_age
+handle_paused_stale() {  # <window> <task> <hash> [idle|busy]
+  local win=$1 task=$2 h=$3 activity=${4:-idle} key statusf mtime age detail reason declaration last until now min_age dead_id
   key=$(window_key "$win")
   printf '%s' "$h" > "$STATE/.stale-$key"
   : > "$STATE/.paused-$key"
@@ -1750,6 +1801,15 @@ handle_paused_stale() {  # <window> <task> <hash>
   now=$(date +%s)
   age=$(( now - mtime ))
   last=$(status_declared_wait_line "$statusf")
+  if [ "$activity" = idle ] \
+    && [ "$(window_kind "$win")" != secondmate ] \
+    && status_is_paused "$last" \
+    && dead_id=$(delivered_terminal_dead_id "$task") \
+    && [ "$(hb_surfaced_offset "$task")" = "${dead_id%%@*}" ] \
+    && wedge_dead_record "$win" "$STATE/.stale-since-$key" "stale (delivered paused status)" "$age" "$dead_id" "$task"; then
+    rm -f "$STATE/.stale-since-$key"
+    return 0
+  fi
   min_age=$PAUSE_RESURFACE_SECS
   declaration="declared:$(fm_wake_signal_sig "$statusf" || true)"
   if status_is_captain_held "$last"; then
@@ -1844,7 +1904,7 @@ busy_turn_bound_check() {  # <window> <task> <hash> <since-file> <escalation-fil
       fi
       return 0
     fi
-    handle_paused_stale "$win" "$task" "$h"
+    handle_paused_stale "$win" "$task" "$h" busy
     return 0
   fi
   wedge_timer_check "$win" "$since_file" "busy (no completed turn)" "$escalation_file" "$task" "$h" "$dialog"
@@ -3322,20 +3382,57 @@ EOF
               clear_write_tracking "$key"
               triage_log "absorbed stale (open captain call already surfaced for this status): $w"
             else
-              stale_reason=$(stale_reason_naming_dialog "stale: $w" "$dialog")
-              fm_wake_append stale "$w" "$stale_reason" || exit 1
-              stale_wait_record "$key"
-              printf '%s' "$h" > "$sf"
-              rm -f "$ssf"
-              clear_write_tracking "$key"
-              stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
-              stale_record=$(status_span_first_actionable_record "$stale_status" 0)
-              case $? in
-                0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
-                *) stale_end=''; stale_ident='' ;;
+              # A gone endpoint whose terminal line was already delivered is not
+              # a new stale per footer tick. wedge_dead_record reports it once
+              # for the busy generation when one is readable, and otherwise for
+              # the delivered status identity, so a pane hash change is absorbed.
+              # A new delivered line re-arms only that fallback identity.
+              # A live or unproven agent
+              # keeps the bare stale below and drops the once-only marker here:
+              # this branch does not call wedge_dead_record for those verdicts,
+              # and that function is what otherwise clears the marker.
+              # The report path exits through wake, so only the already-reported
+              # absorb reaches the bookkeeping under it.
+              dead_reported=1
+              terminal_agent_state=$(fm_backend_agent_state "$(window_backend "$w")" "$w" 2>/dev/null) || terminal_agent_state=unreadable
+              case "$terminal_agent_state" in
+                dead|missing)
+                  terminal_mtime=$(stat_mtime "$STATE/$task.status")
+                  case "$terminal_mtime" in ''|*[!0-9]*) terminal_mtime=$(date +%s) ;; esac
+                  terminal_age=$(( $(date +%s) - terminal_mtime ))
+                  if dead_id=$(delivered_terminal_dead_id "$task") \
+                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" "$terminal_age" "$dead_id" "$task"; then
+                    printf '%s' "$h" > "$sf"
+                    # wedge_dead_record arms the idle timer on the absorb too.
+                    # Leaving it set sends the next poll of this same hash
+                    # through wedge_timer_check, which passes the pane hash and
+                    # would report again whenever that hash is not the identity.
+                    rm -f "$ssf"
+                    clear_write_tracking "$key"
+                    triage_log "absorbed stale (delivered terminal status, agent $terminal_agent_state already reported for this identity): $w"
+                    dead_reported=0
+                  fi
+                  ;;
+                *)
+                  rm -f "$STATE/.dead-reported-$key"
+                  ;;
               esac
-              mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
-              wake "$stale_reason"
+              if [ "$dead_reported" -ne 0 ]; then
+                stale_reason=$(stale_reason_naming_dialog "stale: $w" "$dialog")
+                fm_wake_append stale "$w" "$stale_reason" || exit 1
+                stale_wait_record "$key"
+                printf '%s' "$h" > "$sf"
+                rm -f "$ssf"
+                clear_write_tracking "$key"
+                stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
+                stale_record=$(status_span_first_actionable_record "$stale_status" 0)
+                case $? in
+                  0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
+                  *) stale_end=''; stale_ident='' ;;
+                esac
+                mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
+                wake "$stale_reason"
+              fi
             fi
           elif [ -e "$ssf" ]; then
             # This exact hash was already overridden as provably-working (a
@@ -3387,7 +3484,7 @@ EOF
                          printf '%s' "$h" > "$sf"
                          wedge_timer_check "$w" "$ssf" "non-terminal stale (provably working after a declared pause)" "$ewf" "$task" "$h" "$dialog"
                          triage_log "absorbed non-terminal stale (provably working): $w" ;;
-                *)       handle_paused_stale "$w" "$task" "$h" ;;
+                *)       handle_paused_stale "$w" "$task" "$h" busy ;;
               esac
             else
               wedge_timer_check "$w" "$ssf" "non-terminal stale" "$ewf" "$task" "$h" "$dialog"

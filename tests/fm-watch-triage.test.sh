@@ -2285,6 +2285,269 @@ test_terminal_stale_surfaced() {
   pass "a stale pane sitting on a terminal status is surfaced (queue + exit)"
 }
 
+# Record the whole status log as already delivered, the way a prior signal wake
+# does, so a later pane-hash change is not the first delivery of that line.
+mark_status_log_delivered() {  # <state> <task>
+  local state=$1 task=$2 f ident size
+  f="$state/$task.status"
+  ident=$(_fm_open_decisions_file_ident "$f") || return 1
+  size=$(_fm_status_file_size "$f") || return 1
+  size=${size//[[:space:]]/}
+  status_presentation_marker_commit "$(status_heartbeat_seen_marker_path "$state" "$task")" \
+    "$f" "$size" "$ident"
+}
+
+# The pane hash the watcher records for a capture file.
+# watcher_capture keeps the capture through a command substitution, which drops
+# trailing newlines, and hash_pane then hashes those exact bytes.
+pane_file_hash() {  # <capture-file>
+  local text
+  text=$(cat "$1")
+  if command -v md5 >/dev/null 2>&1; then
+    printf '%s' "$text" | md5 -q
+  else
+    printf '%s' "$text" | md5sum | cut -d' ' -f1
+  fi
+}
+
+# One stopped helper whose done line is already delivered, across two pane hashes.
+# none: the grok fixture, which production never arms.
+# retired: armed, then retired the way fm-control exit does, so no generation remains.
+# armed: a readable generation, which stays the relaunch key.
+assert_stopped_delivered_once() {  # <none|retired|armed>
+  local mode=$1 dir state fakebin out capture window key marker pane_hash gen bare reported_age
+  local stopped='state: stopped · source: pane · bare shell'
+  window="test:fm-wedge"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  dir=$(wedge_threshold_fixture "stopped-delivered-$mode" 'done: PR https://example.test/pr/9 checks green' 1200)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark the terminal line delivered ($mode)"
+  case "$mode" in
+    none) ;;
+    retired|armed)
+      "$ROOT/bin/fm-busy-event.sh" arm "$state" wedge --state idle >/dev/null \
+        || fail "could not arm the stopped helper ($mode)"
+      ;;
+    *) fail "unknown stopped-helper mode $mode" ;;
+  esac
+  if [ "$mode" = retired ]; then
+    "$ROOT/bin/fm-busy-event.sh" retire "$state" wedge --current-gen >/dev/null \
+      || fail "could not retire the generation the way exit does"
+  fi
+  if [ "$mode" = armed ]; then
+    [ -s "$state/wedge.busy-gen" ] || fail "the armed case has no readable generation"
+  else
+    [ ! -e "$state/wedge.busy-gen" ] || fail "a $mode helper still has a busy generation"
+  fi
+  printf 'waiting at the gate\nfooter tick 1\n' > "$capture"
+  gone_endpoint_env dead
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a stopped helper with a delivered terminal line was never reported ($mode): $(cat "$out")"
+  grep -F 'agent dead' "$out" >/dev/null \
+    || fail "the stopped helper was not reported on the once-only dead path ($mode): $(cat "$out")"
+  grep -F 'possible wedge' "$out" >/dev/null \
+    && fail "a stopped helper was reported as a possible wedge ($mode): $(cat "$out")"
+  reported_age=$(sed -n 's/.*(idle \([0-9]*\)s, agent dead.*/\1/p' "$out")
+  [ "${reported_age:-0}" -ge 1200 ] && [ "${reported_age:-0}" -lt 1320 ] \
+    || fail "terminal dead report did not use status age: $(cat "$out")"
+  [ "$(wedge_stale_wakes "$state" "$window")" -eq 1 ] \
+    || fail "the stopped helper queued $(wedge_stale_wakes "$state" "$window") stale wakes instead of one ($mode)"
+  bare=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w && $5 == "stale: " w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$bare" -eq 0 ] || fail "the stopped helper queued $bare bare stale wakes ($mode): $(cat "$state/.wake-queue")"
+  [ -s "$state/.dead-reported-$key" ] || fail "the once-only report left no dead record ($mode)"
+  marker=$(cat "$state/.dead-reported-$key")
+  pane_hash=$(pane_file_hash "$capture")
+  [ -n "$pane_hash" ] || fail "could not hash the pane ($mode)"
+  case "$marker" in
+    *" $pane_hash") fail "the once-only record followed the pane hash ($mode): $marker" ;;
+  esac
+  if [ "$mode" = armed ]; then
+    gen=$(tr -d '\n' < "$state/wedge.busy-gen")
+    case "$marker" in
+      *" $gen") ;;
+      *) fail "a readable generation was not the once-only identity: $marker" ;;
+    esac
+  fi
+  grep -F 'not re-escalated while it stays that way' "$out" >/dev/null \
+    && fail "the dead report claims it will not re-escalate while the agent stays dead ($mode): $(cat "$out")"
+  grep -F 'a repeat of the same identity is absorbed' "$out" >/dev/null \
+    || fail "the dead report does not name the identity bound ($mode): $(cat "$out")"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the stopped helper's report ($mode)"
+
+  printf 'waiting at the gate\nfooter tick 2\n' > "$capture"
+  : > "$out"
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+    || fail "a later footer tick re-woke the stopped helper ($mode): $(cat "$out") $(cat "$state/.wake-queue" 2>/dev/null)"
+  [ "$(wedge_stale_wakes "$state" "$window")" -eq 0 ] \
+    || fail "a later footer tick queued another stale wake ($mode): $(cat "$state/.wake-queue")"
+  [ "$(cat "$state/.dead-reported-$key")" = "$marker" ] \
+    || fail "a later footer tick rewrote the once-only record ($mode): $(cat "$state/.dead-reported-$key")"
+
+  # A new delivered line is a new identity when no generation is readable.
+  # The same generation keeps the relaunch key, so this step is not that case.
+  if [ "$mode" != armed ]; then
+    printf '%s\n' 'done: PR https://example.test/pr/9 checks green' 'done: a later delivered line on the same helper' > "$state/wedge.status"
+    printf '%s' "$(seen_sig "$state/wedge.status")" > "$state/.seen-wedge_status"
+    mark_status_log_delivered "$state" wedge || fail "could not mark the later line delivered ($mode)"
+    printf 'waiting at the gate\nfooter tick 3\n' > "$capture"
+    : > "$out"
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+      || fail "a new delivered line on a stopped helper was swallowed ($mode): $(cat "$out")"
+    grep -F 'agent dead' "$out" >/dev/null \
+      || fail "a new delivered line was not reported on the dead path ($mode): $(cat "$out")"
+    [ "$(wedge_stale_wakes "$state" "$window")" -eq 1 ] \
+      || fail "a new delivered line queued $(wedge_stale_wakes "$state" "$window") wakes instead of one ($mode)"
+    marker=$(cat "$state/.dead-reported-$key")
+    pane_hash=$(pane_file_hash "$capture")
+    case "$marker" in
+      *" $pane_hash") fail "the new line's record followed the pane hash ($mode): $marker" ;;
+    esac
+    ack_stopped_cycle "$state" || fail "could not acknowledge the new delivered line ($mode)"
+  fi
+
+  printf 'waiting at the gate\nfooter tick back\n' > "$capture"
+  FM_TEST_PANE_COMMAND=grok
+  FM_TEST_TMUX_WINDOWS=fm-wedge
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  : > "$out"
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a helper that came back no longer raised stale ($mode): $(cat "$out")"
+  grep -Fx "stale: $window" "$out" >/dev/null \
+    || fail "a helper that came back did not raise the bare stale ($mode): $(cat "$out")"
+  [ ! -e "$state/.dead-reported-$key" ] \
+    || fail "a helper that came back left the once-only record ($mode): $(cat "$state/.dead-reported-$key")"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+}
+
+# A finished helper whose terminal line was already delivered, then stopped with
+# the pane kept, used to emit a bare stale for every new pane hash.
+# The grok record never has a busy generation, and exit deletes one when a
+# harness did arm it, so those two re-reported on each footer tick.
+# A readable generation remains the relaunch key.
+# A live agent on the same delivered line still raises the bare stale, and a
+# return drops the once-only record.
+test_stopped_delivered_terminal_reports_once() {
+  local dir state fakebin out capture window key
+  local stopped='state: stopped · source: pane · bare shell'
+  window="test:fm-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
+
+  assert_stopped_delivered_once none
+  assert_stopped_delivered_once retired
+  assert_stopped_delivered_once armed
+
+  dir=$(wedge_threshold_fixture live-delivered-terminal 'done: PR https://example.test/pr/9 checks green' 0)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark the live helper's terminal line delivered"
+  printf 'waiting at the gate\nfooter tick 1\n' > "$capture"
+  FM_TEST_PANE_COMMAND=grok FM_TEST_TMUX_WINDOWS=fm-wedge
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a live helper on a delivered terminal line no longer raised stale: $(cat "$out")"
+  grep -Fx "stale: $window" "$out" >/dev/null \
+    || fail "a live helper did not raise the bare stale: $(cat "$out")"
+  [ ! -e "$state/.dead-reported-$key" ] \
+    || fail "a live helper wrote a dead record: $(cat "$state/.dead-reported-$key")"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  pass "a stopped helper with a delivered terminal line reports once on the dead path; a live one still raises stale"
+}
+
+test_delivered_pause_skips_secondmate_and_busy_probes() {
+  local mode dir state fakebin out capture pid verdict
+  for mode in secondmate busy; do
+    dir=$(wedge_threshold_fixture "delivered-pause-excluded-$mode" 'paused: awaiting upstream' 2000)
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+    if [ "$mode" = secondmate ]; then
+      printf 'window=test:fm-wedge\nkind=secondmate\nharness=grok\nbackend=tmux\n' > "$state/wedge.meta"
+      verdict='state: paused · source: status-log · awaiting upstream'
+    else
+      printf 'window=test:fm-wedge\nkind=scout\nharness=pi\nbackend=tmux\n' > "$state/wedge.meta"
+      record_pi_busy "$state" wedge
+      touch -t 200001010000 "$state/wedge.meta"
+      printf 'Working... (7200.4s) waiting for upstream' > "$capture"
+      verdict='state: working · source: pane · harness busy (pi-ext)'
+    fi
+    mark_status_log_delivered "$state" wedge || fail "could not mark excluded pause delivered"
+    PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW=test:fm-wedge FM_FAKE_TMUX_CAPTURE="$capture" \
+      FM_FAKE_TMUX_CURRENT_COMMAND=bash FM_FAKE_CREW_STATE="$verdict" \
+      FM_STATE_OVERRIDE="$state" \
+      FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_BUSY_TURN_MAX_SECS=1 \
+      FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+      FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+      "$WATCH" > "$out" &
+    pid=$!
+    wait_for_exit "$pid" 100 || { reap "$pid"; fail "$mode pause did not recheck"; }
+    [ ! -e "$state/.dead-reported-test_fm-wedge" ] || fail "$mode pause wrote a dead record"
+    grep -F 'awaiting external' "$out" >/dev/null || fail "$mode pause lost the declared-wait recheck"
+    grep -F 'agent dead' "$out" >/dev/null && fail "$mode pause emitted a dead report"
+  done
+  pass "delivered secondmate and busy pauses retain rechecks without dead reports"
+}
+
+test_missing_status_keeps_bare_stale() {
+  local dir state fakebin out capture
+  dir=$(wedge_threshold_fixture missing-delivered-status 'done: finished' 0)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark status delivered"
+  rm "$state/wedge.status"
+  printf 'waiting at the gate\nfooter tick\n' > "$capture"
+  gone_endpoint_env dead
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" test:fm-wedge \
+    'state: stopped · source: pane · bare shell' exit || fail "missing log did not surface"
+  grep -Fx 'stale: test:fm-wedge' "$out" >/dev/null || fail "missing log did not keep bare stale"
+  [ ! -e "$state/.dead-reported-test_fm-wedge" ] || fail "missing log wrote a dead marker"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  pass "missing status logs keep the bare stale"
+}
+
+test_delivered_pause_dead_once_live_rechecks() {
+  local mode dir state fakebin out capture window key marker
+  local stopped='state: stopped · source: pane · bare shell'
+  window=test:fm-wedge; key=test_fm-wedge
+  for mode in dead alive; do
+    dir=$(wedge_threshold_fixture "delivered-pause-$mode" 'paused: waiting for upstream' 2000)
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+    mark_status_log_delivered "$state" wedge || fail "could not mark pause delivered"
+    if [ "$mode" = dead ]; then
+      gone_endpoint_env dead
+    else
+      FM_TEST_PANE_COMMAND=grok FM_TEST_TMUX_WINDOWS=fm-wedge
+    fi
+    export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+      || fail "$mode paused helper did not report"
+    if [ "$mode" = dead ]; then
+      grep -F 'agent dead' "$out" >/dev/null || fail "dead pause used a recurring recheck"
+      [ -s "$state/.dead-reported-$key" ] || fail "dead pause has no once marker"
+      marker=$(cat "$state/.dead-reported-$key")
+    else
+      grep -F 'awaiting external' "$out" >/dev/null || fail "live pause lost its declared wait recheck"
+      [ ! -e "$state/.dead-reported-$key" ] || fail "live pause wrote a dead marker"
+    fi
+    ack_stopped_cycle "$state" || fail "could not acknowledge pause wake"
+    : > "$out"
+    set_mtime "$(( $(date +%s) - 2000 ))" "$state/.paused-resurfaced-$key"
+    if [ "$mode" = dead ]; then
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+        || fail "dead pause rechecked on an unchanged pane"
+      printf 'waiting at the gate\nfooter tick\n' > "$capture"
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+        || fail "dead pause rechecked after footer churn"
+      [ "$(cat "$state/.dead-reported-$key")" = "$marker" ] || fail "dead pause marker changed"
+      [ "$(wedge_stale_wakes "$state" "$window")" -eq 0 ] || fail "dead pause queued another wake"
+    else
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+        || fail "live pause stopped rechecking on its cadence"
+      grep -F 'awaiting external' "$out" >/dev/null || fail "live recheck lost wait reason"
+      [ ! -e "$state/.dead-reported-$key" ] || fail "live recheck wrote a dead marker"
+    fi
+    unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  done
+  pass "delivered dead pauses report once while live pauses retain rechecks"
+}
+
 # --- stale pane, STALE terminal status overridden by an active run: absorbed ---
 # Regression for the 2026-07 herdr false-surface incidents: a crew's own status
 # log gets no new entry once firstmate hands it to a no-mistakes validation
@@ -7124,6 +7387,10 @@ test_routine_appends_after_a_classified_event_stay_absorbed
 test_unreadable_status_reports_once_per_file_state
 test_permission_recovery_surfaces_preserved_status
 test_terminal_stale_surfaced
+test_stopped_delivered_terminal_reports_once
+test_delivered_pause_dead_once_live_rechecks
+test_missing_status_keeps_bare_stale
+test_delivered_pause_skips_secondmate_and_busy_probes
 test_stale_terminal_status_overridden_by_active_run
 test_nonterminal_stale_provably_working_absorbed_then_escalated
 test_wedge_escalation_marks_demand_deep_inspection_after_threshold
