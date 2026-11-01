@@ -4021,7 +4021,7 @@ test_composer_state_grok_oversized_title_preserves_safe_verdicts() {
 }
 
 # The same #3436 box, through the Herdr adapter's ANSI capture. "Build anything"
-# on the idle bar and a 256-colour accepted-suggestion ghost read empty.
+# on the idle bar and a dim accepted-suggestion ghost read empty.
 # Typed text, and that placeholder while Enter:send is showing, stay pending.
 test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   local dir log resp fb out esc row pad text vis
@@ -4039,7 +4039,7 @@ test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$idle" > "$resp/1.out"
   text=': Firstmate instruction waiting'
   vis=$((1 + ${#text}))
-  row=$(printf '  │ ❯ %s%s%s%s│' "${esc}[38;5;242m" "$text" "${esc}[0m" "${pad:0:$((72 - vis))}")
+  row=$(printf '  │ ❯ %s%s%s%s│' "${esc}[2m" "$text" "${esc}[0m" "${pad:0:$((72 - vis))}")
   printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/2.out"
   text=' deploy the fix'
   row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
@@ -4047,16 +4047,6 @@ test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   text=' Build anything'
   row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
   printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$send" > "$resp/4.out"
-  text='deploy the fix'
-  vis=$((1 + ${#text}))
-  row=$(printf '  │ ❯ %s%s%s%s│' "${esc}[38;5;231m" "$text" "${esc}[0m" "${pad:0:$((72 - vis))}")
-  printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/5.out"
-  text='deploy the ships'
-  vis=$((1 + ${#text}))
-  row=$(printf '  │ ❯ %sdeploy %sthe ships%s%s│' \
-    "${esc}[38;5;231m" "${esc}[0m${esc}[38;5;242m" "${esc}[0m" \
-    "${pad:0:$((72 - vis))}")
-  printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/6.out"
   fb=$(make_herdr_fakebin "$dir")
 
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
@@ -4064,19 +4054,13 @@ test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   [ "$out" = empty ] || fail "Build anything on Grok's idle bar should read empty, got '$out'"
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
-  [ "$out" = empty ] || fail "a 256-colour suggestion ghost should read empty, got '$out'"
+  [ "$out" = empty ] || fail "a dim suggestion ghost should read empty, got '$out'"
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
   [ "$out" = pending ] || fail "typed text on Grok's idle bar should stay pending, got '$out'"
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
   [ "$out" = pending ] || fail "Build anything with Enter:send should stay pending, got '$out'"
-  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
-    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
-  [ "$out" = pending ] || fail "bright 256-colour typed text on the suggestion bar should stay pending, got '$out'"
-  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
-    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
-  [ "$out" = pending ] || fail "a 256-colour prefix plus a dim ghost should stay pending, got '$out'"
   pass "fm_backend_herdr_composer_state: Grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
 }
 

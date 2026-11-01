@@ -1062,20 +1062,15 @@ grok_idle_screen() {  # <content row> <footer mode>
     none) printf '%s\n%s\n%s\n' "$top" "$row" "$bot" ;;
     idle-adjacent) printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$idle" ;;
     suggest-adjacent) printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" ;;
-    suggest-wrap)
-      printf '%s\n%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" \
-        '  Tab/' '  →:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
-      ;;
     *) printf 'bad grok footer mode %s\n' "$mode" >&2; return 1 ;;
   esac
 }
 
 test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   local row screen plain doorbell=' : Firstmate instruction waiting'
-  local sgr2 tc160 c256
+  local sgr2 tc160
   sgr2="${ESC}[2m"
   tc160="${ESC}[38;2;160;160;160m"
-  c256="${ESC}[38;5;242m"
 
   row=$(grok_idle_row ' Build anything')
   screen=$(grok_idle_screen "$row" idle)
@@ -1091,13 +1086,6 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   assert_screen "grok Build anything on a plain capture with the idle bar is empty" empty "$CAPS_PLAIN" "$screen"
   screen=$(grok_idle_screen "$row" suggest)
   assert_screen "grok Build anything on the suggestion bar is empty" empty "$CAPS_STYLED" "$screen"
-
-  plain='Build anything'
-  row=$(grok_idle_row_ansi " ${c256}${plain}${ESC}[0m" $((1 + ${#plain})))
-  screen=$(grok_idle_screen "$row" idle)
-  assert_screen "grok 256-colour Build anything on the idle bar is empty" empty "$CAPS_STYLED" "$screen"
-  screen=$(grok_idle_screen "$row" send)
-  assert_screen "grok 256-colour Build anything with Enter:send stays pending" pending "$CAPS_STYLED" "$screen"
 
   row=$(grok_idle_row ' deploy the fix')
   screen=$(grok_idle_screen "$row" idle)
@@ -1122,43 +1110,12 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   assert_screen "grok dim suggestion ghost is empty" empty "$CAPS_STYLED" "$screen"
   screen=$(grok_idle_screen "$row" suggest-adjacent)
   assert_screen "grok dim suggestion ghost against the bar is empty" empty "$CAPS_STYLED" "$screen"
-  screen=$(grok_idle_screen "$row" suggest-wrap)
-  assert_screen "grok dim suggestion ghost against a wrapped bar is empty" empty "$CAPS_STYLED" "$screen"
-
-  row=$(grok_idle_row_ansi " ${c256}${doorbell# }${ESC}[0m" $(( ${#doorbell} )))
-  screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok 256-colour suggestion ghost is empty" empty "$CAPS_STYLED" "$screen"
-  screen=$(grok_idle_screen "$row" suggest-adjacent)
-  assert_screen "grok 256-colour suggestion ghost against the bar is empty" empty "$CAPS_STYLED" "$screen"
-  screen=$(grok_idle_screen "$row" send)
-  assert_screen "grok 256-colour doorbell with Enter:send stays pending" pending "$CAPS_STYLED" "$screen"
-
-  # Palette 231 is cube white (255,255,255). A 256-colour draft in that
-  # colour is typed text, on the accept-suggestion bar and under the cursor.
-  plain='deploy the fix'
-  row=$(grok_idle_row_ansi " ${ESC}[38;5;231m${plain}${ESC}[0m" $((1 + ${#plain})))
-  screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok bright 256-colour typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
-  assert_screen "grok bright 256-colour typed text stays pending with the cursor on the body" pending "$CAPS_TMUX" "$screen" 1
-  row=$(grok_idle_row_ansi " ${ESC}[38:5:231m${plain}${ESC}[0m" $((1 + ${#plain})))
-  screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok bright colon-form 256-colour typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
-  # Index 2 is a theme colour, not the standard cube, so it stays typed text.
-  row=$(grok_idle_row_ansi " ${ESC}[38;5;2m${plain}${ESC}[0m" $((1 + ${#plain})))
-  screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok system-palette typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
-  # A bright 256 prefix plus a grey-ramp ghost (index 242, grey 108) keeps the prefix.
-  plain='deploy the ships'
-  row=$(grok_idle_row_ansi " ${ESC}[38;5;231mdeploy ${ESC}[0m${ESC}[38;5;242mthe ships${ESC}[0m" $((1 + ${#plain})))
-  screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok 256-colour prefix plus a dim 256 ghost stays pending" pending "$CAPS_STYLED" "$screen"
-
   plain=': doorbell → waiting'
   row=$(grok_idle_row_ansi " ${sgr2}${plain}${ESC}[0m" $((1 + ${#plain})))
   screen=$(grok_idle_screen "$row" suggest)
-  assert_screen "grok dim suggestion containing an arrow is empty" empty "$CAPS_STYLED" "$screen"
+  assert_screen "grok dim arrow suggestion with unproven geometry stays unknown" unknown "$CAPS_STYLED" "$screen"
   screen=$(grok_idle_screen "$row" suggest-adjacent)
-  assert_screen "grok dim arrow suggestion against the bar is empty" empty "$CAPS_STYLED" "$screen"
+  assert_screen "grok adjacent dim arrow suggestion with unproven geometry stays unknown" unknown "$CAPS_STYLED" "$screen"
 
   row=$(grok_idle_row_ansi " ${tc160}${doorbell# }${ESC}[0m" $(( ${#doorbell} )))
   screen=$(grok_idle_screen "$row" suggest)
@@ -1181,6 +1138,34 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   assert_screen "bare Build anything on a plain row stays unknown" unknown "$CAPS_PLAIN" $'❯ Build anything'
   assert_screen "bare Build anything on a styled row stays pending" pending "$CAPS_STYLED" $'❯ Build anything'
   pass "matrix: grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
+}
+
+test_matrix_grok_footer_preserves_ambiguous_geometry() {
+  local geometry body mode row screen expected caps
+  for geometry in title indent; do
+    for body in blank ghost placeholder typed; do
+      case "$body" in
+        blank) row=$(grok_idle_row ' '); expected=unknown ;;
+        ghost) row=$(grok_idle_row_ansi " ${ESC}[2mghost${ESC}[0m" 6); expected=unknown ;;
+        placeholder) row=$(grok_idle_row ' Build anything'); expected=pending-unproven ;;
+        typed) row=$(grok_idle_row ' deploy the fix'); expected=pending-unproven ;;
+      esac
+      for mode in none idle suggest idle-adjacent suggest-adjacent send; do
+        screen=$(grok_idle_screen "$row" "$mode")
+        case "$geometry" in
+          title) screen=${screen/'Grok 4.6 (xhigh)'/'Grok 9.9 (some-very-long-title)'} ;;
+          indent) screen=${screen/'  ╰'/'   ╰'} ;;
+        esac
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_TMUX"; do
+          assert_screen "grok ambiguous $geometry $body $mode" "$expected" "$caps" "$screen" 1
+        done
+        if [ "$body" != ghost ]; then
+          assert_screen "grok plain ambiguous $geometry $body $mode" "$expected" "$CAPS_PLAIN" "$screen"
+        fi
+      done
+    done
+  done
+  pass "matrix: Grok footers preserve ambiguous geometry verdicts"
 }
 
 # grok 1.0.46 in Herdr paints this idle bar before any input. The key names
@@ -1212,9 +1197,6 @@ test_matrix_grok_1046_real_key_bar() {
   row=$(grok_idle_row ' deploy the fix')
   screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$send_x")
   assert_screen "grok tmux Alt+Enter typed bar stays pending" pending "$CAPS_STYLED" "$screen"
-  row=$(grok_idle_row_ansi " ${ESC}[38;5;231mdeploy the fix${ESC}[0m" 15)
-  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$sug_x")
-  assert_screen "grok bright 256 text on a Ctrl+x suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
   row=$(grok_idle_row ' Build anything')
   screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
   assert_screen "grok Build anything on the Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
@@ -1534,6 +1516,7 @@ test_matrix_opencode_leftbar_cwd_furniture
 test_matrix_opencode_leftbar_abs_cwd_furniture
 test_matrix_grok_titled_bottom_border
 test_matrix_grok_idle_placeholder_and_suggestion_ghost
+test_matrix_grok_footer_preserves_ambiguous_geometry
 test_matrix_grok_1046_real_key_bar
 test_matrix_claude_titled_top_rule
 test_matrix_kimi_bordered_shell_glyph_box

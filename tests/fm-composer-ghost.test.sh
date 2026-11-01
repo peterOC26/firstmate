@@ -135,28 +135,6 @@ test_strip_ghost_keeps_colored_text_with_2_payloads() {
   pass "fm_tmux_strip_ghost keeps bright colored text with 2 payloads"
 }
 
-# The Grok accept-suggestion path sets FM_COMPOSER_GHOST_DROP256. That switch
-# luminance-tests the standard 256 palette. It does not drop every 38;5 run.
-# Index 231 is cube white. Index 242 is grey 108, under the 128 ceiling.
-# Indices 0-15 stay, because they are theme colours. With the switch unset,
-# a dark 256-colour run stays too.
-test_strip_ghost_256_palette_luma_when_drop256() {
-  local out
-  out=$(printf '\033[38;5;231mdeploy the fix\033[0m\n' | FM_COMPOSER_GHOST_DROP256=1 fm_tmux_strip_ghost)
-  [ "$out" = "deploy the fix" ] || fail "bright 256-colour typed text was stripped: '$out'"
-  out=$(printf '\033[38:5:231mdeploy the fix\033[0m\n' | FM_COMPOSER_GHOST_DROP256=1 fm_tmux_strip_ghost)
-  [ "$out" = "deploy the fix" ] || fail "bright colon-form 256-colour typed text was stripped: '$out'"
-  out=$(printf '\033[38;5;242m: Firstmate instruction waiting\033[0m\n' | FM_COMPOSER_GHOST_DROP256=1 fm_tmux_strip_ghost)
-  [ "$out" = "" ] || fail "256-colour 242 ghost was kept: '$out'"
-  out=$(printf '\033[38;5;231mdeploy \033[0m\033[38;5;242mthe ships\033[0m\n' | FM_COMPOSER_GHOST_DROP256=1 fm_tmux_strip_ghost)
-  [ "$out" = "deploy " ] || fail "256 prefix plus dim ghost did not keep the prefix: '$out'"
-  out=$(printf '\033[38;5;2mgreen typed\033[0m\n' | FM_COMPOSER_GHOST_DROP256=1 fm_tmux_strip_ghost)
-  [ "$out" = "green typed" ] || fail "system-palette 256 text was stripped: '$out'"
-  out=$(printf '\033[38;5;242mdeploy the fix\033[0m\n' | fm_tmux_strip_ghost)
-  [ "$out" = "deploy the fix" ] || fail "256-colour text was stripped without the accept-suggestion switch: '$out'"
-  pass "fm_tmux_strip_ghost luminance-tests 256-colour runs only on the accept-suggestion path"
-}
-
 # --- Dark truecolor foreground is ghost (grok placeholder), dropped ----------
 
 test_strip_ghost_drops_dark_truecolor_ghost() {
@@ -706,7 +684,6 @@ test_peek_output_is_escape_free() {
 test_strip_ghost_drops_dim_keeps_normal
 test_strip_ghost_handles_combined_and_boundary_codes
 test_strip_ghost_keeps_colored_text_with_2_payloads
-test_strip_ghost_256_palette_luma_when_drop256
 test_strip_ghost_drops_dark_truecolor_ghost
 test_strip_ghost_keeps_muse_composer_colors
 test_dim_ghost_only_composer_is_not_pending

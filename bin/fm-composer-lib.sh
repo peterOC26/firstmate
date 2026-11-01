@@ -60,11 +60,7 @@
 #                An adjacent hint row does not make the box stale. With no
 #                Enter:send on that row, the exact placeholder "Build anything"
 #                reads empty, and a suggestion that ghost-strips to nothing
-#                reads empty. On an accept-suggestion bar a 256-colour run is
-#                part of that strip only when its standard-palette luminance
-#                is below FM_COMPOSER_GHOST_LUMA_MAX. Default foreground,
-#                bright truecolor, a brighter 256-colour run, and theme
-#                indices 0-15 stay pending. Those words stay pending while
+#                reads empty. Those words stay pending while
 #                Enter:send is showing. "Build anything" is not a fleet-wide
 #                idle phrase.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
@@ -258,16 +254,10 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
-#     foreground (38;5;n or 38:5:n) is NOT luminance-tested by default.
-#     Indices 0-15 are theme colours, so the default keeps every 256-colour
-#     run: under-stripping merely defers, while over-stripping would inject
-#     over real input. FM_COMPOSER_GHOST_DROP256=1 luminance-tests the
-#     standard palette instead. 16-231 is the 6x6x6 cube with levels
-#     0, 95, 135, 175, 215, 255, and 232-255 is the grey ramp
-#     8+10*(n-232). A run is dropped only when that luminance is below
-#     FM_COMPOSER_GHOST_LUMA_MAX. Indices 0-15 stay. The only caller is the
-#     Grok accept-suggestion decision, and only when that key bar is showing
-#     and Enter:send is absent. The fleet default stays 0.
+#     foreground (38;5;n) is NOT luminance-tested - it is palette-dependent and
+#     no fleet harness uses it for ghost text, so it is kept (real text wins:
+#     under-stripping merely defers, which the max-defer alarm surfaces, while
+#     over-stripping would inject over real input).
 # Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
@@ -285,8 +275,7 @@ fm_composer_normalize_trim_var() {  # <varname>
 # LC_ALL=C makes awk walk bytes, so multibyte glyphs (e.g. ❯) and de-emphasised
 # runs alike pass through or drop intact without locale-dependent classes.
 fm_composer_strip_ghost() {
-  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" \
-              -v drop256="${FM_COMPOSER_GHOST_DROP256:-0}" '
+  LC_ALL=C awk -v lumamax="${FM_COMPOSER_GHOST_LUMA_MAX:-128}" '
     function sgr_code(v, b) {
       b = v
       sub(/:.*/, "", b)
@@ -302,44 +291,6 @@ fm_composer_strip_ghost() {
       if (code == "5") return p + 2
       if (code == "2") return p + 4
       return p + 1
-    }
-    # cube_level: one channel of the xterm 6x6x6 cube, index 0..5.
-    function cube_level(i) {
-      if (i == 0) return 0
-      if (i == 1) return 95
-      if (i == 2) return 135
-      if (i == 3) return 175
-      if (i == 4) return 215
-      return 255
-    }
-    # fg38_256_is_dark: 1 when the SGR 38 foreground starting at param p is a
-    # standard-palette 256-colour run whose luminance is below lumamax.
-    # Indices 0-15 are theme colours and are never dark here. 16-231 maps
-    # through the 6x6x6 cube. 232-255 maps through the grey ramp
-    # 8+10*(n-232). Used only when drop256 is set.
-    function fg38_256_is_dark(a, p, k, lumamax,   spec, nf, f, n, idx, r, g, b) {
-      spec = a[p]
-      n = -1
-      if (index(spec, ":") > 0) {
-        nf = split(spec, f, ":")
-        if (nf < 3 || f[2] != "5" || f[nf] !~ /^[0-9]+$/) return 0
-        n = f[nf] + 0
-      } else {
-        if (p + 2 > k || a[p + 1] != "5" || a[p + 2] !~ /^[0-9]+$/) return 0
-        n = a[p + 2] + 0
-      }
-      if (n < 16 || n > 255) return 0
-      if (n >= 232) {
-        r = 8 + 10 * (n - 232)
-        g = r
-        b = r
-      } else {
-        idx = n - 16
-        r = cube_level(int(idx / 36))
-        g = cube_level(int((idx % 36) / 6))
-        b = cube_level(idx % 6)
-      }
-      return ((299 * r + 587 * g + 114 * b) / 1000 < lumamax) ? 1 : 0
     }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
     # TRUECOLOR (38;2 / 38:2) whose luminance is below lumamax; 0 otherwise
@@ -375,8 +326,7 @@ fm_composer_strip_ghost() {
               for (p = 1; p <= k; p++) {
                 v = a[p]; code = sgr_code(v)
                 if (code == "38") {
-                  if (drop256 + 0 && fg38_256_is_dark(a, p, k, lumamax)) darkfg = 1
-                  else darkfg = fg38_is_dark(a, p, k, lumamax)
+                  darkfg = fg38_is_dark(a, p, k, lumamax)
                   p = skip_color_payload(a, p, k)
                 } else if (code == "48" || code == "58") {
                   p = skip_color_payload(a, p, k)
@@ -1338,102 +1288,28 @@ _fm_composer_row_is_grok_footer() {  # <trimmed-row>
   return 1
 }
 
-# A wrapped fragment of that bar. "Tab/" on its own line, or a continuation
-# that opens with "→:". Not enough by itself to prove a footer run.
-_fm_composer_row_is_grok_footer_fragment() {  # <trimmed-row>
-  local row=$1
-  _fm_composer_row_is_grok_footer "$row" && return 0
-  case "$row" in
-    'Tab/'*) return 0 ;;
-    '→:'*) return 0 ;;
-  esac
-  return 1
-}
-
-# 0 when the non-blank rows starting at <start> are one Grok key-hint run:
-# at most three rows, no blank inside, and at least one strong footer row.
-_fm_composer_grok_footer_run_at() {  # <plain> <start-row>
-  local plain=$1 start=$2 row seen=0 strong=0 trimmed next
-  row=$start
-  while [ "$seen" -lt 3 ]; do
-    trimmed=$(_fm_composer_screen_row "$row" "$plain")
-    fm_composer_normalize_trim_var trimmed
-    [ -n "$trimmed" ] || return 1
-    _fm_composer_row_is_grok_footer_fragment "$trimmed" || return 1
-    if _fm_composer_row_is_grok_footer "$trimmed"; then strong=1; fi
-    seen=$((seen + 1))
-    row=$((row + 1))
-    next=$(_fm_composer_screen_row "$row" "$plain")
-    fm_composer_normalize_trim_var next
-    if [ -z "$next" ] || ! _fm_composer_row_is_grok_footer_fragment "$next"; then
-      [ "$strong" = 1 ]
-      return
-    fi
-  done
-  [ "$strong" = 1 ]
-}
-
-# 0 when <target> is a row of the Grok key-hint run under <bottom>. A wrapped
-# bar can open its continuation with "→", which is also an agent prompt glyph.
-# That continuation is the bar, not a second composer.
-_fm_composer_grok_footer_covers_row() {  # <plain> <bottom-row> <target-row>
-  local plain=$1 bottom=$2 target=$3 row trimmed seen=0 next
+_fm_composer_grok_footer_under() {
+  local plain=$1 bottom=$2 row trimmed
   row=$((bottom + 1))
   trimmed=$(_fm_composer_screen_row "$row" "$plain")
   fm_composer_normalize_trim_var trimmed
   if [ -z "$trimmed" ]; then
     row=$((row + 1))
-  fi
-  _fm_composer_grok_footer_run_at "$plain" "$row" || return 1
-  while [ "$seen" -lt 3 ]; do
-    [ "$row" -eq "$target" ] && return 0
     trimmed=$(_fm_composer_screen_row "$row" "$plain")
     fm_composer_normalize_trim_var trimmed
-    [ -n "$trimmed" ] || return 1
-    _fm_composer_row_is_grok_footer_fragment "$trimmed" || return 1
-    seen=$((seen + 1))
-    row=$((row + 1))
-    next=$(_fm_composer_screen_row "$row" "$plain")
-    fm_composer_normalize_trim_var next
-    if [ -z "$next" ] || ! _fm_composer_row_is_grok_footer_fragment "$next"; then
-      return 1
-    fi
-  done
-  return 1
-}
-
-# Print the plain text of the Grok key-hint run under <bottom>, skipping at
-# most one blank row. Returns 1 when the rows under the box are not that bar.
-_fm_composer_grok_footer_under() {  # <plain> <bottom-row>
-  local plain=$1 bottom=$2 row trimmed joined='' seen=0
-  row=$((bottom + 1))
-  trimmed=$(_fm_composer_screen_row "$row" "$plain")
-  fm_composer_normalize_trim_var trimmed
-  if [ -z "$trimmed" ]; then
-    row=$((row + 1))
   fi
-  _fm_composer_grok_footer_run_at "$plain" "$row" || return 1
-  while [ "$seen" -lt 3 ]; do
-    trimmed=$(_fm_composer_screen_row "$row" "$plain")
-    fm_composer_normalize_trim_var trimmed
-    [ -n "$trimmed" ] || break
-    _fm_composer_row_is_grok_footer_fragment "$trimmed" || break
-    joined="${joined}${joined:+ }${trimmed}"
-    seen=$((seen + 1))
-    row=$((row + 1))
-  done
-  printf '%s' "$joined"
+  _fm_composer_row_is_grok_footer "$trimmed" || return 1
+  printf '%s' "$trimmed"
 }
 
 # Joined composer body inside a box, one leading prompt glyph removed.
-# <styled>=1 ghost-strips. FM_COMPOSER_GHOST_DROP256 applies when set.
-_fm_composer_box_body() {  # <screen> <styled> <first> <last>
-  local screen=$1 styled=$2 first=$3 last=$4
+_fm_composer_box_body() {
+  local screen=$1 first=$2 last=$3
   local row raw content glyph='' joined=''
   row=$first
   while [ "$row" -le "$last" ]; do
     raw=$(_fm_composer_screen_row "$row" "$screen")
-    content=$(_fm_composer_row_content "$raw" "$styled")
+    content=$(_fm_composer_row_content "$raw" 0)
     if fm_composer_leading_prompt_glyph_var glyph "$content"; then
       content=${content#"$glyph"}
     fi
@@ -1450,14 +1326,14 @@ _fm_composer_box_body() {  # <screen> <styled> <first> <last>
 # under the box is Grok's key-hint bar and that bar has no Enter:send.
 # A typed draft always paints "Enter:send" on this bar, so an exact-phrase
 # body without it is the placeholder, never a draft.
-# Exact "Build anything" is the idle placeholder, styled or plain. A body
-# that ghost-strips to nothing is a suggestion, including when geometry is
-# ambiguous. On an accept-suggestion bar the strip also drops a 256-colour
-# run below FM_COMPOSER_GHOST_LUMA_MAX. A brighter 256-colour run stays.
 # Anything else keeps <verdict>, so a real draft stays pending.
-_fm_composer_grok_footer_verdict() {  # <screen> <styled> <bottom> <first> <last> <verdict>
-  local screen=$1 styled=$2 bottom=$3 first=$4 last=$5 verdict=$6
+_fm_composer_grok_footer_verdict() {
+  local screen=$1 ambiguous=$2 bottom=$3 first=$4 last=$5 verdict=$6
   local plain footer body
+  if [ "$ambiguous" = 1 ]; then
+    printf '%s' "$verdict"
+    return 0
+  fi
   plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
   footer=$(_fm_composer_grok_footer_under "$plain" "$bottom") || {
     printf '%s' "$verdict"
@@ -1466,26 +1342,10 @@ _fm_composer_grok_footer_verdict() {  # <screen> <styled> <bottom> <first> <last
   case "$footer" in
     *'Enter:send'*) printf '%s' "$verdict"; return 0 ;;
   esac
-  body=$(_fm_composer_box_body "$screen" 0 "$first" "$last")
+  body=$(_fm_composer_box_body "$screen" "$first" "$last")
   if [ "$body" = 'Build anything' ]; then
     printf 'empty'
     return 0
-  fi
-  if [ "$styled" = 1 ]; then
-    body=$(_fm_composer_box_body "$screen" 1 "$first" "$last")
-    if [ -z "$body" ]; then
-      printf 'empty'
-      return 0
-    fi
-    case "$footer" in
-      *'accept suggestion'*)
-        body=$(FM_COMPOSER_GHOST_DROP256=1 _fm_composer_box_body "$screen" 1 "$first" "$last")
-        if [ -z "$body" ]; then
-          printf 'empty'
-          return 0
-        fi
-        ;;
-    esac
   fi
   printf '%s' "$verdict"
 }
@@ -1493,7 +1353,7 @@ _fm_composer_grok_footer_verdict() {  # <screen> <styled> <bottom> <first> <last
 _fm_composer_classify_box() {  # <screen> <styled> <ambiguous> <first> <last> <bottom>
   local verdict
   verdict=$(_fm_composer_classify_rows "$1" "$2" "$3" "$4" "$5")
-  _fm_composer_grok_footer_verdict "$1" "$2" "$6" "$4" "$5" "$verdict"
+  _fm_composer_grok_footer_verdict "$1" "$3" "$6" "$4" "$5" "$verdict"
 }
 
 # _fm_composer_classify_bare_row: the bare agent-glyph row verdict, including
@@ -1987,11 +1847,6 @@ _fm_composer_select_cursorless() {
       bare=-1
     fi
   fi
-  # A wrapped Grok key-hint continuation leads with "→". Leave the box selected.
-  if [ "$bare" -ge 0 ] && [ "$FM_COMPOSER_SCAN_BOX_BOTTOM" -ge 0 ] \
-     && _fm_composer_grok_footer_covers_row "$plain" "$FM_COMPOSER_SCAN_BOX_BOTTOM" "$bare"; then
-    bare=-1
-  fi
   if [ "$bare" -gt "$generic" ]; then
     generic=$bare
     FM_COMPOSER_SELECTED_KIND=bare
@@ -2072,7 +1927,7 @@ _fm_composer_select_cursorless() {
     # Grok draws its key-hint bar flush against the box. That bar is
     # furniture, same as the blank line the idle capture leaves there.
     if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed" \
-       && ! _fm_composer_grok_footer_run_at "$plain" "$next"; then
+       && ! _fm_composer_row_is_grok_footer "$trimmed"; then
       FM_COMPOSER_SELECTED_KIND=
       return 1
     fi

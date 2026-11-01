@@ -73,17 +73,17 @@ Coverage is `../../../tests/fm-composer-ghost.test.sh` and `../../../tests/fm-ba
 
 The idle key bar carries `Shift+Tab:mode` and a shortcuts hint.
 A typed draft adds `Enter:send` on that bar.
-The shared classifier treats the bar as furniture, including when it sits flush against the box and when a suggestion wraps onto a `Tab/` row plus a `→:` continuation.
-With no `Enter:send`, and only while that bar is present, the exact placeholder `Build anything` reads empty.
-A suggestion on a bar that says `accept suggestion` reads empty when ghost-stripping leaves nothing: SGR-2, truecolor below `FM_COMPOSER_GHOST_LUMA_MAX`, or a standard 256-colour index whose palette luminance is below that limit.
-Default-foreground text, bright truecolor, a brighter 256-colour run, and theme indices 0-15 stay pending.
+The shared classifier treats the bar as furniture, including when it sits flush against the box.
+With unambiguous box geometry and no `Enter:send`, and only while that bar is present, the exact placeholder `Build anything` reads empty.
+A suggestion on a bar that says `accept suggestion` reads empty when ghost-stripping leaves nothing: SGR-2 or truecolor below `FM_COMPOSER_GHOST_LUMA_MAX`.
+Default-foreground text, bright truecolor, 256-colour runs stay pending.
 The same placeholder while `Enter:send` is showing stays pending.
 `Build anything` is not a fleet-wide idle phrase, so another harness's box holding those words stays pending.
 On grok 1.0.46 in Herdr the idle bar is present before any input.
 Its plain text is `Shift+Tab:mode │ Ctrl+.:shortcuts`, the key names are bold, and `:mode` and `:shortcuts` are dim.
 A typed draft on that surface adds `Shift+Enter/Alt+Enter:newline`.
 `Build anything` did not paint, and two completed turns with `GROK_PROMPT_SUGGESTIONS=1` did not paint `accept suggestion`.
-The placeholder and the accepted-suggestion ghost are fixture-proven on that build, not live-proven.
+Both the placeholder and accepted-suggestion ghost are proven only on fixtures built from the reported screens, not in a live Herdr capture.
 A private tmux capture of the same build showed no key bar until the first typed input.
 That typed bar read `Enter:send │ Alt+Enter:newline │ Shift+Tab:mode │ Ctrl+x:shortcuts`, and the idle bar after backspace read `Shift+Tab:mode │ Ctrl+x:shortcuts`.
 The dated commands and output are in `../../../docs/verification/runtime-backends.md` under "Grok approval-mode composer".
