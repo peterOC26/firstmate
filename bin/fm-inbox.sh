@@ -6,7 +6,8 @@
 #
 #   note    Queue an idea for firstmate while firstmate is mid-turn and cannot
 #           answer. Writes a durable record and appends ONE `check` wake, so the
-#           note survives a crash and is presented at firstmate's next drain.
+#           note survives a crash; the live watcher surfaces its wake as a close
+#           for firstmate's next drain (bin/fm-watch.sh owns the surfacing rule).
 #           `announce` may append that same wake for an already-saved note.
 #           These two are the only subcommands that touch firstmate's wake queue.
 #   say     Same as `note`, but the body comes from spoken audio on stdin.

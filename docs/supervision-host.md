@@ -107,7 +107,9 @@ Only an away record is away: no record, or the record daemon-backed quiet mode w
 ### Attended
 
 The host asks the Pi branch's offer rule (`branchOfferForWake`, through `bin/fm-branch-dispatch.mjs offer`) whether the branch may take the close.
-So a close reaches main off Pi exactly when it would on Pi: a check trigger, a decision-owned signal or stale trigger, and a scan that is unsafe or holds nothing for the branch stay main's.
+Under that rule, check triggers, decision-owned signal or stale triggers, and scans that are unsafe or hold nothing for the branch stay main's, as on Pi.
+A captain inbox note queued during an attended engine turn waits for that turn to finish without interrupting it; the existing `FM_SUPERVISION_HOST_TURN_TIMEOUT` [engine-turn bound](configuration.md#environment-variables) still applies.
+The host then passes the next close to main before starting another engine turn, even if the successor already closed for an unrelated wake before the note arrived.
 On that main-only pass-through the host starts the successor watcher cycle and leaves it running, then prints the close unchanged.
 That successor, like one a turn hands back at its start (see [Away](#away)), runs in a process group of its own, so the harness tearing down the hook's group after the rewake does not stop it.
 The host leaves the watcher's recovery marker reading downtime, confirming no handling handoff, because the re-arm owner delivers a close to main only while that marker reads downtime.
@@ -409,7 +411,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 
 | Test | What it covers |
 |---|---|
-| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine. |
+| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine; inbox delivery while parked, during a turn through the Claude Stop hook, and after an unrelated successor close. |
 | [tests/fm-supervision-host-dialog.test.sh](../tests/fm-supervision-host-dialog.test.sh) | Away-posture wake handling, dialog mirror delivery and permissions, incomplete engine results, and outcome handoff when the captain returns, against a stub engine. |
 | [tests/fm-supervision-host-recovery.test.sh](../tests/fm-supervision-host-recovery.test.sh) | Engine latching and recovery, bounded turns and park boundaries, owner options, repeated outcome suppression, and host ownership, against a stub engine. |
 | `tests/fm-claude-stop-autoarm.test.sh` | The Claude arm owner's host mode against a stub host. |

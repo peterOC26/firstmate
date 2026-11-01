@@ -49,7 +49,8 @@
 #     engine errors, and the Pi branch's offer rule
 #     (bin/fm-branch-dispatch.mjs offer) says the branch may take this close,
 #     so main-only classes (check triggers, decision-owned triggers, a scan
-#     that is unsafe or holds nothing for the branch) stay main's. That
+#     that is unsafe or holds nothing for the branch), and a queued unsurfaced
+#     captain inbox note, stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
 #     drops the handoff. It confirms no handling handoff, so the recovery
@@ -1028,7 +1029,8 @@ turn_captain_seqs() {  # <turn>
 # or nothing when the supervision session may take it. Sets ATTENDED_WHY, and
 # ATTENDED_OFFER to the offer's verdict and the scope it judged.
 attended_acceptor() {  # <first-reason-line>
-  local offer=
+  local offer='' inbox_ids=''
+  local inbox_keys key
   ATTENDED_WHY=
   ATTENDED_OFFER=
   if ! fm_supervision_host_attended_ready "$CONFIG" "$PRIMARY"; then
@@ -1041,6 +1043,17 @@ attended_acceptor() {  # <first-reason-line>
     ATTENDED_WHY="branch eligibility could not be computed"
   elif [ "$(printf '%s\n' "$offer" | sed -n 's/^eligible=//p')" != 1 ]; then
     ATTENDED_WHY="main-only"
+  fi
+  if [ -z "$ATTENDED_WHY" ]; then
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    inbox_keys=$(fm_wake_inbox_unsurfaced_keys_locked)
+    for key in $inbox_keys; do
+      inbox_ids="$inbox_ids ${key#inbox:}"
+      # A failed marker must still hand the queued note back to main.
+      fm_wake_surfaced_mark_locked "$key" || true
+    done
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    [ -z "$inbox_ids" ] || ATTENDED_WHY="main-only (captain inbox note${inbox_ids} queued)"
   fi
   ATTENDED_OFFER=$offer
   [ -z "$ATTENDED_WHY" ]
@@ -1094,7 +1107,7 @@ while :; do
   if ! fm_afk_contract_away_present "$STATE"; then
     if ! attended_acceptor "$(printf '%s\n' "$REASON" | head -n 1)"; then
       log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-      if [ "$ATTENDED_WHY" = main-only ]; then
+      if [[ "$ATTENDED_WHY" = main-only* ]]; then
         leave_successor_for_main || true
       fi
       emit
