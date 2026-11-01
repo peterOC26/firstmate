@@ -1448,6 +1448,8 @@ _fm_composer_box_body() {  # <screen> <styled> <first> <last>
 
 # _fm_composer_grok_footer_verdict: the box verdict, adjusted when the row
 # under the box is Grok's key-hint bar and that bar has no Enter:send.
+# A typed draft always paints "Enter:send" on this bar, so an exact-phrase
+# body without it is the placeholder, never a draft.
 # Exact "Build anything" is the idle placeholder, styled or plain. A body
 # that ghost-strips to nothing is a suggestion, including when geometry is
 # ambiguous. On an accept-suggestion bar the strip also drops a 256-colour
