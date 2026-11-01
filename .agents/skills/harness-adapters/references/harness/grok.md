@@ -71,6 +71,15 @@ On Grok 0.2.93, real input `38;2;224;222;244` measured about 225 luminance, whil
 The truecolor rule assumes the fleet's dark theme; SGR-2 is theme-independent.
 Coverage is `../../../tests/fm-composer-ghost.test.sh` and `../../../tests/fm-backend-herdr.test.sh`.
 
+The idle key bar is `Shift+Tab:mode │ Ctrl+.:shortcuts`.
+A typed draft adds `Enter:send` on that bar.
+The shared classifier treats the bar as furniture, including when it sits flush against the box and when a suggestion wraps onto a `Tab/` row plus a `→:` continuation.
+With no `Enter:send`, the exact placeholder `Build anything` reads empty, and a greyed accepted suggestion on a bar that says `accept suggestion` reads empty, including a 256-colour ghost.
+The same placeholder while `Enter:send` is showing, and any other bright typed text, stays pending.
+On 2026-11-01, grok 1.0.46 painted neither string: the idle composer was an empty `❯` and an unsent `KEEP UNSENT DRAFT` stayed pending.
+The dated commands and output are in `../../../docs/verification/runtime-backends.md` under "Grok approval-mode composer".
+The placeholder and suggestion shapes are pinned by `../../../tests/fm-composer-lib.test.sh` and `../../../tests/fm-backend-herdr.test.sh`.
+
 Tmux `#{cursor_y}` may point at the pristine composer's bottom border.
 The shared classifier locates the full box and all content rows, so border cursor and multi-row composers require no adapter offsets.
 

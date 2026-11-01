@@ -892,6 +892,30 @@ No model prompt was submitted.
 Portable coverage is `bin/fm-test-run.sh tests/fm-composer-lib.test.sh tests/fm-control.test.sh`; the live refresh guard `FM_COMPOSER_MATRIX_LIVE=1 tests/fm-composer-matrix-live-e2e.test.sh` now launches Grok with `--always-approve` to exercise this title.
 The portable matrix checks the real capture across styled, plain, and cursor-bearing backends, preserves pending drafts, and refuses malformed widths.
 
+Verified again on 2026-11-01 with `grok 1.0.46 (2765805b9442) [stable]`, model `grok-4.7`, reasoning effort `low`, in Herdr `0.9.0` session `fm-lab-fm-control-grok-1688843-17829`, provisioned and torn down through `bin/fm-herdr-lab.sh`.
+Teardown finished with `teardown_rc=0` and the helper's default-session tripwire check passed.
+Launch was `workspace create --cwd <worktree> --no-focus --env GROK_PROMPT_SUGGESTIONS=1`, then `pane run w1:p1 grok --model grok-4.7 --reasoning-effort low --always-approve --session-id 3b727a60-6695-4f6d-86b6-141893adf55e`, both through the helper's `run` command.
+Capture was `pane read w1:p1 --source visible --format ansi`, classified with `fm_composer_classify_screen` and capabilities `styled=1`, `cursor=0`, `identity=1`.
+The idle pane showed an empty `❯`, bottom border `Grok 4.7 (low) · always-approve`, and this footer, with a blank line between the box and the footer:
+
+```text
+Shift+Tab:mode  │  Ctrl+.:shortcuts
+```
+
+The top border, content row, and titled bottom border were each 117 columns, so this release did not render the three-column title overhang recorded for grok 1.0.5.
+The classifier returned `empty`.
+`pane send-text w1:p1 KEEP UNSENT DRAFT` left the text unsent.
+The footer became the line below and the classifier returned `pending`:
+
+```text
+Enter:send  │  Shift+Enter/Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+.:shortcuts
+```
+
+Seventeen `pane send-keys w1:p1 backspace` presses restored the empty composer and the idle footer, and the classifier returned `empty`.
+Neither `Build anything` nor `accept suggestion` appeared in any capture.
+Those two shapes stay pinned by `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh`: the exact placeholder and a greyed accepted-suggestion ghost read `empty` when the key bar has no `Enter:send`, and real typed text, including that placeholder while `Enter:send` is showing, stays `pending`.
+No model prompt was submitted.
+
 ## Composer classification matrix
 
 The shared composer classifier (`bin/fm-composer-lib.sh`, `fm_composer_classify_screen`) owns every composer shape fleet-wide; each backend contributes only a capture and a capability descriptor.
@@ -925,6 +949,7 @@ The 2026-08-23 steering-inbox doorbell run observed grok 1.0.5's idle composer c
 Issue #3436's recorded idle capture reproduced the cause on 2026-09-14: Grok 1.0.5 renders the titled bottom border three columns wider than its aligned top and content rows, so the cursorless Herdr profile rejected the otherwise complete box as ambiguous.
 The classifier now accepts only that exact three-column overhang (`FM_COMPOSER_GROK_TITLE_OVERHANG` in `bin/fm-composer-lib.sh`) carrying a typed `Grok <model> (<effort>)` title; the portable regressions feed the real capture through both the shared Herdr capability profile and `fm_backend_herdr_composer_state`, and prove idle is `empty`, typed content is `pending`, and an unrecognized oversized title remains `unknown`.
 Grok was not installed on the verification machine for this 2026-09-14 change, so the live guard still owes a refresh against the current release rather than treating the portable capture as current live evidence; the three-column width is not live-verified and may need adjustment if Grok's title rendering changes or scales with title length.
+The 2026-11-01 grok 1.0.46 capture under Grok approval-mode composer aligned the top, content, and titled bottom at 117 columns, so that release did not exercise the overhang.
 This closes only #3436's idle-composer-misclassification symptom (Grok/Herdr composer read `unknown` instead of `empty`, blocking away-mode injection). The issue's second symptom - a leftover watcher never yielding and never being taken over or refused at AFK start - is unrelated to composer classification and is tracked separately in #2270, where #3436's reproduction serves as corroborating evidence.
 Cursor is deliberately outside this cursor-anchored empty-composer matrix because its terminal cursor is parked outside the composer; tmux's Cursor-specific, process-identity-gated cursorless fallback is covered by the [Cursor Agent CLI](#cursor-agent-cli) section's separate live evidence and drift guard.
 
