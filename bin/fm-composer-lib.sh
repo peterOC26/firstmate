@@ -46,8 +46,8 @@
 # escalations into whatever it calls empty. Positive container proof means one
 # of the shapes in the catalogue below.
 #
-# THE SHAPE CATALOGUE (all verified against real harnesses; byte-level
-# captures in data/fm-composer-consolidation-audit-s1/report.md and
+# THE SHAPE CATALOGUE (byte-level captures and verification limits in
+# data/fm-composer-consolidation-audit-s1/report.md and
 # docs/verification/runtime-backends.md):
 #   bordered   - a complete boxed composer: a top border, side-bordered content
 #                rows of the same family, and a bottom border (grok, kimi,
@@ -55,14 +55,10 @@
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
-#                The key-hint row directly under that box (Shift+Tab:mode,
-#                accept suggestion, and the Ctrl+ shortcuts bar) is furniture.
-#                An adjacent hint row does not make the box stale. With no
-#                Enter:send on that row, the exact placeholder "Build anything"
-#                reads empty, and a suggestion that ghost-strips to nothing
-#                reads empty. Those words stay pending while
-#                Enter:send is showing. "Build anything" is not a fleet-wide
-#                idle phrase.
+#                Grok's single-row key bar is furniture even when adjacent
+#                to the box; _fm_composer_row_is_grok_footer owns recognition.
+#                _fm_composer_grok_footer_verdict owns the box-local placeholder
+#                exception; a footer never resolves ambiguous box geometry.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
@@ -1317,6 +1313,7 @@ _fm_composer_box_body() {
 
 # _fm_composer_grok_footer_verdict: the box verdict, adjusted when the row
 # under the box is Grok's key-hint bar and that bar has no Enter:send.
+# Ambiguous geometry keeps <verdict>: a key bar cannot prove the box itself.
 # A typed draft always paints "Enter:send" on this bar, so an exact-phrase
 # body without it is the placeholder, never a draft.
 # Anything else keeps <verdict>, so a real draft stays pending.
