@@ -914,7 +914,25 @@ Enter:send  │  Shift+Enter/Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+.
 Seventeen `pane send-keys w1:p1 backspace` presses restored the empty composer and the idle footer, and the classifier returned `empty`.
 Neither `Build anything` nor `accept suggestion` appeared in any capture.
 Those two shapes stay pinned by `tests/fm-composer-lib.test.sh` and `tests/fm-backend-herdr.test.sh`: the exact placeholder and a greyed accepted-suggestion ghost read `empty` when the key bar has no `Enter:send`, and real typed text, including that placeholder while `Enter:send` is showing, stays `pending`.
+A 256-colour run is part of that ghost strip only when the bar says `accept suggestion` and the standard-palette luminance is below `FM_COMPOSER_GHOST_LUMA_MAX`.
+Brighter 256-colour text stays pending.
 No model prompt was submitted.
+
+Verified again the same day, still `grok 1.0.46 (2765805b9442) [stable]` and Herdr `0.9.0`, in session `fm-lab-fm-control-grok-4008720-29999`, provisioned and torn down through `bin/fm-herdr-lab.sh`.
+Teardown finished with `teardown_rc=0` and the helper's default-session tripwire check passed.
+Launch was `workspace create --cwd <worktree> --no-focus --env GROK_PROMPT_SUGGESTIONS=1`, then `pane run w1:p1 grok --model grok-4.7 --reasoning-effort low --always-approve --session-id <id>`, both through the helper's `run` command.
+Capture was `pane read w1:p1 --source visible --format ansi`.
+Before any input the idle bar was already present, and the classifier returned `empty`.
+Its plain text was `Shift+Tab:mode │ Ctrl+.:shortcuts`.
+The key names were SGR 1 and the labels `:mode` and `:shortcuts` were SGR 2.
+The model title on the bottom border was SGR 2, and the empty `❯` row had no colour of its own.
+`Build anything` was not painted.
+Two completed turns were then submitted: `What is 2+2? Reply with only 4.` and `Reply with only the word ok.`.
+After each turn the composer was an empty `❯`, the same idle bar was showing, `accept suggestion` was absent, and the classifier returned `empty`.
+The placeholder and the accepted-suggestion ghost were not painted by this build in this lab, so those two rules stay fixture-proven.
+A private tmux capture of this same grok build on 2026-11-01, outside Herdr, showed no key bar until the first typed input.
+That typed bar read `Enter:send │ Alt+Enter:newline │ Shift+Tab:mode │ Ctrl+x:shortcuts`, and the idle bar after backspace read `Shift+Tab:mode │ Ctrl+x:shortcuts`.
+The classifier treats both shortcut spellings as the same bar.
 
 ## Composer classification matrix
 

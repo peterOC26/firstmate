@@ -1183,6 +1183,44 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   pass "matrix: grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
 }
 
+# grok 1.0.46 in Herdr paints this idle bar before any input. The key names
+# are bold and the labels are dim. The same build's tmux bar uses Ctrl+x
+# and Alt+Enter, and appears only after the first input. Typed text stays
+# pending on both.
+test_matrix_grok_1046_real_key_bar() {
+  local esc top content bot footer screen row
+  local top3436 bot3436 idle_x send_x sug_x
+  esc=$(printf '\033')
+  top='  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮'
+  content='  │ ❯                                                                                                               │'
+  bot="  ╰─────────────────────────────────────────────────────────────────────────────── ${esc}[0m${esc}[2mGrok 4.7 (low) ${esc}[0m· ${esc}[0m${esc}[2malways-approve ${esc}[0m─╯"
+  footer="  ${esc}[0m${esc}[1mShift+Tab${esc}[0m${esc}[2m:mode  │  ${esc}[0m${esc}[1mCtrl+.${esc}[0m${esc}[2m:shortcuts                                                                        ${esc}[0m        "
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top" "$content" "$bot" "$footer")
+  assert_screen "grok 1.0.46 herdr idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  content='  │ ❯ deploy the fix                                                                                                │'
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top" "$content" "$bot" "$footer")
+  assert_screen "grok 1.0.46 herdr idle bar keeps typed text pending" pending "$CAPS_STYLED" "$screen"
+
+  top3436='  ╭──────────────────────────────────────────────────────────────────────────╮'
+  bot3436='  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯'
+  idle_x='  Shift+Tab:mode  │  Ctrl+x:shortcuts'
+  send_x='  Enter:send  │  Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+x:shortcuts'
+  sug_x='  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+x:shortcuts'
+  row=$(grok_idle_row ' ')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
+  assert_screen "grok tmux Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  row=$(grok_idle_row ' deploy the fix')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$send_x")
+  assert_screen "grok tmux Alt+Enter typed bar stays pending" pending "$CAPS_STYLED" "$screen"
+  row=$(grok_idle_row_ansi " ${ESC}[38;5;231mdeploy the fix${ESC}[0m" 15)
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$sug_x")
+  assert_screen "grok bright 256 text on a Ctrl+x suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+  row=$(grok_idle_row ' Build anything')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
+  assert_screen "grok Build anything on the Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  pass "matrix: grok 1.0.46's real key bars read empty when idle and pending when typed"
+}
+
 test_matrix_claude_titled_top_rule() {
   # A named Claude Code session draws its title into the composer's TOP rule
   # (issues #5601 and #5558; observed on herdr as
@@ -1496,6 +1534,7 @@ test_matrix_opencode_leftbar_cwd_furniture
 test_matrix_opencode_leftbar_abs_cwd_furniture
 test_matrix_grok_titled_bottom_border
 test_matrix_grok_idle_placeholder_and_suggestion_ghost
+test_matrix_grok_1046_real_key_bar
 test_matrix_claude_titled_top_rule
 test_matrix_kimi_bordered_shell_glyph_box
 test_matrix_claude_inside_zellij_ansi_dump

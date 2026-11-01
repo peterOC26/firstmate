@@ -56,11 +56,17 @@
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
 #                The key-hint row directly under that box (Shift+Tab:mode,
-#                accept suggestion, the Ctrl+. bar) is furniture. An adjacent
-#                hint row does not make the box stale. With no Enter:send on
-#                that row, a greyed suggestion and the exact idle placeholder
-#                "Build anything" read empty. Real typed text stays pending,
-#                including those words while Enter:send is showing.
+#                accept suggestion, and the Ctrl+ shortcuts bar) is furniture.
+#                An adjacent hint row does not make the box stale. With no
+#                Enter:send on that row, the exact placeholder "Build anything"
+#                reads empty, and a suggestion that ghost-strips to nothing
+#                reads empty. On an accept-suggestion bar a 256-colour run is
+#                part of that strip only when its standard-palette luminance
+#                is below FM_COMPOSER_GHOST_LUMA_MAX. Default foreground,
+#                bright truecolor, a brighter 256-colour run, and theme
+#                indices 0-15 stay pending. Those words stay pending while
+#                Enter:send is showing. "Build anything" is not a fleet-wide
+#                idle phrase.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
@@ -252,12 +258,16 @@ fm_composer_normalize_trim_var() {  # <varname>
 #     dark-foreground run. This assumes a DARK terminal theme, the firstmate
 #     fleet reality, where real typed input is bright and only de-emphasised UI
 #     is dark; the SGR-2 signal above stays theme-independent. A 256-colour
-#     foreground (38;5;n) is NOT luminance-tested. It is palette-dependent, so
-#     the default keeps it: under-stripping merely defers, while over-stripping
-#     would inject over real input. FM_COMPOSER_GHOST_DROP256=1 drops those
-#     runs too. The only caller is the Grok accept-suggestion decision, and
-#     only when that key bar is showing and Enter:send is absent. The fleet
-#     default stays 0.
+#     foreground (38;5;n or 38:5:n) is NOT luminance-tested by default.
+#     Indices 0-15 are theme colours, so the default keeps every 256-colour
+#     run: under-stripping merely defers, while over-stripping would inject
+#     over real input. FM_COMPOSER_GHOST_DROP256=1 luminance-tests the
+#     standard palette instead. 16-231 is the 6x6x6 cube with levels
+#     0, 95, 135, 175, 215, 255, and 232-255 is the grey ramp
+#     8+10*(n-232). A run is dropped only when that luminance is below
+#     FM_COMPOSER_GHOST_LUMA_MAX. Indices 0-15 stay. The only caller is the
+#     Grok accept-suggestion decision, and only when that key bar is showing
+#     and Enter:send is absent. The fleet default stays 0.
 # Raising FM_COMPOSER_GHOST_LUMA_MAX is not free: muse draws its `⟩` prompt glyph
 # in truecolor 38;2;90;160;255, luminance ~149.9 (verified, muse 0.1.0-R708.1),
 # the tightest margin over the 128 default in the fleet. Above ~150 that glyph is
@@ -293,16 +303,43 @@ fm_composer_strip_ghost() {
       if (code == "2") return p + 4
       return p + 1
     }
-    # fg38_is_256: 1 when the SGR 38 foreground starting at param p is a
-    # 256-colour (38;5 / 38:5) run. Used only when drop256 is set.
-    function fg38_is_256(a, p, k,   spec, nf, f) {
+    # cube_level: one channel of the xterm 6x6x6 cube, index 0..5.
+    function cube_level(i) {
+      if (i == 0) return 0
+      if (i == 1) return 95
+      if (i == 2) return 135
+      if (i == 3) return 175
+      if (i == 4) return 215
+      return 255
+    }
+    # fg38_256_is_dark: 1 when the SGR 38 foreground starting at param p is a
+    # standard-palette 256-colour run whose luminance is below lumamax.
+    # Indices 0-15 are theme colours and are never dark here. 16-231 maps
+    # through the 6x6x6 cube. 232-255 maps through the grey ramp
+    # 8+10*(n-232). Used only when drop256 is set.
+    function fg38_256_is_dark(a, p, k, lumamax,   spec, nf, f, n, idx, r, g, b) {
       spec = a[p]
+      n = -1
       if (index(spec, ":") > 0) {
         nf = split(spec, f, ":")
-        return (nf >= 2 && f[2] == "5") ? 1 : 0
+        if (nf < 3 || f[2] != "5" || f[nf] !~ /^[0-9]+$/) return 0
+        n = f[nf] + 0
+      } else {
+        if (p + 2 > k || a[p + 1] != "5" || a[p + 2] !~ /^[0-9]+$/) return 0
+        n = a[p + 2] + 0
       }
-      if (p + 1 > k) return 0
-      return (a[p + 1] == "5") ? 1 : 0
+      if (n < 16 || n > 255) return 0
+      if (n >= 232) {
+        r = 8 + 10 * (n - 232)
+        g = r
+        b = r
+      } else {
+        idx = n - 16
+        r = cube_level(int(idx / 36))
+        g = cube_level(int((idx % 36) / 6))
+        b = cube_level(idx % 6)
+      }
+      return ((299 * r + 587 * g + 114 * b) / 1000 < lumamax) ? 1 : 0
     }
     # fg38_is_dark: 1 when the SGR 38 foreground starting at param p is a
     # TRUECOLOR (38;2 / 38:2) whose luminance is below lumamax; 0 otherwise
@@ -338,7 +375,7 @@ fm_composer_strip_ghost() {
               for (p = 1; p <= k; p++) {
                 v = a[p]; code = sgr_code(v)
                 if (code == "38") {
-                  if (drop256 + 0 && fg38_is_256(a, p, k)) darkfg = 1
+                  if (drop256 + 0 && fg38_256_is_dark(a, p, k, lumamax)) darkfg = 1
                   else darkfg = fg38_is_dark(a, p, k, lumamax)
                   p = skip_color_payload(a, p, k)
                 } else if (code == "48" || code == "58") {
@@ -518,12 +555,13 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # live, devin 3000.11.1). Command Code renders the anchored `Ask your question...`
 # after its `❯` glyph (verified live, Command Code 1.74.1); its truecolor is too
 # bright for the default ghost ceiling, so fm_composer_classify_screen reads its
-# screen with a raised one. Grok's idle placeholder `Build anything` is anchored
-# here so a plain capture reads empty. A styled capture keeps bright text
-# pending unless the key-hint row under the box proves the idle bar; see
-# _fm_composer_grok_footer_verdict. FM_COMPOSER_IDLE_RE overrides for an
+# screen with a raised one. Grok's idle placeholder `Build anything` is not
+# in this set. A plain capture of another harness can hold those words as a
+# typed draft, so only _fm_composer_grok_footer_verdict treats the exact
+# phrase as empty, and only while Grok's key-hint bar is showing and
+# Enter:send is absent. FM_COMPOSER_IDLE_RE overrides for an
 # unverified harness; matching is case-insensitive.
-FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$|^Ask your question\.\.\.$|^Build anything$'
+FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$|^Ask your question\.\.\.$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
@@ -1273,9 +1311,13 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
 }
 
 # _fm_composer_row_is_grok_footer: 0 when <trimmed-row> is Grok's key-hint bar.
-# The live idle bar is "Shift+Tab:mode │ Ctrl+.:shortcuts". A typed draft adds
-# "Enter:send". An accepted suggestion uses "Tab/→:accept suggestion" on that
-# same bar. A row that only mentions one of those words is not the bar.
+# Herdr on grok 1.0.46 paints this bar before any input. Its plain text is
+# "Shift+Tab:mode │ Ctrl+.:shortcuts", the key names are SGR 1, and the
+# labels are SGR 2. A typed draft on that surface adds "Enter:send" and
+# "Shift+Enter/Alt+Enter:newline". A tmux capture of the same build showed
+# the bar only after the first input, as "Ctrl+x:shortcuts" and
+# "Alt+Enter:newline". An accepted suggestion uses "Tab/→:accept suggestion"
+# on that same bar. A row that only mentions one of those words is not the bar.
 _fm_composer_row_is_grok_footer() {  # <trimmed-row>
   local row=$1
   [ -n "$row" ] || return 1
@@ -1406,9 +1448,10 @@ _fm_composer_box_body() {  # <screen> <styled> <first> <last>
 
 # _fm_composer_grok_footer_verdict: the box verdict, adjusted when the row
 # under the box is Grok's key-hint bar and that bar has no Enter:send.
-# Exact "Build anything" is the idle placeholder. A body that ghost-strips
-# to nothing is a suggestion, including when geometry is ambiguous. A
-# 256-colour body is a suggestion only when the bar says "accept suggestion".
+# Exact "Build anything" is the idle placeholder, styled or plain. A body
+# that ghost-strips to nothing is a suggestion, including when geometry is
+# ambiguous. On an accept-suggestion bar the strip also drops a 256-colour
+# run below FM_COMPOSER_GHOST_LUMA_MAX. A brighter 256-colour run stays.
 # Anything else keeps <verdict>, so a real draft stays pending.
 _fm_composer_grok_footer_verdict() {  # <screen> <styled> <bottom> <first> <last> <verdict>
   local screen=$1 styled=$2 bottom=$3 first=$4 last=$5 verdict=$6
