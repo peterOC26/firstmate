@@ -1496,8 +1496,6 @@ terminal_status_already_delivered() {  # <task>
 # It is the delivered status identity, <size>@<file-ident>, from the span the
 # heartbeat has already classified.
 # A footer tick does not change it, and a new delivered line does.
-# The classified endpoint byte is the last resort when that identity cannot be
-# formed.
 # Returns 1 unless the span read is a clean delivery, so a failed or undelivered
 # read keeps the bare stale instead of a once-only report this cannot key.
 delivered_terminal_dead_id() {  # <task>
@@ -1520,10 +1518,7 @@ delivered_terminal_dead_id() {  # <task>
       esac
       ;;
   esac
-  case "$offset" in
-    ''|*[!0-9]*) return 1 ;;
-  esac
-  printf 'offset:%s' "$offset"
+  return 1
 }
 
 # The question the wedge timer never asked before it alarmed: is there still an
@@ -1796,7 +1791,7 @@ busy_turn_over_age() {  # <task>
 # wording; a caller that reached the bounded cadence off pause tracking alone, with
 # no declaring verb left on the log, keeps the external-wait wording it always had.
 handle_paused_stale() {  # <window> <task> <hash>
-  local win=$1 task=$2 h=$3 key statusf mtime age detail reason declaration last until now min_age
+  local win=$1 task=$2 h=$3 key statusf mtime age detail reason declaration last until now min_age dead_id
   key=$(window_key "$win")
   printf '%s' "$h" > "$STATE/.stale-$key"
   : > "$STATE/.paused-$key"
@@ -1808,6 +1803,13 @@ handle_paused_stale() {  # <window> <task> <hash>
   now=$(date +%s)
   age=$(( now - mtime ))
   last=$(status_declared_wait_line "$statusf")
+  if status_is_paused "$last" \
+    && dead_id=$(delivered_terminal_dead_id "$task") \
+    && [ "$(hb_surfaced_offset "$task")" = "${dead_id%%@*}" ] \
+    && wedge_dead_record "$win" "$STATE/.stale-since-$key" "stale (delivered paused status)" "$age" "$dead_id" "$task"; then
+    rm -f "$STATE/.stale-since-$key"
+    return 0
+  fi
   min_age=$PAUSE_RESURFACE_SECS
   declaration="declared:$(fm_wake_signal_sig "$statusf" || true)"
   if status_is_captain_held "$last"; then

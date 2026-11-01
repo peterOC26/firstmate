@@ -2450,6 +2450,69 @@ test_stopped_delivered_terminal_reports_once() {
   pass "a stopped helper with a delivered terminal line reports once on the dead path; a live one still raises stale"
 }
 
+test_missing_status_keeps_bare_stale() {
+  local dir state fakebin out capture
+  dir=$(wedge_threshold_fixture missing-delivered-status 'done: finished' 0)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark status delivered"
+  rm "$state/wedge.status"
+  printf 'waiting at the gate\nfooter tick\n' > "$capture"
+  gone_endpoint_env dead
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" test:fm-wedge \
+    'state: stopped · source: pane · bare shell' exit || fail "missing log did not surface"
+  grep -Fx 'stale: test:fm-wedge' "$out" >/dev/null || fail "missing log did not keep bare stale"
+  [ ! -e "$state/.dead-reported-test_fm-wedge" ] || fail "missing log wrote a dead marker"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  pass "missing status logs keep the bare stale"
+}
+
+test_delivered_pause_dead_once_live_rechecks() {
+  local mode dir state fakebin out capture window key marker
+  local stopped='state: stopped · source: pane · bare shell'
+  window=test:fm-wedge; key=test_fm-wedge
+  for mode in dead alive; do
+    dir=$(wedge_threshold_fixture "delivered-pause-$mode" 'paused: waiting for upstream' 2000)
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+    mark_status_log_delivered "$state" wedge || fail "could not mark pause delivered"
+    if [ "$mode" = dead ]; then
+      gone_endpoint_env dead
+    else
+      FM_TEST_PANE_COMMAND=grok FM_TEST_TMUX_WINDOWS=fm-wedge
+    fi
+    export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+      || fail "$mode paused helper did not report"
+    if [ "$mode" = dead ]; then
+      grep -F 'agent dead' "$out" >/dev/null || fail "dead pause used a recurring recheck"
+      [ -s "$state/.dead-reported-$key" ] || fail "dead pause has no once marker"
+      marker=$(cat "$state/.dead-reported-$key")
+    else
+      grep -F 'awaiting external' "$out" >/dev/null || fail "live pause lost its declared wait recheck"
+      [ ! -e "$state/.dead-reported-$key" ] || fail "live pause wrote a dead marker"
+    fi
+    ack_stopped_cycle "$state" || fail "could not acknowledge pause wake"
+    : > "$out"
+    set_mtime "$(( $(date +%s) - 2000 ))" "$state/.paused-resurfaced-$key"
+    if [ "$mode" = dead ]; then
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+        || fail "dead pause rechecked on an unchanged pane"
+      printf 'waiting at the gate\nfooter tick\n' > "$capture"
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+        || fail "dead pause rechecked after footer churn"
+      [ "$(cat "$state/.dead-reported-$key")" = "$marker" ] || fail "dead pause marker changed"
+      [ "$(wedge_stale_wakes "$state" "$window")" -eq 0 ] || fail "dead pause queued another wake"
+    else
+      wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+        || fail "live pause stopped rechecking on its cadence"
+      grep -F 'awaiting external' "$out" >/dev/null || fail "live recheck lost wait reason"
+      [ ! -e "$state/.dead-reported-$key" ] || fail "live recheck wrote a dead marker"
+    fi
+    unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  done
+  pass "delivered dead pauses report once while live pauses retain rechecks"
+}
+
 # --- stale pane, STALE terminal status overridden by an active run: absorbed ---
 # Regression for the 2026-07 herdr false-surface incidents: a crew's own status
 # log gets no new entry once firstmate hands it to a no-mistakes validation
@@ -7290,6 +7353,8 @@ test_unreadable_status_reports_once_per_file_state
 test_permission_recovery_surfaces_preserved_status
 test_terminal_stale_surfaced
 test_stopped_delivered_terminal_reports_once
+test_delivered_pause_dead_once_live_rechecks
+test_missing_status_keeps_bare_stale
 test_stale_terminal_status_overridden_by_active_run
 test_nonterminal_stale_provably_working_absorbed_then_escalated
 test_wedge_escalation_marks_demand_deep_inspection_after_threshold
