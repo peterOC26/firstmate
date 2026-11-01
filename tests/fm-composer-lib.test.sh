@@ -1193,7 +1193,7 @@ test_matrix_grok_footer_preserves_ambiguous_geometry() {
 # pending on both.
 test_matrix_grok_1046_real_key_bar() {
   local esc top content bot footer screen row
-  local top3436 bot3436 idle_x send_x sug_x
+  local top3436 bot3436 idle_x send_x
   esc=$(printf '\033')
   top='  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮'
   content='  │ ❯                                                                                                               │'
@@ -1209,7 +1209,6 @@ test_matrix_grok_1046_real_key_bar() {
   bot3436='  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯'
   idle_x='  Shift+Tab:mode  │  Ctrl+x:shortcuts'
   send_x='  Enter:send  │  Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+x:shortcuts'
-  sug_x='  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+x:shortcuts'
   row=$(grok_idle_row ' ')
   screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
   assert_screen "grok tmux Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
