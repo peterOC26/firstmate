@@ -2315,11 +2315,11 @@ pane_file_hash() {  # <capture-file>
 # retired: armed, then retired the way fm-control exit does, so no generation remains.
 # armed: a readable generation, which stays the relaunch key.
 assert_stopped_delivered_once() {  # <none|retired|armed>
-  local mode=$1 dir state fakebin out capture window key marker pane_hash gen bare
+  local mode=$1 dir state fakebin out capture window key marker pane_hash gen bare reported_age
   local stopped='state: stopped · source: pane · bare shell'
   window="test:fm-wedge"
   key=$(printf '%s' "$window" | tr ':/.' '___')
-  dir=$(wedge_threshold_fixture "stopped-delivered-$mode" 'done: PR https://example.test/pr/9 checks green' 0)
+  dir=$(wedge_threshold_fixture "stopped-delivered-$mode" 'done: PR https://example.test/pr/9 checks green' 1200)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   mark_status_log_delivered "$state" wedge || fail "could not mark the terminal line delivered ($mode)"
   case "$mode" in
@@ -2348,6 +2348,9 @@ assert_stopped_delivered_once() {  # <none|retired|armed>
     || fail "the stopped helper was not reported on the once-only dead path ($mode): $(cat "$out")"
   grep -F 'possible wedge' "$out" >/dev/null \
     && fail "a stopped helper was reported as a possible wedge ($mode): $(cat "$out")"
+  reported_age=$(sed -n 's/.*(idle \([0-9]*\)s, agent dead.*/\1/p' "$out")
+  [ "${reported_age:-0}" -ge 1200 ] && [ "${reported_age:-0}" -lt 1320 ] \
+    || fail "terminal dead report did not use status age: $(cat "$out")"
   [ "$(wedge_stale_wakes "$state" "$window")" -eq 1 ] \
     || fail "the stopped helper queued $(wedge_stale_wakes "$state" "$window") stale wakes instead of one ($mode)"
   bare=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w && $5 == "stale: " w { n++ } END { print n + 0 }' \
@@ -2448,6 +2451,38 @@ test_stopped_delivered_terminal_reports_once() {
     || fail "a live helper wrote a dead record: $(cat "$state/.dead-reported-$key")"
   unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
   pass "a stopped helper with a delivered terminal line reports once on the dead path; a live one still raises stale"
+}
+
+test_delivered_pause_skips_secondmate_and_busy_probes() {
+  local mode dir state fakebin out capture pid verdict
+  for mode in secondmate busy; do
+    dir=$(wedge_threshold_fixture "delivered-pause-excluded-$mode" 'paused: awaiting upstream' 2000)
+    state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+    if [ "$mode" = secondmate ]; then
+      printf 'window=test:fm-wedge\nkind=secondmate\nharness=grok\nbackend=tmux\n' > "$state/wedge.meta"
+      verdict='state: paused · source: status-log · awaiting upstream'
+    else
+      printf 'window=test:fm-wedge\nkind=scout\nharness=pi\nbackend=tmux\n' > "$state/wedge.meta"
+      record_pi_busy "$state" wedge
+      touch -t 200001010000 "$state/wedge.meta"
+      printf 'Working... (7200.4s) waiting for upstream' > "$capture"
+      verdict='state: working · source: pane · harness busy (pi-ext)'
+    fi
+    mark_status_log_delivered "$state" wedge || fail "could not mark excluded pause delivered"
+    PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW=test:fm-wedge FM_FAKE_TMUX_CAPTURE="$capture" \
+      FM_FAKE_TMUX_CURRENT_COMMAND=bash FM_FAKE_CREW_STATE="$verdict" \
+      FM_STATE_OVERRIDE="$state" \
+      FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_BUSY_TURN_MAX_SECS=1 \
+      FM_PAUSE_RESURFACE_SECS=240 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+      FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+      "$WATCH" > "$out" &
+    pid=$!
+    wait_for_exit "$pid" 100 || { reap "$pid"; fail "$mode pause did not recheck"; }
+    [ ! -e "$state/.dead-reported-test_fm-wedge" ] || fail "$mode pause wrote a dead record"
+    grep -F 'awaiting external' "$out" >/dev/null || fail "$mode pause lost the declared-wait recheck"
+    grep -F 'agent dead' "$out" >/dev/null && fail "$mode pause emitted a dead report"
+  done
+  pass "delivered secondmate and busy pauses retain rechecks without dead reports"
 }
 
 test_missing_status_keeps_bare_stale() {
@@ -7355,6 +7390,7 @@ test_terminal_stale_surfaced
 test_stopped_delivered_terminal_reports_once
 test_delivered_pause_dead_once_live_rechecks
 test_missing_status_keeps_bare_stale
+test_delivered_pause_skips_secondmate_and_busy_probes
 test_stale_terminal_status_overridden_by_active_run
 test_nonterminal_stale_provably_working_absorbed_then_escalated
 test_wedge_escalation_marks_demand_deep_inspection_after_threshold

@@ -66,8 +66,8 @@
 #                          not a wedge and is reported ONCE instead of escalating
 #                          on that cadence forever (wedge_dead_record); only the
 #                          two recovery-grade verdicts license it, and every other
-#                          verdict escalates unchanged. A delivered terminal
-#                          status on that same gone endpoint takes this once-report
+#                          verdict escalates unchanged. A delivered terminal or paused
+#                          status on an idle ordinary crew endpoint takes this once-report
 #                          instead of a bare stale for every new pane hash. The
 #                          report is keyed on the busy generation when one is
 #                          readable, and otherwise on the delivered status
@@ -394,12 +394,10 @@ SECONDMATE_LIVENESS_WINDOW_SECS=${FM_SECONDMATE_LIVENESS_WINDOW_SECS:-}
 case "$SECONDMATE_LIVENESS_WINDOW_SECS" in ''|*[!0-9]*|0) SECONDMATE_LIVENESS_WINDOW_SECS=3600 ;; esac
 # A crew that declared a pause is idling on a known external wait, so its stale
 # pane is absorbed rather than wedge-escalated.
-# A captain-held or paused crew whose agent has confidently exited uses the same
-# bounded cadence, while a live or ambiguously read agent surfaces on first sight
-# and is then held to that same cadence; a secondmate earns the cadence on its
-# declaration alone, because its endpoint liveness is deliberately never read
-# (pause_state_class owns that split).
-# These cases re-surface once for a recheck every PAUSE_RESURFACE_SECS - far
+# An idle ordinary crew whose agent has exited and whose paused line was delivered is reported once, then absorbed.
+# A captain-held crew, an undelivered pause, or a live or ambiguously read agent retains the bounded cadence.
+# A secondmate earns the cadence on its declaration alone, because this path never reads its endpoint liveness (pause_state_class owns that split).
+# The bounded cases re-surface once for a recheck every PAUSE_RESURFACE_SECS - far
 # longer than the wedge threshold, but finite so a forgotten wait cannot rot
 # invisibly - except an item held for the captain while the away-posture record
 # exists, which is never rechecked (away_record_present below).
@@ -1790,8 +1788,8 @@ busy_turn_over_age() {  # <task>
 # captain themself for a verified hold. Only the captain-held verb takes the second
 # wording; a caller that reached the bounded cadence off pause tracking alone, with
 # no declaring verb left on the log, keeps the external-wait wording it always had.
-handle_paused_stale() {  # <window> <task> <hash>
-  local win=$1 task=$2 h=$3 key statusf mtime age detail reason declaration last until now min_age dead_id
+handle_paused_stale() {  # <window> <task> <hash> [idle|busy]
+  local win=$1 task=$2 h=$3 activity=${4:-idle} key statusf mtime age detail reason declaration last until now min_age dead_id
   key=$(window_key "$win")
   printf '%s' "$h" > "$STATE/.stale-$key"
   : > "$STATE/.paused-$key"
@@ -1803,7 +1801,9 @@ handle_paused_stale() {  # <window> <task> <hash>
   now=$(date +%s)
   age=$(( now - mtime ))
   last=$(status_declared_wait_line "$statusf")
-  if status_is_paused "$last" \
+  if [ "$activity" = idle ] \
+    && [ "$(window_kind "$win")" != secondmate ] \
+    && status_is_paused "$last" \
     && dead_id=$(delivered_terminal_dead_id "$task") \
     && [ "$(hb_surfaced_offset "$task")" = "${dead_id%%@*}" ] \
     && wedge_dead_record "$win" "$STATE/.stale-since-$key" "stale (delivered paused status)" "$age" "$dead_id" "$task"; then
@@ -1904,7 +1904,7 @@ busy_turn_bound_check() {  # <window> <task> <hash> <since-file> <escalation-fil
       fi
       return 0
     fi
-    handle_paused_stale "$win" "$task" "$h"
+    handle_paused_stale "$win" "$task" "$h" busy
     return 0
   fi
   wedge_timer_check "$win" "$since_file" "busy (no completed turn)" "$escalation_file" "$task" "$h" "$dialog"
@@ -3396,8 +3396,11 @@ EOF
               terminal_agent_state=$(fm_backend_agent_state "$(window_backend "$w")" "$w" 2>/dev/null) || terminal_agent_state=unreadable
               case "$terminal_agent_state" in
                 dead|missing)
+                  terminal_mtime=$(stat_mtime "$STATE/$task.status")
+                  case "$terminal_mtime" in ''|*[!0-9]*) terminal_mtime=$(date +%s) ;; esac
+                  terminal_age=$(( $(date +%s) - terminal_mtime ))
                   if dead_id=$(delivered_terminal_dead_id "$task") \
-                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" 0 "$dead_id" "$task"; then
+                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" "$terminal_age" "$dead_id" "$task"; then
                     printf '%s' "$h" > "$sf"
                     # wedge_dead_record arms the idle timer on the absorb too.
                     # Leaving it set sends the next poll of this same hash
