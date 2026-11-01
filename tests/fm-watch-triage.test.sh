@@ -2285,6 +2285,75 @@ test_terminal_stale_surfaced() {
   pass "a stale pane sitting on a terminal status is surfaced (queue + exit)"
 }
 
+# Record the whole status log as already delivered, the way a prior signal wake
+# does, so a later pane-hash change is not the first delivery of that line.
+mark_status_log_delivered() {  # <state> <task>
+  local state=$1 task=$2 f ident size
+  f="$state/$task.status"
+  ident=$(_fm_open_decisions_file_ident "$f") || return 1
+  size=$(_fm_status_file_size "$f") || return 1
+  size=${size//[[:space:]]/}
+  status_presentation_marker_commit "$(status_heartbeat_seen_marker_path "$state" "$task")" \
+    "$f" "$size" "$ident"
+}
+
+# A finished helper whose terminal line was already delivered, then stopped with
+# the pane kept, used to emit a bare stale for every new pane hash. That path
+# never wrote the once-only dead record, so the same stopped helper pinged again
+# on the next footer tick. A live agent on the same delivered line still raises
+# the bare stale.
+test_stopped_delivered_terminal_reports_once() {
+  local dir state fakebin out capture window key wakes bare
+  local stopped='state: stopped · source: pane · bare shell'
+  window="test:fm-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
+
+  dir=$(wedge_threshold_fixture stopped-delivered-terminal 'done: PR https://example.test/pr/9 checks green' 0)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark the terminal line delivered"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" wedge --state idle >/dev/null \
+    || fail "could not arm the stopped helper's incarnation"
+  printf 'waiting at the gate\nfooter tick 1\n' > "$capture"
+  gone_endpoint_env dead
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a stopped helper with a delivered terminal line was never reported: $(cat "$out")"
+  grep -F 'agent dead' "$out" >/dev/null \
+    || fail "the stopped helper was not reported on the once-only dead path: $(cat "$out")"
+  grep -F 'possible wedge' "$out" >/dev/null \
+    && fail "a stopped helper was reported as a possible wedge: $(cat "$out")"
+  wakes=$(wedge_stale_wakes "$state" "$window")
+  bare=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w && $5 == "stale: " w { n++ } END { print n + 0 }' \
+    "$state/.wake-queue" 2>/dev/null || echo 0)
+  [ "$wakes" -eq 1 ] || fail "the stopped helper queued $wakes stale wakes instead of one: $(cat "$state/.wake-queue" 2>/dev/null)"
+  [ "$bare" -eq 0 ] || fail "the stopped helper queued $bare bare stale wakes: $(cat "$state/.wake-queue")"
+  [ -s "$state/.dead-reported-$key" ] || fail "the once-only report left no dead record"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the stopped helper's report"
+
+  printf 'waiting at the gate\nfooter tick 2\n' > "$capture"
+  : > "$out"
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
+    || fail "a later footer tick re-woke the stopped helper: $(cat "$out") $(cat "$state/.wake-queue" 2>/dev/null)"
+  [ "$(wedge_stale_wakes "$state" "$window")" -eq 0 ] \
+    || fail "a later footer tick queued another stale wake: $(cat "$state/.wake-queue")"
+  [ -s "$state/.dead-reported-$key" ] || fail "the later footer tick dropped the dead record"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+
+  dir=$(wedge_threshold_fixture live-delivered-terminal 'done: PR https://example.test/pr/9 checks green' 0)
+  state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
+  mark_status_log_delivered "$state" wedge || fail "could not mark the live helper's terminal line delivered"
+  printf 'waiting at the gate\nfooter tick 1\n' > "$capture"
+  FM_TEST_PANE_COMMAND=grok FM_TEST_TMUX_WINDOWS=fm-wedge
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a live helper on a delivered terminal line no longer raised stale: $(cat "$out")"
+  grep -Fx "stale: $window" "$out" >/dev/null \
+    || fail "a live helper did not raise the bare stale: $(cat "$out")"
+  [ ! -e "$state/.dead-reported-$key" ] \
+    || fail "a live helper wrote a dead record: $(cat "$state/.dead-reported-$key")"
+  unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  pass "a stopped helper with a delivered terminal line reports once on the dead path; a live one still raises stale"
+}
+
 # --- stale pane, STALE terminal status overridden by an active run: absorbed ---
 # Regression for the 2026-07 herdr false-surface incidents: a crew's own status
 # log gets no new entry once firstmate hands it to a no-mistakes validation
@@ -7124,6 +7193,7 @@ test_routine_appends_after_a_classified_event_stay_absorbed
 test_unreadable_status_reports_once_per_file_state
 test_permission_recovery_surfaces_preserved_status
 test_terminal_stale_surfaced
+test_stopped_delivered_terminal_reports_once
 test_stale_terminal_status_overridden_by_active_run
 test_nonterminal_stale_provably_working_absorbed_then_escalated
 test_wedge_escalation_marks_demand_deep_inspection_after_threshold
