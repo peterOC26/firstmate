@@ -66,7 +66,10 @@
 #                          not a wedge and is reported ONCE instead of escalating
 #                          on that cadence forever (wedge_dead_record); only the
 #                          two recovery-grade verdicts license it, and every other
-#                          verdict escalates unchanged.
+#                          verdict escalates unchanged. A delivered terminal
+#                          status on that same gone endpoint takes this once-report
+#                          instead of a bare stale for every new pane hash; a live
+#                          agent keeps the bare stale.
 #                          Where config/wedge-evidence-guards lists operator
 #                          guards, a live pane about to escalate whose guard
 #                          answers CRITICAL defers a bounded run of windows
@@ -1470,6 +1473,19 @@ EOF
 clear_write_tracking() {  # <window-key>
   local key=$1
   rm -f "$STATE/.writing-since-$key" "$STATE/.writing-resurfaced-$key" "$STATE/.guard-deferrals-$key"
+}
+
+# 0 when <task>'s status log has no captain-relevant event past the offset the
+# heartbeat backstop already classified. That is a delivered terminal line: the
+# signal path marked it when it woke, and a later pane-hash change is not a new
+# delivery. An absent marker reads as offset 0, so an undelivered line stays
+# undelivered. A read failure is not delivery.
+terminal_status_already_delivered() {  # <task>
+  local task=$1 rc
+  [ -n "$task" ] || return 1
+  status_span_first_actionable_record "$STATE/$task.status" "$(hb_surfaced_offset "$task")" >/dev/null
+  rc=$?
+  [ "$rc" -eq 1 ]
 }
 
 # The question the wedge timer never asked before it alarmed: is there still an
@@ -3322,20 +3338,40 @@ EOF
               clear_write_tracking "$key"
               triage_log "absorbed stale (open captain call already surfaced for this status): $w"
             else
-              stale_reason=$(stale_reason_naming_dialog "stale: $w" "$dialog")
-              fm_wake_append stale "$w" "$stale_reason" || exit 1
-              stale_wait_record "$key"
-              printf '%s' "$h" > "$sf"
-              rm -f "$ssf"
-              clear_write_tracking "$key"
-              stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
-              stale_record=$(status_span_first_actionable_record "$stale_status" 0)
-              case $? in
-                0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
-                *) stale_end=''; stale_ident='' ;;
+              # A gone endpoint whose terminal line was already delivered is not
+              # a new stale per footer tick. wedge_dead_record reports it once
+              # and absorbs the repeat; a live or unproven agent keeps the bare
+              # stale below. The report path exits through wake, so only the
+              # already-reported absorb reaches the bookkeeping under it.
+              dead_reported=1
+              terminal_agent_state=$(fm_backend_agent_state "$(window_backend "$w")" "$w" 2>/dev/null) || terminal_agent_state=unreadable
+              case "$terminal_agent_state" in
+                dead|missing)
+                  if terminal_status_already_delivered "$task" \
+                    && wedge_dead_record "$w" "$ssf" "stale (delivered terminal status)" 0 "$h" "$task"; then
+                    printf '%s' "$h" > "$sf"
+                    clear_write_tracking "$key"
+                    triage_log "absorbed stale (delivered terminal status, agent $terminal_agent_state already reported once): $w"
+                    dead_reported=0
+                  fi
+                  ;;
               esac
-              mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
-              wake "$stale_reason"
+              if [ "$dead_reported" -ne 0 ]; then
+                stale_reason=$(stale_reason_naming_dialog "stale: $w" "$dialog")
+                fm_wake_append stale "$w" "$stale_reason" || exit 1
+                stale_wait_record "$key"
+                printf '%s' "$h" > "$sf"
+                rm -f "$ssf"
+                clear_write_tracking "$key"
+                stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
+                stale_record=$(status_span_first_actionable_record "$stale_status" 0)
+                case $? in
+                  0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
+                  *) stale_end=''; stale_ident='' ;;
+                esac
+                mark_surfaced "$stale_status" "$stale_end" "$stale_ident"
+                wake "$stale_reason"
+              fi
             fi
           elif [ -e "$ssf" ]; then
             # This exact hash was already overridden as provably-working (a
