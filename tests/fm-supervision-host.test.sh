@@ -1282,7 +1282,7 @@ test_inbox_note_queued_while_parked_reaches_main() {
   wait_until 250 host_exited "$home" || fail "inbox parked: note never reached main"
   expect_code 0 "$(cat "$home/host.rc")" "inbox parked: host failed"
   assert_grep "check: captain inbox note $id" "$home/host.out" "inbox parked: reason missing"
-  assert_grep 'pass-through\tattended\tmain-only\tcheck: captain inbox note' "$home/state/.supervision-host.log" \
+  assert_grep $'pass-through\tattended\tmain-only\tcheck: captain inbox note' "$home/state/.supervision-host.log" \
     "inbox parked: note was not passed to main"
   [ "$(engine_calls "$home")" = 1 ] || fail "inbox parked: engine took the inbox note"
   watcher_live "$home" || fail "inbox parked: no live successor for main"
@@ -1338,7 +1338,7 @@ test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn() {
   expect_code 0 "$(cat "$home/host.rc")" "inbox after-close: host failed"
   assert_absent "$home/engine-drain.2" "inbox after-close: a second engine turn started"
   assert_re '^signal: .*demo.status' "$home/host.out" "inbox after-close: original signal close was changed"
-  assert_grep 'pass-through\tattended\tmain-only (captain inbox note '"$id"' queued)' \
+  assert_grep $'pass-through\tattended\tmain-only (captain inbox note '"$id"' queued)' \
     "$home/state/.supervision-host.log" "inbox after-close: missing main-only inbox verdict"
   assert_no_re "inbox:$id" "$home/engine-drain.1" "inbox after-close: engine presented the inbox row"
   FM_HOME="$home" bash -c '. "$1"; fm_wake_queued_keys check' _ "$ROOT/bin/fm-wake-lib.sh" > "$home/queued"

@@ -2634,6 +2634,43 @@ fm_wake_queued_keys_locked() {
     "$FM_WAKE_QUEUE" 2>/dev/null || true
 }
 
+# Queued-check delivery markers are shared by the watcher and attended host.
+# Call the readers/writer under FM_WAKE_QUEUE_LOCK; only mark when handing a
+# close to its owner (the watcher does so after successful output).
+fm_wake_surfaced_marker() {  # <procevent:...|inbox:...>
+  local key=$1
+  case "$key" in procevent:*|inbox:*) ;; *) return 1 ;; esac
+  printf '%s/.seen-%s-%s' "$STATE" "${key%%:*}" "$(printf '%s' "$key" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+}
+
+fm_wake_surfaced_mark_locked() {  # <procevent:...|inbox:...>
+  local key=$1 marker tmp
+  marker=$(fm_wake_surfaced_marker "$key") || return 1
+  tmp=$(umask 077; mktemp "$STATE/.seen-${key%%:*}.XXXXXX") || return 1
+  if ! mv -f -- "$tmp" "$marker"; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+# Prints unsurfaced inbox keys and prunes markers for rows no longer queued.
+fm_wake_inbox_unsurfaced_keys_locked() {
+  local key marker queued_markers=$'\n'
+  while IFS= read -r key; do
+    case "$key" in inbox:*) ;; *) continue ;; esac
+    marker=$(fm_wake_surfaced_marker "$key") || return 1
+    queued_markers="$queued_markers$marker"$'\n'
+    [ -e "$marker" ] || printf '%s\n' "$key"
+  done < <(fm_wake_queued_keys_locked check)
+  for marker in "$STATE"/.seen-inbox-*; do
+    [ -e "$marker" ] || [ -L "$marker" ] || continue
+    case "$queued_markers" in
+      *$'\n'"$marker"$'\n'*) ;;
+      *) rm -f -- "$marker" || return 1 ;;
+    esac
+  done
+}
+
 fm_wake_secondmate_progress_marker_write() { # <task> <observed-at> <oldest-row-key>
   local task=$1 observed_at=$2 oldest_row_key=$3 marker tmp
   case "$task" in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac
