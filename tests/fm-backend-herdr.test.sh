@@ -4020,6 +4020,50 @@ test_composer_state_grok_oversized_title_preserves_safe_verdicts() {
   pass "fm_backend_herdr_composer_state: Grok's exact title overhang is empty while pending and unproved panes remain safe"
 }
 
+# The same #3436 box, through the Herdr adapter's ANSI capture. "Build anything"
+# on the idle bar and a 256-colour accepted-suggestion ghost read empty.
+# Typed text, and that placeholder while Enter:send is showing, stay pending.
+test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
+  local dir log resp fb out esc row pad text vis
+  local top bot idle send sug
+  esc=$(printf '\033')
+  pad=$(printf '%72s' '')
+  top='  ╭──────────────────────────────────────────────────────────────────────────╮'
+  bot='  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯'
+  idle='  Shift+Tab:mode  │  Ctrl+.:shortcuts'
+  send='  Enter:send  │  Shift+Enter/Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+.:shortcuts'
+  sug='  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+  dir="$TMP_ROOT/composer-grok-idle-ghost"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  text=' Build anything'
+  row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
+  printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$idle" > "$resp/1.out"
+  text=': Firstmate instruction waiting'
+  vis=$((1 + ${#text}))
+  row=$(printf '  │ ❯ %s%s%s%s│' "${esc}[38;5;242m" "$text" "${esc}[0m" "${pad:0:$((72 - vis))}")
+  printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/2.out"
+  text=' deploy the fix'
+  row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
+  printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$idle" > "$resp/3.out"
+  text=' Build anything'
+  row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
+  printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$send" > "$resp/4.out"
+  fb=$(make_herdr_fakebin "$dir")
+
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = empty ] || fail "Build anything on Grok's idle bar should read empty, got '$out'"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = empty ] || fail "a 256-colour suggestion ghost should read empty, got '$out'"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = pending ] || fail "typed text on Grok's idle bar should stay pending, got '$out'"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = pending ] || fail "Build anything with Enter:send should stay pending, got '$out'"
+  pass "fm_backend_herdr_composer_state: Grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
+}
+
 # Live-verified incident (2026-07-03, real grok 0.2.82 on herdr, isolated
 # session): typing "/compact" opens the completion popup; the FIRST Enter
 # closes the popup and EXPANDS the composer into an argument-hint placeholder
@@ -6121,6 +6165,7 @@ test_composer_state_bare_prompt_is_empty
 test_composer_state_styled_placeholder_draft_is_pending
 test_composer_state_real_text_is_pending
 test_composer_state_grok_oversized_title_preserves_safe_verdicts
+test_composer_state_grok_idle_placeholder_and_suggestion_ghost
 test_composer_state_popup_placeholder_fill_is_pending
 test_composer_state_unknown_on_capture_failure
 test_composer_state_inactive_session_fails_fast_without_server_autostart
