@@ -1,0 +1,1 @@
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 7s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)

@@ -1,0 +1,11 @@
+{
+  "default": [
+    {
+      "name": "default",
+      "default": true,
+      "running": true,
+      "socket_path": "/home/zabi/.config/herdr/herdr.sock"
+    }
+  ],
+  "lab": []
+}

@@ -1,0 +1,1 @@
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 12s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)

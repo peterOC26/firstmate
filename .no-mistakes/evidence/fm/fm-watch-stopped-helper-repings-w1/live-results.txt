@@ -1,0 +1,55 @@
+Live watcher validation: real Herdr 0.9.0 and Codex 0.160.0; isolated named lab; FM_POLL=1, FM_PAUSE_RESURFACE_SECS=4, FM_STALE_ESCALATE_SECS=4.
+No LLM prompt or model response was needed to exercise agent exit and watcher delivery.
+Initial setup omissions (project metadata) and normal supervision-restart notices were resolved before the scenario checks.
+
+02-stopped-done
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 12s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+03-unchanged-done
+(No wake output. The driver verified advancing watcher beacons over 16 seconds, a still-running watcher and an empty wake queue. Display-churn cases also verified the once marker stayed unchanged.)
+
+04-footer-done-retry
+(No wake output. The driver verified advancing watcher beacons over 16 seconds, a still-running watcher and an empty wake queue. Display-churn cases also verified the once marker stayed unchanged.)
+
+05-live-return
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+07-live-pause-recheck
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 7s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+
+08-live-pause-recheck-again
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 11s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+
+09-stopped-pause
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 16s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+10-unchanged-pause
+(No wake output. The driver verified advancing watcher beacons over 16 seconds, a still-running watcher and an empty wake queue. Display-churn cases also verified the once marker stayed unchanged.)
+
+11-footer-pause
+(No wake output. The driver verified advancing watcher beacons over 16 seconds, a still-running watcher and an empty wake queue. Display-churn cases also verified the once marker stayed unchanged.)
+
+12-new-completion-signal
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+
+13-new-completion-dead
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 7s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+14-new-completion-absorbed
+(No wake output. The driver verified advancing watcher beacons over 16 seconds, a still-running watcher and an empty wake queue. Display-churn cases also verified the once marker stayed unchanged.)
+
+15-undelivered-completion
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+16-missing-status
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+17-baseline-done-1
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+17-baseline-done-2
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+Persisted marker observations and exact commands appear in live-transcript.txt.
+Baseline observations intentionally reproduce the pre-fix defect and are not target failures.
+Guarded lab teardown succeeded. The named lab is absent and the default-session snapshot is unchanged. Disposable FM_HOME removed.

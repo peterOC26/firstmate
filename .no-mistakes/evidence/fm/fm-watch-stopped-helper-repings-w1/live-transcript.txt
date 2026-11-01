@@ -1,0 +1,404 @@
+$ bash -c . bin/fm-backend.sh; fm_backend_agent_state herdr "$1" _ fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+alive
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane read w1:p1 --format text --lines 35
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2
+
+  This terminal has excellent conversational potential.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                    ⚠ weekly limit: 20% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2 · Context 0% used
+  ← for agents · ? for shortcuts                                                             ⚠ 2 warnings · f2 to view
+
+01-deliver-done:
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+
+$ bin/fm-wake-drain.sh
+1793567988	2	signal	helper.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 108680.1793567988.bqNMwR
+wake annotation: latest wake-EVENT observed at drain, not current state: helper.status: done: finished isolated watcher validation helper
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+helper done: finished isolated watcher validation helper
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 108680.1793567988.bqNMwR
+
+$ bin/fm-control.sh helper exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab
+REFUSED: task helper has a missing, empty, or ambiguous project identity; preserving task state.
+
+$ bash -c . bin/fm-backend.sh; fm_backend_agent_state herdr "$1" _ fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+alive
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane read w1:p1 --format text --lines 35
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2
+
+  This terminal has excellent conversational potential.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                    ⚠ weekly limit: 20% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2 · Context 0% used
+  ← for agents · ? for shortcuts                                                             ⚠ 2 warnings · f2 to view
+
+01-deliver-done:
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+
+$ bin/fm-wake-drain.sh
+1793568008	4	signal	helper.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 132362.1793568008.J6i6MI
+wake annotation: latest wake-EVENT observed at drain, not current state: helper.status: 1793568005.8614209
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+helper done: finished isolated watcher validation helper 1793568005.8614209
+WARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 132362.1793568008.J6i6MI
+
+$ bin/fm-control.sh helper exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab
+stopped helper harness=codex backend=herdr endpoint=fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2
+
+$ bash -c . bin/fm-backend.sh; fm_backend_agent_state herdr "$1" _ fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+dead
+02-stopped-done:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 12s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+PERSISTED DEAD MARKER: dead 69@strong:65028:17884401:2026-11-01 22:19:45.948846857 +0100
+$ bin/fm-wake-drain.sh
+1793568017	5	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 12s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 136547.1793568017.4QFsNE
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 136547.1793568017.4QFsNE
+
+03-unchanged-done: watcher stayed running across 11 observed poll beacons
+03-unchanged-done:
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "footer tick 1\n"
+
+$ bin/fm-wake-drain.sh
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 140691.1793568035.MOwmLN
+WARNING: watcher still down (same stale episode; last beat: 31s ago, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 140691.1793568035.MOwmLN
+
+04-footer-done-retry: watcher stayed running across 11 observed poll beacons
+04-footer-done-retry:
+
+PASS: actual stopped completion remains absorbed across real pane churn
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab codex --disable hooks
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane read w1:p1 --format text --lines 40
+
+  Update available · 0.160.0 → 0.166.0
+  Release notes: https://github.com/openai/codex/releases/latest
+
+› 1. Update now (runs `npm install -g @openai/codex`)
+  2. Skip
+  3. Skip until next version
+
+  enter continue · esc skip
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane send-keys w1:p1 esc
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane read w1:p1 --format text --lines 40
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.160.0 -> 0.166.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+⚠ Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.
+
+
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2
+
+  Back for another round?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                    ⚠ weekly limit: 20% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2 · Context 0% used
+  ? for shortcuts                                                                            ⚠ 3 warnings · f2 to view
+
+$ bash -c . bin/fm-backend.sh; fm_backend_agent_state herdr "$1" _ fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+alive
+05-live-return:
+check: rearm-resurface
+
+$ bin/fm-wake-drain.sh
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 180975.1793568082.kBnsk7
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 180975.1793568082.kBnsk7
+
+05-live-return:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+$ bin/fm-wake-drain.sh
+1793568105	6	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 224085.1793568105.aTKHvV
+WARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 224085.1793568105.aTKHvV
+
+06-live-pause-first:
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+
+$ bin/fm-wake-drain.sh
+1793568110	8	signal	helper.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 240697.1793568110.jd532w
+wake annotation: latest wake-EVENT observed at drain, not current state: helper.status: paused: waiting for upstream in live validation
+WARNING: watcher still down (same stale episode; last beat: 4s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 240697.1793568110.jd532w
+
+07-live-pause-recheck:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 7s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+
+$ bin/fm-wake-drain.sh
+1793568114	9	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 7s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 247209.1793568114.HDrnnn
+WARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 247209.1793568114.HDrnnn
+
+08-live-pause-recheck-again:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 11s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+
+$ bin/fm-wake-drain.sh
+1793568118	10	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (paused 11s, awaiting external - declared pause, rechecked on a long cadence not a wedge; confirm the wait still holds)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 250933.1793568118.BC7mhO
+WARNING: watcher still down (same stale episode; last beat: 3s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 250933.1793568118.BC7mhO
+
+PASS: live helper returning clears once marker and raises ordinary stale; live paused helper rechecks twice
+$ bin/fm-control.sh helper exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab
+stopped helper harness=codex backend=herdr endpoint=fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2
+
+$ bash -c . bin/fm-backend.sh; fm_backend_agent_state herdr "$1" _ fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+dead
+09-stopped-pause:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 16s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+PERSISTED PAUSED DEAD MARKER: dead 48@strong:65028:17884401:2026-11-01 22:19:45.948846857 +0100
+$ bin/fm-wake-drain.sh
+1793568124	11	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 16s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 255527.1793568124.iCljA8
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 255527.1793568124.iCljA8
+
+10-unchanged-pause: watcher stayed running across 10 observed poll beacons
+10-unchanged-pause:
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "footer tick paused\n"
+
+11-footer-pause: acknowledging supervision-restart notice
+$ bin/fm-wake-drain.sh
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 258807.1793568141.ZxRDvs
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 258807.1793568141.ZxRDvs
+
+11-footer-pause: watcher stayed running across 10 observed poll beacons
+11-footer-pause:
+
+PASS: delivered paused + actual control exit reports once; unchanged and changed real pane displays stay absorbed beyond the cadence
+12-new-completion-signal:
+check: rearm-resurface
+
+$ bin/fm-wake-drain.sh
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+helper done: later delivered completion is new work
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 266647.1793568159.dHz9ce
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 266647.1793568159.dHz9ce
+
+12-new-completion-signal:
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+
+$ bin/fm-wake-drain.sh
+1793568173	13	signal	helper.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 292563.1793568173.H1XAB9
+wake annotation: latest wake-EVENT observed at drain, not current state: helper.status: done: later delivered completion is new work
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 292563.1793568173.H1XAB9
+
+13-new-completion-dead:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 7s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+
+NEW STATUS IDENTITY MARKER: dead 93@strong:65028:17884401:2026-11-01 22:19:45.948846857 +0100
+$ bin/fm-wake-drain.sh
+1793568176	14	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1 (idle 7s, agent dead - the endpoint is still there with no agent running in it, so this is not a wedge; reported once for this identity, and a repeat of the same identity is absorbed until that identity changes or the endpoint is no longer gone - reconcile this record, and check for unlanded work before any cleanup)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 294533.1793568176.wqCoi4
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 294533.1793568176.wqCoi4
+
+14-new-completion-absorbed: watcher stayed running across 11 observed poll beacons
+14-new-completion-absorbed:
+
+PASS: new delivered completion is reported once even without a busy-generation token
+$ bash -c . bin/fm-wake-lib.sh; . bin/fm-classify-lib.sh; f="$FM_HOME/state/helper.status"; fm_wake_status_mark_current "$FM_HOME/state" "$f"
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "undelivered footer\n"
+
+15-undelivered-completion:
+check: rearm-resurface
+
+$ bin/fm-wake-drain.sh
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+helper done: a completion the watcher has never delivered
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 296455.1793568194.3pxgjj
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 296455.1793568194.3pxgjj
+
+15-undelivered-completion:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+$ bin/fm-wake-drain.sh
+1793568200	15	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 307351.1793568200.uWtdhH
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 307351.1793568200.uWtdhH
+
+PASS: undelivered completion retains ordinary stale, so the once-report does not hide new output
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "missing log footer\n"
+
+16-missing-status:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+$ bin/fm-wake-drain.sh
+1793568206	16	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 16 --recovery-generation 310077.1793568206.h0t6JL
+WARNING: watcher still down (same stale episode; last beat: 1s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 16 --recovery-generation 310077.1793568206.h0t6JL
+
+PASS: missing status file raises ordinary stale instead of a fabricated dead identity
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "baseline footer 1\n"
+
+17-baseline-done-1:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+$ bin/fm-wake-drain.sh
+1793568215	17	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 313780.1793568215.AHnYKF
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 313780.1793568215.AHnYKF
+
+$ bin/fm-herdr-lab.sh run fm-lab-watch-validation-01M6CE5PAXJH pane run w1:p1 printf "baseline footer 2\n"
+
+17-baseline-done-2:
+stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+
+$ bin/fm-wake-drain.sh
+1793568220	18	stale	fm-lab-watch-validation-01M6CE5PAXJH:w1:p1	stale: fm-lab-watch-validation-01M6CE5PAXJH:w1:p1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 18 --recovery-generation 316477.1793568221.V8vMHc
+WARNING: watcher still down (same stale episode; last beat: 2s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 18 --recovery-generation 316477.1793568221.V8vMHc
+
+BASELINE REPRODUCED: delivered completion from a real stopped helper raises two bare stale wakes across display churn and never creates a dead marker

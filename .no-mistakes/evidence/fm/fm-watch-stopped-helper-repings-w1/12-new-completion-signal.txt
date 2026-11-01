@@ -1,0 +1,1 @@
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6CE5PAXJHGPKDCHA416NJW2/.watch-live-lab/state/helper.status
