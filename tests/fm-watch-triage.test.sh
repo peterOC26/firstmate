@@ -2297,46 +2297,142 @@ mark_status_log_delivered() {  # <state> <task>
     "$f" "$size" "$ident"
 }
 
-# A finished helper whose terminal line was already delivered, then stopped with
-# the pane kept, used to emit a bare stale for every new pane hash. That path
-# never wrote the once-only dead record, so the same stopped helper pinged again
-# on the next footer tick. A live agent on the same delivered line still raises
-# the bare stale.
-test_stopped_delivered_terminal_reports_once() {
-  local dir state fakebin out capture window key wakes bare
-  local stopped='state: stopped · source: pane · bare shell'
-  window="test:fm-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
+# The pane hash the watcher records for a capture file.
+# watcher_capture keeps the capture through a command substitution, which drops
+# trailing newlines, and hash_pane then hashes those exact bytes.
+pane_file_hash() {  # <capture-file>
+  local text
+  text=$(cat "$1")
+  if command -v md5 >/dev/null 2>&1; then
+    printf '%s' "$text" | md5 -q
+  else
+    printf '%s' "$text" | md5sum | cut -d' ' -f1
+  fi
+}
 
-  dir=$(wedge_threshold_fixture stopped-delivered-terminal 'done: PR https://example.test/pr/9 checks green' 0)
+# One stopped helper whose done line is already delivered, across two pane hashes.
+# none: the grok fixture, which production never arms.
+# retired: armed, then retired the way fm-control exit does, so no generation remains.
+# armed: a readable generation, which stays the relaunch key.
+assert_stopped_delivered_once() {  # <none|retired|armed>
+  local mode=$1 dir state fakebin out capture window key marker pane_hash gen bare
+  local stopped='state: stopped · source: pane · bare shell'
+  window="test:fm-wedge"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  dir=$(wedge_threshold_fixture "stopped-delivered-$mode" 'done: PR https://example.test/pr/9 checks green' 0)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
-  mark_status_log_delivered "$state" wedge || fail "could not mark the terminal line delivered"
-  "$ROOT/bin/fm-busy-event.sh" arm "$state" wedge --state idle >/dev/null \
-    || fail "could not arm the stopped helper's incarnation"
+  mark_status_log_delivered "$state" wedge || fail "could not mark the terminal line delivered ($mode)"
+  case "$mode" in
+    none) ;;
+    retired|armed)
+      "$ROOT/bin/fm-busy-event.sh" arm "$state" wedge --state idle >/dev/null \
+        || fail "could not arm the stopped helper ($mode)"
+      ;;
+    *) fail "unknown stopped-helper mode $mode" ;;
+  esac
+  if [ "$mode" = retired ]; then
+    "$ROOT/bin/fm-busy-event.sh" retire "$state" wedge --current-gen >/dev/null \
+      || fail "could not retire the generation the way exit does"
+  fi
+  if [ "$mode" = armed ]; then
+    [ -s "$state/wedge.busy-gen" ] || fail "the armed case has no readable generation"
+  else
+    [ ! -e "$state/wedge.busy-gen" ] || fail "a $mode helper still has a busy generation"
+  fi
   printf 'waiting at the gate\nfooter tick 1\n' > "$capture"
   gone_endpoint_env dead
   export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
   wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
-    || fail "a stopped helper with a delivered terminal line was never reported: $(cat "$out")"
+    || fail "a stopped helper with a delivered terminal line was never reported ($mode): $(cat "$out")"
   grep -F 'agent dead' "$out" >/dev/null \
-    || fail "the stopped helper was not reported on the once-only dead path: $(cat "$out")"
+    || fail "the stopped helper was not reported on the once-only dead path ($mode): $(cat "$out")"
   grep -F 'possible wedge' "$out" >/dev/null \
-    && fail "a stopped helper was reported as a possible wedge: $(cat "$out")"
-  wakes=$(wedge_stale_wakes "$state" "$window")
+    && fail "a stopped helper was reported as a possible wedge ($mode): $(cat "$out")"
+  [ "$(wedge_stale_wakes "$state" "$window")" -eq 1 ] \
+    || fail "the stopped helper queued $(wedge_stale_wakes "$state" "$window") stale wakes instead of one ($mode)"
   bare=$(awk -F '\t' -v w="$window" '$3 == "stale" && $4 == w && $5 == "stale: " w { n++ } END { print n + 0 }' \
     "$state/.wake-queue" 2>/dev/null || echo 0)
-  [ "$wakes" -eq 1 ] || fail "the stopped helper queued $wakes stale wakes instead of one: $(cat "$state/.wake-queue" 2>/dev/null)"
-  [ "$bare" -eq 0 ] || fail "the stopped helper queued $bare bare stale wakes: $(cat "$state/.wake-queue")"
-  [ -s "$state/.dead-reported-$key" ] || fail "the once-only report left no dead record"
-  ack_stopped_cycle "$state" || fail "could not acknowledge the stopped helper's report"
+  [ "$bare" -eq 0 ] || fail "the stopped helper queued $bare bare stale wakes ($mode): $(cat "$state/.wake-queue")"
+  [ -s "$state/.dead-reported-$key" ] || fail "the once-only report left no dead record ($mode)"
+  marker=$(cat "$state/.dead-reported-$key")
+  pane_hash=$(pane_file_hash "$capture")
+  [ -n "$pane_hash" ] || fail "could not hash the pane ($mode)"
+  case "$marker" in
+    *" $pane_hash") fail "the once-only record followed the pane hash ($mode): $marker" ;;
+  esac
+  if [ "$mode" = armed ]; then
+    gen=$(tr -d '\n' < "$state/wedge.busy-gen")
+    case "$marker" in
+      *" $gen") ;;
+      *) fail "a readable generation was not the once-only identity: $marker" ;;
+    esac
+  fi
+  grep -F 'not re-escalated while it stays that way' "$out" >/dev/null \
+    && fail "the dead report claims it will not re-escalate while the agent stays dead ($mode): $(cat "$out")"
+  grep -F 'a repeat of the same identity is absorbed' "$out" >/dev/null \
+    || fail "the dead report does not name the identity bound ($mode): $(cat "$out")"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the stopped helper's report ($mode)"
 
   printf 'waiting at the gate\nfooter tick 2\n' > "$capture"
   : > "$out"
   wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" absorb \
-    || fail "a later footer tick re-woke the stopped helper: $(cat "$out") $(cat "$state/.wake-queue" 2>/dev/null)"
+    || fail "a later footer tick re-woke the stopped helper ($mode): $(cat "$out") $(cat "$state/.wake-queue" 2>/dev/null)"
   [ "$(wedge_stale_wakes "$state" "$window")" -eq 0 ] \
-    || fail "a later footer tick queued another stale wake: $(cat "$state/.wake-queue")"
-  [ -s "$state/.dead-reported-$key" ] || fail "the later footer tick dropped the dead record"
+    || fail "a later footer tick queued another stale wake ($mode): $(cat "$state/.wake-queue")"
+  [ "$(cat "$state/.dead-reported-$key")" = "$marker" ] \
+    || fail "a later footer tick rewrote the once-only record ($mode): $(cat "$state/.dead-reported-$key")"
+
+  # A new delivered line is a new identity when no generation is readable.
+  # The same generation keeps the relaunch key, so this step is not that case.
+  if [ "$mode" != armed ]; then
+    printf '%s\n' 'done: PR https://example.test/pr/9 checks green' 'done: a later delivered line on the same helper' > "$state/wedge.status"
+    printf '%s' "$(seen_sig "$state/wedge.status")" > "$state/.seen-wedge_status"
+    mark_status_log_delivered "$state" wedge || fail "could not mark the later line delivered ($mode)"
+    printf 'waiting at the gate\nfooter tick 3\n' > "$capture"
+    : > "$out"
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+      || fail "a new delivered line on a stopped helper was swallowed ($mode): $(cat "$out")"
+    grep -F 'agent dead' "$out" >/dev/null \
+      || fail "a new delivered line was not reported on the dead path ($mode): $(cat "$out")"
+    [ "$(wedge_stale_wakes "$state" "$window")" -eq 1 ] \
+      || fail "a new delivered line queued $(wedge_stale_wakes "$state" "$window") wakes instead of one ($mode)"
+    marker=$(cat "$state/.dead-reported-$key")
+    pane_hash=$(pane_file_hash "$capture")
+    case "$marker" in
+      *" $pane_hash") fail "the new line's record followed the pane hash ($mode): $marker" ;;
+    esac
+    ack_stopped_cycle "$state" || fail "could not acknowledge the new delivered line ($mode)"
+  fi
+
+  printf 'waiting at the gate\nfooter tick back\n' > "$capture"
+  FM_TEST_PANE_COMMAND=grok
+  FM_TEST_TMUX_WINDOWS=fm-wedge
+  export FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+  : > "$out"
+  wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$stopped" exit \
+    || fail "a helper that came back no longer raised stale ($mode): $(cat "$out")"
+  grep -Fx "stale: $window" "$out" >/dev/null \
+    || fail "a helper that came back did not raise the bare stale ($mode): $(cat "$out")"
+  [ ! -e "$state/.dead-reported-$key" ] \
+    || fail "a helper that came back left the once-only record ($mode): $(cat "$state/.dead-reported-$key")"
   unset FM_TEST_PANE_COMMAND FM_TEST_TMUX_WINDOWS
+}
+
+# A finished helper whose terminal line was already delivered, then stopped with
+# the pane kept, used to emit a bare stale for every new pane hash.
+# The grok record never has a busy generation, and exit deletes one when a
+# harness did arm it, so those two re-reported on each footer tick.
+# A readable generation remains the relaunch key.
+# A live agent on the same delivered line still raises the bare stale, and a
+# return drops the once-only record.
+test_stopped_delivered_terminal_reports_once() {
+  local dir state fakebin out capture window key
+  local stopped='state: stopped · source: pane · bare shell'
+  window="test:fm-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
+
+  assert_stopped_delivered_once none
+  assert_stopped_delivered_once retired
+  assert_stopped_delivered_once armed
 
   dir=$(wedge_threshold_fixture live-delivered-terminal 'done: PR https://example.test/pr/9 checks green' 0)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
