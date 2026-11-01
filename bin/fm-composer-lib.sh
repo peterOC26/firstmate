@@ -46,8 +46,8 @@
 # escalations into whatever it calls empty. Positive container proof means one
 # of the shapes in the catalogue below.
 #
-# THE SHAPE CATALOGUE (all verified against real harnesses; byte-level
-# captures in data/fm-composer-consolidation-audit-s1/report.md and
+# THE SHAPE CATALOGUE (byte-level captures and verification limits in
+# data/fm-composer-consolidation-audit-s1/report.md and
 # docs/verification/runtime-backends.md):
 #   bordered   - a complete boxed composer: a top border, side-bordered content
 #                rows of the same family, and a bottom border (grok, kimi,
@@ -55,6 +55,10 @@
 #                writes its model name there); a titled bottom border that
 #                still starts and ends with the family's rule glyph is
 #                tolerated, including Grok 1.0.5's three-column title overhang.
+#                Grok's single-row key bar is furniture even when adjacent
+#                to the box; _fm_composer_row_is_grok_footer owns recognition.
+#                _fm_composer_grok_footer_verdict owns the box-local placeholder
+#                exception; a footer never resolves ambiguous box geometry.
 #   bare       - an agent prompt glyph row with no border at all (claude `❯`,
 #                codex `›`, muse `⟩`, cursor `→`). The agent glyph is itself the container
 #                proof; a bare SHELL glyph (`>` `$` `%` `#`) never is.
@@ -497,8 +501,12 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # live, devin 3000.11.1). Command Code renders the anchored `Ask your question...`
 # after its `❯` glyph (verified live, Command Code 1.74.1); its truecolor is too
 # bright for the default ghost ceiling, so fm_composer_classify_screen reads its
-# screen with a raised one. FM_COMPOSER_IDLE_RE overrides for an unverified harness;
-# matching is case-insensitive.
+# screen with a raised one. Grok's idle placeholder `Build anything` is not
+# in this set. A plain capture of another harness can hold those words as a
+# typed draft, so only _fm_composer_grok_footer_verdict treats the exact
+# phrase as empty, and only while Grok's key-hint bar is showing and
+# Enter:send is absent. FM_COMPOSER_IDLE_RE overrides for an
+# unverified harness; matching is case-insensitive.
 FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^Ask Devin to build features, fix bugs, or work on your code$|^Ask your question\.\.\.$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
@@ -1248,6 +1256,96 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
   fi
 }
 
+# _fm_composer_row_is_grok_footer: 0 when <trimmed-row> is Grok's key-hint bar.
+# Herdr on grok 1.0.46 paints this bar before any input. Its plain text is
+# "Shift+Tab:mode │ Ctrl+.:shortcuts", the key names are SGR 1, and the
+# labels are SGR 2. A typed draft on that surface adds "Enter:send" and
+# "Shift+Enter/Alt+Enter:newline". A tmux capture of the same build showed
+# the bar only after the first input, as "Ctrl+x:shortcuts" and
+# "Alt+Enter:newline". An accepted suggestion uses "Tab/→:accept suggestion"
+# on that same bar. A row that only mentions one of those words is not the bar.
+_fm_composer_row_is_grok_footer() {  # <trimmed-row>
+  local row=$1
+  [ -n "$row" ] || return 1
+  case "$row" in
+    *'Shift+Tab:mode'*) ;;
+    *) return 1 ;;
+  esac
+  case "$row" in
+    *'│'*|*'Ctrl+'*|*'Enter:send'*|*':shortcuts'*|*':cancel'*|*':newline'*) return 0 ;;
+  esac
+  return 1
+}
+
+_fm_composer_grok_footer_under() {
+  local plain=$1 bottom=$2 row trimmed
+  row=$((bottom + 1))
+  trimmed=$(_fm_composer_screen_row "$row" "$plain")
+  fm_composer_normalize_trim_var trimmed
+  if [ -z "$trimmed" ]; then
+    row=$((row + 1))
+    trimmed=$(_fm_composer_screen_row "$row" "$plain")
+    fm_composer_normalize_trim_var trimmed
+  fi
+  _fm_composer_row_is_grok_footer "$trimmed" || return 1
+  printf '%s' "$trimmed"
+}
+
+# Joined composer body inside a box, one leading prompt glyph removed.
+_fm_composer_box_body() {
+  local screen=$1 first=$2 last=$3
+  local row raw content glyph='' joined=''
+  row=$first
+  while [ "$row" -le "$last" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    content=$(_fm_composer_row_content "$raw" 0)
+    if fm_composer_leading_prompt_glyph_var glyph "$content"; then
+      content=${content#"$glyph"}
+    fi
+    fm_composer_normalize_trim_var content
+    if [ -n "$content" ]; then
+      joined="${joined}${joined:+ }${content}"
+    fi
+    row=$((row + 1))
+  done
+  printf '%s' "$joined"
+}
+
+# _fm_composer_grok_footer_verdict: the box verdict, adjusted when the row
+# under the box is Grok's key-hint bar and that bar has no Enter:send.
+# Ambiguous geometry keeps <verdict>: a key bar cannot prove the box itself.
+# A typed draft always paints "Enter:send" on this bar, so an exact-phrase
+# body without it is the placeholder, never a draft.
+# Anything else keeps <verdict>, so a real draft stays pending.
+_fm_composer_grok_footer_verdict() {
+  local screen=$1 ambiguous=$2 bottom=$3 first=$4 last=$5 verdict=$6
+  local plain footer body
+  if [ "$ambiguous" = 1 ]; then
+    printf '%s' "$verdict"
+    return 0
+  fi
+  plain=$(printf '%s\n' "$screen" | fm_composer_strip_ansi)
+  footer=$(_fm_composer_grok_footer_under "$plain" "$bottom") || {
+    printf '%s' "$verdict"
+    return 0
+  }
+  case "$footer" in
+    *'Enter:send'*) printf '%s' "$verdict"; return 0 ;;
+  esac
+  body=$(_fm_composer_box_body "$screen" "$first" "$last")
+  if [ "$body" = 'Build anything' ]; then
+    printf 'empty'
+    return 0
+  fi
+  printf '%s' "$verdict"
+}
+
+_fm_composer_classify_box() {  # <screen> <styled> <ambiguous> <first> <last> <bottom>
+  local verdict
+  verdict=$(_fm_composer_classify_rows "$1" "$2" "$3" "$4" "$5")
+  _fm_composer_grok_footer_verdict "$1" "$3" "$6" "$4" "$5" "$verdict"
+}
+
 # _fm_composer_classify_bare_row: the bare agent-glyph row verdict, including
 # the styled=0 degradation: without styling, trailing text after the glyph may
 # be the harness's own idle suggestion (claude's rotating dim hint, codex's
@@ -1816,7 +1914,10 @@ _fm_composer_select_cursorless() {
     raw=$(_fm_composer_screen_row "$next" "$plain")
     trimmed=$raw
     fm_composer_normalize_trim_var trimmed
-    if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed"; then
+    # Grok draws its key-hint bar flush against the box. That bar is
+    # furniture, same as the blank line the idle capture leaves there.
+    if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed" \
+       && ! _fm_composer_row_is_grok_footer "$trimmed"; then
       FM_COMPOSER_SELECTED_KIND=
       return 1
     fi
@@ -2015,8 +2116,9 @@ EOF
       printf 'unknown'; return 0
     fi
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
-      _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
-        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))"
+      _fm_composer_classify_box "$screen" "$styled" "$FM_COMPOSER_SCAN_BOX_AMBIG" \
+        "$((FM_COMPOSER_SCAN_BOX_TOP + 1))" "$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))" \
+        "$FM_COMPOSER_SCAN_BOX_BOTTOM"
       return 0
     fi
     if [ "$FM_COMPOSER_SCAN_LEFTBAR_START" -ge 0 ] \
@@ -2075,8 +2177,9 @@ EOF
       _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
       ;;
     box)
-      _fm_composer_classify_rows "$screen" "$styled" "$FM_COMPOSER_SELECTED_AMBIG" \
-        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST"
+      _fm_composer_classify_box "$screen" "$styled" "$FM_COMPOSER_SELECTED_AMBIG" \
+        "$FM_COMPOSER_SELECTED_FIRST" "$FM_COMPOSER_SELECTED_LAST" \
+        "$FM_COMPOSER_SCAN_BOX_BOTTOM"
       ;;
     bare)
       if [ "$FM_COMPOSER_SELECTED_LAST" -gt "$FM_COMPOSER_SELECTED_FIRST" ]; then

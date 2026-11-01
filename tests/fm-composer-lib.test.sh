@@ -1021,6 +1021,206 @@ test_matrix_grok_titled_bottom_border() {
   pass "matrix: grok's real oversized titled bottom is empty while typed and unproved panes stay safe"
 }
 
+# Grok's idle placeholder "Build anything" and an accepted-suggestion ghost.
+# The box is the same proven #3436 geometry as the titled-bottom matrix above,
+# so a wrong width cannot fake the verdict. The hint row is the live key bar
+# directly under that box: the idle bar has no Enter:send, and the suggestion
+# bar is "Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts".
+# A blank line between the box and the bar is the 2026-11-01 grok 1.0.46
+# shape; the bar also sits flush against the box. Real typed text stays
+# pending on every one of those bars, including the placeholder words while
+# Enter:send is showing.
+grok_idle_pad() { printf '%72s' ''; }
+
+grok_idle_row() {  # <plain text after the prompt glyph>
+  local text=$1 pad inner
+  pad=$(grok_idle_pad)
+  inner="${text}${pad}"
+  inner=${inner:0:72}
+  printf '  │ ❯%s│' "$inner"
+}
+
+grok_idle_row_ansi() {  # <raw bytes after the glyph> <visible columns>
+  local raw=$1 vis=$2 pad spaces
+  pad=$(grok_idle_pad)
+  spaces=${pad:0:$((72 - vis))}
+  printf '  │ ❯%s%s│' "$raw" "$spaces"
+}
+
+grok_idle_screen() {  # <content row> <footer mode>
+  local row=$1 mode=$2
+  local top bot idle send sug
+  top='  ╭──────────────────────────────────────────────────────────────────────────╮'
+  bot='  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯'
+  idle='  Shift+Tab:mode  │  Ctrl+.:shortcuts'
+  send='  Enter:send  │  Shift+Enter/Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+.:shortcuts'
+  sug='  Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts'
+  case "$mode" in
+    idle) printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$idle" ;;
+    send) printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$send" ;;
+    suggest) printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$sug" ;;
+    none) printf '%s\n%s\n%s\n' "$top" "$row" "$bot" ;;
+    idle-adjacent) printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$idle" ;;
+    suggest-adjacent) printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" ;;
+    *) printf 'bad grok footer mode %s\n' "$mode" >&2; return 1 ;;
+  esac
+}
+
+test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
+  local row screen plain doorbell=' : Firstmate instruction waiting'
+  local sgr2 tc160
+  sgr2="${ESC}[2m"
+  tc160="${ESC}[38;2;160;160;160m"
+
+  row=$(grok_idle_row ' Build anything')
+  screen=$(grok_idle_screen "$row" idle)
+  assert_screen "grok Build anything on the idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  assert_screen "grok Build anything on the idle bar is empty on tmux" empty "$CAPS_TMUX" "$screen" 1
+  screen=$(grok_idle_screen "$row" send)
+  assert_screen "grok Build anything with Enter:send stays pending" pending "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" none)
+  assert_screen "grok bright Build anything without a key bar stays pending" pending "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" none)
+  assert_screen "grok Build anything on a plain capture without the key bar stays pending" pending "$CAPS_PLAIN" "$screen"
+  screen=$(grok_idle_screen "$row" idle)
+  assert_screen "grok Build anything on a plain capture with the idle bar is empty" empty "$CAPS_PLAIN" "$screen"
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok Build anything on the suggestion bar is empty" empty "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row ' deploy the fix')
+  screen=$(grok_idle_screen "$row" idle)
+  assert_screen "grok typed text on the idle bar stays pending" pending "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" send)
+  assert_screen "grok typed text with Enter:send stays pending" pending "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" idle-adjacent)
+  assert_screen "grok typed text against an adjacent idle bar stays pending" pending "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row ' Type a message...')
+  screen=$(grok_idle_screen "$row" idle)
+  assert_screen "grok bright Type a message on the idle bar stays pending" pending "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row "$doorbell")
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok bright doorbell on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row_ansi " ${sgr2}${doorbell# }${ESC}[0m" $(( ${#doorbell} )))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok dim suggestion ghost is empty" empty "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" suggest-adjacent)
+  assert_screen "grok dim suggestion ghost against the bar is empty" empty "$CAPS_STYLED" "$screen"
+  plain=': doorbell → waiting'
+  row=$(grok_idle_row_ansi " ${sgr2}${plain}${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok dim arrow suggestion with unproven geometry stays unknown" unknown "$CAPS_STYLED" "$screen"
+  screen=$(grok_idle_screen "$row" suggest-adjacent)
+  assert_screen "grok adjacent dim arrow suggestion with unproven geometry stays unknown" unknown "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row_ansi " ${tc160}${doorbell# }${ESC}[0m" $(( ${#doorbell} )))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok bright-truecolor doorbell on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+
+  plain='deploy the ships'
+  row=$(grok_idle_row_ansi " ${ESC}[1mdeploy ${ESC}[0m${sgr2}the ships${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok bright prefix plus a dim suggestion stays pending" pending "$CAPS_STYLED" "$screen"
+
+  row=$(grok_idle_row ' ')
+  screen=$(grok_idle_screen "$row" idle-adjacent)
+  assert_screen "grok empty composer against the idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  screen=$(printf '%s\n%s\n' "transcript says Tab/→:accept suggestion │ Shift+Tab:mode │ Ctrl+.:shortcuts" \
+    "$(grok_idle_screen "$(grok_idle_row ' deploy the fix')" none)")
+  assert_screen "grok a quoted suggestion bar above the box does not clear typed text" pending "$CAPS_STYLED" "$screen"
+  screen=$(printf '%s\n%s\n' "$(grok_idle_screen "$(grok_idle_row ' ')" idle)" 'Working on request...')
+  assert_screen "grok text below the idle bar does not fill an empty composer" empty "$CAPS_STYLED" "$screen"
+
+  assert_screen "bare Build anything on a plain row stays unknown" unknown "$CAPS_PLAIN" $'❯ Build anything'
+  assert_screen "bare Build anything on a styled row stays pending" pending "$CAPS_STYLED" $'❯ Build anything'
+  pass "matrix: grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
+}
+
+test_matrix_grok_suggestion_mentions_are_not_footers() {
+  local footer screen box caps text
+  for text in ' Build anything' ' deploy the fix'; do
+    box=$(grok_idle_screen "$(grok_idle_row "$text")" none)
+    for footer in 'Tab/→:accept suggestion' 'see the accept suggestion │ docs' 'accept suggestion Shift+Tab'; do
+      screen=$(printf '%s\n%s\n' "$box" "$footer")
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        assert_screen "adjacent suggestion mention invalidates cursorless box" unknown "$caps" "$screen"
+      done
+      assert_screen "suggestion mention cannot clear cursor-anchored text" pending "$CAPS_TMUX" "$screen" 1
+      screen=$(printf '%s\n\n%s\n' "$box" "$footer")
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN" "$CAPS_TMUX"; do
+        assert_screen "separated suggestion mention cannot clear text" pending "$caps" "$screen" 1
+      done
+    done
+  done
+  pass "matrix: suggestion mentions without the mode hint are not Grok footers"
+}
+
+test_matrix_grok_footer_preserves_ambiguous_geometry() {
+  local geometry body mode row screen expected caps
+  for geometry in title indent; do
+    for body in blank ghost placeholder typed; do
+      case "$body" in
+        blank) row=$(grok_idle_row ' '); expected=unknown ;;
+        ghost) row=$(grok_idle_row_ansi " ${ESC}[2mghost${ESC}[0m" 6); expected=unknown ;;
+        placeholder) row=$(grok_idle_row ' Build anything'); expected=pending-unproven ;;
+        typed) row=$(grok_idle_row ' deploy the fix'); expected=pending-unproven ;;
+      esac
+      for mode in none idle suggest idle-adjacent suggest-adjacent send; do
+        screen=$(grok_idle_screen "$row" "$mode")
+        case "$geometry" in
+          title) screen=${screen/'Grok 4.6 (xhigh)'/'Grok 9.9 (some-very-long-title)'} ;;
+          indent) screen=${screen/'  ╰'/'   ╰'} ;;
+        esac
+        for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_TMUX"; do
+          assert_screen "grok ambiguous $geometry $body $mode" "$expected" "$caps" "$screen" 1
+        done
+        if [ "$body" != ghost ]; then
+          assert_screen "grok plain ambiguous $geometry $body $mode" "$expected" "$CAPS_PLAIN" "$screen"
+        fi
+      done
+    done
+  done
+  pass "matrix: Grok footers preserve ambiguous geometry verdicts"
+}
+
+# grok 1.0.46 in Herdr paints this idle bar before any input. The key names
+# are bold and the labels are dim. The same build's tmux bar uses Ctrl+x
+# and Alt+Enter, and appears only after the first input. Typed text stays
+# pending on both.
+test_matrix_grok_1046_real_key_bar() {
+  local esc top content bot footer screen row
+  local top3436 bot3436 idle_x send_x
+  esc=$(printf '\033')
+  top='  ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮'
+  content='  │ ❯                                                                                                               │'
+  bot="  ╰─────────────────────────────────────────────────────────────────────────────── ${esc}[0m${esc}[2mGrok 4.7 (low) ${esc}[0m· ${esc}[0m${esc}[2malways-approve ${esc}[0m─╯"
+  footer="  ${esc}[0m${esc}[1mShift+Tab${esc}[0m${esc}[2m:mode  │  ${esc}[0m${esc}[1mCtrl+.${esc}[0m${esc}[2m:shortcuts                                                                        ${esc}[0m        "
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top" "$content" "$bot" "$footer")
+  assert_screen "grok 1.0.46 herdr idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  content='  │ ❯ deploy the fix                                                                                                │'
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top" "$content" "$bot" "$footer")
+  assert_screen "grok 1.0.46 herdr idle bar keeps typed text pending" pending "$CAPS_STYLED" "$screen"
+
+  top3436='  ╭──────────────────────────────────────────────────────────────────────────╮'
+  bot3436='  ╰────────────────────────────────────────────────────────── Grok 4.6 (xhigh) ─╯'
+  idle_x='  Shift+Tab:mode  │  Ctrl+x:shortcuts'
+  send_x='  Enter:send  │  Alt+Enter:newline  │  Shift+Tab:mode  │  Ctrl+x:shortcuts'
+  row=$(grok_idle_row ' ')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
+  assert_screen "grok tmux Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  row=$(grok_idle_row ' deploy the fix')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$send_x")
+  assert_screen "grok tmux Alt+Enter typed bar stays pending" pending "$CAPS_STYLED" "$screen"
+  row=$(grok_idle_row ' Build anything')
+  screen=$(printf '%s\n%s\n%s\n\n%s\n' "$top3436" "$row" "$bot3436" "$idle_x")
+  assert_screen "grok Build anything on the Ctrl+x idle bar is empty" empty "$CAPS_STYLED" "$screen"
+  pass "matrix: grok 1.0.46's real key bars read empty when idle and pending when typed"
+}
+
 test_matrix_claude_titled_top_rule() {
   # A named Claude Code session draws its title into the composer's TOP rule
   # (issues #5601 and #5558; observed on herdr as
@@ -1084,6 +1284,11 @@ test_matrix_kimi_bordered_shell_glyph_box() {
   assert_screen "kimi idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
   assert_screen "kimi idle on herdr" empty "$CAPS_STYLED" "$screen"
   assert_screen "kimi idle on zellij" empty "$CAPS_STYLED_NOID" "$screen"
+  # "Build anything" is a Grok placeholder, not a fleet-wide idle phrase.
+  # A Kimi box holding those words is a typed draft on every capture.
+  screen=$'╭────────────────────────╮\n│ > Build anything       │\n╰────────────────────────╯'
+  assert_screen "kimi plain box holding Build anything stays pending" pending "$CAPS_PLAIN" "$screen"
+  assert_screen "kimi styled box holding Build anything stays pending" pending "$CAPS_STYLED" "$screen"
   pass "matrix: kimi's bordered shell-glyph box reads empty through the shared owner (spawn's fourth copy retired)"
 }
 
@@ -1328,6 +1533,10 @@ test_grok_approval_mode_title
 test_matrix_opencode_leftbar_cwd_furniture
 test_matrix_opencode_leftbar_abs_cwd_furniture
 test_matrix_grok_titled_bottom_border
+test_matrix_grok_idle_placeholder_and_suggestion_ghost
+test_matrix_grok_suggestion_mentions_are_not_footers
+test_matrix_grok_footer_preserves_ambiguous_geometry
+test_matrix_grok_1046_real_key_bar
 test_matrix_claude_titled_top_rule
 test_matrix_kimi_bordered_shell_glyph_box
 test_matrix_claude_inside_zellij_ansi_dump

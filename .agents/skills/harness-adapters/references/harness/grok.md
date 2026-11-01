@@ -8,7 +8,7 @@ Launch shape: `grok --always-approve "$(cat <brief>)"`.
 
 | Fact | Value |
 |---|---|
-| Busy state | The last rendered-tail fallback, isolated to Grok pending a semantic source: ASCII mid-turn `Ctrl+c:cancel`, absent from idle bar `Shift+Tab:mode │ Ctrl+.:shortcuts`, never the locale-fragile braille spinner. |
+| Busy state | The last rendered-tail fallback, isolated to Grok pending a semantic source: ASCII mid-turn `Ctrl+c:cancel`, absent from the idle bar (`Shift+Tab:mode` with `Ctrl+.:shortcuts` or `Ctrl+x:shortcuts`), never the locale-fragile braille spinner. |
 | Exit | `/exit` prints `Resume this session with: grok --resume <session-id>`; fallback is `Ctrl+Q` twice within 1000ms, `Ctrl+D` quits in VS Code-family terminals, and `Ctrl+C` interrupts. |
 | Interrupt | Single `Ctrl+C`; Escape only focuses scrollback. |
 | Skill | `/<skill>`, for example `/no-mistakes`, with end-to-end user-skill discovery, invocation, and real `no-mistakes axi run` evidence; the popup may consume Enter and fill an argument placeholder, requiring a real second Enter. |
@@ -70,6 +70,24 @@ Fresh placeholder `Type a message...` uses dark 24-bit TRUECOLOR, not SGR-2.
 On Grok 0.2.93, real input `38;2;224;222;244` measured about 225 luminance, while borders and placeholder ranged from `38;2;50;47;70` through `38;2;110;106;134`, about 51-110, and were dropped.
 The truecolor rule assumes the fleet's dark theme; SGR-2 is theme-independent.
 Coverage is `../../../tests/fm-composer-ghost.test.sh` and `../../../tests/fm-backend-herdr.test.sh`.
+
+The idle key bar carries `Shift+Tab:mode` and a shortcuts hint.
+A typed draft adds `Enter:send` on that bar.
+The shared classifier treats the bar as furniture, including when it sits flush against the box.
+With unambiguous box geometry and no `Enter:send`, and only while that bar is present, the exact placeholder `Build anything` reads empty.
+A suggestion on a bar that says `accept suggestion` reads empty when ghost-stripping leaves nothing: SGR-2 or truecolor below `FM_COMPOSER_GHOST_LUMA_MAX`.
+Default-foreground text, bright truecolor, 256-colour runs stay pending.
+The same placeholder while `Enter:send` is showing stays pending.
+`Build anything` is not a fleet-wide idle phrase, so another harness's box holding those words stays pending.
+On grok 1.0.46 in Herdr the idle bar is present before any input.
+Its plain text is `Shift+Tab:mode │ Ctrl+.:shortcuts`, the key names are bold, and `:mode` and `:shortcuts` are dim.
+A typed draft on that surface adds `Shift+Enter/Alt+Enter:newline`.
+`Build anything` did not paint, and two completed turns with `GROK_PROMPT_SUGGESTIONS=1` did not paint `accept suggestion`.
+Both the placeholder and accepted-suggestion ghost are proven only on fixtures built from the reported screens, not in a live Herdr capture.
+A private tmux capture of the same build showed no key bar until the first typed input.
+That typed bar read `Enter:send │ Alt+Enter:newline │ Shift+Tab:mode │ Ctrl+x:shortcuts`, and the idle bar after backspace read `Shift+Tab:mode │ Ctrl+x:shortcuts`.
+The dated commands and output are in `../../../docs/verification/runtime-backends.md` under "Grok approval-mode composer".
+The placeholder and suggestion shapes are pinned by `../../../tests/fm-composer-lib.test.sh` and `../../../tests/fm-backend-herdr.test.sh`.
 
 Tmux `#{cursor_y}` may point at the pristine composer's bottom border.
 The shared classifier locates the full box and all content rows, so border cursor and multi-row composers require no adapter offsets.
