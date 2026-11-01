@@ -6138,6 +6138,26 @@ test_captain_inbox_note_surfaces_once_until_acknowledged() {
   pass "inbox notes surface once until acknowledged and obsolete markers are pruned"
 }
 
+test_inbox_named_task_status_surfaces_once() {
+  local dir state out pid
+  dir=$(make_case inbox-named-task); state="$dir/state"; out="$dir/watch.out"
+  printf 'done [at=%s]: fixture finished\n' "$(date +%s)" > "$state/inbox-triage-w1.status"
+  inbox_watch_bg "$dir" "$out"; pid=$!
+  wait_for_exit "$pid" 100 || { reap "$pid"; fail "inbox-named task status never surfaced"; }
+  assert_grep "signal: $state/inbox-triage-w1.status" "$out" "inbox-named task status reason missing"
+  [ -s "$state/.seen-inbox-triage-w1_status" ] || fail "first close left no status marker"
+  ack_stopped_cycle "$state" || fail "inbox-named task wake acknowledgement failed"
+
+  inbox_watch_bg "$dir" "$out.second"; pid=$!
+  wait_poll_cycle "$state" "$pid" \
+    || { reap "$pid"; fail "inbox-named task status surfaced twice: $(cat "$out.second")"; }
+  [ -s "$state/.seen-inbox-triage-w1_status" ] \
+    || { reap "$pid"; fail "inbox pruning removed the task status marker"; }
+  [ ! -s "$out.second" ] || { reap "$pid"; fail "quiet successor printed a repeated wake"; }
+  reap "$pid"
+  pass "an inbox-named task status surfaces once and its signal marker survives inbox pruning"
+}
+
 test_inbox_marker_failure_exits_and_replays() {
   local dir state out pid id
   dir=$(make_case inbox-marker-failure); state="$dir/state"; out="$dir/watch.out"
@@ -7377,4 +7397,5 @@ test_closed_exit_picker_drops_saved_dialog_name
 
 test_handling_successor_surfaces_a_queued_captain_inbox_note
 test_captain_inbox_note_surfaces_once_until_acknowledged
+test_inbox_named_task_status_surfaces_once
 test_inbox_marker_failure_exits_and_replays

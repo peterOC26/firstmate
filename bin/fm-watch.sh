@@ -2209,17 +2209,12 @@ queued_check_surface_after_output() {
 }
 
 queued_check_surface_queued() {
-  local key marker has_marker=0 reason captured="" stranded="" unstarted="" inbox=""
+  local key marker reason captured="" stranded="" unstarted="" inbox=""
   QUEUED_CHECK_SURFACED=
   # Preserve the empty-queue fast path (also when a home was torn down), but
   # still take the lock to prune inbox markers after the final row is acked.
   if [ ! -s "$FM_WAKE_QUEUE" ]; then
-    for marker in "$STATE"/.seen-inbox-*; do
-      [ -e "$marker" ] || [ -L "$marker" ] || continue
-      has_marker=1
-      break
-    done
-    [ "$has_marker" -eq 1 ] || return 0
+    IFS= read -r marker < <(fm_wake_inbox_surfaced_markers) || return 0
   fi
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
   while IFS= read -r key; do

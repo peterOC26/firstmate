@@ -2653,6 +2653,16 @@ fm_wake_surfaced_mark_locked() {  # <procevent:...|inbox:...>
   fi
 }
 
+# List only inbox delivery markers, excluding per-task signal markers.
+fm_wake_inbox_surfaced_markers() {
+  local marker
+  for marker in "$STATE"/.seen-inbox-*; do
+    [ -e "$marker" ] || [ -L "$marker" ] || continue
+    case "${marker##*/.seen-inbox-}" in ''|*[!0-9a-f]*) continue ;; esac
+    printf '%s\n' "$marker"
+  done
+}
+
 # Prints unsurfaced inbox keys and prunes markers for rows no longer queued.
 fm_wake_inbox_unsurfaced_keys_locked() {
   local key marker queued_markers=$'\n'
@@ -2662,13 +2672,12 @@ fm_wake_inbox_unsurfaced_keys_locked() {
     queued_markers="$queued_markers$marker"$'\n'
     [ -e "$marker" ] || printf '%s\n' "$key"
   done < <(fm_wake_queued_keys_locked check)
-  for marker in "$STATE"/.seen-inbox-*; do
-    [ -e "$marker" ] || [ -L "$marker" ] || continue
+  while IFS= read -r marker; do
     case "$queued_markers" in
       *$'\n'"$marker"$'\n'*) ;;
       *) rm -f -- "$marker" || return 1 ;;
     esac
-  done
+  done < <(fm_wake_inbox_surfaced_markers)
 }
 
 fm_wake_secondmate_progress_marker_write() { # <task> <observed-at> <oldest-row-key>
