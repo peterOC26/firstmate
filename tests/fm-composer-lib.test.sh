@@ -1086,7 +1086,9 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   screen=$(grok_idle_screen "$row" none)
   assert_screen "grok bright Build anything without a key bar stays pending" pending "$CAPS_STYLED" "$screen"
   screen=$(grok_idle_screen "$row" none)
-  assert_screen "grok Build anything on a plain capture is the idle placeholder" empty "$CAPS_PLAIN" "$screen"
+  assert_screen "grok Build anything on a plain capture without the key bar stays pending" pending "$CAPS_PLAIN" "$screen"
+  screen=$(grok_idle_screen "$row" idle)
+  assert_screen "grok Build anything on a plain capture with the idle bar is empty" empty "$CAPS_PLAIN" "$screen"
   screen=$(grok_idle_screen "$row" suggest)
   assert_screen "grok Build anything on the suggestion bar is empty" empty "$CAPS_STYLED" "$screen"
 
@@ -1130,6 +1132,26 @@ test_matrix_grok_idle_placeholder_and_suggestion_ghost() {
   assert_screen "grok 256-colour suggestion ghost against the bar is empty" empty "$CAPS_STYLED" "$screen"
   screen=$(grok_idle_screen "$row" send)
   assert_screen "grok 256-colour doorbell with Enter:send stays pending" pending "$CAPS_STYLED" "$screen"
+
+  # Palette 231 is cube white (255,255,255). A 256-colour draft in that
+  # colour is typed text, on the accept-suggestion bar and under the cursor.
+  plain='deploy the fix'
+  row=$(grok_idle_row_ansi " ${ESC}[38;5;231m${plain}${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok bright 256-colour typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+  assert_screen "grok bright 256-colour typed text stays pending with the cursor on the body" pending "$CAPS_TMUX" "$screen" 1
+  row=$(grok_idle_row_ansi " ${ESC}[38:5:231m${plain}${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok bright colon-form 256-colour typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+  # Index 2 is a theme colour, not the standard cube, so it stays typed text.
+  row=$(grok_idle_row_ansi " ${ESC}[38;5;2m${plain}${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok system-palette typed text on the suggestion bar stays pending" pending "$CAPS_STYLED" "$screen"
+  # A bright 256 prefix plus a grey-ramp ghost (index 242, grey 108) keeps the prefix.
+  plain='deploy the ships'
+  row=$(grok_idle_row_ansi " ${ESC}[38;5;231mdeploy ${ESC}[0m${ESC}[38;5;242mthe ships${ESC}[0m" $((1 + ${#plain})))
+  screen=$(grok_idle_screen "$row" suggest)
+  assert_screen "grok 256-colour prefix plus a dim 256 ghost stays pending" pending "$CAPS_STYLED" "$screen"
 
   plain=': doorbell → waiting'
   row=$(grok_idle_row_ansi " ${sgr2}${plain}${ESC}[0m" $((1 + ${#plain})))
@@ -1224,6 +1246,11 @@ test_matrix_kimi_bordered_shell_glyph_box() {
   assert_screen "kimi idle on cmux/orca" empty "$CAPS_PLAIN" "$screen"
   assert_screen "kimi idle on herdr" empty "$CAPS_STYLED" "$screen"
   assert_screen "kimi idle on zellij" empty "$CAPS_STYLED_NOID" "$screen"
+  # "Build anything" is a Grok placeholder, not a fleet-wide idle phrase.
+  # A Kimi box holding those words is a typed draft on every capture.
+  screen=$'╭────────────────────────╮\n│ > Build anything       │\n╰────────────────────────╯'
+  assert_screen "kimi plain box holding Build anything stays pending" pending "$CAPS_PLAIN" "$screen"
+  assert_screen "kimi styled box holding Build anything stays pending" pending "$CAPS_STYLED" "$screen"
   pass "matrix: kimi's bordered shell-glyph box reads empty through the shared owner (spawn's fourth copy retired)"
 }
 

@@ -4047,6 +4047,16 @@ test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   text=' Build anything'
   row=$(printf '  │ ❯%s│' "${text}${pad:0:$((72 - ${#text}))}")
   printf '%s\n%s\n%s\n\n%s\n' "$top" "$row" "$bot" "$send" > "$resp/4.out"
+  text='deploy the fix'
+  vis=$((1 + ${#text}))
+  row=$(printf '  │ ❯ %s%s%s%s│' "${esc}[38;5;231m" "$text" "${esc}[0m" "${pad:0:$((72 - vis))}")
+  printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/5.out"
+  text='deploy the ships'
+  vis=$((1 + ${#text}))
+  row=$(printf '  │ ❯ %sdeploy %sthe ships%s%s│' \
+    "${esc}[38;5;231m" "${esc}[0m${esc}[38;5;242m" "${esc}[0m" \
+    "${pad:0:$((72 - vis))}")
+  printf '%s\n%s\n%s\n%s\n' "$top" "$row" "$bot" "$sug" > "$resp/6.out"
   fb=$(make_herdr_fakebin "$dir")
 
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
@@ -4061,6 +4071,12 @@ test_composer_state_grok_idle_placeholder_and_suggestion_ghost() {
   out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
     bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
   [ "$out" = pending ] || fail "Build anything with Enter:send should stay pending, got '$out'"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = pending ] || fail "bright 256-colour typed text on the suggestion bar should stay pending, got '$out'"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_composer_state default:w1:p2' "$ROOT" )
+  [ "$out" = pending ] || fail "a 256-colour prefix plus a dim ghost should stay pending, got '$out'"
   pass "fm_backend_herdr_composer_state: Grok's idle placeholder and suggestion ghost read empty; typed text stays pending"
 }
 
