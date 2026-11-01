@@ -1262,3 +1262,103 @@ test_pass_through_successor_survives_the_hook_process_group_teardown
 test_next_park_takes_over_the_cycle_a_pass_through_left_for_main
 test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park
 test_unrecorded_successor_is_stopped_rather_than_left_for_main
+
+
+# Use the real inbox producer; the engine's grants must never include its rows.
+queue_host_inbox_note() {  # <home>
+  FM_HOME="$1" "$ROOT/bin/fm-inbox.sh" note --json 'Jobs answer fixture' > "$1/note.json" \
+    || fail "inbox note append failed"
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$1/note.json"
+}
+
+test_inbox_note_queued_while_parked_reaches_main() {
+  local home id
+  home=$(make_home inbox-parked attended)
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "inbox parked: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 handled_at_least "$home" 1 || fail "inbox parked: first turn never completed"
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 host_exited "$home" || fail "inbox parked: note never reached main"
+  expect_code 0 "$(cat "$home/host.rc")" "inbox parked: host failed"
+  assert_grep "check: captain inbox note $id" "$home/host.out" "inbox parked: reason missing"
+  assert_grep 'pass-through\tattended\tmain-only\tcheck: captain inbox note' "$home/state/.supervision-host.log" \
+    "inbox parked: note was not passed to main"
+  [ "$(engine_calls "$home")" = 1 ] || fail "inbox parked: engine took the inbox note"
+  watcher_live "$home" || fail "inbox parked: no live successor for main"
+  stop_home_processes "$home"
+  pass "host: an inbox note queued while parked reaches main with a live successor"
+}
+
+test_claude_stop_hook_delivers_an_inbox_note_queued_mid_engine_turn() {
+  local home successor id
+  home=$(make_primary_home hook-inbox-mid-turn)
+  ln -s "$ROOT/.agents" "$home/.agents"
+  echo held > "$home/stub-mode"
+  mkfifo "$home/stub-release"
+  start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "inbox hook: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 test -s "$home/engine-drain.1" || fail "inbox hook: engine did not reach its hold"
+  successor=$(cat "$home/state/.watch.lock/pid")
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" \
+    || fail "inbox hook: successor did not surface the note mid-turn"
+  [ ! -s "$home/hook.rc" ] || fail "inbox hook: current engine turn was interrupted"
+  printf 'continue\n' > "$home/stub-release"
+  wait_until 250 hook_exited "$home" || fail "inbox hook: main was not rewoken after the turn"
+  assert_rewoke_main "$home" "inbox hook"
+  assert_grep "check: captain inbox note $id" "$home/hook.err" "inbox hook: rewake lost the note"
+  assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=rewake ' "$home/state/.claude-autoarm-epoch" \
+    "inbox hook: rewake not committed"
+  [ "$(marker_kind "$home")" = downtime ] || fail "inbox hook: no deliverable downtime marker"
+  assert_no_re "inbox:$id" "$home/engine-drain.1" "inbox hook: engine presented the note"
+  : > "$home/session.stop"
+  stop_home_processes "$home"
+  pass "host+hook: an inbox note queued mid-turn rewakes main when that turn ends"
+}
+
+test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn() {
+  local home successor id marker beat i
+  home=$(make_home inbox-after-close attended)
+  echo held > "$home/stub-mode"
+  mkfifo "$home/stub-release"
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "inbox after-close: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 test -s "$home/engine-drain.1" || fail "inbox after-close: first engine did not reach its hold"
+  successor=$(cat "$home/state/.watch.lock/pid")
+  append_status "$home" 'second wake while first turn is held'
+  wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" \
+    || fail "inbox after-close: successor did not close on the second signal"
+  id=$(queue_host_inbox_note "$home")
+  printf 'continue\n' > "$home/stub-release"
+  wait_until 250 host_exited "$home" || fail "inbox after-close: main was not reached before another turn"
+  expect_code 0 "$(cat "$home/host.rc")" "inbox after-close: host failed"
+  assert_absent "$home/engine-drain.2" "inbox after-close: a second engine turn started"
+  assert_re '^signal: .*demo.status' "$home/host.out" "inbox after-close: original signal close was changed"
+  assert_grep 'pass-through\tattended\tmain-only (captain inbox note '"$id"' queued)' \
+    "$home/state/.supervision-host.log" "inbox after-close: missing main-only inbox verdict"
+  assert_no_re "inbox:$id" "$home/engine-drain.1" "inbox after-close: engine presented the inbox row"
+  FM_HOME="$home" bash -c '. "$1"; fm_wake_queued_keys check' _ "$ROOT/bin/fm-wake-lib.sh" > "$home/queued"
+  assert_grep "inbox:$id" "$home/queued" "inbox after-close: engine acknowledged main's note"
+  marker="$home/state/.seen-inbox-$(printf 'inbox:%s' "$id" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+  [ -f "$marker" ] || fail "inbox after-close: host did not mark the note before starting main's successor"
+  watcher_live "$home" || fail "inbox after-close: no live successor for main"
+  successor=$(cat "$home/state/.watch.lock/pid")
+  beat=$(FM_HOME="$home" bash -c '. "$1"; fm_path_mtime "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/.last-watcher-beat")
+  i=0
+  while [ "$(FM_HOME="$home" bash -c '. "$1"; fm_path_mtime "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/.last-watcher-beat")" = "$beat" ] && [ "$i" -lt 150 ]; do
+    sleep 0.1; i=$((i + 1))
+  done
+  [ "$i" -lt 150 ] || fail "inbox after-close: successor did not complete a poll"
+  kill -0 "$successor" 2>/dev/null || fail "inbox after-close: successor surfaced the note twice"
+  stop_home_processes "$home"
+  pass "host: an inbox note queued after successor close reaches main before any second engine turn"
+}
+
+
+test_inbox_note_queued_while_parked_reaches_main
+test_claude_stop_hook_delivers_an_inbox_note_queued_mid_engine_turn
+test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn

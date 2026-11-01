@@ -6087,6 +6087,80 @@ procevent_watch_bg() {  # <dir> <out>
     FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
 }
 
+
+# Inbox notes share the queued-check delivery path with process-event results.
+inbox_watch_bg() {  # <dir> <out> [extra env assignments...]
+  local dir=$1 out=$2
+  shift 2
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" \
+    FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=0.2 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$@" "$WATCH" > "$out" &
+}
+
+queue_inbox_note() {  # <home>
+  FM_HOME="$1" "$ROOT/bin/fm-inbox.sh" note --json 'Jobs answer fixture' > "$1/note.json" \
+    || fail "inbox note append failed"
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$1/note.json"
+}
+
+test_handling_successor_surfaces_a_queued_captain_inbox_note() {
+  local dir state out pid id i
+  dir=$(make_case inbox-delivery); state="$dir/state"; out="$dir/watch.out"
+  inbox_watch_bg "$dir" "$out"; pid=$!
+  i=0
+  while [ ! -s "$state/.watch.lock/pid" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$state/.watch.lock/pid" ] || fail "inbox fixture watcher did not acquire its lock"
+  id=$(queue_inbox_note "$dir")
+  wait_for_exit "$pid" 100 || fail "handling successor never surfaced the inbox note: $(cat "$out")"
+  assert_grep "check: captain inbox note $id" "$out" "inbox close lost the note id"
+  FM_HOME="$dir" "$DRAIN" > "$dir/drain.out" 2>/dev/null || fail "inbox drain failed"
+  assert_grep "inbox:$id" "$dir/drain.out" "inbox row missing from main drain"
+  pass "a handling successor proactively surfaces a captain inbox note"
+}
+
+test_captain_inbox_note_surfaces_once_until_acknowledged() {
+  local dir state out pid id count
+  dir=$(make_case inbox-once); state="$dir/state"; out="$dir/watch.out"
+  id=$(queue_inbox_note "$dir")
+  inbox_watch_bg "$dir" "$out"; pid=$!
+  wait_for_exit "$pid" 100 || fail "inbox note never surfaced"
+  assert_grep "check: captain inbox note $id" "$out" "inbox reason missing"
+  inbox_watch_bg "$dir" "$out.second"; pid=$!
+  wait_poll_cycle "$state" "$pid" || fail "inbox note surfaced twice: $(cat "$out.second")"
+  count=$(find "$state" -maxdepth 1 -name '.seen-inbox-*' -type f | wc -l | tr -d ' ')
+  [ "$count" = 1 ] || fail "inbox surfacing did not leave exactly one marker"
+  ack_stopped_cycle "$state" || fail "wake acknowledgement failed"
+  FM_HOME="$dir" "$ROOT/bin/fm-inbox.sh" drain --ack "$id" >/dev/null || fail "note acknowledgement failed"
+  wait_poll_cycle "$state" "$pid" || fail "acknowledged inbox note resurfaced"
+  count=$(find "$state" -maxdepth 1 -name '.seen-inbox-*' | wc -l | tr -d ' ')
+  [ "$count" = 0 ] || fail "acknowledged inbox marker was not pruned"
+  reap "$pid"
+  pass "inbox notes surface once until acknowledged and obsolete markers are pruned"
+}
+
+test_inbox_marker_failure_exits_and_replays() {
+  local dir state out pid id
+  dir=$(make_case inbox-marker-failure); state="$dir/state"; out="$dir/watch.out"
+  id=$(queue_inbox_note "$dir")
+  cat > "$dir/fakebin/mv" <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'/.seen-inbox-'*) exit 1 ;; esac
+exec /bin/mv "$@"
+SH
+  chmod +x "$dir/fakebin/mv"
+  inbox_watch_bg "$dir" "$out"; pid=$!
+  wait_for_exit "$pid" 100 || fail "inbox marker failure did not finish the actionable cycle"
+  assert_grep "check: captain inbox note $id" "$out" "marker failure lost the reason"
+  [ "$(grep -Fc "check: captain inbox note $id" "$out")" = 1 ] || fail "marker failure printed twice"
+  [ ! -e "$state/.wake-queue.lock" ] || fail "marker failure left the queue locked"
+  [ -z "$(find "$state" -maxdepth 1 -name '.seen-inbox-*')" ] || fail "failed marker suppressed replay"
+  rm "$dir/fakebin/mv"
+  inbox_watch_bg "$dir" "$out.replay"; pid=$!
+  wait_for_exit "$pid" 100 || fail "inbox marker failure did not replay"
+  assert_grep "check: captain inbox note $id" "$out.replay" "inbox replay lost the reason"
+  pass "inbox marker failure releases the queue lock and permits proactive replay"
+}
+
 test_procevent_captured_result_surfaces_proactively() {
   local dir state out drain_out pid beacon_age
   dir=$(make_case procevent-delivery); state="$dir/state"
@@ -7300,3 +7374,7 @@ test_exit_picker_wedge_keeps_climbing
 test_quoted_exit_picker_stays_ordinary_stale
 test_secondmate_exit_picker_stays_quiet
 test_closed_exit_picker_drops_saved_dialog_name
+
+test_handling_successor_surfaces_a_queued_captain_inbox_note
+test_captain_inbox_note_surfaces_once_until_acknowledged
+test_inbox_marker_failure_exits_and_replays
