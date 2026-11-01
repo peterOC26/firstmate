@@ -1534,9 +1534,9 @@ delivered_terminal_dead_id() {  # <task>
 # escalate and never how loudly the ones that still do.
 #
 # Deliberately NOT a deferral like the two above it. They restart the idle timer
-# because the pane might still be working; this is terminal for as long as the
-# endpoint stays gone, because there is nothing left to re-probe on a cadence and a
-# repeat is exactly the noise it exists to stop. WHICH verdict fired is named for
+# because the pane might still be working; this absorbs a repeat while the
+# verdict and report identity still match, because that repeat is exactly the
+# noise it exists to stop. WHICH verdict fired is named for
 # the same reason wedge_wait_evidence names its kind of wait: the two ask the supervisor
 # for different things.
 #
@@ -3385,8 +3385,9 @@ EOF
               # A gone endpoint whose terminal line was already delivered is not
               # a new stale per footer tick. wedge_dead_record reports it once
               # for the busy generation when one is readable, and otherwise for
-              # the delivered status identity, so a pane hash change is absorbed
-              # and a new delivered line still reports. A live or unproven agent
+              # the delivered status identity, so a pane hash change is absorbed.
+              # A new delivered line re-arms only that fallback identity.
+              # A live or unproven agent
               # keeps the bare stale below and drops the once-only marker here:
               # this branch does not call wedge_dead_record for those verdicts,
               # and that function is what otherwise clears the marker.
