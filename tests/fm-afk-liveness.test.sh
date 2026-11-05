@@ -62,7 +62,7 @@ test_one_away_turn_keeps_the_check_silent() {
   seed "$dir" daemon
   epoch=1793836800
   printf 'actor: daemon\nentry_epoch: %s\nwindow: %s\n' "$epoch" "$WINDOW" > "$dir/state/.afk-away-actor"
-  printf '[2026-11-05T00:00:01+0000] wake force-self (FM_INJECT_SKIP): heartbeat\n' > "$dir/state/.supervise-daemon.log"
+  printf '[2026-11-05T00:00:01+0000] wake: heartbeat\n' > "$dir/state/.supervise-daemon.log"
   out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_AFK_LIVENESS_WINDOW=$WINDOW \
     FM_AFK_LIVENESS_NOW=$((epoch + WINDOW)) "$LIVE" check)
   [ -z "$out" ] || fail "a daemon heartbeat still fired the no-session line: $out"
@@ -91,17 +91,25 @@ test_arm_records_the_actor_and_disarm_drops_only_the_check() {
 }
 
 test_new_window_gets_new_wakes() {
-  local dir out
+  local dir out entry
   dir="$TMP_ROOT/windows"
-  seed "$dir" host
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
-  assert_contains "$out" 'no away session ran' "first window did not wake"
-  printf 'actor: host\nentry_epoch: 2000\nwindow: 900\n' > "$dir/state/.afk-away-actor"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2900 "$LIVE" check)
-  assert_contains "$out" 'no away session ran' "second window inherited no-session suppression"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2901 "$LIVE" check)
-  [ -z "$out" ] || fail "second window fired twice: $out"
-  pass "each window gets its own no-session wake"
+  seed "$dir" daemon
+  printf 'older-window:no-session\n' > "$dir/state/.afk-liveness-fired"
+  for entry in 2000 3000; do
+    printf 'mode: away\nentered_epoch: %s\n' "$entry" > "$dir/state/.afk-contract"
+    out=$(run_live "$dir" env FM_TEST_HARNESS=claude "$LIVE" arm) || fail "new entry arm failed: $out"
+    [ ! -e "$dir/state/.afk-liveness-fired" ] || fail "new entry retained the fired ledger"
+    out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((entry + WINDOW)) "$LIVE" check)
+    assert_contains "$out" 'no away session ran' "new window did not wake"
+    [ -s "$dir/state/.afk-liveness-fired" ] || fail "check did not persist the wake"
+    out=$(run_live "$dir" env FM_TEST_HARNESS=claude "$LIVE" arm) || fail "refresh failed: $out"
+    [ -s "$dir/state/.afk-liveness-fired" ] || fail "same-entry refresh discarded the wake"
+    out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((entry + WINDOW + 1)) "$LIVE" check)
+    [ -z "$out" ] || fail "refreshed window fired twice: $out"
+  done
+  out=$(run_live "$dir" "$LIVE" disarm) || fail "disarm failed: $out"
+  [ ! -e "$dir/state/.afk-liveness-fired" ] || fail "disarm retained the fired ledger"
+  pass "new entries reset wake history, refreshes preserve it, and disarm removes it"
 }
 
 test_failed_receipts_are_not_turns() {
@@ -110,7 +118,7 @@ test_failed_receipts_are_not_turns() {
     dir="$TMP_ROOT/failed-$actor"
     seed "$dir" "$actor"
     printf '1001\tfailed\tposture=away\tjob\n' > "$dir/state/.supervision-host.log"
-    printf '[1970-01-01T00:16:41+0000] %s\n' 'daemon starting' 'startup failed: job not found' 'wake: signal: job.status' 'inject failed: job' > "$dir/state/.supervise-daemon.log"
+    printf '[1970-01-01T00:16:41+0000] %s\n' 'daemon starting' 'startup failed: job not found' 'wake: signal: job.status' 'inject failed: job' 'self-handle: signal: job.status -> job.status: working' 'escalate: signal: job.status -> job.status: failed' > "$dir/state/.supervise-daemon.log"
     out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
     assert_contains "$out" 'no away session ran' "$actor counted a failure as a turn"
   done
@@ -126,10 +134,11 @@ test_daemon_offsets_and_full_log() {
   seed "$dir" daemon
   printf 'actor: daemon\nentry_epoch: 1709251200\nwindow: 900\n' > "$dir/state/.afk-away-actor"
   {
-    printf '[2024-02-29T23:59:59+0000] self-handle: job\n'
-    printf '[2024-03-01T01:00:00+0100] self-handle: signal: /home/fleet/state/job.status -> job.status: working: building\n'
-    printf '[2024-02-29T19:00:00-0500] wake force-self (FM_INJECT_SKIP): heartbeat\n'
-    for ((i=0;i<1997;i++)); do
+    printf '[2024-02-29T23:59:59+0000] wake: heartbeat\n'
+    printf '[2024-03-01T01:00:00+0100] wake: heartbeat: scan\n'
+    printf '[2024-02-29T19:00:00-0500] wake: heartbeat\n'
+    printf '[2024-03-01T00:00:00+0000] wake force-self (FM_INJECT_SKIP): heartbeat\n'
+    for ((i=0;i<1996;i++)); do
       printf '[2024-03-01T00:00:01+0000] inject failed: job\n'
     done
   } > "$dir/state/.supervise-daemon.log"

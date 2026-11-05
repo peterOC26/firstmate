@@ -5,7 +5,7 @@
 #   fm-afk-liveness.sh arm       Record the expected actor and register the check.
 #   fm-afk-liveness.sh check     Print a line only when the window shows no away
 #                                session. The line wakes once per window.
-#   fm-afk-liveness.sh disarm    Unregister the check. The actor record stays.
+#   fm-afk-liveness.sh disarm    Remove the check and fired ledger; keep the actor.
 #   fm-afk-liveness.sh health    Print the return brief's away-session lines.
 #   fm-afk-liveness.sh --help
 #
@@ -17,8 +17,8 @@
 #
 # Actor is host when this home runs the supervision host, branch on Pi, and
 # daemon otherwise. A host turn is a state/.supervision-host.log row at or
-# after entry marked handled with posture=away. A daemon turn is a completed
-# self-handling, escalation, or forced heartbeat row after entry. Branch outcomes
+# after entry marked handled with posture=away. A daemon turn is a logged
+# heartbeat wake at or after entry. Branch outcomes
 # do not establish actor identity and are not counted. Nothing reads a transcript.
 #
 # The check stays silent until the window has elapsed (default 15 minutes,
@@ -104,7 +104,7 @@ load_log_evidence() {
     }
     /^\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9][+-][0-9][0-9][0-9][0-9]\] / {
       message=substr($0,28)
-      if (message ~ /^escalate: / || message ~ /^self-handle( \(paused\))?: / || message ~ /^wake force-self \(FM_INJECT_SKIP\): heartbeat($|:)/)
+      if (message ~ /^wake: heartbeat($|:)/)
         printf "%.0f\tdaemon\n", epoch(substr($0,2,24))
     }
   ' "$host" "$daemon")
@@ -191,6 +191,9 @@ cmd_arm() {
   case "$entry" in ''|*[!0-9]*) entry=$(now_epoch) ;; esac
   actor=$(choose_actor)
   mkdir -p "$STATE" || return 1
+  if ! read_actor || [ "$ENTRY" != "$entry" ]; then
+    rm -f -- "$FIRED_FILE" || return 1
+  fi
   tmp=$(mktemp "$STATE/.afk-away-actor.XXXXXX" 2>/dev/null) || return 1
   printf 'actor: %s\nentry_epoch: %s\nwindow: %s\n' "$actor" "$entry" "$(window_seconds)" > "$tmp" \
     || { rm -f "$tmp"; return 1; }
@@ -202,6 +205,7 @@ cmd_disarm() {
   if [ -e "$CHECK_SHIM" ] || [ -e "$CHECK_TRUST" ] || [ -L "$CHECK_SHIM" ] || [ -L "$CHECK_TRUST" ]; then
     "$SCRIPT_DIR/fm-check-unregister.sh" "$CHECK_ID" >/dev/null 2>&1 || rm -f -- "$CHECK_SHIM" "$CHECK_TRUST"
   fi
+  rm -f -- "$FIRED_FILE" || return 1
   printf 'disarmed: state/%s.check.sh\n' "$CHECK_ID"
 }
 
