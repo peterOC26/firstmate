@@ -31,7 +31,7 @@
 # capped to the subsection), then cost. The health snapshot is taken BEFORE the
 # daemon shutdown so the shutdown itself cannot read as a gap.
 # The not-started subsection uses FM_AFK_NOT_STARTED_BUDGET (default 4096)
-# characters for complete command lines including their newlines; its heading
+# bytes for complete command lines including their newlines; its heading
 # and omission-count notice are outside that budget.
 #
 # THE GATE. `blocked:` is the crewmate protocol's firstmate-actionable verb. A
@@ -716,7 +716,7 @@ EOF
     omitted=0
     while IFS= read -r extra_line; do
       [ -n "$extra_line" ] || continue
-      size=${#extra_line}
+      size=$(LC_ALL=C; printf '%s' "${#extra_line}")
       if [ $((used + size + 1)) -gt "$budget" ]; then
         omitted=$((omitted + 1))
         continue

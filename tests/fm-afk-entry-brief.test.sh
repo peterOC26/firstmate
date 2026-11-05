@@ -268,6 +268,38 @@ EOF
   pass "entry inventory and not-started each read the backlog once"
 }
 
+test_not_started_omits_truncated_commands() {
+  local dir out padding id mode listing
+  dir="$TMP_ROOT/truncated-next"
+  seed_home "$dir"
+  padding=$(printf '%0480d' 0)
+  for id in cut-job complete-job short-job status-job; do
+    axi "$dir" add "$id" 'next command coverage' >/dev/null
+    meta "$dir" "$id" 'working: building'
+  done
+  axi "$dir" update cut-job --body "$padding
+Next: bin/fm-send.sh cut-job please continue the work" >/dev/null
+  axi "$dir" update complete-job --body "Next: bin/fm-send.sh complete-job continue
+$padding extra trailing text" >/dev/null
+  axi "$dir" update short-job --body 'Next: bin/fm-send.sh short-job continue' >/dev/null
+  axi "$dir" update status-job --body "$padding
+Next: bin/fm-send.sh status-job partial body command" >/dev/null
+  meta "$dir" status-job 'working: Next: bin/fm-send.sh status-job use status instead'
+  listing=$(axi "$dir" list --fields body)
+  assert_contains "$listing" '... (truncated,' "fixture did not exercise real backlog truncation"
+  for mode in inventory not-started; do
+    out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+      "$BRIEF" "$mode") || fail "$mode failed: $out"
+    assert_not_contains "$out" 'bin/fm-send.sh cut-job' "$mode printed a cut command"
+    assert_not_contains "$out" 'cut-job: working; next:' "inventory printed a cut command prefix"
+    assert_not_contains "$out" '  - cut-job:' "not-started printed a cut command prefix"
+    assert_contains "$out" 'bin/fm-send.sh complete-job continue' "$mode lost a complete line before truncation"
+    assert_contains "$out" 'bin/fm-send.sh short-job continue' "$mode lost a short complete command"
+    assert_contains "$out" 'bin/fm-send.sh status-job use status instead' "$mode lost status precedence"
+  done
+  pass "entry and not-started omit cut commands and retain complete commands"
+}
+
 test_enter_prints_live_ids_and_quiet_omits_inventory() {
   local dir out off
   dir="$TMP_ROOT/enter"
@@ -296,6 +328,7 @@ test_enter_prints_live_ids_and_quiet_omits_inventory() {
 test_not_started_reports_an_unreadable_backlog_on_stdout
 test_redeferred_future_date_fires_when_it_comes_due
 test_inventory_reads_the_backlog_once
+test_not_started_omits_truncated_commands
 test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point
 test_unreadable_backlog_exits_zero_without_creating_one
 test_future_date_registers_once_and_a_passed_date_does_not

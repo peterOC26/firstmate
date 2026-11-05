@@ -1352,6 +1352,40 @@ test_return_brief_keeps_next_steps_ahead_of_held_rows() {
   pass "next commands appear once and held rows stay in Waiting on you"
 }
 
+test_not_started_budget_counts_bytes() {
+  local dir out section line bytes budget utf8_locale
+  utf8_locale=$(locale -a | awk 'tolower($0) ~ /utf-?8/ { print; exit }')
+  [ -n "$utf8_locale" ] || fail "a UTF-8 locale is required for byte-budget coverage"
+  dir="$TMP_ROOT/unstarted-byte-cap"
+  install_runner "$dir"
+  (cd "$dir/home" \
+    && tasks-axi add a-job 'multibyte next step' --file data/backlog.md >/dev/null \
+    && tasks-axi add z-job 'short next step' --file data/backlog.md >/dev/null) \
+    || fail "could not seed the byte-budget backlog"
+  printf 'window=synthetic:a-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/a-job.meta"
+  printf 'working: building\nNext: bin/fm-send.sh a-job café\n' > "$dir/home/state/a-job.status"
+  printf 'window=synthetic:z-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/z-job.meta"
+  printf 'working: building\nNext: bin/go\n' > "$dir/home/state/z-job.status"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  line='  - a-job: bin/fm-send.sh a-job café'
+  bytes=$(printf '%s\n' "$line" | wc -c)
+  for budget in "$((bytes - 1))" "$bytes"; do
+    contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
+    out=$(LC_ALL="$utf8_locale" FM_AFK_NOT_STARTED_BUDGET="$budget" run_return "$dir" begin) || fail "return failed: $out"
+    section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+    if [ "$budget" -lt "$bytes" ]; then
+      assert_not_contains "$section" "$line" "a multibyte line exceeded its byte budget"
+      assert_contains "$section" '  - z-job: bin/go' "a skipped oversized line prevented a later short line fitting"
+    else
+      assert_contains "$section" "$line" "a complete multibyte line did not fit its exact byte budget"
+      assert_not_contains "$section" '  - z-job: bin/go' "the subsection exceeded its cumulative byte budget"
+    fi
+    assert_contains "$section" '(1 more not shown)' "the omission notice was lost"
+  done
+  pass "not-started charges bytes including newlines under a UTF-8 locale"
+}
+
 test_return_brief_names_unstarted_work() {
   local dir out rc section waiting
   dir="$TMP_ROOT/unstarted"
@@ -1502,3 +1536,5 @@ test_return_brief_without_a_record_reports_the_legacy_flag
 test_return_brief_reports_an_unreadable_not_started_list
 test_return_brief_keeps_next_steps_ahead_of_held_rows
 test_return_brief_names_unstarted_work
+
+test_not_started_budget_counts_bytes

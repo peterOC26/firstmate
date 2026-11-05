@@ -350,12 +350,18 @@ next_in_text() {  # <text>
 }
 
 explicit_next() {  # <id>
-  local status=$STATE/$1.status found=''
+  local status=$STATE/$1.status found='' body
   if [ -f "$status" ] && [ ! -L "$status" ]; then
     found=$(next_in_text "$(cat "$status" 2>/dev/null || true)")
   fi
   if [ -z "$found" ]; then
-    found=$(next_in_text "${TASK_BODY[$1]:-}")
+    body=$(printf '%s\n' "${TASK_BODY[$1]:-}" | awk '
+      index($0, "... (truncated,") { truncated = 1; exit }
+      NR > 1 { print previous }
+      { previous = $0 }
+      END { if (!truncated) print previous }
+    ')
+    found=$(next_in_text "$body")
   fi
   printf '%s\n' "$found"
 }
