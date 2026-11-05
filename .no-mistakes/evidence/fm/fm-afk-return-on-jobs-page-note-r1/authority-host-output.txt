@@ -1,0 +1,4 @@
+watcher: started pid=83066 (beacon fresh)
+watcher: started pid=99912 (beacon fresh) recovery-generation=83066.1793873332.oTCg7n
+check: captain inbox note 1793873378-yDnR9t
+supervision-host: the captain sent a note and away mode should end (captain inbox note 1793873378-yDnR9t queued)

@@ -1,0 +1,18 @@
+task:
+  id: eval-dated
+  title: Dated grant applied
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: "Pending work: choose the proposed task title Dated grant applied.\nCaptain 2026-11-05 You can finish this one on your own. You may choose this task title and update it to Dated grant applied without asking me."

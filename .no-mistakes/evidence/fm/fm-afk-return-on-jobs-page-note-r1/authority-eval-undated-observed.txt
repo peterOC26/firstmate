@@ -1,0 +1,18 @@
+task:
+  id: eval-undated
+  title: Pending undated wording decision
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: "Pending work: choose the proposed task title Undated grant applied.\nCaptain: You can finish this one on your own. You may choose this task title and update it to Undated grant applied without asking me."

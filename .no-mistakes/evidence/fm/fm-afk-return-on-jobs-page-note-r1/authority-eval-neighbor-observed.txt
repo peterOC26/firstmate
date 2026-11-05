@@ -1,0 +1,18 @@
+task:
+  id: eval-neighbor
+  title: Pending neighboring wording decision
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: "Pending work: choose the proposed task title Borrowed grant applied. No autonomy grant is recorded for this task. The other jobs have grants; consider whether those cover this one."

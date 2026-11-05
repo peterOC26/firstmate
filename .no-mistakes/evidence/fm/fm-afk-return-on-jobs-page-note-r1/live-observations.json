@@ -1,0 +1,9 @@
+{
+  "jobs_reply_and_away_archive": true,
+  "unsurfaced_note_at_boundary": true,
+  "quiet_preserved": true,
+  "dated_and_qid_grants_applied": true,
+  "undated_and_neighbor_grants_not_applied": true,
+  "security_sensitive_deletion_refused": true,
+  "automatic_event_keeps_main_parked_and_away": true
+}

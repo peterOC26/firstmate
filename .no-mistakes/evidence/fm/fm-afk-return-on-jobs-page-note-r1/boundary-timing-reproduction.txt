@@ -1,0 +1,5 @@
+not ok - park bound: return line missing: watcher: started pid=539734 (beacon fresh)
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+1793873585	start	gen=host-539099-1793873584	primary=claude
+1793873587	boundary	after 3s
+1793873588	1	check	inbox:1793873588-l4RohH	check: captain inbox note 1793873588-l4RohH - Jobs answer fixture

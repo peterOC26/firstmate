@@ -1,0 +1,3 @@
+watcher: started pid=3868348 (beacon fresh)
+check: captain inbox note 1793873121-7hs2JI
+supervision-host: the captain sent a note and away mode should end (captain inbox note 1793873121-7hs2JI queued)

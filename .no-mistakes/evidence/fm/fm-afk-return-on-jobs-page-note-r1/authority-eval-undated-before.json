@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "action": "add",
+  "task": {
+    "id": "eval-undated",
+    "title": "Pending undated wording decision",
+    "state": "queued",
+    "kind": null,
+    "repo": null,
+    "priority": null,
+    "created": "2026-11-05",
+    "closed": null,
+    "deps": [],
+    "hold": null,
+    "links": [],
+    "body": "Pending work: choose the proposed task title Undated grant applied.\nCaptain: You can finish this one on your own. You may choose this task title and update it to Undated grant applied without asking me.",
+    "blocked": false,
+    "blocked_by": [],
+    "held": false
+  }
+}
