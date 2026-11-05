@@ -134,11 +134,8 @@ The engine turn runs beside a captain who is present, so its guarded actions tak
 ### Away
 
 Every close goes to the engine, except a close that carries a captain inbox note or coincides with a queued unsurfaced one.
-That close is handed back at once, the successor watcher left running, with one `supervision-host:` line that says the captain sent a note and away mode should end.
-That wake is the captain's return: main runs `bin/fm-afk-return.sh`, then answers the note.
-While an away record exists, a captain inbox note row in main's own drain is also that return; the emitted protocol states it.
-Every other handed-back away wake stays automatic supervision.
-The [host header](../bin/fm-supervision-host.sh) owns the hand-back.
+The [host header](../bin/fm-supervision-host.sh) owns the hand-back, successor continuity, and the check for unsurfaced notes at park-boundary and other exits.
+Main follows the [`/afk` return contract](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) for host signals and notes presented by its own drain.
 An explicit captain autonomy grant in the current task's own note is standing authority for that job only; `bin/fm-branch-prompt.sh` "Postures" owns how the away session reads and judges it.
 Captain outcomes of a close the engine takes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
 Every turn that starts attended meets the attended rule again at its start, and the offer's scan is the scope the turn claims: a close accepted away whose turn starts attended, because the captain returned in between, or an attended close whose task turned main-only (a decision appeared) while the successor started, reaches main unchanged and leaves that successor cycle running, with the handoff that turn had confirmed handed back to downtime.
@@ -237,7 +234,7 @@ The captain row is still durable, and the next drain presents it until it is ack
 
 ## Failure direction
 
-Every path that cannot finish a wake the engine took hands that wake to main, with one `supervision-host: <why>` line after the close.
+Every path that cannot finish a wake the engine took hands that wake to main, with a `supervision-host: <why>` line after the close; an away hand-back may also carry the [inbox-note return signal](#away).
 Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
@@ -303,7 +300,7 @@ The OpenCode, omp, and Grok owners have no hook timeout and keep the same defaul
 
 ### At the boundary
 
-At the boundary the host stops the home's watcher and exits with one `supervision-host: cycle boundary` line.
+At the boundary the host stops the home's watcher and exits with a `supervision-host: cycle boundary` line; an away exit may also carry the [inbox-note return signal](#away).
 Main drains and acknowledges, and the owner starts the next park:
 
 | Primary | When the next park starts |

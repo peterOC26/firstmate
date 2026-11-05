@@ -1471,13 +1471,15 @@ test_away_inbox_note_beside_a_closed_successor_reaches_main() {
 }
 
 # The report's case: the watcher's first poll has finished, a note is queued
-# one second later, and the park bound (3s) arrives before the next poll.
+# one second later, and the test clock reaches the park bound before the next poll.
 # The bound must name the note as the return. The record stays until main
 # runs the return, and the note stays queued for that drain.
 test_away_inbox_note_at_the_park_bound_is_the_return() {
   local home id
   home=$(make_home away-park-bound away)
-  FM_POLL=15 FM_SUPERVISION_HOST_PARK_SECONDS=3 start_host "$home"
+  # Advance only after the note is saved, so scheduling cannot end the park
+  # between the pre-queue exit check and the inbox producer's append.
+  FM_POLL=15 FM_SUPERVISION_HOST_PARK_SECONDS=60 FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
   wait_until 150 watcher_live "$home" || fail "park bound: no initial watcher"
   wait_until 150 test -e "$home/state/.last-watcher-beat" \
     || fail "park bound: the first poll did not complete: $(cat "$home/host.out" 2>/dev/null)"
@@ -1486,6 +1488,7 @@ test_away_inbox_note_at_the_park_bound_is_the_return() {
     fail "park bound: the host exited before the note was queued: $(cat "$home/host.out" 2>/dev/null)"
   fi
   id=$(queue_host_inbox_note "$home")
+  printf '60\n' > "$home/park-clock"
   wait_until 250 host_exited "$home" \
     || fail "park bound: the host did not return: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
   expect_code 0 "$(cat "$home/host.rc")" "park bound: host failed"
