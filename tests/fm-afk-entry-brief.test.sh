@@ -93,11 +93,17 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
     *) fail "sections were not in inventory order: $ids" ;;
   esac
 
+  meta "$dir" green-done 'done: https://github.com/example/repo/pull/10 checks green'
+  meta "$dir" landed-done 'done: landed, awaiting cleanup'
+  meta "$dir" explicit-done $'done: finished\nNext: bin/fm-teardown.sh explicit-done'
   out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
     FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF" not-started) || fail "not-started exited nonzero: $out"
   assert_contains "$out" '  - hold-a: bin/fm-tasks-axi.sh show hold-a' "a held task lost its show command"
   assert_contains "$out" '  - hold-b: bin/fm-tasks-axi.sh show hold-b' "the second hold lost its show command"
   assert_contains "$out" '  - done-job: bin/fm-send.sh done-job the follow-up' "a done task lost the recorded next command"
+  assert_not_contains "$out" 'green-done' "green finished work acquired an invented next command"
+  assert_not_contains "$out" 'landed-done' "landed work acquired an invented next command"
+  assert_contains "$out" '  - explicit-done: bin/fm-teardown.sh explicit-done' "finished work lost its explicit status next command"
   assert_not_contains "$out" 'retired-job' "completed backlog item appeared as not started"
   assert_not_contains "$out" 'blocked-job'  "an open blocked task was listed as not started"
   assert_not_contains "$out" 'paused-job' "a paused task with no next step was listed as not started"

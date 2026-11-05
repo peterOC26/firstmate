@@ -18,10 +18,9 @@
 # An unreadable backlog is reported and the command still exits 0.
 # FM_AFK_ENTRY_TODAY (YYYY-MM-DD) pins "today" for tests.
 # The next command is an explicit "Next: bin/..." line in the status file or
-# the backlog body when one exists; otherwise a live task whose newest status
-# is done uses bin/fm-control.sh <id> relaunch, and a held task uses
-# bin/fm-tasks-axi.sh show <id>. An open blocked event stays out of the
-# not-started list.
+# the backlog body when one exists; otherwise a held task uses
+# bin/fm-tasks-axi.sh show <id>. Finished work has no inferred next command.
+# An open blocked event stays out of the not-started list.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -389,16 +388,13 @@ EOF
 }
 
 not_started_lines() {
-  local id explicit verb cmd
+  local id explicit cmd
   while IFS= read -r id; do
     [ -n "$id" ] || continue
     task_open_blocked "$id" && continue
     explicit=$(explicit_next "$id")
-    verb=$(task_verb "$id")
     if [ -n "$explicit" ]; then
       cmd=$explicit
-    elif [ -f "$STATE/$id.meta" ] && [ "$verb" = "done" ]; then
-      cmd="bin/fm-control.sh ${id} relaunch"
     elif [ "${TASK_HELD[$id]:-}" = yes ]; then
       cmd="bin/fm-tasks-axi.sh show ${id}"
     else

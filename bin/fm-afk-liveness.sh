@@ -21,7 +21,7 @@
 # Actor is host when this home runs the supervision host, branch on Pi, and
 # daemon otherwise. A host turn is a state/.supervision-host.log row at or
 # after entry marked handled with posture=away. A daemon turn is a completed
-# self-handling or forced heartbeat row at or after entry. Branch outcomes
+# self-handling, escalation, or forced heartbeat row after entry. Branch outcomes
 # do not establish actor identity and are not counted. Nothing reads a transcript.
 #
 # The check stays silent until the window has elapsed (default 15 minutes,
@@ -112,7 +112,7 @@ load_log_evidence() {
     }
     /^\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9][+-][0-9][0-9][0-9][0-9]\] / {
       message=substr($0,28)
-      if (message ~ /^self-handle( \(paused\))?: / || message ~ /^wake force-self \(FM_INJECT_SKIP\): heartbeat($|:)/)
+      if (message ~ /^escalate: / || message ~ /^self-handle( \(paused\))?: / || message ~ /^wake force-self \(FM_INJECT_SKIP\): heartbeat($|:)/)
         printf "%.0f\tdaemon\t%s\n", epoch(substr($0,2,24)), message
     }
   ' "$host" "$daemon")
@@ -128,15 +128,11 @@ count_turns() {
 log_names_task_since() {
   printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v since="$1" -v id="$2" '
     $1 + 0 >= since {
-      value=$0
-      n=length(id)
-      while ((pos=index(value,id)) > 0) {
-        before=(pos==1) ? "" : substr(value,pos-1,1)
-        after=substr(value,pos+n,1)
-        if ((before=="" || before !~ /[A-Za-z0-9._-]/) && (after=="" || after !~ /[A-Za-z0-9._-]/)) {
+      n=split($0, tokens, /[^A-Za-z0-9._-]+/)
+      for (i=1; i<=n; i++) {
+        if (tokens[i] == id || tokens[i] == id ".status") {
           found=1; exit
         }
-        value=substr(value,pos+n)
       }
     }
     END { exit found ? 0 : 1 }
@@ -188,11 +184,12 @@ block_epoch_of() {  # <status-file> <key>
   esac
 }
 
-# Print task<TAB>key<TAB>block-epoch for each open unhandled blocked event.
+# Print task<TAB>key for each due open unhandled blocked event.
 each_unhandled_block() {
-  local meta id status key verb _summary opened since
+  local meta id status key verb _summary opened since now
   [ -d "$STATE" ] || return 0
   read_actor || return 0
+  now=$(now_epoch)
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] && [ ! -L "$meta" ] || continue
     id=$(basename "$meta")
@@ -204,10 +201,11 @@ each_unhandled_block() {
       [ -n "$key" ] || continue
       opened=$(block_epoch_of "$status" "$key")
       case "$opened" in ''|*[!0-9]*) opened=$ENTRY ;; esac
+      [ "$now" -ge "$((opened + WINDOW))" ] || continue
       since=$opened
       [ "$since" -lt "$ENTRY" ] && since=$ENTRY
       block_handled "$id" "$since" && continue
-      printf '%s\t%s\t%s\n' "$id" "$key" "$opened"
+      printf '%s\t%s\n' "$id" "$key"
     done <<EOF
 $(status_open_decisions "$status")
 EOF
@@ -312,18 +310,12 @@ cmd_health() {
 }
 
 cmd_unhandled() {
-  local id key opened
   load_log_evidence
-  while IFS="$(printf '\t')" read -r id key opened; do
-    [ -n "$id" ] || continue
-    printf '%s\t%s\n' "$id" "$key"
-  done <<EOF
-$(each_unhandled_block)
-EOF
+  each_unhandled_block
 }
 
 cmd_check() {
-  local now due turns id key opened block_due
+  local now due turns id key
   read_actor || return 0
   now=$(now_epoch)
   due=$((ENTRY + WINDOW))
@@ -335,11 +327,8 @@ cmd_check() {
       fired_add no-session
     fi
   fi
-  while IFS="$(printf '\t')" read -r id key opened; do
+  while IFS="$(printf '\t')" read -r id key; do
     [ -n "$id" ] || continue
-    case "$opened" in ''|*[!0-9]*) continue ;; esac
-    block_due=$((opened + WINDOW))
-    [ "$now" -ge "$block_due" ] || continue
     fired_has "blocked:$id:$key" && continue
     printf '%s [key=%s] has had no away handling and no hand-back\n' "$id" "$key"
     fired_add "blocked:$id:$key"
