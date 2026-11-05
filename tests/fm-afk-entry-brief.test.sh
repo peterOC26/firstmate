@@ -47,7 +47,7 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   axi "$dir" block retired-job --by done-job >/dev/null
   axi "$dir" block queued-job --by done-job >/dev/null
   axi "$dir" "done" done-job --note 'landed' >/dev/null
-  axi "$dir" done retired-job --note 'landed' >/dev/null
+  axi "$dir" "done" retired-job --note 'landed' >/dev/null
   axi "$dir" update retired-job --body 'Next: bin/fm-send.sh retired-job obsolete' >/dev/null
   axi "$dir" update done-job --body 'Next: bin/fm-send.sh done-job the follow-up' >/dev/null
   axi "$dir" hold hold-a --reason 'wait for captain' --kind captain >/dev/null
