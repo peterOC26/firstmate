@@ -43,8 +43,12 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   axi "$dir" add hold-b 'second hold' >/dev/null
   axi "$dir" add dated-job 'a passed date' >/dev/null
   axi "$dir" add future-job 'a future date' >/dev/null
+  axi "$dir" add retired-job 'completed dependency follower' >/dev/null
+  axi "$dir" block retired-job --by done-job >/dev/null
   axi "$dir" block queued-job --by done-job >/dev/null
   axi "$dir" "done" done-job --note 'landed' >/dev/null
+  axi "$dir" done retired-job --note 'landed' >/dev/null
+  axi "$dir" update retired-job --body 'Next: bin/fm-send.sh retired-job obsolete' >/dev/null
   axi "$dir" update done-job --body 'Next: bin/fm-send.sh done-job the follow-up' >/dev/null
   axi "$dir" hold hold-a --reason 'wait for captain' --kind captain >/dev/null
   axi "$dir" hold hold-b --reason 'pick a name' --kind captain >/dev/null
@@ -79,7 +83,8 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   assert_contains "$out" 'A named merge still waits while a slower advisory suite has not reported.' "the slower-suite sentence was missing"
   assert_contains "$out" 'Name any sentence dropped when /afk is sent again with only a stop clause.' "the dropped-sentence line was missing"
   assert_contains "$out" 'Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.' "the stop-point sentence was missing"
-  assert_not_contains "$out" 'mate:' "a secondmate was listed as live work"
+  assert_not_contains "$out" 'retired-job:' "completed backlog item appeared as pending"
+  assert_not_contains "$out" 'mate:'  "a secondmate was listed as live work"
   [ ! -e "$dir/state/fm-afk-future-future-job.check.sh" ] || fail "inventory registered a future check"
 
   ids=$(printf '%s\n' "$out" | sed -n 's/^  \([a-z0-9-]*\):.*/\1/p' | tr '\n' ' ')
@@ -93,7 +98,8 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   assert_contains "$out" '  - hold-a: bin/fm-tasks-axi.sh show hold-a' "a held task lost its show command"
   assert_contains "$out" '  - hold-b: bin/fm-tasks-axi.sh show hold-b' "the second hold lost its show command"
   assert_contains "$out" '  - done-job: bin/fm-send.sh done-job the follow-up' "a done task lost the recorded next command"
-  assert_not_contains "$out" 'blocked-job' "an open blocked task was listed as not started"
+  assert_not_contains "$out" 'retired-job' "completed backlog item appeared as not started"
+  assert_not_contains "$out" 'blocked-job'  "an open blocked task was listed as not started"
   assert_not_contains "$out" 'paused-job' "a paused task with no next step was listed as not started"
   assert_not_contains "$out" 'running-job' "a working task with no next step was listed as not started"
   pass "entry inventory lists every gate and leaves the home unchanged"

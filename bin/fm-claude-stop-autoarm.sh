@@ -448,11 +448,6 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   fi
   attempt=$((attempt + 1))
   OUT=$(mktemp "$STATE/.claude-autoarm-output.XXXXXX") || OUT=
-  if [ "$HOST_MODE" -eq 1 ] && [ ! -x "$SCRIPT_DIR/fm-supervision-host.sh" ] && away_host_is_actor; then
-    printf 'away session did not start\n' > "$STATE/.afk-away-session-alarm" 2>/dev/null || true
-    [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
-    exit 0
-  fi
   if [ "$HOST_MODE" -eq 1 ]; then
     HOST_RC=0
     FM_SUPERVISION_HOST_AUTOARM_GEN=$MY_GEN FM_SUPERVISION_HOST_OWNER_PID=$$ \

@@ -2013,8 +2013,8 @@ test_clear_rekey_stale_sidecar_starts_the_away_host() {
   write_host_fixture "$dir" boundary
   export CLAUDE_CODE_SESSION_ID=new-session
   out=$(run_rekey "$dir"); status=$?
-  if [ ! -e "$dir/state/host-ran" ] && [ ! -s "$dir/state/.afk-away-session-alarm" ]; then
-    fail "a live lock under a new session id with a stale sidecar and an away record did not start the host or record an alarm: $out"
+  if [ ! -e "$dir/state/host-ran" ]; then
+    fail "a live lock under a new session id with a stale sidecar and an away record did not start the host: $out"
   fi
   [ "$(cat "$dir/state/.lock-session" 2>/dev/null)" = new-session ] \
     || fail "the stale sidecar was not re-anchored to the new session: $(cat "$dir/state/.lock-session" 2>/dev/null || true)"

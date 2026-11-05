@@ -60,9 +60,9 @@ test_one_away_turn_keeps_the_check_silent() {
 
   dir="$TMP_ROOT/daemon-turn"
   seed "$dir" daemon
-  epoch=$(date -u -d '2026-11-05T00:00:00+0000' +%s)
+  epoch=1793836800
   printf 'actor: daemon\nentry_epoch: %s\nwindow: %s\n' "$epoch" "$WINDOW" > "$dir/state/.afk-away-actor"
-  printf '[2026-11-05T00:00:01+0000] heartbeat\n' > "$dir/state/.supervise-daemon.log"
+  printf '[2026-11-05T00:00:01+0000] wake force-self (FM_INJECT_SKIP): heartbeat\n' > "$dir/state/.supervise-daemon.log"
   out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_AFK_LIVENESS_WINDOW=$WINDOW \
     FM_AFK_LIVENESS_NOW=$((epoch + WINDOW)) "$LIVE" check)
   [ -z "$out" ] || fail "a daemon heartbeat still fired the no-session line: $out"
@@ -81,7 +81,7 @@ test_old_unhandled_blocker_wakes_once_and_a_fresh_one_waits() {
   printf 'blocked [at=%s] [key=fresh]: just opened\n' "$((ENTRY + WINDOW))" > "$dir/state/new-job.status"
   printf 'window=synthetic:job-extra\nbackend=tmux\nkind=ship\n' > "$dir/state/job-extra.meta"
   printf 'blocked [at=%s] [key=other]: named only as a longer id\n' "$ENTRY" > "$dir/state/job-extra.status"
-  printf '%s\thandled job-extra-more\tposture=away\n' "$((ENTRY + 1))" > "$dir/state/.supervision-host.log"
+  printf '%s\thandled\tjob-extra-more\tposture=away\n' "$((ENTRY + 1))" > "$dir/state/.supervision-host.log"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW)) "$LIVE" check) \
     || fail "the blocker check failed: $out"
   assert_contains "$out" 'old-job [key=dep] has had no away handling and no hand-back' "the old blocker was not named"
@@ -89,7 +89,7 @@ test_old_unhandled_blocker_wakes_once_and_a_fresh_one_waits() {
   assert_contains "$out" 'job-extra [key=other] has had no away handling and no hand-back' "a longer id was treated as handled"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW + 5)) "$LIVE" check)
   assert_not_contains "$out" 'old-job' "the old blocker woke twice: $out"
-  printf '%s\thandled old-job\tposture=away\n' "$((ENTRY + 2))" >> "$dir/state/.supervision-host.log"
+  printf '%s\thandled\told-job\tposture=away\n' "$((ENTRY + 2))" >> "$dir/state/.supervision-host.log"
   rm -f "$dir/state/.afk-liveness-fired"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW + 5)) "$LIVE" unhandled)
   assert_not_contains "$out" 'old-job' "a later host line that names the task did not count as handling: $out"
@@ -115,6 +115,74 @@ test_arm_records_the_actor_and_disarm_drops_only_the_check() {
   [ -f "$dir/state/.afk-away-actor" ] || fail "disarm removed the actor record"
   pass "arm records the actor and disarm removes only the check"
 }
+
+test_new_window_gets_new_wakes() {
+  local dir out
+  dir="$TMP_ROOT/windows"
+  seed "$dir" host
+  printf 'kind=ship\n' > "$dir/state/job.meta"
+  printf 'blocked [at=1000] [key=dep]: waiting\n' > "$dir/state/job.status"
+  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
+  assert_contains "$out" 'no away session ran' "first window did not wake"
+  assert_contains "$out" 'job [key=dep]' "first blocker did not wake"
+  printf 'actor: host\nentry_epoch: 2000\nwindow: 900\n' > "$dir/state/.afk-away-actor"
+  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2900 "$LIVE" check)
+  assert_contains "$out" 'no away session ran' "second window inherited no-session suppression"
+  assert_contains "$out" 'job [key=dep]' "second window inherited blocker suppression"
+  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2901 "$LIVE" check)
+  [ -z "$out" ] || fail "second window fired twice: $out"
+  pass "each window gets its own no-session and blocker wakes"
+}
+
+test_failed_receipts_are_not_handling() {
+  local dir out actor
+  for actor in host daemon branch; do
+    dir="$TMP_ROOT/failed-$actor"
+    seed "$dir" "$actor"
+    printf 'kind=ship\n' > "$dir/state/job.meta"
+    printf 'blocked [at=1000] [key=dep]: waiting\n' > "$dir/state/job.status"
+    printf '1001\tfailed\tposture=away\tjob\n' > "$dir/state/.supervision-host.log"
+    printf '[1970-01-01T00:16:41+0000] %s\n' 'daemon starting' 'startup failed: job not found' 'wake: signal: job.status' 'inject failed: job' > "$dir/state/.supervise-daemon.log"
+    out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
+    assert_contains "$out" 'no away session ran' "$actor counted a failure as a turn"
+    assert_contains "$out" 'job [key=dep]' "$actor counted a receipt as handling"
+  done
+  run_live "$dir" "$ROOT/bin/fm-afk-main-outcome.sh" --task job --summary handled >/dev/null || fail "main outcome failed"
+  out=$(run_live "$dir" "$LIVE" health)
+  assert_contains "$out" 'away-session turns: 0' "main outcome counted as branch turn"
+  out=$(run_live "$dir" "$LIVE" unhandled)
+  [ -z "$out" ] || fail "main handling failed to clear the blocker evidence"
+  pass "failed receipts do not establish handling and main does not count as branch"
+}
+
+test_daemon_offsets_and_full_log() {
+  local dir out i
+  dir="$TMP_ROOT/offsets"
+  seed "$dir" daemon
+  printf 'actor: daemon\nentry_epoch: 1709251200\nwindow: 900\n' > "$dir/state/.afk-away-actor"
+  printf 'kind=ship\n' > "$dir/state/job.meta"
+  printf 'blocked [at=1709251200] [key=dep]: waiting\n' > "$dir/state/job.status"
+  {
+    printf '[2024-02-29T23:59:59+0000] self-handle: job\n'
+    printf '[2024-03-01T01:00:00+0100] self-handle: signal: job.status -> job handled\n'
+    printf '[2024-02-29T19:00:00-0500] wake force-self (FM_INJECT_SKIP): heartbeat\n'
+    for ((i=0;i<1997;i++)); do
+      printf '[2024-03-01T00:00:01+0000] inject failed: job\n'
+    done
+  } > "$dir/state/.supervise-daemon.log"
+  mkdir -p "$dir/fakebin"
+  printf '#!/bin/sh\nexit 99\n' > "$dir/fakebin/date"
+  chmod +x "$dir/fakebin/date"
+  out=$(PATH="$dir/fakebin:$PATH" run_live "$dir" "$LIVE" health)
+  assert_contains "$out" 'away-session turns: 2' "offsets or leap day parsed incorrectly"
+  out=$(PATH="$dir/fakebin:$PATH" run_live "$dir" env FM_AFK_LIVENESS_NOW=1709252100 "$LIVE" check)
+  [ -z "$out" ] || fail "completed daemon handling was missed: $out"
+  pass "full daemon log handles offsets and leap day without date subprocesses"
+}
+
+test_new_window_gets_new_wakes
+test_failed_receipts_are_not_handling
+test_daemon_offsets_and_full_log
 
 test_check_stays_silent_until_the_window_and_fires_once
 test_one_away_turn_keeps_the_check_silent

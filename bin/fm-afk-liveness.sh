@@ -20,9 +20,9 @@
 #
 # Actor is host when this home runs the supervision host, branch on Pi, and
 # daemon otherwise. A host turn is a state/.supervision-host.log row at or
-# after entry whose text contains posture=away. A daemon turn is a
-# state/.supervise-daemon.log line at or after entry. A branch turn is an
-# outcome-store row at or after entry. Nothing here reads a transcript.
+# after entry marked handled with posture=away. A daemon turn is a completed
+# self-handling or forced heartbeat row at or after entry. Branch outcomes
+# do not establish actor identity and are not counted. Nothing reads a transcript.
 #
 # The check stays silent until the window has elapsed (default 15 minutes,
 # FM_AFK_LIVENESS_WINDOW). FM_AFK_LIVENESS_NOW pins the clock for tests.
@@ -89,98 +89,58 @@ read_actor() {
   return 0
 }
 
-# 0 when text names id as a whole task id, not as part of a longer id.
-text_names_id() {  # <text> <id>
-  awk -v text="$1" -v id="$2" '
-    function names(value, token,    n, from, pos, before, after) {
-      n = length(token)
-      if (n == 0) return 0
-      from = 1
-      while (from <= length(value)) {
-        pos = index(substr(value, from), token)
-        if (pos == 0) return 0
-        pos = from + pos - 1
-        before = (pos == 1) ? "" : substr(value, pos - 1, 1)
-        after = substr(value, pos + n, 1)
-        if ((before == "" || before !~ /[A-Za-z0-9._-]/) && (after == "" || after !~ /[A-Za-z0-9._-]/)) return 1
-        from = pos + 1
-      }
-      return 0
+load_log_evidence() {
+  local host=/dev/null daemon=/dev/null
+  [ ! -f "$STATE/.supervision-host.log" ] || host="$STATE/.supervision-host.log"
+  [ ! -f "$STATE/.supervise-daemon.log" ] || daemon="$STATE/.supervise-daemon.log"
+  LOG_EVIDENCE=$(awk -F '\t' -v host="$host" '
+    function leap(y) { return y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) }
+    function days(y) { y--; return 365*y + int(y/4) - int(y/100) + int(y/400) }
+    function epoch(t,    y,m,d,i,n,offset,month) {
+      y=substr(t,1,4)+0; m=substr(t,6,2)+0; d=substr(t,9,2)+0
+      split("31 28 31 30 31 30 31 31 30 31 30 31",month," ")
+      n=days(y)-days(1970)+d-1
+      for(i=1;i<m;i++) n+=month[i]+(i==2 && leap(y))
+      offset=(substr(t,21,2)*60+substr(t,23,2))*60
+      if(substr(t,20,1)=="-") offset=-offset
+      return n*86400+substr(t,12,2)*3600+substr(t,15,2)*60+substr(t,18,2)-offset
     }
-    BEGIN { exit names(text, id) ? 0 : 1 }
+    FILENAME == host {
+      if ($1 ~ /^[0-9]+$/ && $2 == "handled" && index($0,"posture=away"))
+        print $1 "\thost\t" $0
+      next
+    }
+    /^\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9][+-][0-9][0-9][0-9][0-9]\] / {
+      message=substr($0,28)
+      if (message ~ /^self-handle( \(paused\))?: / || message ~ /^wake force-self \(FM_INJECT_SKIP\): heartbeat($|:)/)
+        printf "%.0f\tdaemon\t%s\n", epoch(substr($0,2,24)), message
+    }
+  ' "$host" "$daemon")
+}
+
+count_turns() {
+  printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v actor="$1" -v since="$2" '
+    $1 + 0 >= since && $2 == actor { n++ }
+    END { print n + 0 }
   '
 }
 
-count_host_turns() {  # <since>
-  [ -f "$STATE/.supervision-host.log" ] || { printf '0\n'; return; }
-  awk -F '\t' -v since="$1" '$1 + 0 >= since && index($0, "posture=away") { n++ } END { print n + 0 }' \
-    "$STATE/.supervision-host.log"
-}
-
-count_daemon_turns() {  # <since>
-  local since=$1 n=0 line ts epoch
-  [ -f "$STATE/.supervise-daemon.log" ] || { printf '0\n'; return; }
-  while IFS= read -r line; do
-    case "$line" in
-      '['*) ;;
-      *) continue ;;
-    esac
-    ts=${line#\[}
-    ts=${ts%%]*}
-    epoch=$(date -u -d "$ts" +%s 2>/dev/null || true)
-    case "$epoch" in ''|*[!0-9]*) continue ;; esac
-    [ "$epoch" -ge "$since" ] && n=$((n + 1))
-  done < "$STATE/.supervise-daemon.log"
-  printf '%s\n' "$n"
-}
-
-count_branch_turns() {  # <since>
-  [ -f "$STATE/branch-outcomes.jsonl" ] || { printf '0\n'; return; }
-  awk -v since="$1" '
-    {
-      if (match($0, /"epoch":[0-9]+/)) {
-        e = substr($0, RSTART + 8, RLENGTH - 8)
-        if (e + 0 >= since) n++
+log_names_task_since() {
+  printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v since="$1" -v id="$2" '
+    $1 + 0 >= since {
+      value=$0
+      n=length(id)
+      while ((pos=index(value,id)) > 0) {
+        before=(pos==1) ? "" : substr(value,pos-1,1)
+        after=substr(value,pos+n,1)
+        if ((before=="" || before !~ /[A-Za-z0-9._-]/) && (after=="" || after !~ /[A-Za-z0-9._-]/)) {
+          found=1; exit
+        }
+        value=substr(value,pos+n)
       }
     }
-    END { print n + 0 }
-  ' "$STATE/branch-outcomes.jsonl"
-}
-
-count_turns() {  # <actor> <since>
-  case "$1" in
-    host) count_host_turns "$2" ;;
-    daemon) count_daemon_turns "$2" ;;
-    branch) count_branch_turns "$2" ;;
-    *) printf '0\n' ;;
-  esac
-}
-
-log_names_task_since() {  # <file> <since> <id> <kind:host|daemon>
-  local file=$1 since=$2 id=$3 kind=$4 line epoch ts
-  [ -f "$file" ] || return 1
-  if [ "$kind" = host ]; then
-    while IFS= read -r line; do
-      epoch=${line%%$'\t'*}
-      case "$epoch" in ''|*[!0-9]*) continue ;; esac
-      [ "$epoch" -ge "$since" ] || continue
-      text_names_id "$line" "$id" && return 0
-    done < "$file"
-    return 1
-  fi
-  while IFS= read -r line; do
-    case "$line" in
-      '['*) ;;
-      *) continue ;;
-    esac
-    ts=${line#\[}
-    ts=${ts%%]*}
-    epoch=$(date -u -d "$ts" +%s 2>/dev/null || true)
-    case "$epoch" in ''|*[!0-9]*) continue ;; esac
-    [ "$epoch" -ge "$since" ] || continue
-    text_names_id "$line" "$id" && return 0
-  done < "$file"
-  return 1
+    END { exit found ? 0 : 1 }
+  '
 }
 
 outcome_names_task_since() {  # <since> <id>
@@ -200,8 +160,7 @@ outcome_names_task_since() {  # <since> <id>
 }
 
 block_handled() {  # <id> <since>
-  log_names_task_since "$STATE/.supervision-host.log" "$2" "$1" host && return 0
-  log_names_task_since "$STATE/.supervise-daemon.log" "$2" "$1" daemon && return 0
+  log_names_task_since "$2" "$1" && return 0
   outcome_names_task_since "$2" "$1"
 }
 
@@ -256,11 +215,11 @@ EOF
 }
 
 fired_has() {  # <key>
-  [ -f "$FIRED_FILE" ] && grep -Fxq -- "$1" "$FIRED_FILE"
+  [ -f "$FIRED_FILE" ] && grep -Fxq -- "$ENTRY:$1" "$FIRED_FILE"
 }
 
 fired_add() {  # <key>
-  printf '%s\n' "$1" >> "$FIRED_FILE" 2>/dev/null || true
+  printf '%s:%s\n' "$ENTRY" "$1" >> "$FIRED_FILE" 2>/dev/null || true
 }
 
 choose_actor() {
@@ -346,6 +305,7 @@ cmd_disarm() {
 cmd_health() {
   local turns
   read_actor || return 0
+  load_log_evidence
   turns=$(count_turns "$ACTOR" "$ENTRY")
   printf 'away-session turns: %s\n' "$turns"
   [ "$turns" -eq 0 ] && printf 'no away session ran; main handled the window itself\n'
@@ -353,6 +313,7 @@ cmd_health() {
 
 cmd_unhandled() {
   local id key opened
+  load_log_evidence
   while IFS="$(printf '\t')" read -r id key opened; do
     [ -n "$id" ] || continue
     printf '%s\t%s\n' "$id" "$key"
@@ -366,9 +327,10 @@ cmd_check() {
   read_actor || return 0
   now=$(now_epoch)
   due=$((ENTRY + WINDOW))
-  if [ "$now" -ge "$due" ]; then
+  load_log_evidence
+  if [ "$now" -ge "$due" ] && ! fired_has no-session; then
     turns=$(count_turns "$ACTOR" "$ENTRY")
-    if [ "$turns" -eq 0 ] && ! fired_has no-session; then
+    if [ "$turns" -eq 0 ]; then
       printf 'no away session ran; main handled the window itself\n'
       fired_add no-session
     fi

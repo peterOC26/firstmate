@@ -935,7 +935,7 @@ EOF
     return 3
   fi
 
-  rm -f "$GATE"
+  rm -f "$GATE" "$STATE/.afk-away-actor"
   clear_delivery_artifacts
   rm -f "$evidence" "$blockers" "$drain_err"
   printf 'fm-afk-return: catch-up clear; ordinary captain work may proceed\n'

@@ -24,10 +24,10 @@ SILENT=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --task) TASK=${2:-}; shift 2 || usage ;;
-    --summary) SUMMARY=${2:-}; shift 2 || usage ;;
-    --wake) WAKE=${2:-}; shift 2 || usage ;;
-    --silent) SILENT=${2:-}; shift 2 || usage ;;
+    --task) TASK=${2:-}; shift 2 || { usage >&2; exit 2; } ;;
+    --summary) SUMMARY=${2:-}; shift 2 || { usage >&2; exit 2; } ;;
+    --wake) WAKE=${2:-}; shift 2 || { usage >&2; exit 2; } ;;
+    --silent) SILENT=${2:-}; shift 2 || { usage >&2; exit 2; } ;;
     --verdict|--continuation) usage >&2; exit 2 ;;
     -h|--help|help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;

@@ -258,9 +258,12 @@ status_ids() {
   done | sort
 }
 
-known_ids() {
-  assoc_any TASK_STATE || return 0
-  printf '%s\n' "${!TASK_STATE[@]}" | sort
+held_ids() {
+  local id
+  assoc_any TASK_HELD || return 0
+  for id in "${!TASK_HELD[@]}"; do
+    [ "${TASK_HELD[$id]:-}" != yes ] || printf '%s\n' "$id"
+  done
 }
 
 print_section() {  # <title> <body>
@@ -308,6 +311,7 @@ section_cleared() {
   assoc_any TASK_DEPS || return 0
   while IFS= read -r id; do
     [ -n "$id" ] || continue
+    [ "${TASK_STATE[$id]:-}" = queued ] || continue
     case "${TASK_BLOCKED[$id]:-}" in yes) continue ;; esac
     case "${TASK_BLOCKED_BY[$id]:-}" in ''|none|-) ;; *) continue ;; esac
     deps=${TASK_DEPS[$id]:-}
@@ -402,7 +406,7 @@ not_started_lines() {
     fi
     printf '  - %s: %s\n' "$id" "$cmd"
   done <<EOF
-$( { live_ids; known_ids; } | sort -u)
+$( { live_ids; held_ids; } | sort -u)
 EOF
 }
 

@@ -51,5 +51,17 @@ test_prompt_names_the_main_actor_contract_and_stays_byte_stable() {
   pass "the prompt states the main-actor contract and stays stable"
 }
 
+test_missing_values_exit() {
+  local flag rc
+  for flag in --task --summary --wake --silent; do
+    rc=0
+    "$HELPER" --task job --summary handled "$flag" >/dev/null 2>&1 || rc=$?
+    [ "$rc" -eq 2 ] || fail "$flag without value returned $rc"
+  done
+  pass "every missing option value exits with usage status"
+}
+
+test_missing_values_exit
+
 test_helper_appends_a_silent_routine_row_and_refuses_a_captain_verdict
 test_prompt_names_the_main_actor_contract_and_stays_byte_stable

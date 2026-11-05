@@ -1333,7 +1333,15 @@ test_return_brief_names_unstarted_work_and_a_silent_window() {
   set -e
   assert_contains "$out" 'Not started:' "the capped check dropped the not-started heading"
   assert_contains "$out" 'more not shown' "a one-byte budget did not omit a line"
-  pass "the return names unstarted work, a silent window, and an unhandled blocker"
+  printf 'resolved [key=stuck]: recovered\n' >> "$dir/home/state/blocked-job.status"
+  out=$(run_return "$dir" check) || fail "resolved return failed: $out"
+  [ ! -e "$dir/home/state/.afk-away-actor" ] || fail "cleared return retained the actor"
+  FM_AFK_MODE=quiet contract_in "$dir" enter --words 'stay quiet' >/dev/null 2>&1 || fail "quiet entry failed"
+  out=$(run_return "$dir" begin) || fail "quiet return failed: $out"
+  assert_not_contains "$out" 'away-session turns:' "quiet return reused the away actor"
+  assert_not_contains "$out" 'no away session ran' "quiet return reused away health"
+  pass "the return names unstarted work and clears actor evidence before quiet"
+
 }
 
 test_unreadable_superseded_archive_keeps_return_gated() {
