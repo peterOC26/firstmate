@@ -326,7 +326,7 @@ return_guard() {
 # --- supervisor health, snapshotted before anything is shut down ------------
 
 health_snapshot() {  # <evidence-file>
-  local evidence=$1 beat_age state lines="" note="" extra=""
+  local evidence=$1 beat_age state lines="" note=""
   beat_age=$(fm_path_age "$STATE/.last-watcher-beat")
   if [ -e "$STATE/.watcher-down" ]; then
     # The marker survives past its episode in an acked:* state
@@ -360,14 +360,6 @@ delivery wedged: $(head -1 "$STATE/.subsuper-inject-wedged" 2>/dev/null || true)
   fi
   if [ -z "$(printf '%s' "$lines" | tr -d '[:space:]')" ]; then
     lines="supervision ran through the away window with no detected gap (watcher beat ${beat_age}s old at return)"
-  fi
-  if [ -f "$STATE/.afk-away-actor" ] && [ ! -L "$STATE/.afk-away-actor" ] \
-    && [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
-    extra=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" health 2>/dev/null || true)
-    if [ -n "$extra" ]; then
-      lines="$lines
-$extra"
-    fi
   fi
   append_evidence health "$lines
 $note" "$evidence"
@@ -893,9 +885,6 @@ EOF
     lifecycle_ok=0
   fi
   render_return_brief "$evidence" "$blockers" "$since" "$drain_ok"
-  if [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" disarm >/dev/null 2>&1 || true
-  fi
   if [ "$HELD_READ_FAILED" -eq 1 ]; then
     append_evidence lifecycle "held set unreadable: $HELD_READ_PATH; catch-up stays gated" "$evidence"
     lifecycle_ok=0
@@ -927,7 +916,7 @@ EOF
     return 3
   fi
 
-  rm -f "$GATE" "$STATE/.afk-away-actor"
+  rm -f "$GATE"
   clear_delivery_artifacts
   rm -f "$evidence" "$blockers" "$drain_err"
   printf 'fm-afk-return: catch-up clear; ordinary captain work may proceed\n'

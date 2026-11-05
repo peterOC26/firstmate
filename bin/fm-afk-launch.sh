@@ -26,8 +26,7 @@
 # runs the daemon for now, so `start` and `start-native` require the record
 # `enter` wrote before they launch the daemon.
 # For an away record, `enter` then prints the read-only entry inventory
-# (bin/fm-afk-entry-brief.sh) and arms the away-session liveness check
-# (bin/fm-afk-liveness.sh). A quiet entry does neither.
+# (bin/fm-afk-entry-brief.sh). A quiet entry does not print the inventory.
 # QUIET MODE on a home that runs the supervision host needs nothing
 # where the attended host runs (docs/supervision-host.md "Quiet mode"): its
 # primary is attended-ready (fm_supervision_host_attended_ready: engine, tools,
@@ -74,9 +73,8 @@
 #                              Write the away-posture record now, with no
 #                              separate confirmation, then print the entry
 #                              announcement and the read-back. An away record
-#                              then prints the entry inventory and arms the
-#                              away-session liveness check; a quiet entry does
-#                              neither. With no words while away it is a
+#                              then prints the entry inventory; a quiet entry
+#                              does not. With no words while away it is a
 #                              refresh; new words replace the mandate. On Pi
 #                              no daemon is launched.
 #   fm-afk-launch.sh start     Capture the captain pane, then (unless the daemon
@@ -390,10 +388,6 @@ fm_afk_launch_enter() {
     FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$FM_AFK_LAUNCH_STATE" \
       "$FM_AFK_LAUNCH_DIR/fm-afk-entry-brief.sh" \
       || fm_afk_launch_log "entry inventory could not be printed"
-    if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$FM_AFK_LAUNCH_STATE" \
-      "$FM_AFK_LAUNCH_DIR/fm-afk-liveness.sh" arm; then
-      fm_afk_launch_log "away-session liveness check was not armed"
-    fi
   fi
   fm_afk_launch_host_engine_note
 }

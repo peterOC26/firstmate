@@ -42,7 +42,6 @@ install_runner() {  # <case-dir>
   cp "$ROOT/bin/fm-check-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-check-register.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-check-unregister.sh" "$dir/bin/"
-  cp "$ROOT/bin/fm-afk-liveness.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-afk-entry-brief.sh" "$dir/bin/"
   fm_test_tasks_toml "$dir/home/.tasks.toml"
   printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/home/data/backlog.md"
@@ -1289,7 +1288,7 @@ test_return_brief_without_a_record_reports_the_legacy_flag() {
   pass "a return with only the legacy away flag still renders the brief and measures the window from the flag"
 }
 
-test_return_brief_names_unstarted_work_and_a_silent_window() {
+test_return_brief_names_unstarted_work() {
   local dir out rc section
   dir="$TMP_ROOT/unstarted"
   install_runner "$dir"
@@ -1305,9 +1304,6 @@ test_return_brief_names_unstarted_work_and_a_silent_window() {
   printf 'done: finished\n' > "$dir/home/state/next-job.status"
   printf 'window=synthetic:blocked-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/blocked-job.meta"
   printf 'blocked [at=100] [key=stuck]: still waiting\n' > "$dir/home/state/blocked-job.status"
-  printf 'actor: host\nentry_epoch: 1000\nwindow: 900\n' > "$dir/home/state/.afk-away-actor"
-  printf '#!/bin/sh\nexit 0\n' > "$dir/home/state/fm-afk-liveness.check.sh"
-  chmod 700 "$dir/home/state/fm-afk-liveness.check.sh"
   touch "$dir/home/state/.last-watcher-beat"
   : > "$dir/home/state/.fake-drain"
   contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
@@ -1316,16 +1312,12 @@ test_return_brief_names_unstarted_work_and_a_silent_window() {
   rc=$?
   set -e
   [ "$rc" -eq 3 ] || fail "an open blocker should keep the return gated (rc=$rc): $out"
-  assert_contains "$out" 'away-session turns: 0' "a silent window did not report zero turns"
-  assert_contains "$out" 'no away session ran; main handled the window itself' "the zero-turn sentence was missing"
   assert_contains "$out" 'no detected gap' "health lost the no-gap line"
   assert_contains "$out" 'blocked-job [key=stuck] still blocked, firstmate remediates before ordinary work: still waiting' "the blocker line lost its existing prefix"
   assert_contains "$out" '  - hold-job: bin/fm-tasks-axi.sh show hold-job' "the held job lost its show command"
   assert_contains "$out" '  - next-job: bin/fm-send.sh next-job the follow-up' "the next command was missing"
   section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
   assert_not_contains "$section" 'blocked-job' "an open blocked task was listed as not started"
-  [ ! -e "$dir/home/state/fm-afk-liveness.check.sh" ] || fail "return left the liveness check armed"
-  [ -f "$dir/home/state/.afk-away-actor" ] || fail "return removed the away actor record"
   set +e
   out=$(FM_AFK_NOT_STARTED_BUDGET=1 run_return "$dir" check)
   rc=$?
@@ -1334,12 +1326,9 @@ test_return_brief_names_unstarted_work_and_a_silent_window() {
   assert_contains "$out" 'more not shown' "a one-byte budget did not omit a line"
   printf 'resolved [key=stuck]: recovered\n' >> "$dir/home/state/blocked-job.status"
   out=$(run_return "$dir" check) || fail "resolved return failed: $out"
-  [ ! -e "$dir/home/state/.afk-away-actor" ] || fail "cleared return retained the actor"
   FM_AFK_MODE=quiet contract_in "$dir" enter --words 'stay quiet' >/dev/null 2>&1 || fail "quiet entry failed"
   out=$(run_return "$dir" begin) || fail "quiet return failed: $out"
-  assert_not_contains "$out" 'away-session turns:' "quiet return reused the away actor"
-  assert_not_contains "$out" 'no away session ran' "quiet return reused away health"
-  pass "the return names unstarted work and clears actor evidence before quiet"
+  pass "the return names unstarted work and supports a later quiet window"
 
 }
 
@@ -1444,4 +1433,4 @@ test_return_brief_keeps_trip_row_count_after_probe
 test_return_brief_ignores_previous_main_session
 test_return_brief_keeps_in_window_history_across_main_restart
 test_return_brief_without_a_record_reports_the_legacy_flag
-test_return_brief_names_unstarted_work_and_a_silent_window
+test_return_brief_names_unstarted_work

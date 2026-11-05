@@ -170,7 +170,7 @@ test_future_date_registers_once_and_a_passed_date_does_not() {
   pass "a future date registers one check and a passed date does not"
 }
 
-test_enter_prints_live_ids_and_quiet_does_not_arm() {
+test_enter_prints_live_ids_and_quiet_omits_inventory() {
   local dir out off
   dir="$TMP_ROOT/enter"
   seed_home "$dir"
@@ -185,8 +185,6 @@ test_enter_prints_live_ids_and_quiet_does_not_arm() {
   assert_contains "$out" 'paused-job' "enter did not print a live task"
   assert_contains "$out" 'running-job' "enter did not print every live task"
   assert_contains "$out" 'Read-back checklist:' "enter did not print the checklist"
-  [ -f "$dir/state/.afk-away-actor" ] || fail "enter did not record the away actor"
-  [ -f "$dir/state/fm-afk-liveness.check.sh" ] || fail "enter did not arm the liveness check"
 
   dir="$TMP_ROOT/quiet"
   seed_home "$dir"
@@ -194,12 +192,10 @@ test_enter_prints_live_ids_and_quiet_does_not_arm() {
     FM_AFK_MODE=quiet CLAUDECODE=1 FM_TEST_HARNESS=claude FM_TEST_SEAM=1 \
     "$LAUNCH" enter --words 'stay quiet' 2>&1) || fail "quiet enter failed: $out"
   assert_not_contains "$out" 'Read-back checklist:' "quiet enter printed the away checklist"
-  [ ! -e "$dir/state/.afk-away-actor" ] || fail "quiet enter armed an away actor"
-  [ ! -e "$dir/state/fm-afk-liveness.check.sh" ] || fail "quiet enter armed the liveness check"
-  pass "away enter prints the inventory and quiet enter does not arm it"
+  pass "away enter prints the inventory and quiet enter omits it"
 }
 
 test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point
 test_unreadable_backlog_exits_zero_without_creating_one
 test_future_date_registers_once_and_a_passed_date_does_not
-test_enter_prints_live_ids_and_quiet_does_not_arm
+test_enter_prints_live_ids_and_quiet_omits_inventory
