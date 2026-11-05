@@ -126,8 +126,15 @@ count_turns() {
 }
 
 log_names_task_since() {
-  printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v since="$1" -v id="$2" '
+  printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v since="$1" -v id="$2" -v key="$3" '
     $1 + 0 >= since {
+      if ($2 == "daemon" && $3 !~ /^escalate: /) {
+        if ($3 !~ /^self-handle( \(paused\))?: /) next
+        keyed=0
+        n=split($0, fields, /[^A-Za-z0-9._=-]+/)
+        for (i=1; i<=n; i++) if (fields[i] == "key=" key) keyed=1
+        if (!keyed) next
+      }
       n=split($0, tokens, /[^A-Za-z0-9._-]+/)
       for (i=1; i<=n; i++) {
         if (tokens[i] == id || tokens[i] == id ".status") {
@@ -155,8 +162,8 @@ outcome_names_task_since() {  # <since> <id>
   return 1
 }
 
-block_handled() {  # <id> <since>
-  log_names_task_since "$2" "$1" && return 0
+block_handled() {  # <id> <since> <key>
+  log_names_task_since "$2" "$1" "$3" && return 0
   outcome_names_task_since "$2" "$1"
 }
 
@@ -201,10 +208,10 @@ each_unhandled_block() {
       [ -n "$key" ] || continue
       opened=$(block_epoch_of "$status" "$key")
       case "$opened" in ''|*[!0-9]*) opened=$ENTRY ;; esac
-      [ "$now" -ge "$((opened + WINDOW))" ] || continue
       since=$opened
       [ "$since" -lt "$ENTRY" ] && since=$ENTRY
-      block_handled "$id" "$since" && continue
+      [ "$now" -ge "$((since + WINDOW))" ] || continue
+      block_handled "$id" "$since" "$key" && continue
       printf '%s\t%s\n' "$id" "$key"
     done <<EOF
 $(status_open_decisions "$status")
