@@ -37,6 +37,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-hold-reason-lib.sh
+. "$SCRIPT_DIR/fm-hold-reason-lib.sh"
 
 declare -A TASK_STATE TASK_HELD TASK_REASON TASK_UNTIL TASK_BLOCKED TASK_BLOCKED_BY TASK_DEPS TASK_BODY
 
@@ -84,6 +86,7 @@ warn_backlog() {  # <text>
 
 parse_show() {  # <id> <show-text>
   local id=$1 text=$2 line rest key val
+  text=$(printf '%s\n' "$text" | fm_hold_reason_decode_stream)
   while IFS= read -r line; do
     case "$line" in
       '  '[a-z_]*:*) ;;

@@ -51,7 +51,9 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   axi "$dir" update retired-job --body 'Next: bin/fm-send.sh retired-job obsolete' >/dev/null
   axi "$dir" update done-job --body 'Next: bin/fm-send.sh done-job the follow-up' >/dev/null
   axi "$dir" hold hold-a --reason 'wait for captain' --kind captain >/dev/null
-  axi "$dir" hold hold-b --reason 'pick a name' --kind captain >/dev/null
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    bash "$ROOT/bin/fm-captain-hold.sh" hold hold-b --reason 'Choose the public name' >/dev/null \
+    || fail "the captain hold command failed"
   axi "$dir" hold dated-job --reason 'the date passed' --kind future --until 2026-11-01 >/dev/null
   axi "$dir" hold future-job --reason 'later' --kind future --until 2026-12-01 >/dev/null
   meta "$dir" paused-job 'paused: waiting on the suite'
@@ -72,7 +74,7 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   assert_contains "$out" '  running-job: working' "the running live task was missing"
   assert_contains "$out" '  done-job: done; next: bin/fm-send.sh done-job the follow-up' "the done task lost its next command"
   assert_contains "$out" '  hold-a: wait for captain' "the first hold was missing"
-  assert_contains "$out" '  hold-b: pick a name' "the second hold was missing"
+  assert_contains "$out" '  hold-b: Choose the public name' "the captain hold reason was not decoded"
   assert_contains "$out" '  queued-job: blocked-by done-job is done' "a cleared blocker was not listed"
   assert_contains "$out" '  done-job: https://github.com/example/repo/pull/9' "the green pull request was missing"
   assert_contains "$out" '  dated-job: hold until 2026-11-01' "a passed hold date was missing"
