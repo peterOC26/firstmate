@@ -30,6 +30,9 @@
 # the away session handled, then what was not started (bin/fm-afk-entry-brief.sh,
 # capped to the subsection), then cost. The health snapshot is taken BEFORE the
 # daemon shutdown so the shutdown itself cannot read as a gap.
+# The not-started subsection uses FM_AFK_NOT_STARTED_BUDGET (default 4096)
+# characters for complete command lines including their newlines; its heading
+# and omission-count notice are outside that budget.
 #
 # THE GATE. `blocked:` is the crewmate protocol's firstmate-actionable verb. A
 # live task's open blocked event must be remediated and closed with

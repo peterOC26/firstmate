@@ -21,6 +21,11 @@
 # the backlog body when one exists; otherwise a held task uses
 # bin/fm-tasks-axi.sh show <id>. Finished work has no inferred next command.
 # An open blocked event stays out of the not-started list.
+# Nonempty inventory sections list live jobs (including paused and finished
+# records), captain holds, queued jobs with a completed blocking dependency,
+# status-recorded green PRs, hold dates, and consecutive failed checks.
+# Hold dates use UTC calendar days; today's date is already due. Future-date
+# checks are offered only, until --register-future is explicitly requested.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

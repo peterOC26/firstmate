@@ -17,7 +17,7 @@
 #     transient helper chain is recycled).
 #     When an existing numeric owner fails the shared harness-liveness predicate,
 #     the hook delegates guarded recovery to bin/fm-lock.sh and then re-verifies
-#     ownership. A live owner, missing lock, malformed lock, or unresolved
+#     ownership. A live foreign owner, missing lock, malformed lock, or unresolved
 #     ancestry remains inert, so a competing session never arms or rewakes.
 #   - AFK: while state/.afk exists the away daemon owns the watcher and triage
 #     on a home the daemon still runs, and this hook exits 0 and NEVER rewakes

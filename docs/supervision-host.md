@@ -146,9 +146,7 @@ Where the home runs the host but the attended host lacks one of its parts, `/qui
 
 ### Main as the away actor
 
-When the away-posture record stands and no away session is running, main handles the wakes under that record, records one routine outcome per handled event with `bin/fm-afk-main-outcome.sh`, and does not send the captain a message for routine work.
-The [afk skill](../.agents/skills/afk/SKILL.md) owns that fallback.
-It is not new authority, and a captain call stays a held backlog task through `bin/fm-captain-hold.sh`.
+The [afk skill](../.agents/skills/afk/SKILL.md#when-main-is-the-away-actor) points to the fallback contract for main when no away session is running.
 
 ## The dialog mirror
 
