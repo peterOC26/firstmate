@@ -5,7 +5,7 @@
 #   fm-afk-entry-brief.sh
 #       Print the entry inventory and the read-back checklist.
 #   fm-afk-entry-brief.sh not-started
-#       Print one "not started" line per held or next step, with its command.
+#       Print one line per live task that has an explicit next command.
 #   fm-afk-entry-brief.sh --register-future <id>
 #       Register a one-shot check for a future hold date. A date that is
 #       already due is named and not registered.
@@ -18,9 +18,13 @@
 # An unreadable backlog is reported and the command still exits 0.
 # FM_AFK_ENTRY_TODAY (YYYY-MM-DD) pins "today" for tests.
 # The next command is an explicit "Next: bin/..." line in the status file or
-# the backlog body when one exists; otherwise a held task uses
-# bin/fm-tasks-axi.sh show <id>. Finished work has no inferred next command.
+# the backlog body when one exists. A held row without that command is not
+# repeated. Finished work has no inferred next command.
 # An open blocked event stays out of the not-started list.
+# A future-date check fires once for a hold date. Deferring the same task to a
+# later date fires again when that date arrives.
+# The backlog is read once per render. A per-row read makes entry and return
+# wait on one process per backlog row.
 # Nonempty inventory sections list live jobs (including paused and finished
 # records), captain holds, queued jobs with a completed blocking dependency,
 # status-recorded green PRs, hold dates, and consecutive failed checks.
@@ -82,11 +86,20 @@ unquote_field() {  # <value>
 }
 
 warn_backlog() {  # <text>
-  if [ "${BRIEF_MODE:-inventory}" = inventory ]; then
-    printf 'entry inventory: %s\n' "$1"
-  else
-    printf 'entry inventory: %s\n' "$1" >&2
-  fi
+  case "${BRIEF_MODE:-inventory}" in
+    register)
+      printf 'entry inventory: %s\n' "$1" >&2
+      ;;
+    not-started)
+      # The return brief keeps this command's stdout and drops stderr, so the
+      # read failure has to be part of the section or the brief says nothing
+      # was left.
+      printf '  entry inventory: %s\n' "$1"
+      ;;
+    *)
+      printf 'entry inventory: %s\n' "$1"
+      ;;
+  esac
 }
 
 parse_show() {  # <id> <show-text>
@@ -117,8 +130,121 @@ $text
 EOF
 }
 
+# One tasks-axi list row, packed as nine unit-separated fields ending in a
+# record separator. Percent-encoding keeps % and the two separators literal.
+backlog_rows_pack() {
+  perl -e '
+    use strict;
+    use warnings;
+    my @cols;
+    my $saw_header = 0;
+    sub decode_quoted {
+      my ($raw) = @_;
+      return $raw if length($raw) < 2 || substr($raw, 0, 1) ne "\"";
+      return $raw if substr($raw, -1, 1) ne "\"";
+      my $v = substr($raw, 1, -1);
+      my $out = "";
+      my $i = 0;
+      while ($i < length($v)) {
+        my $c = substr($v, $i, 1);
+        if ($c eq "\\" && $i + 1 < length($v)) {
+          my $n = substr($v, $i + 1, 1);
+          if ($n eq "n") { $out .= "\n"; }
+          elsif ($n eq "r") { $out .= "\r"; }
+          elsif ($n eq "t") { $out .= "\t"; }
+          elsif ($n eq "\"") { $out .= "\""; }
+          elsif ($n eq "\\") { $out .= "\\"; }
+          elsif ($n eq "u" && $i + 5 < length($v) && substr($v, $i + 2, 4) =~ /^[0-9A-Fa-f]{4}$/) {
+            require Encode;
+            $out .= Encode::encode("UTF-8", pack("U", hex(substr($v, $i + 2, 4))));
+            $i += 6;
+            next;
+          }
+          else { $out .= $n; }
+          $i += 2;
+          next;
+        }
+        $out .= $c;
+        $i++;
+      }
+      return $out;
+    }
+    sub parse_csv {
+      my ($line) = @_;
+      my @out;
+      my $i = 0;
+      my $n = length($line);
+      while ($i < $n) {
+        my $c = substr($line, $i, 1);
+        if ($c eq "\"") {
+          my $j = $i + 1;
+          while ($j < $n) {
+            my $ch = substr($line, $j, 1);
+            if ($ch eq "\\" && $j + 1 < $n) { $j += 2; next; }
+            if ($ch eq "\"") { last; }
+            $j++;
+          }
+          die "backlog row has an unterminated quoted field\n" if $j >= $n;
+          push @out, decode_quoted(substr($line, $i, $j - $i + 1));
+          $i = $j + 1;
+          if ($i < $n && substr($line, $i, 1) eq ",") { $i++; next; }
+          last if $i >= $n;
+          die "backlog row has text after a quoted field\n";
+        }
+        my $comma = index($line, ",", $i);
+        if ($comma < 0) { push @out, substr($line, $i); last; }
+        push @out, substr($line, $i, $comma - $i);
+        $i = $comma + 1;
+        push @out, "" if $i == $n;
+      }
+      return @out;
+    }
+    sub enc {
+      my ($s) = @_;
+      $s = "" unless defined $s;
+      $s =~ s/%/%25/g;
+      $s =~ s/\x1e/%1E/g;
+      $s =~ s/\x1f/%1F/g;
+      return $s;
+    }
+    while (my $line = <STDIN>) {
+      $line =~ s/\r?\n\z//;
+      if ($line =~ /^tasks\[\d+\]\{([^}]*)\}:$/) {
+        @cols = split /,/, $1;
+        $saw_header = 1;
+        my %have = map { $_ => 1 } @cols;
+        for my $need (qw(id state held hold_reason hold_until blocked blocked_by deps body)) {
+          die "backlog list is missing the $need column\n" unless $have{$need};
+        }
+        next;
+      }
+      next if !$saw_header || $line !~ /^  (.+)$/;
+      my $rest = $1;
+      next if $rest =~ /^- /;
+      my @fields = parse_csv($rest);
+      die "backlog row field count does not match its header\n" if @fields < @cols;
+      my %row;
+      for my $i (0 .. $#cols) { $row{$cols[$i]} = $fields[$i]; }
+      next if !defined $row{id} || $row{id} eq "";
+      my @vals = map { $row{$_} } qw(id state held hold_reason hold_until blocked blocked_by deps body);
+      print join("\x1f", map { enc($_) } @vals), "\x1e";
+    }
+    die "backlog list had no task table\n" unless $saw_header;
+    exit 0;
+  '
+}
+
+pct_decode() {  # <text>
+  local s=$1
+  s=${s//%1E/$'\x1e'}
+  s=${s//%1F/$'\x1f'}
+  s=${s//%25/%}
+  printf '%s' "$s"
+}
+
 load_backlog() {
-  local file list id show err
+  local file list err parsed pack_status=0 pipefail_was_off=0 pack_err_file
+  local id state held reason until blocked blocked_by deps body
   if [ ! -e "$DATA/backlog.md" ] && [ ! -f "$FM_HOME/.tasks.toml" ]; then
     return 0
   fi
@@ -139,23 +265,43 @@ load_backlog() {
     warn_backlog "backlog file is unreadable"
     return 0
   fi
-  if ! list=$(fm_backlog_row_list "$DATA" 2>&1); then
+  if ! list=$(fm_backlog_row_list "$DATA" --fields held,hold_reason,hold_until,blocked,blocked_by,deps,body 2>&1); then
     err=$(printf '%s\n' "$list" | head -1)
     warn_backlog "${err:-backlog listing failed}"
     return 0
   fi
-  while IFS= read -r id; do
+  pack_err_file=$(mktemp "${TMPDIR:-/tmp}/fm-afk-entry-pack.XXXXXX") || {
+    warn_backlog "backlog listing could not be read"
+    return 0
+  }
+  if set -o | grep -q '^pipefail[[:space:]]*off$'; then
+    pipefail_was_off=1
+    set -o pipefail
+  fi
+  parsed=$(printf '%s\n' "$list" | fm_hold_reason_decode_stream | backlog_rows_pack 2>"$pack_err_file") || pack_status=$?
+  if [ "$pipefail_was_off" -eq 1 ]; then
+    set +o pipefail
+  fi
+  if [ "$pack_status" -ne 0 ]; then
+    err=$(head -1 "$pack_err_file")
+    rm -f "$pack_err_file"
+    warn_backlog "${err:-backlog listing could not be read}"
+    return 0
+  fi
+  rm -f "$pack_err_file"
+  while IFS=$'\x1f' read -r -d $'\x1e' id state held reason until blocked blocked_by deps body || [ -n "${id:-}" ]; do
     [ -n "$id" ] || continue
+    id=$(pct_decode "$id")
     fm_pr_task_id_valid "$id" || continue
-    if ! show=$(fm_backlog_row_show "$DATA" "$id" 2>&1); then
-      err=$(printf '%s\n' "$show" | head -1)
-      warn_backlog "${id}: ${err:-backlog read failed}"
-      continue
-    fi
-    parse_show "$id" "$show"
-  done <<EOF
-$(printf '%s\n' "$list" | sed -n 's/^  \([A-Za-z0-9._-][A-Za-z0-9._-]*\),.*/\1/p')
-EOF
+    TASK_STATE[$id]=$(pct_decode "$state")
+    TASK_HELD[$id]=$(pct_decode "$held")
+    TASK_REASON[$id]=$(pct_decode "$reason")
+    TASK_UNTIL[$id]=$(pct_decode "$until")
+    TASK_BLOCKED[$id]=$(pct_decode "$blocked")
+    TASK_BLOCKED_BY[$id]=$(pct_decode "$blocked_by")
+    TASK_DEPS[$id]=$(pct_decode "$deps")
+    TASK_BODY[$id]=$(pct_decode "$body")
+  done < <(printf '%s' "$parsed")
 }
 
 load_one() {  # <id>
@@ -263,14 +409,6 @@ status_ids() {
     fm_pr_task_id_valid "$id" || continue
     printf '%s\n' "$id"
   done | sort
-}
-
-held_ids() {
-  local id
-  assoc_any TASK_HELD || return 0
-  for id in "${!TASK_HELD[@]}"; do
-    [ "${TASK_HELD[$id]:-}" != yes ] || printf '%s\n' "$id"
-  done
 }
 
 print_section() {  # <title> <body>
@@ -396,21 +534,15 @@ EOF
 }
 
 not_started_lines() {
-  local id explicit cmd
+  local id explicit
   while IFS= read -r id; do
     [ -n "$id" ] || continue
     task_open_blocked "$id" && continue
     explicit=$(explicit_next "$id")
-    if [ -n "$explicit" ]; then
-      cmd=$explicit
-    elif [ "${TASK_HELD[$id]:-}" = yes ]; then
-      cmd="bin/fm-tasks-axi.sh show ${id}"
-    else
-      continue
-    fi
-    printf '  - %s: %s\n' "$id" "$cmd"
+    [ -n "$explicit" ] || continue
+    printf '  - %s: %s\n' "$id" "$explicit"
   done <<EOF
-$( { live_ids; held_ids; } | sort -u)
+$(live_ids)
 EOF
 }
 
@@ -440,8 +572,8 @@ hold_until_of() {  # <id>
   esac
 }
 
-future_fired_has() {  # <id>
-  [ -f "$STATE/.afk-future-fired" ] && grep -Fxq -- "$1" "$STATE/.afk-future-fired"
+future_fired_has() {  # <id> <until>
+  [ -f "$STATE/.afk-future-fired" ] && grep -Fxq -- "$1 $2" "$STATE/.afk-future-fired"
 }
 
 future_check_id() {  # <task-id>
@@ -506,10 +638,10 @@ cmd_future_check() {  # <id>
   until=$(hold_until_of "$id") || return 0
   day=$(today)
   [ "$until" \> "$day" ] && return 0
-  future_fired_has "$id" && return 0
+  future_fired_has "$id" "$until" && return 0
   printf '%s hold until %s is due\n' "$id" "$until"
   mkdir -p "$STATE" 2>/dev/null || true
-  printf '%s\n' "$id" >> "$STATE/.afk-future-fired" 2>/dev/null || true
+  printf '%s %s\n' "$id" "$until" >> "$STATE/.afk-future-fired" 2>/dev/null || true
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

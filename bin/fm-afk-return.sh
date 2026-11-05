@@ -696,9 +696,10 @@ EOF
     printf '  (no routine outcomes recorded in the store for this window)\n'
   fi
 
-  # 7. not started. Held rows and live tasks with a next step, each with the
-  # command the entry inventory would run. An open blocked event stays in the
-  # blocker section above. The cap applies to this subsection only.
+  # 7. not started. Each live task with an explicit next command, once. Held
+  # rows without that command stay in Waiting on you. An open blocked event
+  # stays in the blocker section above. An unreadable backlog is named here
+  # instead of an empty list. The cap applies to this subsection only.
   printf 'Not started:\n'
   not_started_body=''
   if [ -x "$SCRIPT_DIR/fm-afk-entry-brief.sh" ]; then

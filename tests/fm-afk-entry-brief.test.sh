@@ -100,8 +100,8 @@ test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   meta "$dir" explicit-done $'done: finished\nNext: bin/fm-teardown.sh explicit-done'
   out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
     FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF" not-started) || fail "not-started exited nonzero: $out"
-  assert_contains "$out" '  - hold-a: bin/fm-tasks-axi.sh show hold-a' "a held task lost its show command"
-  assert_contains "$out" '  - hold-b: bin/fm-tasks-axi.sh show hold-b' "the second hold lost its show command"
+  assert_not_contains "$out" 'bin/fm-tasks-axi.sh show hold-a' "a held row with no next command was repeated"
+  assert_not_contains "$out" 'bin/fm-tasks-axi.sh show hold-b' "a held row with no next command was repeated"
   assert_contains "$out" '  - done-job: bin/fm-send.sh done-job the follow-up' "a done task lost the recorded next command"
   assert_not_contains "$out" 'green-done' "green finished work acquired an invented next command"
   assert_not_contains "$out" 'landed-done' "landed work acquired an invented next command"
@@ -172,6 +172,102 @@ test_future_date_registers_once_and_a_passed_date_does_not() {
   pass "a future date registers one check and a passed date does not"
 }
 
+test_not_started_reports_an_unreadable_backlog_on_stdout() {
+  local dir out rc
+  dir="$TMP_ROOT/unreadable-not-started"
+  seed_home "$dir"
+  meta "$dir" live-job 'working: building'
+  chmod 000 "$dir/data/backlog.md"
+  set +e
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF" not-started 2>/dev/null)
+  rc=$?
+  set -e
+  chmod 644 "$dir/data/backlog.md" || true
+  [ "$rc" -eq 0 ] || fail "not-started did not exit 0 when the backlog was unreadable (rc=$rc): $out"
+  assert_contains "$out" 'backlog file is unreadable' "not-started hid the unreadable-backlog diagnostic"
+  assert_not_contains "$out" '(nothing)' "not-started claimed nothing was pending while the backlog could not be read"
+  pass "not-started reports an unreadable backlog on stdout"
+}
+
+test_redeferred_future_date_fires_when_it_comes_due() {
+  local dir out
+  dir="$TMP_ROOT/redefer"
+  seed_home "$dir"
+  axi "$dir" add job-x 'a deferred job' >/dev/null
+  axi "$dir" hold job-x --reason 'later' --kind future --until 2026-12-01 >/dev/null
+
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF" --register-future job-x) \
+    || fail "the first future registration failed: $out"
+  assert_contains "$out" 'registered: state/fm-afk-future-job-x.check.sh' "the first future check was not registered"
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=2026-12-02 "$BRIEF" future-check job-x) \
+    || fail "the first due check failed: $out"
+  assert_contains "$out" 'job-x hold until 2026-12-01 is due' "the first due date stayed silent"
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=2026-12-02 "$BRIEF" future-check job-x)
+  [ -z "$out" ] || fail "the same due date fired twice: $out"
+
+  axi "$dir" hold job-x --reason 'later again' --kind future --until 2027-01-01 >/dev/null
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=2026-12-02 "$BRIEF" --register-future job-x) \
+    || fail "re-registering the new date failed: $out"
+  assert_contains "$out" 'registered: state/fm-afk-future-job-x.check.sh' "the re-deferred date was not registered"
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=2027-01-02 "$BRIEF" future-check job-x) \
+    || fail "the re-deferred due check failed: $out"
+  assert_contains "$out" 'job-x hold until 2027-01-01 is due' "a re-deferred hold date never fired"
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=2027-01-02 "$BRIEF" future-check job-x)
+  [ -z "$out" ] || fail "the re-deferred date fired twice: $out"
+  pass "a re-deferred future date fires once when it comes due"
+}
+
+test_inventory_reads_the_backlog_once() {
+  local dir out log real wrap list_n show_n
+  dir="$TMP_ROOT/one-read"
+  seed_home "$dir"
+  axi "$dir" add hold-a 'first hold' >/dev/null
+  axi "$dir" add hold-b 'second hold' >/dev/null
+  axi "$dir" add done-job 'finished work' >/dev/null
+  axi "$dir" hold hold-a --reason 'wait for captain' --kind captain >/dev/null
+  axi "$dir" update done-job --body 'Next: bin/fm-send.sh done-job the follow-up' >/dev/null
+  axi "$dir" "done" done-job --note 'landed' >/dev/null
+  meta "$dir" done-job 'done: finished'
+  log="$dir/axi.log"
+  : > "$log"
+  real=$(command -v tasks-axi)
+  wrap="$dir/wrap"
+  mkdir -p "$wrap"
+  cat > "$wrap/tasks-axi" <<EOF
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> $(printf '%q' "$log")
+exec $(printf '%q' "$real") "\$@"
+EOF
+  chmod +x "$wrap/tasks-axi"
+
+  out=$(PATH="$wrap:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF") || fail "inventory exited nonzero: $out"
+  assert_contains "$out" '  hold-a: wait for captain' "the single backlog read dropped a hold"
+  assert_contains "$out" '  done-job: done; next: bin/fm-send.sh done-job the follow-up' "the single backlog read dropped a next command"
+  list_n=$(grep -c '^list ' "$log" || true)
+  show_n=$(grep -c '^show ' "$log" || true)
+  [ "$list_n" -eq 1 ] || fail "inventory made $list_n backlog list calls, expected 1: $(cat "$log")"
+  [ "$show_n" -eq 0 ] || fail "inventory made $show_n per-row backlog reads: $(cat "$log")"
+
+  : > "$log"
+  out=$(PATH="$wrap:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    FM_AFK_ENTRY_TODAY=$TODAY "$BRIEF" not-started) || fail "not-started exited nonzero: $out"
+  assert_contains "$out" '  - done-job: bin/fm-send.sh done-job the follow-up' "not-started dropped the next command"
+  assert_not_contains "$out" 'bin/fm-tasks-axi.sh show hold-a' "not-started repeated a held row"
+  list_n=$(grep -c '^list ' "$log" || true)
+  show_n=$(grep -c '^show ' "$log" || true)
+  [ "$list_n" -eq 1 ] || fail "not-started made $list_n backlog list calls, expected 1: $(cat "$log")"
+  [ "$show_n" -eq 0 ] || fail "not-started made $show_n per-row backlog reads: $(cat "$log")"
+  pass "entry inventory and not-started each read the backlog once"
+}
+
 test_enter_prints_live_ids_and_quiet_omits_inventory() {
   local dir out off
   dir="$TMP_ROOT/enter"
@@ -197,6 +293,9 @@ test_enter_prints_live_ids_and_quiet_omits_inventory() {
   pass "away enter prints the inventory and quiet enter omits it"
 }
 
+test_not_started_reports_an_unreadable_backlog_on_stdout
+test_redeferred_future_date_fires_when_it_comes_due
+test_inventory_reads_the_backlog_once
 test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point
 test_unreadable_backlog_exits_zero_without_creating_one
 test_future_date_registers_once_and_a_passed_date_does_not
