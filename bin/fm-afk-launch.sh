@@ -15,16 +15,19 @@
 # (bin/fm-afk-contract.sh owns the record schema; the words are the whole
 # mandate and no script parses them). The record is the posture in every
 # harness.
-# On Pi and pi-signed the entry ENDS there: the away daemon is no longer launched
-# on Pi, the ordinary supervision session keeps running in both postures, and
-# `start` refuses on those harnesses. The same holds for away mode (not quiet
-# mode) on a claude, cursor, opencode, omp, grok, or codex primary whose home
-# runs the supervision host (fm_supervision_host_enabled: by default on
-# Claude, by config/supervision-host elsewhere), where the host runs the away
+# On Pi and pi-signed the entry launches no daemon: the away daemon is no longer
+# launched on Pi, the ordinary supervision session keeps running in both
+# postures, and `start` refuses on those harnesses. The same holds for away mode
+# (not quiet mode) on a claude, cursor, opencode, omp, grok, or codex primary
+# whose home runs the supervision host (fm_supervision_host_enabled: by default
+# on Claude, by config/supervision-host elsewhere), where the host runs the away
 # session; `enter` there adds one line when the host has no
 # engine, because every away wake then reaches main. Every other harness still
 # runs the daemon for now, so `start` and `start-native` require the record
 # `enter` wrote before they launch the daemon.
+# For an away record, `enter` then prints the read-only entry inventory
+# (bin/fm-afk-entry-brief.sh) and arms the away-session liveness check
+# (bin/fm-afk-liveness.sh). A quiet entry does neither.
 # QUIET MODE on a home that runs the supervision host needs nothing
 # where the attended host runs (docs/supervision-host.md "Quiet mode"): its
 # primary is attended-ready (fm_supervision_host_attended_ready: engine, tools,
@@ -70,9 +73,12 @@
 #                          [--expected-return <UTC ISO 8601>] [--spend <n>]
 #                              Write the away-posture record now, with no
 #                              separate confirmation, then print the entry
-#                              announcement and the read-back. With no words
-#                              while away it is a refresh; new words replace
-#                              the mandate. On Pi this is the whole entry.
+#                              announcement and the read-back. An away record
+#                              then prints the entry inventory and arms the
+#                              away-session liveness check; a quiet entry does
+#                              neither. With no words while away it is a
+#                              refresh; new words replace the mandate. On Pi
+#                              no daemon is launched.
 #   fm-afk-launch.sh start     Capture the captain pane, then (unless the daemon
 #                              is already running) launch the daemon in a fresh
 #                              non-visible terminal for the detected backend and
@@ -380,6 +386,15 @@ fm_afk_launch_enter() {
     esac
   fi
   "$FM_AFK_CONTRACT_CMD" enter "$@" || return
+  if ! fm_afk_launch_record_quiet; then
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$FM_AFK_LAUNCH_STATE" \
+      "$FM_AFK_LAUNCH_DIR/fm-afk-entry-brief.sh" \
+      || fm_afk_launch_log "entry inventory could not be printed"
+    if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$FM_AFK_LAUNCH_STATE" \
+      "$FM_AFK_LAUNCH_DIR/fm-afk-liveness.sh" arm; then
+      fm_afk_launch_log "away-session liveness check was not armed"
+    fi
+  fi
   fm_afk_launch_host_engine_note
 }
 

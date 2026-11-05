@@ -19,9 +19,13 @@
 #     the hook delegates guarded recovery to bin/fm-lock.sh and then re-verifies
 #     ownership. A live owner, missing lock, malformed lock, or unresolved
 #     ancestry remains inert, so a competing session never arms or rewakes.
-#   - AFK: while state/.afk exists the away daemon owns the watcher and triage;
-#     this hook exits 0 and NEVER rewakes the primary (checked again at
-#     translation time so a mid-cycle AFK transition is honored).
+#   - AFK: while state/.afk exists the away daemon owns the watcher and triage
+#     on a home the daemon still runs, and this hook exits 0 and NEVER rewakes
+#     the primary (checked again at translation time so a mid-cycle AFK
+#     transition is honored). A home that runs the supervision host is the
+#     exception while its posture record is away: the host is the away session,
+#     so a leftover state/.afk must not leave that host unarmed or swallow a
+#     host hand-back. Quiet mode stays on the daemon rule.
 #   - Need: arms only while the home needs supervision, as
 #     bin/fm-supervision-lib.sh defines it; an idle home exits 0.
 #   - Single-flight: Claude does not dedupe async hooks, so exactly one
@@ -76,8 +80,8 @@
 #     retried instead of being judged by the healthy-watcher predicate
 #     (docs/supervision-host.md). On a home that opted out nothing below
 #     changes.
-#   - Translation: while supervision is still needed and AFK remains inactive,
-#     an actionable arm close (signal:/stale:/check:/heartbeat) prints one
+#   - Translation: while supervision is still needed and the daemon-owned AFK
+#     rule remains inactive, an actionable arm close (signal:/stale:/check:/heartbeat) prints one
 #     rewake banner to stderr and exits 2, which wakes Claude even while idle
 #     ("Stop hook feedback"). The irrevocable commit point is the EXIT STATUS:
 #     the harness delivers the collected stderr only on exit 2, so an owned
@@ -213,8 +217,34 @@ if ! fm_session_lock_owned_by_self "$STATE"; then
   RECOVER_SESSION_LOCK=1
 fi
 
+# True when this Claude home runs the supervision host and the posture record
+# is away, not quiet. The host is the away session there. A leftover state/.afk
+# must not leave it unarmed. Quiet mode and a daemon-owned away stay inert.
+away_host_is_actor() {
+  fm_supervision_host_enabled "$CONFIG" claude || return 1
+  [ -e "$STATE/.afk-contract" ] && [ ! -L "$STATE/.afk-contract" ] || return 1
+  [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-contract.sh" mode 2>/dev/null || true)" != quiet ]
+}
+
+# A /clear re-keys the session id inside the same process. Ancestry still owns
+# the lock, but this hook does not otherwise call fm-lock.sh, so the sidecar
+# keeps the previous id. Refresh it before arming. A failed refresh still arms,
+# because ancestry already owns the lock. Never call this while the AFK or need
+# gate kept the home inert, and never reclaim a live pid outside this ancestry.
+refresh_stale_lock_session() {
+  local trusted recorded
+  trusted=$(fm_session_lock_trusted_session_id) || return 0
+  recorded=$(fm_session_lock_recorded_session_id "$STATE") || return 0
+  [ "$recorded" != "$trusted" ] || return 0
+  "$SCRIPT_DIR/fm-lock.sh" >/dev/null 2>&1 || return 0
+}
+
 # --- AFK: the away daemon owns the watcher and triage; never rewake ----------
-[ -e "$STATE/.afk" ] && exit 0
+# The supervision host is the away session on a home that runs it, so the
+# daemon flag does not apply there while the posture record is away.
+if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
+  exit 0
+fi
 
 # --- need: whatever bin/fm-supervision-lib.sh counts as supervision need ------
 need_supervision() {
@@ -229,6 +259,8 @@ need_supervision || exit 0
 if [ "$RECOVER_SESSION_LOCK" -eq 1 ]; then
   "$SCRIPT_DIR/fm-lock.sh" >/dev/null 2>&1 || exit 0
   fm_session_lock_owned_by_self "$STATE" || exit 0
+else
+  refresh_stale_lock_session
 fi
 
 # --- single-flight generation claim --------------------------------------------
@@ -416,6 +448,11 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   fi
   attempt=$((attempt + 1))
   OUT=$(mktemp "$STATE/.claude-autoarm-output.XXXXXX") || OUT=
+  if [ "$HOST_MODE" -eq 1 ] && [ ! -x "$SCRIPT_DIR/fm-supervision-host.sh" ] && away_host_is_actor; then
+    printf 'away session did not start\n' > "$STATE/.afk-away-session-alarm" 2>/dev/null || true
+    [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
+    exit 0
+  fi
   if [ "$HOST_MODE" -eq 1 ]; then
     HOST_RC=0
     FM_SUPERVISION_HOST_AUTOARM_GEN=$MY_GEN FM_SUPERVISION_HOST_OWNER_PID=$$ \
@@ -426,8 +463,9 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   fi
 
   # AFK may have appeared mid-cycle: the daemon owns triage now, so suppress
-  # every subsequent classification and handoff.
-  if [ -e "$STATE/.afk" ]; then
+  # every subsequent classification and handoff. A host that is itself the
+  # away session still delivers its hand-back.
+  if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
     autoarm_record afk
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0

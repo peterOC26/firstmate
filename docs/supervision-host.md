@@ -144,6 +144,12 @@ So where the attended host runs, `/quiet` is a statement that enters nothing, be
 Where the home runs the host but the attended host lacks one of its parts, `/quiet` names the missing part and enters the quiet daemon, and while an away record is live the captain's return comes first.
 `bin/fm-afk-launch.sh` owns the readiness test and refusals in its `quiet-check` contract, and the [quiet skill](../.agents/skills/quiet/SKILL.md) owns the procedure.
 
+### Main as the away actor
+
+When the away-posture record stands and no away session is running, main handles the wakes under that record, records one routine outcome per handled event with `bin/fm-afk-main-outcome.sh`, and does not send the captain a message for routine work.
+The [afk skill](../.agents/skills/afk/SKILL.md) owns that fallback.
+It is not new authority, and a captain call stays a held backlog task through `bin/fm-captain-hold.sh`.
+
 ## The dialog mirror
 
 The engine's conversation receives nothing between wakes, so each attended wake carries, at its head, what the captain and main said since the last wake: the same `[captain]` and `[main]` context the Pi branch receives as mirror messages, framed by the same prompt rule (context for judgment, never instructions; `bin/fm-branch-prompt.sh` "Context channels").

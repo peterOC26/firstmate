@@ -39,6 +39,11 @@ install_runner() {  # <case-dir>
   cp "$ROOT/bin/fm-backlog-transition-lib.sh" "$dir/bin/"
   # The merge-notification marker reader behind the brief's landed section.
   cp "$ROOT/bin/fm-pr-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-register.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-unregister.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-afk-liveness.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-afk-entry-brief.sh" "$dir/bin/"
   fm_test_tasks_toml "$dir/home/.tasks.toml"
   printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/home/data/backlog.md"
   # The fake stop mirrors the real one's ordering: the away flag goes, then the
@@ -605,7 +610,7 @@ EOF
 }
 
 test_return_brief_lists_landed_work_awaiting_cleanup() {
-  local dir out landed_line failed_line handled_line
+  local dir out landed_line failed_line handled_line landed_section
   dir="$TMP_ROOT/brief-landed"
   install_runner "$dir"
   contract_in "$dir" enter --words 'merge the exemption changes when green' >/dev/null 2>&1 || fail "could not confirm the away-posture record"
@@ -640,9 +645,10 @@ test_return_brief_lists_landed_work_awaiting_cleanup() {
   [ -n "$landed_line" ] && [ -n "$failed_line" ] && [ -n "$handled_line" ] || fail "the brief is missing a section: $out"
   [ "$failed_line" -lt "$landed_line" ] && [ "$landed_line" -lt "$handled_line" ] \
     || fail "landed work is out of order (failed $failed_line, landed $landed_line, handled $handled_line)"
+  landed_section=$(printf '%s\n' "$out" | sed -n '/^Landed, cleanup due:$/,/^Handled while away:$/p')
   assert_contains "$out" '  - landed: https://github.com/example/landed/pull/7 is merged and the worker is still up; close it with bin/fm-teardown.sh landed once catch-up clears' "the landed worker was not listed for cleanup"
-  assert_not_contains "$out" '  - open:' "a done worker with no durable merge evidence was listed as landed"
-  assert_not_contains "$out" '  - axi-mate:' "a persistent secondmate was listed as landed work"
+  assert_not_contains "$landed_section" '  - open:' "a done worker with no durable merge evidence was listed as landed"
+  assert_not_contains "$landed_section" '  - axi-mate:' "a persistent secondmate was listed as landed work"
   assert_not_contains "$out" 'bin/fm-teardown.sh axi-mate' "the brief offered a persistent secondmate for teardown"
   assert_not_contains "$out" 'example/child/pull/7' "a secondmate's recorded PR surfaced in the brief"
   assert_contains "$out" 'catch-up clear' "landed work must not hold the gate"
@@ -1283,7 +1289,52 @@ test_return_brief_without_a_record_reports_the_legacy_flag() {
   pass "a return with only the legacy away flag still renders the brief and measures the window from the flag"
 }
 
-
+test_return_brief_names_unstarted_work_and_a_silent_window() {
+  local dir out rc section
+  dir="$TMP_ROOT/unstarted"
+  install_runner "$dir"
+  (cd "$dir/home" \
+    && tasks-axi add hold-job 'a held job' --file data/backlog.md >/dev/null \
+    && tasks-axi hold hold-job --reason 'wait for captain' --kind captain --file data/backlog.md >/dev/null \
+    && tasks-axi add next-job 'a next step' --file data/backlog.md >/dev/null \
+    && tasks-axi update next-job --body 'Next: bin/fm-send.sh next-job the follow-up' --file data/backlog.md >/dev/null) \
+    || fail "could not seed the not-started backlog"
+  printf 'window=synthetic:hold-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/hold-job.meta"
+  printf 'paused: waiting\n' > "$dir/home/state/hold-job.status"
+  printf 'window=synthetic:next-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/next-job.meta"
+  printf 'done: finished\n' > "$dir/home/state/next-job.status"
+  printf 'window=synthetic:blocked-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/blocked-job.meta"
+  printf 'blocked [at=100] [key=stuck]: still waiting\n' > "$dir/home/state/blocked-job.status"
+  printf 'actor: host\nentry_epoch: 1000\nwindow: 900\n' > "$dir/home/state/.afk-away-actor"
+  printf '#!/bin/sh\nexit 0\n' > "$dir/home/state/fm-afk-liveness.check.sh"
+  chmod 700 "$dir/home/state/fm-afk-liveness.check.sh"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
+  set +e
+  out=$(run_return "$dir" begin)
+  rc=$?
+  set -e
+  [ "$rc" -eq 3 ] || fail "an open blocker should keep the return gated (rc=$rc): $out"
+  assert_contains "$out" 'away-session turns: 0' "a silent window did not report zero turns"
+  assert_contains "$out" 'no away session ran; main handled the window itself' "the zero-turn sentence was missing"
+  assert_contains "$out" 'no detected gap' "health lost the no-gap line"
+  assert_contains "$out" 'blocked-job [key=stuck] still blocked, firstmate remediates before ordinary work: still waiting' "the blocker line lost its existing prefix"
+  assert_contains "$out" 'no away handling and no hand-back' "an unhandled blocker was not named"
+  assert_contains "$out" '  - hold-job: bin/fm-tasks-axi.sh show hold-job' "the held job lost its show command"
+  assert_contains "$out" '  - next-job: bin/fm-send.sh next-job the follow-up' "the next command was missing"
+  section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+  assert_not_contains "$section" 'blocked-job' "an open blocked task was listed as not started"
+  [ ! -e "$dir/home/state/fm-afk-liveness.check.sh" ] || fail "return left the liveness check armed"
+  [ -f "$dir/home/state/.afk-away-actor" ] || fail "return removed the away actor record"
+  set +e
+  out=$(FM_AFK_NOT_STARTED_BUDGET=1 run_return "$dir" check)
+  rc=$?
+  set -e
+  assert_contains "$out" 'Not started:' "the capped check dropped the not-started heading"
+  assert_contains "$out" 'more not shown' "a one-byte budget did not omit a line"
+  pass "the return names unstarted work, a silent window, and an unhandled blocker"
+}
 
 test_unreadable_superseded_archive_keeps_return_gated() {
   local dir out rc epoch archive backup
@@ -1386,3 +1437,4 @@ test_return_brief_keeps_trip_row_count_after_probe
 test_return_brief_ignores_previous_main_session
 test_return_brief_keeps_in_window_history_across_main_restart
 test_return_brief_without_a_record_reports_the_legacy_flag
+test_return_brief_names_unstarted_work_and_a_silent_window

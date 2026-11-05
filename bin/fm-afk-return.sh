@@ -27,7 +27,8 @@
 # merge-notification marker bin/fm-pr-lib.sh owns, read from durable records
 # only, never the forge - finished work that owes an ordinary teardown, which
 # is fleet work and so waits for the gate rather than holding it), then what
-# the away session handled, then cost. The health snapshot is taken BEFORE the
+# the away session handled, then what was not started (bin/fm-afk-entry-brief.sh,
+# capped to the subsection), then cost. The health snapshot is taken BEFORE the
 # daemon shutdown so the shutdown itself cannot read as a gap.
 #
 # THE GATE. `blocked:` is the crewmate protocol's firstmate-actionable verb. A
@@ -325,7 +326,7 @@ return_guard() {
 # --- supervisor health, snapshotted before anything is shut down ------------
 
 health_snapshot() {  # <evidence-file>
-  local evidence=$1 beat_age state lines="" note=""
+  local evidence=$1 beat_age state lines="" note="" extra=""
   beat_age=$(fm_path_age "$STATE/.last-watcher-beat")
   if [ -e "$STATE/.watcher-down" ]; then
     # The marker survives past its episode in an acked:* state
@@ -359,6 +360,14 @@ delivery wedged: $(head -1 "$STATE/.subsuper-inject-wedged" 2>/dev/null || true)
   fi
   if [ -z "$(printf '%s' "$lines" | tr -d '[:space:]')" ]; then
     lines="supervision ran through the away window with no detected gap (watcher beat ${beat_age}s old at return)"
+  fi
+  if [ -f "$STATE/.afk-away-actor" ] && [ ! -L "$STATE/.afk-away-actor" ] \
+    && [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
+    extra=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" health 2>/dev/null || true)
+    if [ -n "$extra" ]; then
+      lines="$lines
+$extra"
+    fi
   fi
   append_evidence health "$lines
 $note" "$evidence"
@@ -535,6 +544,7 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
 render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-ok>
   local evidence=$1 blockers=$2 since=$3 drain_ok=$4 now record superseded superseded_at archive_dir stamp
   local tag task key summary count routine routine_visible captain visible_outcomes live held_err last verb rows status url drained=0 pointer
+  local unhandled='' clause used size shown omitted budget not_started_body extra_line
   now=$(date +%s)
   # Where main processes outcomes through the drain's BRANCH OUTCOMES section
   # (the supervision host off Pi, docs/supervision-host.md "Captain outcomes"),
@@ -636,10 +646,18 @@ EOF
     count=$((count + 1))
     printf '  - %s\n' "$text"
   done < "$evidence"
+  if [ -f "$STATE/.afk-away-actor" ] && [ ! -L "$STATE/.afk-away-actor" ] \
+    && [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
+    unhandled=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" unhandled 2>/dev/null || true)
+  fi
   while IFS="$(printf '\t')" read -r tag task key summary; do
     [ "$tag" = blocker ] || continue
     count=$((count + 1))
-    printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s\n' "$task" "$key" "$summary"
+    clause=''
+    if [ -n "$unhandled" ] && printf '%s\n' "$unhandled" | grep -Fxq -- "$(printf '%s\t%s' "$task" "$key")"; then
+      clause='; no away handling and no hand-back'
+    fi
+    printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s%s\n' "$task" "$key" "$summary" "$clause"
   done < "$blockers"
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
@@ -691,7 +709,40 @@ EOF
     printf '  (no routine outcomes recorded in the store for this window)\n'
   fi
 
-  # 7. cost.
+  # 7. not started. Held rows and live tasks with a next step, each with the
+  # command the entry inventory would run. An open blocked event stays in the
+  # blocker section above. The cap applies to this subsection only.
+  printf 'Not started:\n'
+  not_started_body=''
+  if [ -x "$SCRIPT_DIR/fm-afk-entry-brief.sh" ]; then
+    not_started_body=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+      "$SCRIPT_DIR/fm-afk-entry-brief.sh" not-started 2>/dev/null || true)
+  fi
+  if [ -z "$(printf '%s' "$not_started_body" | tr -d '[:space:]')" ]; then
+    printf '  (nothing)\n'
+  else
+    budget=${FM_AFK_NOT_STARTED_BUDGET:-4096}
+    case "$budget" in ''|*[!0-9]*) budget=4096 ;; esac
+    used=0
+    shown=0
+    omitted=0
+    while IFS= read -r extra_line; do
+      [ -n "$extra_line" ] || continue
+      size=${#extra_line}
+      if [ $((used + size + 1)) -gt "$budget" ]; then
+        omitted=$((omitted + 1))
+        continue
+      fi
+      printf '%s\n' "$extra_line"
+      used=$((used + size + 1))
+      shown=$((shown + 1))
+    done <<EOF
+$not_started_body
+EOF
+    [ "$omitted" -eq 0 ] || printf '  (%s more not shown)\n' "$omitted"
+  fi
+
+  # 8. cost.
   live=0
   for meta in "$STATE"/*.meta; do [ -f "$meta" ] && live=$((live + 1)); done
   printf 'Cost: %s supervision outcome(s) recorded (%s routine, %s captain); %s task(s) live at return.\n' \
@@ -850,6 +901,9 @@ EOF
     lifecycle_ok=0
   fi
   render_return_brief "$evidence" "$blockers" "$since" "$drain_ok"
+  if [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" disarm >/dev/null 2>&1 || true
+  fi
   if [ "$HELD_READ_FAILED" -eq 1 ]; then
     append_evidence lifecycle "held set unreadable: $HELD_READ_PATH; catch-up stays gated" "$evidence"
     lifecycle_ok=0
