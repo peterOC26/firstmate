@@ -544,7 +544,7 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
 render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-ok>
   local evidence=$1 blockers=$2 since=$3 drain_ok=$4 now record superseded superseded_at archive_dir stamp
   local tag task key summary count routine routine_visible captain visible_outcomes live held_err last verb rows status url drained=0 pointer
-  local unhandled='' clause used size shown omitted budget not_started_body extra_line
+  local used size shown omitted budget not_started_body extra_line
   now=$(date +%s)
   # Where main processes outcomes through the drain's BRANCH OUTCOMES section
   # (the supervision host off Pi, docs/supervision-host.md "Captain outcomes"),
@@ -646,18 +646,10 @@ EOF
     count=$((count + 1))
     printf '  - %s\n' "$text"
   done < "$evidence"
-  if [ -f "$STATE/.afk-away-actor" ] && [ ! -L "$STATE/.afk-away-actor" ] \
-    && [ -x "$SCRIPT_DIR/fm-afk-liveness.sh" ]; then
-    unhandled=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-liveness.sh" unhandled 2>/dev/null || true)
-  fi
   while IFS="$(printf '\t')" read -r tag task key summary; do
     [ "$tag" = blocker ] || continue
     count=$((count + 1))
-    clause=''
-    if [ -n "$unhandled" ] && printf '%s\n' "$unhandled" | grep -Fxq -- "$(printf '%s\t%s' "$task" "$key")"; then
-      clause='; no away handling and no hand-back'
-    fi
-    printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s%s\n' "$task" "$key" "$summary" "$clause"
+    printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s\n' "$task" "$key" "$summary"
   done < "$blockers"
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue

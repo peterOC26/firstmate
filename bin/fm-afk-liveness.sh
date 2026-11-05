@@ -4,12 +4,9 @@
 # Usage:
 #   fm-afk-liveness.sh arm       Record the expected actor and register the check.
 #   fm-afk-liveness.sh check     Print a line only when the window shows no away
-#                                session, or an open blocked event has had no
-#                                handling and no hand-back. Each line wakes once.
+#                                session. The line wakes once per window.
 #   fm-afk-liveness.sh disarm    Unregister the check. The actor record stays.
 #   fm-afk-liveness.sh health    Print the return brief's away-session lines.
-#   fm-afk-liveness.sh unhandled Print task and key for each open blocked event
-#                                with no handling and no hand-back.
 #   fm-afk-liveness.sh --help
 #
 # `arm` writes state/.afk-away-actor (actor, entry epoch, window) and registers
@@ -26,9 +23,6 @@
 #
 # The check stays silent until the window has elapsed (default 15 minutes,
 # FM_AFK_LIVENESS_WINDOW). FM_AFK_LIVENESS_NOW pins the clock for tests.
-# An open blocked event is due once it is older than that window. Handling is
-# a later host-log line, daemon-log line, or outcome-store row that names the
-# task, at or after the later of the block and the entry.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,13 +42,11 @@ DEFAULT_WINDOW=900
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-check-lib.sh
 . "$SCRIPT_DIR/fm-check-lib.sh"
-# shellcheck source=bin/fm-classify-lib.sh
-. "$SCRIPT_DIR/fm-classify-lib.sh"
 # shellcheck source=bin/fm-afk-contract.sh
 . "$SCRIPT_DIR/fm-afk-contract.sh"
 
 usage() {
-  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 now_epoch() {
@@ -107,13 +99,13 @@ load_log_evidence() {
     }
     FILENAME == host {
       if ($1 ~ /^[0-9]+$/ && $2 == "handled" && index($0,"posture=away"))
-        print $1 "\thost\t" $0
+        print $1 "\thost"
       next
     }
     /^\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9][+-][0-9][0-9][0-9][0-9]\] / {
       message=substr($0,28)
       if (message ~ /^escalate: / || message ~ /^self-handle( \(paused\))?: / || message ~ /^wake force-self \(FM_INJECT_SKIP\): heartbeat($|:)/)
-        printf "%.0f\tdaemon\t%s\n", epoch(substr($0,2,24)), message
+        printf "%.0f\tdaemon\n", epoch(substr($0,2,24))
     }
   ' "$host" "$daemon")
 }
@@ -123,100 +115,6 @@ count_turns() {
     $1 + 0 >= since && $2 == actor { n++ }
     END { print n + 0 }
   '
-}
-
-log_names_task_since() {
-  printf '%s\n' "$LOG_EVIDENCE" | awk -F '\t' -v since="$1" -v id="$2" -v key="$3" '
-    $1 + 0 >= since {
-      if ($2 == "daemon" && $3 !~ /^escalate: /) {
-        if ($3 !~ /^self-handle( \(paused\))?: /) next
-        keyed=0
-        n=split($0, fields, /[^A-Za-z0-9._=-]+/)
-        for (i=1; i<=n; i++) if (fields[i] == "key=" key) keyed=1
-        if (!keyed) next
-      }
-      n=split($0, tokens, /[^A-Za-z0-9._-]+/)
-      for (i=1; i<=n; i++) {
-        if (tokens[i] == id || tokens[i] == id ".status") {
-          found=1; exit
-        }
-      }
-    }
-    END { exit found ? 0 : 1 }
-  '
-}
-
-outcome_names_task_since() {  # <since> <id>
-  local since=$1 id=$2 needle line epoch
-  [ -f "$STATE/branch-outcomes.jsonl" ] || return 1
-  needle="\"task\":\"$id\""
-  while IFS= read -r line; do
-    case "$line" in
-      *"$needle"*) ;;
-      *) continue ;;
-    esac
-    epoch=$(printf '%s\n' "$line" | sed -n 's/.*"epoch":\([0-9][0-9]*\).*/\1/p')
-    case "$epoch" in ''|*[!0-9]*) continue ;; esac
-    [ "$epoch" -ge "$since" ] && return 0
-  done < "$STATE/branch-outcomes.jsonl"
-  return 1
-}
-
-block_handled() {  # <id> <since> <key>
-  log_names_task_since "$2" "$1" "$3" && return 0
-  outcome_names_task_since "$2" "$1"
-}
-
-block_epoch_of() {  # <status-file> <key>
-  local file=$1 key=$2 line candidate='' epoch verb
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      *"key=${key}"*) ;;
-      *) continue ;;
-    esac
-    status_line_verb "$line" verb
-    [ "$verb" = blocked ] || continue
-    candidate=$line
-  done < "$file"
-  epoch=$(printf '%s\n' "$candidate" | sed -n 's/.*\[at=\([0-9][0-9]*\)\].*/\1/p')
-  case "$epoch" in
-    ''|*[!0-9]*)
-      if [ "$(uname)" = Darwin ]; then
-        /usr/bin/stat -f %m "$file" 2>/dev/null || printf '0\n'
-      else
-        stat -c %Y "$file" 2>/dev/null || printf '0\n'
-      fi
-      ;;
-    *) printf '%s\n' "$epoch" ;;
-  esac
-}
-
-# Print task<TAB>key for each due open unhandled blocked event.
-each_unhandled_block() {
-  local meta id status key verb _summary opened since now
-  [ -d "$STATE" ] || return 0
-  read_actor || return 0
-  now=$(now_epoch)
-  for meta in "$STATE"/*.meta; do
-    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
-    id=$(basename "$meta")
-    id=${id%.meta}
-    status="$STATE/$id.status"
-    [ -f "$status" ] && [ ! -L "$status" ] || continue
-    while IFS="$(printf '\t')" read -r key verb _summary; do
-      [ "$verb" = blocked ] || continue
-      [ -n "$key" ] || continue
-      opened=$(block_epoch_of "$status" "$key")
-      case "$opened" in ''|*[!0-9]*) opened=$ENTRY ;; esac
-      since=$opened
-      [ "$since" -lt "$ENTRY" ] && since=$ENTRY
-      [ "$now" -ge "$((since + WINDOW))" ] || continue
-      block_handled "$id" "$since" "$key" && continue
-      printf '%s\t%s\n' "$id" "$key"
-    done <<EOF
-$(status_open_decisions "$status")
-EOF
-  done
 }
 
 fired_has() {  # <key>
@@ -316,32 +214,19 @@ cmd_health() {
   [ "$turns" -eq 0 ] && printf 'no away session ran; main handled the window itself\n'
 }
 
-cmd_unhandled() {
-  load_log_evidence
-  each_unhandled_block
-}
-
 cmd_check() {
-  local now due turns id key
+  local now due turns
   read_actor || return 0
   now=$(now_epoch)
   due=$((ENTRY + WINDOW))
-  load_log_evidence
   if [ "$now" -ge "$due" ] && ! fired_has no-session; then
+    load_log_evidence
     turns=$(count_turns "$ACTOR" "$ENTRY")
     if [ "$turns" -eq 0 ]; then
       printf 'no away session ran; main handled the window itself\n'
       fired_add no-session
     fi
   fi
-  while IFS="$(printf '\t')" read -r id key; do
-    [ -n "$id" ] || continue
-    fired_has "blocked:$id:$key" && continue
-    printf '%s [key=%s] has had no away handling and no hand-back\n' "$id" "$key"
-    fired_add "blocked:$id:$key"
-  done <<EOF
-$(each_unhandled_block)
-EOF
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
@@ -350,7 +235,6 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     check) cmd_check ;;
     disarm) cmd_disarm ;;
     health) cmd_health ;;
-    unhandled) cmd_unhandled ;;
     -h|--help|help) usage ;;
     *) usage >&2; exit 2 ;;
   esac

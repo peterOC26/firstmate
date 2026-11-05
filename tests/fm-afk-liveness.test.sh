@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Away-session liveness: zero turns, one turn, and an unhandled blocker.
+# Away-session liveness: zero turns, one turn, and window lifecycle.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -71,40 +71,6 @@ test_one_away_turn_keeps_the_check_silent() {
   pass "one host or daemon turn keeps the no-session line silent"
 }
 
-test_old_unhandled_blocker_wakes_once_and_a_fresh_one_waits() {
-  local dir out
-  dir="$TMP_ROOT/blocked"
-  seed "$dir" host
-  printf 'window=synthetic:old-job\nbackend=tmux\nkind=ship\n' > "$dir/state/old-job.meta"
-  printf 'blocked [at=%s] [key=dep]: waiting on the feed\n' "$ENTRY" > "$dir/state/old-job.status"
-  printf 'window=synthetic:new-job\nbackend=tmux\nkind=ship\n' > "$dir/state/new-job.meta"
-  printf 'blocked [at=%s] [key=fresh]: just opened\n' "$((ENTRY + WINDOW))" > "$dir/state/new-job.status"
-  printf 'window=synthetic:job-extra\nbackend=tmux\nkind=ship\n' > "$dir/state/job-extra.meta"
-  printf 'blocked [at=%s] [key=other]: named only as a longer id\n' "$ENTRY" > "$dir/state/job-extra.status"
-  printf '%s\thandled\tjob-extra-more\tposture=away\n' "$((ENTRY + 1))" > "$dir/state/.supervision-host.log"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW)) "$LIVE" check) \
-    || fail "the blocker check failed: $out"
-  assert_contains "$out" 'old-job [key=dep] has had no away handling and no hand-back' "the old blocker was not named"
-  assert_not_contains "$out" 'new-job' "a blocker inside the window was named"
-  assert_contains "$out" 'job-extra [key=other] has had no away handling and no hand-back' "a longer id was treated as handled"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW + 5)) "$LIVE" check)
-  assert_not_contains "$out" 'old-job' "the old blocker woke twice: $out"
-  printf '%s\thandled\told-job\tposture=away\n' "$((ENTRY + 2))" >> "$dir/state/.supervision-host.log"
-  rm -f "$dir/state/.afk-liveness-fired"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW + 5)) "$LIVE" unhandled)
-  assert_not_contains "$out" 'old-job' "a later host line that names the task did not count as handling: $out"
-  assert_contains "$out" $'job-extra\tother' "an unhandled blocker disappeared from the return list"
-  assert_not_contains "$out" 'new-job' "return tagged a blocker before its window"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + 2 * WINDOW - 1)) "$LIVE" unhandled)
-  assert_not_contains "$out" 'new-job' "return tagged a blocker one second early"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + 2 * WINDOW)) "$LIVE" unhandled)
-  assert_contains "$out" $'new-job\tfresh' "return omitted a blocker at the window boundary"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + 2 * WINDOW)) "$LIVE" check)
-  assert_contains "$out" 'new-job [key=fresh]' "check disagreed with return at the window boundary"
-  pass "check and return use the same blocker window"
-
-}
-
 test_arm_records_the_actor_and_disarm_drops_only_the_check() {
   local dir out home
   dir="$TMP_ROOT/arm"
@@ -128,39 +94,30 @@ test_new_window_gets_new_wakes() {
   local dir out
   dir="$TMP_ROOT/windows"
   seed "$dir" host
-  printf 'kind=ship\n' > "$dir/state/job.meta"
-  printf 'blocked [at=1000] [key=dep]: waiting\n' > "$dir/state/job.status"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
   assert_contains "$out" 'no away session ran' "first window did not wake"
-  assert_contains "$out" 'job [key=dep]' "first blocker did not wake"
   printf 'actor: host\nentry_epoch: 2000\nwindow: 900\n' > "$dir/state/.afk-away-actor"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2900 "$LIVE" check)
   assert_contains "$out" 'no away session ran' "second window inherited no-session suppression"
-  assert_contains "$out" 'job [key=dep]' "second window inherited blocker suppression"
   out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=2901 "$LIVE" check)
   [ -z "$out" ] || fail "second window fired twice: $out"
-  pass "each window gets its own no-session and blocker wakes"
+  pass "each window gets its own no-session wake"
 }
 
-test_failed_receipts_are_not_handling() {
+test_failed_receipts_are_not_turns() {
   local dir out actor
   for actor in host daemon branch; do
     dir="$TMP_ROOT/failed-$actor"
     seed "$dir" "$actor"
-    printf 'kind=ship\n' > "$dir/state/job.meta"
-    printf 'blocked [at=1000] [key=dep]: waiting\n' > "$dir/state/job.status"
     printf '1001\tfailed\tposture=away\tjob\n' > "$dir/state/.supervision-host.log"
     printf '[1970-01-01T00:16:41+0000] %s\n' 'daemon starting' 'startup failed: job not found' 'wake: signal: job.status' 'inject failed: job' > "$dir/state/.supervise-daemon.log"
     out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" check)
     assert_contains "$out" 'no away session ran' "$actor counted a failure as a turn"
-    assert_contains "$out" 'job [key=dep]' "$actor counted a receipt as handling"
   done
   run_live "$dir" "$ROOT/bin/fm-afk-main-outcome.sh" --task job --summary handled >/dev/null || fail "main outcome failed"
   out=$(run_live "$dir" "$LIVE" health)
   assert_contains "$out" 'away-session turns: 0' "main outcome counted as branch turn"
-  out=$(run_live "$dir" "$LIVE" unhandled)
-  [ -z "$out" ] || fail "main handling failed to clear the blocker evidence"
-  pass "failed receipts do not establish handling and main does not count as branch"
+  pass "failed receipts and main outcomes do not count as away turns"
 }
 
 test_daemon_offsets_and_full_log() {
@@ -168,8 +125,6 @@ test_daemon_offsets_and_full_log() {
   dir="$TMP_ROOT/offsets"
   seed "$dir" daemon
   printf 'actor: daemon\nentry_epoch: 1709251200\nwindow: 900\n' > "$dir/state/.afk-away-actor"
-  printf 'kind=ship\n' > "$dir/state/job.meta"
-  printf 'blocked [at=1709251200] [key=dep]: waiting\n' > "$dir/state/job.status"
   {
     printf '[2024-02-29T23:59:59+0000] self-handle: job\n'
     printf '[2024-03-01T01:00:00+0100] self-handle: signal: /home/fleet/state/job.status -> job.status: working: building\n'
@@ -184,100 +139,14 @@ test_daemon_offsets_and_full_log() {
   out=$(PATH="$dir/fakebin:$PATH" run_live "$dir" "$LIVE" health)
   assert_contains "$out" 'away-session turns: 2' "offsets or leap day parsed incorrectly"
   out=$(PATH="$dir/fakebin:$PATH" run_live "$dir" env FM_AFK_LIVENESS_NOW=1709252100 "$LIVE" check)
-  assert_contains "$out" 'job [key=dep]' "unrelated progress hid the open blocker"
+  [ -z "$out" ] || fail "recorded daemon turns still triggered a no-session wake: $out"
   pass "full daemon log handles offsets and leap day without date subprocesses"
 }
 
-test_daemon_status_names_and_escalations() {
-  local dir out action name command
-  for action in self-handle 'self-handle (paused)' escalate; do
-    for name in job.status /home/fleet/state/job.status; do
-      dir="$TMP_ROOT/daemon-shapes"
-      seed "$dir" daemon
-      printf 'kind=ship\n' > "$dir/state/job.meta"
-      printf 'blocked [at=1000] [key=dep]: waiting\n' > "$dir/state/job.status"
-      printf '[1970-01-01T00:16:41+0000] %s: signal: %s -> %s: blocked [key=dep]: waiting\n' "$action" "$name" "$name" > "$dir/state/.supervise-daemon.log"
-      rm -f "$dir/state/.afk-liveness-fired"
-      for command in check unhandled; do
-        out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" "$command")
-        [ -z "$out" ] || fail "$command missed $action for $name: $out"
-      done
-    done
-  done
-  for name in job-extra.status other-job.status job.status.old job.status-more jobjob.status; do
-    printf '[1970-01-01T00:16:41+0000] escalate: signal: /home/fleet/state/%s -> %s: blocked\n' "$name" "$name" > "$dir/state/.supervise-daemon.log"
-    out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" unhandled)
-    assert_contains "$out" $'job\tdep' "a different status name $name counted as job"
-  done
-  printf '[1970-01-01T00:16:39+0000] escalate: signal: job.status -> job.status: blocked\n' > "$dir/state/.supervise-daemon.log"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" unhandled)
-  assert_contains "$out" $'job\tdep' "an older escalation handled the new blocker"
-  pass "daemon handling and escalations recognize exact status basenames and paths"
-}
-
-test_preentry_blocker_gets_a_full_window() {
-  local dir out command
-  dir="$TMP_ROOT/preentry"
-  seed "$dir" host
-  printf 'kind=ship\n' > "$dir/state/job.meta"
-  printf 'blocked [at=100] [key=dep]: waiting\n' > "$dir/state/job.status"
-  for command in check unhandled; do
-    out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW - 1)) "$LIVE" "$command")
-    [ -z "$out" ] || fail "$command reported a pre-entry blocker early: $out"
-    [ ! -e "$dir/state/.afk-liveness-fired" ] || fail "early check spent the wake"
-  done
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW)) "$LIVE" check)
-  assert_contains "$out" 'job [key=dep]' "pre-entry blocker missed its due wake"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW)) "$LIVE" unhandled)
-  assert_contains "$out" $'job\tdep' "pre-entry blocker missed its due return tag"
-  out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=$((ENTRY + WINDOW + 1)) "$LIVE" check)
-  [ -z "$out" ] || fail "due blocker woke twice: $out"
-  pass "pre-entry blockers receive a full away window before either report"
-}
-
-test_daemon_self_handling_requires_the_open_key() {
-  local dir out message command
-  dir="$TMP_ROOT/keyed-handling"
-  seed "$dir" daemon
-  printf 'kind=ship\n' > "$dir/state/job.meta"
-  printf 'blocked [at=100] [key=dep]: waiting\nworking: retrying\n' > "$dir/state/job.status"
-  for message in \
-    'self-handle: signal: /state/job.status -> job.status: working: building' \
-    'self-handle: stale: window:job -> stale + terminal (already escalated by signal)' \
-    'self-handle (paused): stale: window:job -> declared wait' \
-    'self-handle: signal: job.status -> job.status: blocked [key=dep-other]: waiting' \
-    'self-handle: signal: job.status -> job.status: blocked [key=other-dep]: waiting'; do
-    printf '[1970-01-01T00:01:41+0000] escalate: signal: job.status -> job.status: blocked [key=dep]\n[1970-01-01T00:16:41+0000] %s\n' "$message" > "$dir/state/.supervise-daemon.log"
-    rm -f "$dir/state/.afk-liveness-fired"
-    for command in check unhandled; do
-      out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" "$command")
-      assert_contains "$out" 'job' "$command treated unrelated self-handling as blocker handling: $message"
-    done
-  done
-  for message in \
-    'self-handle: stale: window:job -> blocked [key=dep]: waiting' \
-    'self-handle (paused): stale: window:job -> blocked [key=dep]: waiting' \
-    'escalate: signal: /state/job.status -> job.status: blocked: waiting'; do
-    printf '[1970-01-01T00:16:41+0000] %s\n' "$message" > "$dir/state/.supervise-daemon.log"
-    rm -f "$dir/state/.afk-liveness-fired"
-    for command in check unhandled; do
-      out=$(run_live "$dir" env FM_AFK_LIVENESS_NOW=1900 "$LIVE" "$command")
-      [ -z "$out" ] || fail "$command missed keyed handling or hand-back: $message: $out"
-    done
-  done
-  pass "daemon self-handling requires the exact open key while escalations count as hand-back"
-}
-
-test_preentry_blocker_gets_a_full_window
-test_daemon_self_handling_requires_the_open_key
-
-test_daemon_status_names_and_escalations
-
 test_new_window_gets_new_wakes
-test_failed_receipts_are_not_handling
+test_failed_receipts_are_not_turns
 test_daemon_offsets_and_full_log
 
 test_check_stays_silent_until_the_window_and_fires_once
 test_one_away_turn_keeps_the_check_silent
-test_old_unhandled_blocker_wakes_once_and_a_fresh_one_waits
 test_arm_records_the_actor_and_disarm_drops_only_the_check

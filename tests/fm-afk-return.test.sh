@@ -1320,7 +1320,6 @@ test_return_brief_names_unstarted_work_and_a_silent_window() {
   assert_contains "$out" 'no away session ran; main handled the window itself' "the zero-turn sentence was missing"
   assert_contains "$out" 'no detected gap' "health lost the no-gap line"
   assert_contains "$out" 'blocked-job [key=stuck] still blocked, firstmate remediates before ordinary work: still waiting' "the blocker line lost its existing prefix"
-  assert_contains "$out" 'no away handling and no hand-back' "an unhandled blocker was not named"
   assert_contains "$out" '  - hold-job: bin/fm-tasks-axi.sh show hold-job' "the held job lost its show command"
   assert_contains "$out" '  - next-job: bin/fm-send.sh next-job the follow-up' "the next command was missing"
   section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
