@@ -1,0 +1,4 @@
+ok - entry inventory lists every gate and leaves the home unchanged
+ok - an unreadable backlog is reported and left untouched
+ok - a future date registers one check and a passed date does not
+ok - away enter prints the inventory and quiet enter omits it

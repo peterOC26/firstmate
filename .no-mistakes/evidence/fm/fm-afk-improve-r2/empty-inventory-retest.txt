@@ -1,0 +1,8 @@
+$ bin/fm-afk-entry-brief.sh (empty disposable lab home)
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+OBSERVED: empty sections omitted; no backlog created.

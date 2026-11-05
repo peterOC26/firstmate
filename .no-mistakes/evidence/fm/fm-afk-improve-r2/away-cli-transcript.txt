@@ -1,0 +1,578 @@
+$ fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6P7QKVE7DA9AXYNDHV9FXED/.away-live-leb7q7rk
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6P7QKVE7DA9AXYNDHV9FXED/.away-live-leb7q7rk
+[exit 0]
+
+$ fm-tasks-axi.sh add decision Choose a name
+ok: added decision -> Queued
+task:
+  id: decision
+  title: Choose a name
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start decision` to move it to in flight
+  - Run `tasks-axi block decision --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh add finished Completed dependency
+ok: added finished -> Queued
+task:
+  id: finished
+  title: Completed dependency
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start finished` to move it to in flight
+  - Run `tasks-axi block finished --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh add queued Ready after dependency
+ok: added queued -> Queued
+task:
+  id: queued
+  title: Ready after dependency
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start queued` to move it to in flight
+  - Run `tasks-axi block queued --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh add due Past deferral
+ok: added due -> Queued
+task:
+  id: due
+  title: Past deferral
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start due` to move it to in flight
+  - Run `tasks-axi block due --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh add future Future deferral
+ok: added future -> Queued
+task:
+  id: future
+  title: Future deferral
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start future` to move it to in flight
+  - Run `tasks-axi block future --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh block queued --by finished
+ok: block queued -> blocked-by finished
+help[2]:
+  - Run `tasks-axi unblock queued --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+[exit 0]
+
+$ fm-tasks-axi.sh done finished --note landed
+ok: done finished -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[exit 0]
+
+$ fm-captain-hold.sh hold decision --reason Choose the public name
+decision
+[exit 0]
+
+$ fm-tasks-axi.sh hold due --reason Revisit on the date --kind future --until 2026-11-04
+ok: hold due -> held (future, until 2026-11-04)
+task:
+  id: due
+  title: Past deferral
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: Revisit on the date
+  hold_kind: future
+  hold_until: 2026-11-04
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold due` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+[exit 0]
+
+$ fm-tasks-axi.sh hold future --reason Revisit on the date --kind future --until 2026-11-06
+ok: hold future -> held (future, until 2026-11-06)
+task:
+  id: future
+  title: Future deferral
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: Revisit on the date
+  hold_kind: future
+  hold_until: 2026-11-06
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold future` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+[exit 0]
+
+$ fm-tasks-axi.sh update finished --body Next: bin/fm-send.sh finished prepare the follow-up
+ok: updated finished (body)
+task:
+  id: finished
+  title: Completed dependency
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-11-05
+  deps: none
+  links: none
+  body: "Next: bin/fm-send.sh finished prepare the follow-up"
+help[1]:
+  - Run `tasks-axi show finished --full` to see the result
+[exit 0]
+
+$ fm-afk-launch.sh enter --words Move ready jobs forward; no merges. Stop a job after three checks fail on the same finding.
+Away posture recorded at 2026-11-05T21:18:30Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 6 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-05T21:18:30Z
+  expected return: not given
+  spend cap: 6 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Move ready jobs forward; no merges. Stop a job after three checks fail on the same finding.
+Live work:
+  blocked: blocked; next: bin/fm-send.sh blocked retry
+  finished: done; next: bin/fm-send.sh finished prepare the follow-up
+  other-green: done
+  paused: paused; next: bin/fm-peek.sh paused
+  repeated: failed
+  working: working; next: bin/fm-peek.sh working
+
+Held for the captain:
+  decision: fm-hold-v1:Q2hvb3NlIHRoZSBwdWJsaWMgbmFtZQ==
+  future: Revisit on the date
+
+Queued, blocker cleared:
+  queued: blocked-by finished is done
+
+Green, waiting on a merge sentence:
+  finished: https://github.com/example/away-demo/pull/9
+  other-green: https://github.com/example/away-demo/pull/10
+
+Dates that have passed:
+  due: hold until 2026-11-04
+
+Future dates, not registered:
+  future: hold until 2026-11-06; bin/fm-afk-entry-brief.sh --register-future future
+
+Stop point, three failed checks:
+  repeated: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+
+OBSERVED: away record exists; inventory contains every seeded job category, both green PRs, cleared dependency and dates; backlog bytes unchanged; no future check registered by entry.
+
+$ fm-tasks-axi.sh show decision
+task:
+  id: decision
+  title: Choose a name
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "Choose the public name"
+  hold_kind: captain
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-11-05T21:18:28Z"
+[exit 0]
+
+PRODUCT FAILURE: the normal captain-hold path displays an encoded fm-hold-v1 reason in the entry inventory, while fm-tasks-axi.sh show decodes the same persisted reason correctly.
+
+$ fm-tasks-axi.sh add plain-hold Plain held comparison
+ok: added plain-hold -> Queued
+task:
+  id: plain-hold
+  title: Plain held comparison
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start plain-hold` to move it to in flight
+  - Run `tasks-axi block plain-hold --by <other>` to record a dependency
+[exit 0]
+
+$ fm-tasks-axi.sh hold plain-hold --reason Plain held comparison --kind captain
+ok: hold plain-hold -> held (captain)
+task:
+  id: plain-hold
+  title: Plain held comparison
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: Plain held comparison
+  hold_kind: captain
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-05
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold plain-hold` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+[exit 0]
+
+$ fm-afk-entry-brief.sh
+Live work:
+  blocked: blocked; next: bin/fm-send.sh blocked retry
+  finished: done; next: bin/fm-send.sh finished prepare the follow-up
+  other-green: done
+  paused: paused; next: bin/fm-peek.sh paused
+  repeated: failed
+  working: working; next: bin/fm-peek.sh working
+
+Held for the captain:
+  decision: fm-hold-v1:Q2hvb3NlIHRoZSBwdWJsaWMgbmFtZQ==
+  future: Revisit on the date
+  plain-hold: Plain held comparison
+
+Queued, blocker cleared:
+  queued: blocked-by finished is done
+
+Green, waiting on a merge sentence:
+  finished: https://github.com/example/away-demo/pull/9
+  other-green: https://github.com/example/away-demo/pull/10
+
+Dates that have passed:
+  due: hold until 2026-11-04
+
+Future dates, not registered:
+  future: hold until 2026-11-06; bin/fm-afk-entry-brief.sh --register-future future
+
+Stop point, three failed checks:
+  repeated: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+
+COUNTERFACTUAL: a plain tasks-axi hold displays its reason correctly in the same inventory; the normal captain-hold wrapper stores encoded reasons, which the new reader does not decode.
+
+$ fm-afk-entry-brief.sh
+Live work:
+  blocked: blocked; next: bin/fm-send.sh blocked retry
+  finished: done; next: bin/fm-send.sh finished prepare the follow-up
+  other-green: done
+  paused: paused; next: bin/fm-peek.sh paused
+  repeated: failed
+  working: working; next: bin/fm-peek.sh working
+
+Held for the captain:
+  decision: fm-hold-v1:Q2hvb3NlIHRoZSBwdWJsaWMgbmFtZQ==
+  future: Revisit on the date
+  plain-hold: Plain held comparison
+
+Queued, blocker cleared:
+  queued: blocked-by finished is done
+
+Green, waiting on a merge sentence:
+  finished: https://github.com/example/away-demo/pull/9
+  other-green: https://github.com/example/away-demo/pull/10
+
+Dates that have passed:
+  due: hold until 2026-11-04
+
+Future dates, not registered:
+  future: hold until 2026-11-06; bin/fm-afk-entry-brief.sh --register-future future
+
+Stop point, three failed checks:
+  repeated: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+
+OBSERVED: standalone inventory changed no state or data bytes.
+
+$ fm-afk-entry-brief.sh
+entry inventory: backlog file is unreadable
+Live work:
+  blocked: blocked; next: bin/fm-send.sh blocked retry
+  finished: done
+  other-green: done
+  paused: paused; next: bin/fm-peek.sh paused
+  repeated: failed
+  working: working; next: bin/fm-peek.sh working
+
+Green, waiting on a merge sentence:
+  finished: https://github.com/example/away-demo/pull/9
+  other-green: https://github.com/example/away-demo/pull/10
+
+Stop point, three failed checks:
+  repeated: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+
+OBSERVED: unreadable backlog reported with exit 0 and no persisted byte changes.
+
+$ fm-afk-entry-brief.sh --register-future due
+due hold until 2026-11-04 is already due
+[exit 0]
+
+$ fm-afk-entry-brief.sh --register-future future
+registered: state/fm-afk-future-future.check.sh
+[exit 0]
+
+$ registered future check (today=2026-11-05)
+[exit 0]
+
+$ registered future check (today=2026-11-06)
+future hold until 2026-11-06 is due
+[exit 0]
+
+$ registered future check (today=2026-11-06)
+[exit 0]
+
+OBSERVED: registered executable stays silent before its date, emits exactly once when due, and does not mark a job seen.
+
+$ fm-afk-main-outcome.sh --task working --summary Reviewed progress and left the active build running --wake signal: working.status
+1
+[exit 0]
+
+$ fm-afk-main-outcome.sh --task working --summary Decision requested --verdict captain
+fm-afk-main-outcome.sh - one routine outcome for an event main handled
+while the away record stood and no away session was running.
+
+Usage:
+  fm-afk-main-outcome.sh --task <id> --summary <text> [--wake <text>] [--silent true|false]
+      Append one routine outcome row. --silent defaults to true, so a routine
+      note stays out of the captain's chat. This is not new authority.
+      A captain call stays a held backlog task through bin/fm-captain-hold.sh.
+      --verdict and --continuation are refused.
+  fm-afk-main-outcome.sh --help
+set -u
+[exit 2]
+
+PERSISTED PUBLIC OUTCOME STORE:
+{"seq":1,"epoch":1793913515,"task":"working","wake":"signal: working.status","verdict":"routine","summary":"Reviewed progress and left the active build running","silent":true,"statusEndpoint":47,"statusIdent":"strong:65028:14332083:2026-11-05 22:18:30.413149059 +0100"}
+
+$ fm-afk-return.sh begin
+=== Return brief (away 2026-11-05T21:18:30Z -> 2026-11-05T21:18:40Z, 10s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    Move ready jobs forward; no merges. Stop a job after three checks fail on the same finding.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      decision,queued,task,"-",Choose a name,captain,"Choose the public name","-"
+      future,queued,task,"-",Future deferral,future,Revisit on the date,2026-11-06
+      plain-hold,queued,task,"-",Plain held comparison,captain,Plain held comparison,"-"
+Tried and failed, or could not be fixed:
+  - blocked [key=dep] still blocked, firstmate remediates before ordinary work: missing dependency
+  - repeated: failed [key=same]: failed check on same finding
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - decision: bin/fm-tasks-axi.sh show decision
+  - finished: bin/fm-send.sh finished prepare the follow-up
+  - future: bin/fm-tasks-axi.sh show future
+  - paused: bin/fm-peek.sh paused
+  - plain-hold: bin/fm-tasks-axi.sh show plain-hold
+  - working: bin/fm-peek.sh working
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 6 task(s) live at return.
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6P7QKVE7DA9AXYNDHV9FXED/.away-live-leb7q7rk/state/afk-contracts/1793913510.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  6 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: finished done: https://github.com/example/away-demo/pull/9 checks green
+catch-up wake: other-green done: https://github.com/example/away-demo/pull/10 checks green
+catch-up wake: repeated failed [key=same]: failed check on same finding
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked [key=dep] blocked: missing dependency
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: blocked [key=dep] missing dependency
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+[exit 3]
+
+$ fm-afk-return.sh check
+=== Return brief (away 2026-11-05T21:18:30Z -> 2026-11-05T21:18:45Z, 15s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    Move ready jobs forward; no merges. Stop a job after three checks fail on the same finding.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      decision,queued,task,"-",Choose a name,captain,"Choose the public name","-"
+      future,queued,task,"-",Future deferral,future,Revisit on the date,2026-11-06
+      plain-hold,queued,task,"-",Plain held comparison,captain,Plain held comparison,"-"
+Tried and failed, or could not be fixed:
+  - blocked [key=dep] still blocked, firstmate remediates before ordinary work: missing dependency
+  - repeated: failed [key=same]: failed check on same finding
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - decision: bin/fm-tasks-axi.sh show decision
+  - future: bin/fm-tasks-axi.sh show future
+  (4 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 6 task(s) live at return.
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: finished done: https://github.com/example/away-demo/pull/9 checks green
+catch-up wake: other-green done: https://github.com/example/away-demo/pull/10 checks green
+catch-up wake: repeated failed [key=same]: failed check on same finding
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked [key=dep] blocked: missing dependency
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: blocked [key=dep] missing dependency
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+[exit 3]
+
+OBSERVED: return names exact pending commands; open blocker remains in blockers; 100-character subsection budget omits excess rows.
