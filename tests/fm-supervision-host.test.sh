@@ -1470,6 +1470,38 @@ test_away_inbox_note_beside_a_closed_successor_reaches_main() {
   pass "host: an unsurfaced inbox note beside an away close is handed back before another engine turn"
 }
 
+# The report's case: the watcher's first poll has finished, a note is queued
+# one second later, and the park bound (3s) arrives before the next poll.
+# The bound must name the note as the return. The record stays until main
+# runs the return, and the note stays queued for that drain.
+test_away_inbox_note_at_the_park_bound_is_the_return() {
+  local home id
+  home=$(make_home away-park-bound away)
+  FM_POLL=15 FM_SUPERVISION_HOST_PARK_SECONDS=3 start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "park bound: no initial watcher"
+  wait_until 150 test -e "$home/state/.last-watcher-beat" \
+    || fail "park bound: the first poll did not complete: $(cat "$home/host.out" 2>/dev/null)"
+  sleep 1
+  if host_exited "$home"; then
+    fail "park bound: the host exited before the note was queued: $(cat "$home/host.out" 2>/dev/null)"
+  fi
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 host_exited "$home" \
+    || fail "park bound: the host did not return: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "park bound: host failed"
+  assert_grep "supervision-host: cycle boundary" "$home/host.out" "park bound: the boundary line is missing"
+  assert_grep "the captain sent a note and away mode should end" "$home/host.out" "park bound: return line missing"
+  assert_grep "captain inbox note $id queued" "$home/host.out" "park bound: note id missing from the return line"
+  assert_grep $'pass-through\taway\tmain-only (captain inbox note '"$id"' queued)' \
+    "$home/state/.supervision-host.log" "park bound: missing away hand-back verdict"
+  [ "$(engine_calls "$home")" = 0 ] || fail "park bound: the engine took a wake ($(engine_calls "$home") calls)"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = away ] || fail "park bound: the host changed the away record"
+  FM_HOME="$home" bash -c '. "$1"; fm_wake_queued_keys check' _ "$ROOT/bin/fm-wake-lib.sh" > "$home/queued"
+  assert_grep "inbox:$id" "$home/queued" "park bound: the note was consumed before main could drain it"
+  stop_home_processes "$home"
+  pass "host: an inbox note queued after the first poll is the return at the park bound"
+}
+
 test_inbox_note_queued_while_parked_reaches_main
 test_claude_stop_hook_delivers_an_inbox_note_queued_mid_engine_turn
 test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn
@@ -1477,3 +1509,4 @@ test_away_inbox_note_is_handed_back_so_main_can_end_away_mode
 test_away_wake_without_an_inbox_note_stays_on_the_engine
 test_quiet_inbox_note_stays_an_attended_handback
 test_away_inbox_note_beside_a_closed_successor_reaches_main
+test_away_inbox_note_at_the_park_bound_is_the_return

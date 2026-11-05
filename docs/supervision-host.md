@@ -136,6 +136,7 @@ The engine turn runs beside a captain who is present, so its guarded actions tak
 Every close goes to the engine, except a close that carries a captain inbox note or coincides with a queued unsurfaced one.
 That close is handed back at once, the successor watcher left running, with one `supervision-host:` line that says the captain sent a note and away mode should end.
 That wake is the captain's return: main runs `bin/fm-afk-return.sh`, then answers the note.
+While an away record exists, a captain inbox note row in main's own drain is also that return; the emitted protocol states it.
 Every other handed-back away wake stays automatic supervision.
 The [host header](../bin/fm-supervision-host.sh) owns the hand-back.
 An explicit captain autonomy grant in the current task's own note is standing authority for that job only; `bin/fm-branch-prompt.sh` "Postures" owns how the away session reads and judges it.

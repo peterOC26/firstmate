@@ -20,6 +20,7 @@ Supervision host: on for this home (`config/supervision-host-off` turns it off; 
    That wake is automatic supervision, not the captain's return, except the line below: drain and handle it under the away posture, and never run the return from it.
    The `supervision-host:` line that says the captain sent a note and away mode should end is the captain's return.
    Run `bin/fm-afk-return.sh`, then answer the note.
+   While an away record exists, a captain inbox note row in main's own drain is also the return: run `bin/fm-afk-return.sh`, then answer the note.
    Every other handed-back away wake stays automatic supervision.
    After the return, a `supervision-host:` line naming the captain's return during a turn means that turn has visible outcomes missing from the return brief, whether the wake was handled or handed back: relay every following `supervision-host: outcome ...` line to the captain (the rows also remain in `bin/fm-branch-outcome.sh list`), then drain and handle any queued wake before acknowledging.
    Each such visible outcome is also a queued `check: supervision-host outcome <n> ... was recorded after the captain returned` wake, which the drain presents until acknowledged: relay each outcome once, whichever arrives first, and acknowledge its `BRANCH OUTCOMES` entry too when it has one. Silent outcomes remain in the store but do not generate a handoff line or check wake.

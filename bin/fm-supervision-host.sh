@@ -65,9 +65,11 @@
 #     unsurfaced one. That close is handed to main at once, the same way as
 #     the attended main-only inbox hand-back (the same inbox-key helpers, the
 #     successor left running), with one "supervision-host:" line that says
-#     the captain sent a note and away mode should end. Main treats that
-#     wake as the return. Quiet mode never takes this path. The away daemon
-#     and the Pi branch do not apply this hand-back yet.
+#     the captain sent a note and away mode should end. A park-bound exit,
+#     and every other hand-back to main, emits that same line beside its own
+#     when a note is still unsurfaced. Main treats that wake as the return.
+#     Quiet mode never takes this path. The away daemon and the Pi branch do
+#     not apply this hand-back yet.
 # Every turn that starts attended meets that rule again at its start, so a
 # close accepted away whose turn starts attended (the captain returned in
 # between) or an attended close whose task turned main-only while the
@@ -521,7 +523,9 @@ boundary_exit() {
   "$SCRIPT_DIR/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
   park_elapsed
   log_line "boundary	after ${PARK_ELAPSED}s"
-  emit 'supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own'
+  away_unsurfaced_inbox_return
+  emit 'supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own' \
+    "$AWAY_INBOX_RETURN_LINE"
   exit 0
 }
 
@@ -602,7 +606,8 @@ exit_to_main() {  # <why> [further lines]
     rc=1
   fi
   log_line "to-main	$1"
-  emit "supervision-host: $1" "$lines"
+  away_unsurfaced_inbox_return
+  emit "supervision-host: $1" "$lines" "$AWAY_INBOX_RETURN_LINE"
   exit "$rc"
 }
 
@@ -1072,6 +1077,23 @@ attended_acceptor() {  # <first-reason-line>
   fi
   ATTENDED_OFFER=$offer
   [ -z "$ATTENDED_WHY" ]
+}
+
+# A park bound or any other hand-back to main is not the note's own close.
+# While away, and while the away daemon is not running, a note still
+# unsurfaced is the return anyway. Sets AWAY_INBOX_RETURN_LINE, or leaves
+# it empty. The same helper marks the note, so a later close does not hand
+# it back twice.
+away_unsurfaced_inbox_return() {
+  AWAY_INBOX_RETURN_LINE=
+  fm_afk_contract_away_present "$STATE" || return 0
+  if [ -e "$STATE/.afk" ]; then
+    return 0
+  fi
+  collect_unsurfaced_inbox_note_ids
+  [ -n "$INBOX_NOTE_IDS" ] || return 0
+  log_line "pass-through	away	main-only (captain inbox note${INBOX_NOTE_IDS} queued)	unsurfaced at exit"
+  AWAY_INBOX_RETURN_LINE="supervision-host: the captain sent a note and away mode should end (captain inbox note${INBOX_NOTE_IDS} queued)"
 }
 
 # A captain inbox note while away proves the captain is reachable, so the
