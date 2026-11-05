@@ -1,0 +1,8 @@
+{
+  "away_record_present": false,
+  "catchup_gate_present": false,
+  "away_record_archived": true,
+  "sentinel_intact": true,
+  "inbox_acknowledged": true,
+  "reply_recorded": true
+}

@@ -1,0 +1,24 @@
+$ FM_SUPERVISION_HOST_PRIMARY=claude bin/fm-supervision-host.sh park; echo "EXIT=$?"
+
+watcher: started pid=378649 (beacon fresh)
+check: captain inbox note 1793864543-Pdb4Q8
+EXIT=0
+
+Captain, the park returned with an inbox note; draining and handling it now.
+
+$ bin/fm-inbox.sh reply 1793864543-Pdb4Q8 "Greeting received and acknowledged. Supervision is on deck; nothing else is under way." ; echo "R=$?"; bin/fm-inbox.sh drain --ack 1793864543-Pdb4Q8; echo "A=$?"; bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 471407.1793864543.Emyqfh; echo "W=$?"
+
+replied 1793864543-Pdb4Q8
+R=0
+acked 1793864543-Pdb4Q8
+A=0
+W=0
+
+Captain, I handled the inbox note:
+
+- **Startup:** Session start ran once inside the lab home, and the session lock was acquired. The posture was quiet mode with no away daemon running, so the captain counts as present and nothing is held for a return.
+- **Park:** I ran `bin/fm-supervision-host.sh park` once in the foreground. It started monitoring and returned when the captain's inbox note `1793864543-Pdb4Q8` arrived ("Hello from Jobs. Please acknowledge this greeting.").
+- **Handling:** Ordinary chat doesn't end quiet mode, so I answered the note as ordinary work. I recorded a reply on the note ("Greeting received and acknowledged…"), acknowledged the note, and then acknowledged the notification through sequence 1. All three commands succeeded.
+- **Left as-is:** Quiet mode is still on. No workers, publishing, source changes or writes outside the lab home. I didn't start another park, and I left alone the monitoring process (pid 378649) that the park started.
+
+LAB_DONE
