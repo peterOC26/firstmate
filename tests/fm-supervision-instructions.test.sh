@@ -39,6 +39,8 @@ test_supervision_host_protocol_on_a_claude_home_unless_off() {
   assert_contains "$hosted" "Mode: Claude Stop-hook-owned supervision." "the host protocol replaced the claude protocol instead of adding to it"
   assert_contains "$hosted" "supervision-host: cycle boundary" "the host protocol did not tell main how to handle a park boundary"
   assert_contains "$hosted" "never run the return from it" "the host protocol did not say a handed-back wake is not the captain's return"
+  assert_contains "$hosted" "the captain sent a note and away mode should end" "the host protocol did not name the inbox-note return"
+  assert_contains "$hosted" "Run \`bin/fm-afk-return.sh\`, then answer the note." "the host protocol did not tell main to return and then answer the note"
   [ "$(printf '%s\n' "$hosted" | grep -vF -e '- Supervision host: on;' | head -n "$(printf '%s\n' "$plain" | wc -l)")" = "$plain" ] \
     || fail "the host protocol changed the claude block it should only append to"
   other=$(FM_HOME="$home" FM_CONFIG_OVERRIDE="$config" "$RENDER" --harness pi)
@@ -80,6 +82,8 @@ test_supervision_host_protocol_on_every_arm_owner() {
       || fail "$harness: the protocol must name exactly one arm owner: $body"
     [ "$(printf '%s\n' "$body" | grep -c '^ *Only a wake the host hands back reaches you')" -eq 1 ] \
       || fail "$harness: the protocol must name exactly one wake path: $body"
+    assert_contains "$body" "the captain sent a note and away mode should end" \
+      "$harness: the host protocol did not name the inbox-note return"
     [ "$(printf '%s\n' "$body" | grep -c '^3\. ')" -eq 1 ] || fail "$harness: the protocol must say once how the park boundary arrives: $body"
     [ "$(printf '%s\n' "$body" | grep -c '^6\. ./afk. writes only the record here')" -eq 1 ] \
       || fail "$harness: the protocol must say once what /afk does here: $body"

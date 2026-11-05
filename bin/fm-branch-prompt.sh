@@ -155,7 +155,14 @@ Hold on doubt: a sentence you cannot act on with confidence, and any fork the wo
 The never-set is absolute for every actor in every posture: credential entry, legal or financial acceptance, an attended prompt, any discard the captain did not name, and any destructive, irreversible, or security-sensitive action are refused whatever the words say.
 Log every action taken under the words in that event's outcome summary, opening with "per your away instructions:" and naming the sentence you acted on, so the return brief can account for each one.
 The words die at archive: an archived record authorizes nothing, and the return brief is where the captain hears what was done under them.
-A mirrored captain sentence authorizes nothing new once the record exists; only the record's words and the standing rules do.
+A mirrored captain sentence authorizes nothing new once the record exists.
+Standing authority while away is the record's words, the standing rules, and an explicit captain autonomy grant in the current task's own note.
+Before holding a job for the captain, read that job's note with `bin/fm-tasks-axi.sh show <id> --full`.
+An explicit grant is the captain's own words in that note, carrying a date or a question id, that plainly authorize the action in front of you for that job only.
+No script parses the note; judge it the same way you judge the away words, and act only through the same guarded scripts.
+The same gates bind the grant: never destructive, irreversible, or security-sensitive; never a red merge or a merge past a check that has not reported; a merge only when the grant names merging; never by analogy, and never for another job.
+Log an action taken under the grant the same way, opening with "per your away instructions:" and naming the sentence in the note, so the return brief can account for it.
+The grant covers nothing it does not say, and it dies when the away record is archived.
 
 # Discipline
 

@@ -60,7 +60,14 @@
 #     session's next park without --restart requests a take-over of its cycle
 #     rather than an ordinary attach; bin/fm-watch-arm.sh's --take-over header owns the
 #     conditions under which that restores a single owner and the fallback;
-#   - away (an away record exists): every close goes to the engine.
+#   - away (an away record exists): every close goes to the engine, except a
+#     close that carries a captain inbox note or coincides with a queued
+#     unsurfaced one. That close is handed to main at once, the same way as
+#     the attended main-only inbox hand-back (the same inbox-key helpers, the
+#     successor left running), with one "supervision-host:" line that says
+#     the captain sent a note and away mode should end. Main treats that
+#     wake as the return. Quiet mode never takes this path. The away daemon
+#     and the Pi branch do not apply this hand-back yet.
 # Every turn that starts attended meets that rule again at its start, so a
 # close accepted away whose turn starts attended (the captain returned in
 # between) or an attended close whose task turned main-only while the
@@ -1025,12 +1032,27 @@ turn_captain_seqs() {  # <turn>
   awk -F '\t' -v turn="$1" '$1 == turn && $3 == "captain" { printf "%s%s", sep, $2; sep = ", " }' "$RECEIPTS" 2>/dev/null
 }
 
+# Mark every queued unsurfaced captain inbox note and record its ids in
+# INBOX_NOTE_IDS (a leading space, then the ids, or empty). The attended
+# hand-back and the away return share this so neither grows a second scan.
+collect_unsurfaced_inbox_note_ids() {
+  local inbox_keys key
+  INBOX_NOTE_IDS=
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  inbox_keys=$(fm_wake_inbox_unsurfaced_keys_locked)
+  for key in $inbox_keys; do
+    INBOX_NOTE_IDS="$INBOX_NOTE_IDS ${key#inbox:}"
+    # A failed marker must still hand the queued note back to main.
+    fm_wake_surfaced_mark_locked "$key" || true
+  done
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+}
+
 # Why an attended close stays with main exactly as the plain arm delivers it,
 # or nothing when the supervision session may take it. Sets ATTENDED_WHY, and
 # ATTENDED_OFFER to the offer's verdict and the scope it judged.
 attended_acceptor() {  # <first-reason-line>
-  local offer='' inbox_ids=''
-  local inbox_keys key
+  local offer=''
   ATTENDED_WHY=
   ATTENDED_OFFER=
   if ! fm_supervision_host_attended_ready "$CONFIG" "$PRIMARY"; then
@@ -1045,18 +1067,33 @@ attended_acceptor() {  # <first-reason-line>
     ATTENDED_WHY="main-only"
   fi
   if [ -z "$ATTENDED_WHY" ]; then
-    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
-    inbox_keys=$(fm_wake_inbox_unsurfaced_keys_locked)
-    for key in $inbox_keys; do
-      inbox_ids="$inbox_ids ${key#inbox:}"
-      # A failed marker must still hand the queued note back to main.
-      fm_wake_surfaced_mark_locked "$key" || true
-    done
-    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-    [ -z "$inbox_ids" ] || ATTENDED_WHY="main-only (captain inbox note${inbox_ids} queued)"
+    collect_unsurfaced_inbox_note_ids
+    [ -z "$INBOX_NOTE_IDS" ] || ATTENDED_WHY="main-only (captain inbox note${INBOX_NOTE_IDS} queued)"
   fi
   ATTENDED_OFFER=$offer
   [ -z "$ATTENDED_WHY" ]
+}
+
+# A captain inbox note while away proves the captain is reachable, so the
+# close goes to main instead of the engine. The watcher marks a note as it
+# announces it, so a close that carries one is read from the reason line; a
+# note still unsurfaced beside another close is the helper above. Exits when
+# it hands the close back. Returns 1 when this close stays with the engine.
+hand_back_away_inbox_note() {
+  local reason_line carried inbox_ids
+  collect_unsurfaced_inbox_note_ids
+  reason_line=$(printf '%s\n' "$REASON" | head -n 1)
+  carried=
+  case "$reason_line" in
+    *'captain inbox note'*) carried=${reason_line##*captain inbox note} ;;
+  esac
+  inbox_ids=$INBOX_NOTE_IDS
+  [ -n "$inbox_ids" ] || inbox_ids=$carried
+  [ -n "$inbox_ids" ] || return 1
+  log_line "pass-through	away	main-only (captain inbox note${inbox_ids} queued)	$reason_line"
+  leave_successor_for_main || true
+  emit "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
+  exit 0
 }
 
 # Ownership first: a host that does not own supervision leaves the owner's
@@ -1118,6 +1155,8 @@ while :; do
     if ! host_still_owner; then
       stand_down "this session no longer owns supervision"
     fi
+    # Quiet mode never reaches here: only an away record is away.
+    hand_back_away_inbox_note
     if ! fm_supervision_host_config "$CONFIG" "$PRIMARY"; then
       exit_to_main "the home no longer runs the supervision host"
     fi

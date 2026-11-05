@@ -17,7 +17,10 @@ Supervision host: on for this home (`config/supervision-host-off` turns it off; 
 {grok}    Only a wake the host hands back reaches you, as the arm's background-task-completed notification whose output carries the close plus one `supervision-host: <why>` line.
 {codex}    Only a wake the host hands back reaches you, as checkpoint output carrying the close plus one `supervision-host: <why>` line.
 {codex}    While an away record exists each checkpoint uses the longer away bound (`FM_CODEX_WATCH_CHECKPOINT_AWAY`, default 3600s, subject to the host's park cap; see [`supervision-host.md`](../supervision-host.md#the-park-boundary)), so a captain message waits until the checkpoint returns unless the captain interrupts it.
-   That wake is automatic supervision, not the captain's return: drain and handle it under the away posture, and never run the return from it.
+   That wake is automatic supervision, not the captain's return, except the line below: drain and handle it under the away posture, and never run the return from it.
+   The `supervision-host:` line that says the captain sent a note and away mode should end is the captain's return.
+   Run `bin/fm-afk-return.sh`, then answer the note.
+   Every other handed-back away wake stays automatic supervision.
    After the return, a `supervision-host:` line naming the captain's return during a turn means that turn has visible outcomes missing from the return brief, whether the wake was handled or handed back: relay every following `supervision-host: outcome ...` line to the captain (the rows also remain in `bin/fm-branch-outcome.sh list`), then drain and handle any queued wake before acknowledging.
    Each such visible outcome is also a queued `check: supervision-host outcome <n> ... was recorded after the captain returned` wake, which the drain presents until acknowledged: relay each outcome once, whichever arrives first, and acknowledge its `BRANCH OUTCOMES` entry too when it has one. Silent outcomes remain in the store but do not generate a handoff line or check wake.
 {claude,cursor} 3. `supervision-host: cycle boundary ...` means the host ended its park at its bound: run `bin/fm-wake-drain.sh`, handle whatever it presents, run its printed acknowledgement (an empty queue prints `--ack-through 0`), and end the turn; the next park starts at that turn end.

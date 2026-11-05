@@ -29,7 +29,7 @@ Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: aw
 - Attended (no away record: no `state/.afk-contract`, or quiet mode's) on Claude and Cursor, the engine takes the wakes the Pi branch would take and never wakes main for a routine outcome; see [Postures](#postures).
   Every other close reaches main exactly as the plain watcher arm delivers it.
 - Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
-- Away (an away record exists), the host hands each close to the engine.
+- Away (an away record exists), the host hands each close to the engine, except a captain inbox note, which it hands back so main can end away mode; see [Away](#away).
   Main stays parked unless the host hands the wake back.
 - `/afk` launches no away daemon on a home of those harnesses that runs the host, because the host is the away session there.
 - `/quiet` enters nothing where the attended host runs, and elsewhere launches the daemon; see [Quiet mode](#quiet-mode).
@@ -133,7 +133,13 @@ The engine turn runs beside a captain who is present, so its guarded actions tak
 
 ### Away
 
-Every close goes to the engine; captain outcomes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
+Every close goes to the engine, except a close that carries a captain inbox note or coincides with a queued unsurfaced one.
+That close is handed back at once, the successor watcher left running, with one `supervision-host:` line that says the captain sent a note and away mode should end.
+That wake is the captain's return: main runs `bin/fm-afk-return.sh`, then answers the note.
+Every other handed-back away wake stays automatic supervision.
+The [host header](../bin/fm-supervision-host.sh) owns the hand-back.
+An explicit captain autonomy grant in the current task's own note is standing authority for that job only; `bin/fm-branch-prompt.sh` "Postures" owns how the away session reads and judges it.
+Captain outcomes of a close the engine takes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
 Every turn that starts attended meets the attended rule again at its start, and the offer's scan is the scope the turn claims: a close accepted away whose turn starts attended, because the captain returned in between, or an attended close whose task turned main-only (a decision appeared) while the successor started, reaches main unchanged and leaves that successor cycle running, with the handoff that turn had confirmed handed back to downtime.
 A captain who leaves while an attended turn runs turns its captain outcomes into away outcomes: they wait for the return too.
 
@@ -411,7 +417,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 
 | Test | What it covers |
 |---|---|
-| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine; inbox delivery while parked, during a turn through the Claude Stop hook, and after an unrelated successor close. |
+| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine; inbox delivery while parked, during a turn through the Claude Stop hook, and after an unrelated successor close, plus an away inbox note handed to main with the engine idle, a note-free away wake left on the engine, and a quiet-mode note left on the attended path. |
 | [tests/fm-supervision-host-dialog.test.sh](../tests/fm-supervision-host-dialog.test.sh) | Away-posture wake handling, dialog mirror delivery and permissions, incomplete engine results, and outcome handoff when the captain returns, against a stub engine. |
 | [tests/fm-supervision-host-recovery.test.sh](../tests/fm-supervision-host-recovery.test.sh) | Engine latching and recovery, bounded turns and park boundaries, owner options, repeated outcome suppression, and host ownership, against a stub engine. |
 | `tests/fm-claude-stop-autoarm.test.sh` | The Claude arm owner's host mode against a stub host. |
