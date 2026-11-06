@@ -219,7 +219,7 @@ BLOCKER_DWELL_ROWS=
 BLOCKER_DWELL_UNTIMED=0
 BLOCKER_DWELL_MISSING=
 scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL_*
-  local since=$1 now=$2 meta id status line verb key epoch latest valid kind
+  local since=$1 now=$2 meta id status line verb key epoch latest valid kind folded previous
   local opened summary close_epoch first steer gap open state rows='' steers grace
   BLOCKER_DWELL_ROWS='' BLOCKER_DWELL_UNTIMED=0 BLOCKER_DWELL_MISSING=''
   case "$since" in ''|*[!0-9]*) return 0 ;; esac
@@ -238,8 +238,12 @@ scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL
       continue
     fi
     kind=$(_fm_status_kind "$status")
-    latest=''
+    latest='' folded=''
     while IFS= read -r line || [ -n "$line" ]; do
+      previous=$folded
+      folded=$(_fm_decision_fold_line "$folded" "$line" \
+        "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
+        "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" "$kind")
       status_line_verb "$line" verb
       [ "$verb" = blocked ] || continue
       valid=$(_fm_decision_fold_line '' "$line" \
@@ -249,6 +253,7 @@ scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL
       key=$(_fm_decision_key "$line") || continue
       epoch=$(status_line_at_epoch "$line") || epoch=-
       [ "$epoch" != - ] || BLOCKER_DWELL_UNTIMED=$((BLOCKER_DWELL_UNTIMED + 1))
+      [ "$(_fm_open_set_verb "$previous" "$key")" != blocked ] || continue
       latest=$(_fm_decision_drop "$latest" "$key")
       latest="${latest}${latest:+$'\n'}${key}"$'\t'"${epoch}"$'\t'"$(status_line_note "$line" | clean_field)"
     done < "$status"
@@ -283,19 +288,6 @@ $latest
 EOF
   done
   BLOCKER_DWELL_ROWS=$(printf '%s' "$rows" | LC_ALL=C sort -t $'\t' -k1,1nr -k2,2 -k3,3)
-}
-
-blocker_dwell_iso() {  # <epoch>
-  date -u -r "$1" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
-    || date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ'
-}
-
-blocker_dwell_duration() {  # <seconds>
-  if [ "$1" -ge 3600 ]; then
-    printf '%sh%sm' "$(( $1 / 3600 ))" "$(( $1 % 3600 / 60 ))"
-  else
-    printf '%sm' "$(( $1 / 60 ))"
-  fi
 }
 
 write_pending_seed() {  # <window-epoch> <contract-epoch>  Fail-closed marker before any lifecycle mutation.
@@ -735,11 +727,11 @@ EOF
   while IFS=$'\t' read -r gap task key opened first close_epoch state summary; do
     [ -n "$task" ] || continue
     count=$((count + 1))
-    printf '  - %s [key=%s] blocked %s; ' "$task" "$key" "$(blocker_dwell_iso "$opened")"
+    printf '  - %s [key=%s] blocked %s; ' "$task" "$key" "$(epoch_to_iso "$opened")"
     if [ "$first" -eq 0 ]; then
-      printf 'no action for %s' "$(blocker_dwell_duration "$gap")"
+      printf 'no action for %s' "$(format_duration "$gap")"
     else
-      printf 'first action %s (%s later)' "$(blocker_dwell_iso "$first")" "$(blocker_dwell_duration "$gap")"
+      printf 'first action %s (%s later)' "$(epoch_to_iso "$first")" "$(format_duration "$gap")"
     fi
     [ "$longest" -ne 1 ] || printf ', the longest wait this window'
     longest=0
@@ -748,7 +740,7 @@ EOF
     elif [ "$state" = changed ]; then
       printf '; no longer an open blocker: %s\n' "$summary"
     elif [ "$close_epoch" != - ]; then
-      printf '; closed %s: %s\n' "$(blocker_dwell_iso "$close_epoch")" "$summary"
+      printf '; closed %s: %s\n' "$(epoch_to_iso "$close_epoch")" "$summary"
     else
       printf '; closed (time unknown): %s\n' "$summary"
     fi

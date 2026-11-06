@@ -1603,6 +1603,24 @@ test_blocker_dwell_boundary_and_reopen() {
   pass "grace is inclusive and configurable; a reopened key uses only its latest interval"
 }
 
+test_blocker_dwell_reassertions() {
+  local dir="$TMP_ROOT/dwell-reassertions" out key stamp
+  dwell_prepare "$dir" 900
+  for key in default route; do
+    for stamp in '[at=20000]' ''; do
+      printf '%s\n' "blocked [key=$key] [at=1000]: waiting" \
+        'working [at=1100]: retrying' 'paused [at=1200]: waiting' \
+        "blocked [key=$key] $stamp: still waiting" > "$dir/home/state/servora-s15-ics-feed.status"
+      out=$(dwell_return "$dir" 20300 | dwell_section)
+      assert_contains "$out" "[key=$key] blocked 1970-01-01T00:16:40Z; no action for 5h21m" "reassertion replaced the interval opening"
+      printf 'resolved [key=%s] [at=20400]: answered\n' "$key" >> "$dir/home/state/servora-s15-ics-feed.status"
+      out=$(dwell_return "$dir" 20500 check | dwell_section)
+      assert_contains "$out" 'first action 1970-01-01T05:40:00Z (5h23m later)' "closure lost the original interval"
+    done
+  done
+  pass "timed and untimed reassertions preserve default and named blocker intervals"
+}
+
 test_blocker_dwell_ignores_supervision_sidecars() {
   local dir="$TMP_ROOT/dwell-shapes" expected out shape
   dwell_prepare "$dir" 1793861166
@@ -1686,6 +1704,7 @@ test_blocker_dwell_closure_and_terminal_actions() {
 test_blocker_dwell_real_samples
 test_blocker_dwell_incident_and_late_rescue
 test_blocker_dwell_boundary_and_reopen
+test_blocker_dwell_reassertions
 test_blocker_dwell_ignores_supervision_sidecars
 test_blocker_dwell_questions_and_missing_logs
 test_blocker_dwell_source_boundary
