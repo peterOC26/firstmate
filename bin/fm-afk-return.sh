@@ -40,6 +40,8 @@
 # durable reason, before an ordinary captain request may proceed.
 # `needs-decision:` is deliberately not part of this blocker gate. The gate
 # keeps every open blocker until that blocker's own resolution is proven.
+# Blocker dwell rows inform while this gate decides; FM_AFK_BLOCKER_GRACE
+# (default 900 seconds) is the inclusive response-time reporting threshold.
 # Captain-verdict outcomes are listed under "waiting on you", but cannot exempt
 # a blocker: per-blocker decision-key provenance is deferred, with no owner,
 # because the gate fails safe by keeping every open blocker. Away-window
@@ -208,6 +210,92 @@ scan_open_blockers() {  # -> tab-separated blocker rows
 $open
 EOF
   done
+}
+
+# Last blocked interval per key, using the decision fold for transition validity
+# and its closing reader for keyed and ship/scout terminal closure. Only live
+# metadata records are attributable; missing status logs are named separately.
+BLOCKER_DWELL_ROWS=
+BLOCKER_DWELL_UNTIMED=0
+BLOCKER_DWELL_MISSING=
+scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL_*
+  local since=$1 now=$2 meta id status line verb key epoch latest valid kind
+  local opened summary close_epoch first steer gap open state rows='' steers grace
+  BLOCKER_DWELL_ROWS='' BLOCKER_DWELL_UNTIMED=0 BLOCKER_DWELL_MISSING=''
+  case "$since" in ''|*[!0-9]*) return 0 ;; esac
+  grace=${FM_AFK_BLOCKER_GRACE:-900}
+  case "$grace" in ''|*[!0-9]*|0[0-9]*) grace=900 ;; esac
+  [ "${#grace}" -le 12 ] || grace=900
+  # Load only on the reporting path; guard and catchup-summary stay read-only.
+  # shellcheck source=bin/fm-task-inbox-lib.sh
+  . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] || continue
+    id=${meta##*/}; id=${id%.meta}
+    status="$STATE/$id.status"
+    if ! status_path_readable "$status"; then
+      BLOCKER_DWELL_MISSING="${BLOCKER_DWELL_MISSING}  - note: $id status log missing or unreadable; blocker wait could not be judged"$'\n'
+      continue
+    fi
+    kind=$(_fm_status_kind "$status")
+    latest=''
+    while IFS= read -r line || [ -n "$line" ]; do
+      status_line_verb "$line" verb
+      [ "$verb" = blocked ] || continue
+      valid=$(_fm_decision_fold_line '' "$line" \
+        "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
+        "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" "$kind")
+      [ -n "$valid" ] || continue
+      key=$(_fm_decision_key "$line") || continue
+      epoch=$(status_line_at_epoch "$line") || epoch=-
+      [ "$epoch" != - ] || BLOCKER_DWELL_UNTIMED=$((BLOCKER_DWELL_UNTIMED + 1))
+      latest=$(_fm_decision_drop "$latest" "$key")
+      latest="${latest}${latest:+$'\n'}${key}"$'\t'"${epoch}"$'\t'"$(status_line_note "$line" | clean_field)"
+    done < "$status"
+    steers=$(fm_task_inbox_at_list "$STATE" "$id")
+    open=$(status_open_decisions "$status")
+    while IFS=$'\t' read -r key opened summary; do
+      [ -n "$key" ] && [ "$opened" != - ] || continue
+      [ "$opened" -ge "$since" ] && [ "$opened" -le "$now" ] || continue
+      close_epoch=''
+      status_key_closing_verb "$status" "$key" close_epoch "$opened" >/dev/null
+      first=0
+      if [ -n "$close_epoch" ] && [ "$close_epoch" -gt "$opened" ] && [ "$close_epoch" -le "$now" ]; then
+        first=$close_epoch
+      fi
+      while IFS= read -r steer; do
+        [ -n "$steer" ] || continue
+        [ "$steer" -gt "$opened" ] && [ "$steer" -le "$now" ] || continue
+        if [ "$first" -eq 0 ] || [ "$steer" -lt "$first" ]; then first=$steer; fi
+      done <<EOF
+$steers
+EOF
+      if [ "$first" -eq 0 ]; then gap=$((now - opened)); else gap=$((first - opened)); fi
+      [ "$gap" -ge "$grace" ] || continue
+      state=closed
+      if _fm_open_set_has "$open" "$key"; then
+        state=changed
+        [ "$(_fm_open_set_verb "$open" "$key")" != blocked ] || state=open
+      fi
+      rows="${rows}${gap}"$'\t'"${id}"$'\t'"${key}"$'\t'"${opened}"$'\t'"${first}"$'\t'"${close_epoch:--}"$'\t'"${state}"$'\t'"${summary}"$'\n'
+    done <<EOF
+$latest
+EOF
+  done
+  BLOCKER_DWELL_ROWS=$(printf '%s' "$rows" | LC_ALL=C sort -t $'\t' -k1,1nr -k2,2 -k3,3)
+}
+
+blocker_dwell_iso() {  # <epoch>
+  date -u -r "$1" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
+    || date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+blocker_dwell_duration() {  # <seconds>
+  if [ "$1" -ge 3600 ]; then
+    printf '%sh%sm' "$(( $1 / 3600 ))" "$(( $1 % 3600 / 60 ))"
+  else
+    printf '%sm' "$(( $1 / 60 ))"
+  fi
 }
 
 write_pending_seed() {  # <window-epoch> <contract-epoch>  Fail-closed marker before any lifecycle mutation.
@@ -540,6 +628,7 @@ render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-
   local evidence=$1 blockers=$2 since=$3 drain_ok=$4 now record superseded superseded_at archive_dir stamp
   local tag task key summary count routine routine_visible captain visible_outcomes live held_err last verb rows status url drained=0 pointer
   local used size shown omitted budget not_started_body extra_line
+  local gap opened first close_epoch state dwell longest
   now=$(date +%s)
   # Where main processes outcomes through the drain's BRANCH OUTCOMES section
   # (the supervision host off Pi, docs/supervision-host.md "Captain outcomes"),
@@ -641,11 +730,47 @@ EOF
     count=$((count + 1))
     printf '  - %s\n' "$text"
   done < "$evidence"
+  scan_blocker_dwell "$since" "$now"
+  longest=1
+  while IFS=$'\t' read -r gap task key opened first close_epoch state summary; do
+    [ -n "$task" ] || continue
+    count=$((count + 1))
+    printf '  - %s [key=%s] blocked %s; ' "$task" "$key" "$(blocker_dwell_iso "$opened")"
+    if [ "$first" -eq 0 ]; then
+      printf 'no action for %s' "$(blocker_dwell_duration "$gap")"
+    else
+      printf 'first action %s (%s later)' "$(blocker_dwell_iso "$first")" "$(blocker_dwell_duration "$gap")"
+    fi
+    [ "$longest" -ne 1 ] || printf ', the longest wait this window'
+    longest=0
+    if [ "$state" = open ]; then
+      printf '; still blocked, firstmate remediates before ordinary work: %s\n' "$summary"
+    elif [ "$state" = changed ]; then
+      printf '; no longer an open blocker: %s\n' "$summary"
+    elif [ "$close_epoch" != - ]; then
+      printf '; closed %s: %s\n' "$(blocker_dwell_iso "$close_epoch")" "$summary"
+    else
+      printf '; closed (time unknown): %s\n' "$summary"
+    fi
+  done <<EOF
+$BLOCKER_DWELL_ROWS
+EOF
   while IFS="$(printf '\t')" read -r tag task key summary; do
     [ "$tag" = blocker ] || continue
+    # Long-wait open keys already carry the gate's remediation wording above.
+    dwell=$(printf '%s\n' "$BLOCKER_DWELL_ROWS" | awk -F '\t' -v task="$task" -v key="$key" '$2 == task && $3 == key { print 1 }')
+    [ -z "$dwell" ] || continue
     count=$((count + 1))
     printf '  - %s [key=%s] still blocked, firstmate remediates before ordinary work: %s\n' "$task" "$key" "$summary"
   done < "$blockers"
+  if [ "$BLOCKER_DWELL_UNTIMED" -gt 0 ]; then
+    count=$((count + 1))
+    printf '  - note: %s blocked event(s) carried no time stamp and could not be attributed to this window\n' "$BLOCKER_DWELL_UNTIMED"
+  fi
+  if [ -n "$BLOCKER_DWELL_MISSING" ]; then
+    count=$((count + 1))
+    printf '%s' "$BLOCKER_DWELL_MISSING"
+  fi
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
     task=$(basename "$meta"); task=${task%.meta}

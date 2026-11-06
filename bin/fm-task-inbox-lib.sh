@@ -308,6 +308,29 @@ fm_task_inbox_body() {  # <record-path>
   return 1
 }
 
+# Read only the record header; message text can never supply a timestamp.
+fm_task_inbox_at() {  # <record-path> -> UTC epoch; nonzero for an invalid header
+  local line schema='' at='' boundary=0
+  [ -f "$1" ] && [ -r "$1" ] && [ ! -L "$1" ] || return 1
+  while IFS= read -r line; do
+    case "$line" in
+      --) boundary=1; break ;;
+      schema=*) [ -z "$schema" ] || return 1; schema=${line#schema=} ;;
+      at=*) [ -z "$at" ] || return 1; at=${line#at=} ;;
+    esac
+  done < "$1"
+  [ "$boundary" -eq 1 ] && [ "$schema" = "$FM_TASK_INBOX_SCHEMA" ] || return 1
+  _fm_wake_require_classify
+  fm_utc_iso_to_epoch "$at"
+}
+
+fm_task_inbox_at_list() {  # <state-dir> <task-id> -> epochs from root and handled/
+  local record
+  for record in "$1/$2.inbox/"*.msg "$1/$2.inbox/handled/"*.msg; do
+    fm_task_inbox_at "$record" 2>/dev/null || continue
+  done
+}
+
 # The constant self-describing doorbell line for the inbox containing a record.
 # It names the inbox by the literal "$FM_TASK_INBOX", which bin/fm-spawn.sh
 # exports into every launch as the inbox's absolute path, so the worker can

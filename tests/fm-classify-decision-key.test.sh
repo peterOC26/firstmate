@@ -604,3 +604,52 @@ test_recorded_line_stays_recorded_across_a_resolve() {
 }
 
 test_recorded_line_stays_recorded_across_a_resolve
+
+# Closing-time reads share the keyed fold, including both tag orders, custom
+# verbs, reserved-key validation, and ship/scout terminal transitions.
+test_closing_epoch_uses_the_same_fold() {
+  local dir="$TMP_ROOT/closing-epoch" f epoch output kind
+  mkdir -p "$dir"
+  f="$dir/task.status"
+  printf 'kind=ship\n' > "$dir/task.meta"
+  printf '%s\n' 'blocked [at=100] [key=route]: waiting' \
+    'resolved [key=route] [at=200]: answered' > "$f"
+  status_key_closing_verb "$f" route epoch > "$dir/verb"
+  [ "$epoch" = 200 ] && [ "$(cat "$dir/verb")" = resolved ] || fail "key-before-time closure epoch lost"
+  printf '%s\n' 'blocked [key=route] [at=300]: waiting again' >> "$f"
+  status_key_closing_verb "$f" route epoch >/dev/null
+  [ -z "$epoch" ] || fail "a reopened decision retained a closing epoch"
+  printf '%s\n' 'working [at=400]: building' 'resolved [at=500] [key=other]: unrelated' >> "$f"
+  status_key_closing_verb "$f" route epoch >/dev/null
+  [ -z "$epoch" ] || fail "unrelated progress closed a blocker"
+  printf '%s\n' 'captain-held [at=600] [key=route]: durable transfer' >> "$f"
+  status_key_closing_verb "$f" route epoch >/dev/null
+  [ "$epoch" = 600 ] || fail "time-before-key closure epoch lost"
+  printf '%s\n' 'blocked [key=route] [at=700]: again' 'resolved [key=route]: untimed' >> "$f"
+  status_key_closing_verb "$f" route epoch >/dev/null
+  [ -z "$epoch" ] || fail "untimed closure inherited an old epoch"
+  for kind in ship scout secondmate; do
+    printf 'kind=%s\n' "$kind" > "$dir/task.meta"
+    printf '%s\n' 'blocked [at=100] [key=route]: waiting' 'failed [at=200]: ended' > "$f"
+    status_key_closing_verb "$f" route epoch > "$dir/verb"
+    output=$(cat "$dir/verb")
+    if [ "$kind" = secondmate ]; then
+      [ -z "$epoch" ] && [ "$output" = blocked ] || fail "secondmate terminal cleared a blocker"
+    else
+      [ "$epoch" = 200 ] && [ "$output" = failed ] || fail "$kind terminal epoch lost"
+    fi
+  done
+  printf 'kind=ship\n' > "$dir/task.meta"
+  printf '%s\n' 'blocked [key=route] [at=100]: blocked' 'resolved [key=route] [at=200]: closed' \
+    'needs-decision [key=route] [at=300]: later question' > "$f"
+  status_key_closing_verb "$f" route epoch 100 >/dev/null
+  [ "$epoch" = 200 ] || fail "a later question erased the block interval's first closure"
+  printf '%s\n' 'resolved [key=route] [at=400]: later answer' >> "$f"
+  status_key_closing_verb "$f" route epoch 100 >/dev/null
+  [ "$epoch" = 200 ] || fail "a later answer replaced the block interval's first closure"
+  status_key_closing_verb "$dir/missing.status" route epoch >/dev/null
+  [ -z "$epoch" ] || fail "missing status retained caller's epoch"
+  pass "optional closing epoch follows the existing fold without changing its verb output"
+}
+
+test_closing_epoch_uses_the_same_fold

@@ -1,0 +1,2 @@
+blocked [at=1793873574] [key=ci-log-capture]: gh-axi unit-log retrieval failed twice with gh exit 1; unit CI passed but required seven-Caddy-test log proof unavailable; daemon healthy, Tier 2 and drive session still active; https://github.com/peterOC26/PurpleVoice_GSD_Claude/pull/264
+resolved [at=1793873931] [key=ci-log-capture]: firstmate supplied unit job log; verified all seven Caddy tests passed without skips with checksum-verified Caddy 2.11.7 and PV_REQUIRE_CADDY=1

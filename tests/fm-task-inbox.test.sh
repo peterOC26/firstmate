@@ -1228,3 +1228,26 @@ test_watcher_retry_keeps_a_newer_mark
 test_watcher_escalates_once_after_budget
 test_watcher_dead_pane_escalates_once_without_ringing
 test_watcher_dead_pane_ignores_stale_busy_state
+
+# Timestamp readers consume the durable header in both acknowledgement states;
+# neither body text nor malformed/duplicate header fields can invent an action.
+test_inbox_at_reads_only_valid_headers() {
+  local state="$TMP_ROOT/at-reader/state" record got
+  mkdir -p "$state/t1.inbox/handled"
+  cp "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-tests-pass-without-testing-s3.inbox/handled/001.msg" "$state/t1.inbox/001.msg"
+  cp "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-tests-pass-without-testing-s3.inbox/handled/002.msg" "$state/t1.inbox/handled/002.msg"
+  got=$(inbox_lib "$state" fm_task_inbox_at_list "$state" t1 | sort -n)
+  [ "$got" = "$(printf '1793868868\n1793873878')" ] || fail "root/handled timestamps lost: $got"
+  record="$state/t1.inbox/003.msg"
+  printf 'schema=fm-task-inbox.v1\n--\nat=2026-11-05T11:33:19Z\n' > "$record"
+  if inbox_lib "$state" fm_task_inbox_at "$record"; then fail "body text supplied a header time"; fi
+  printf 'schema=fm-task-inbox.v1\nat=2026-11-05T11:33:19Z\nat=2026-11-05T11:34:19Z\n--\n' > "$record"
+  if inbox_lib "$state" fm_task_inbox_at "$record"; then fail "duplicate timestamp was accepted"; fi
+  printf 'schema=fm-task-inbox.v1\nat=tomorrow\n--\n' > "$record"
+  if inbox_lib "$state" fm_task_inbox_at "$record"; then fail "malformed timestamp was accepted"; fi
+  ln -s "$state/t1.inbox/001.msg" "$state/t1.inbox/004.msg"
+  if inbox_lib "$state" fm_task_inbox_at "$state/t1.inbox/004.msg"; then fail "symlink timestamp was accepted"; fi
+  pass "inbox epochs come only from valid root/handled headers, never message prose"
+}
+
+test_inbox_at_reads_only_valid_headers

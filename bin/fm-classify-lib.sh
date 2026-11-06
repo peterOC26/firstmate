@@ -1015,6 +1015,10 @@ EOF
 # _fm_decision_fold_line rule the two folds use, and the reported verb is read
 # off the transitions that rule produces.
 #
+# The optional out-var receives the closing event's emission epoch, or empty
+# when the key is open or the closing event is untimed. It never changes closure.
+# With an opening epoch, it instead receives the first closure of that blocked
+# interval, even if a later question reuses the key. The verb output is unchanged.
 # One `grep` pre-selects those candidates so the bash fold below costs the log's
 # TRANSITIONS rather than its whole lifetime length - status files are only ever
 # appended to, and this runs per open task on every supervision presentation.
@@ -1023,8 +1027,10 @@ EOF
 # token), and the fold alone decides which of them really moves the set. A line
 # whose leading word is followed by neither whitespace, a colon, nor a bracket
 # tag cannot be a transition, because the fold's own declaration guard rejects it.
-status_key_closing_verb() {  # <status-file> <key>
-  local f=$1 want=$2 line resolve held open='' was verb='' kind event candidates
+status_key_closing_verb() {  # <status-file> <key> [<closing-epoch-out-var> [<blocked-epoch>]]
+  local f=$1 want=$2 line resolve held open='' was verb='' kind event candidates __fm_close_at=''
+  local __fm_close_watch=0 __fm_close_seen=0
+  [ -z "${3:-}" ] || printf -v "$3" '%s' ''
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   [ -n "$want" ] || return 0
   kind=$(_fm_status_kind "$f")
@@ -1050,16 +1056,28 @@ status_key_closing_verb() {  # <status-file> <key>
     was=0
     _fm_open_set_has "$open" "$want" && was=1
     open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+    if [ -n "${4:-}" ] && [ "$event" = blocked ] \
+      && [ "$(_fm_decision_key "$line")" = "$want" ] \
+      && [ "$(status_line_at_epoch "$line")" = "$4" ] \
+      && [ "$(_fm_open_set_verb "$open" "$want")" = blocked ]; then
+      __fm_close_watch=1 __fm_close_seen=0 __fm_close_at=''
+    fi
     if [ "$was" = 1 ] && ! _fm_open_set_has "$open" "$want"; then
       verb=$event
+      if [ -z "${4:-}" ] || { [ "$__fm_close_watch" -eq 1 ] && [ "$__fm_close_seen" -eq 0 ]; }; then
+        _fm_status_at_epoch "$line" __fm_close_at || true
+        __fm_close_seen=1
+      fi
     fi
   done <<EOF
 $candidates
 EOF
+  if [ -n "${3:-}" ] && [ -n "${4:-}" ]; then printf -v "$3" '%s' "$__fm_close_at"; fi
   if _fm_open_set_has "$open" "$want"; then
     _fm_open_set_verb "$open" "$want"
     return 0
   fi
+  [ -z "${3:-}" ] || printf -v "$3" '%s' "$__fm_close_at"
   printf '%s' "$verb"
 }
 

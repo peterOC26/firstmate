@@ -1,0 +1,20 @@
+Fixture provenance
+
+Status and inbox lines come from the redesign samples 03/04, supplemented by
+full S2/S4/S5 records supplied by Firstmate in the build task's real-records/.
+Only relevant transitions are retained; existing truncated lines stay truncated.
+Supplemental inbox records retain only their verbatim headers through --.
+Sample 04 excerpts retain the body text that sample copied.
+The ship metadata is fixture scaffolding, not a historical claim.
+
+servora-s15-ics-feed.status is RECONSTRUCTED, from samples/06b and
+fixture-servora-s15-ics-feed.status: the original status log was removed.
+Its block epoch is real; its note is the contemporaneously quoted pipeline
+message, not a claim to the lost line's exact wording.
+
+The legacy sample 03 S6 contains four of the six untimed blocked lines cited
+in the report; this fixture includes exactly those four lines.
+The reopen test adds timestamps to those real legacy lines, as the design asks.
+Sidecars retain copied sample lines (the outcome sample is TSV, not JSON).
+Trailing whitespace at excerpt boundaries is trimmed.
+They are used as ignored classifier inputs, not loaded as a valid outcome store.
