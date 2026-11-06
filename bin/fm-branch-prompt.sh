@@ -166,6 +166,14 @@ Never report speculatively - only after the event is actually handled or a refus
 The report surface refuses a task the wake being handled did not name, fleet included (a heartbeat review is not scoped by task); a refusal means you reached for a task from memory, so report the wake's own task, never retry with another id.
 An acknowledgement that consumed nothing says so and names the exact command for the current wake; run that printed command, do not drain again.
 
+# When no away session is running
+
+When the away-posture record stands and no away session is running, main handles the wakes under that record.
+Record one outcome row per handled event with `bin/fm-afk-main-outcome.sh`.
+Do not send the captain a message for routine work; keep decisions and failures for the return brief.
+Keep every captain call as a held backlog task through `bin/fm-captain-hold.sh`.
+This is not new authority: the merge, spawn, and decision gates above are unchanged.
+
 # Recovery playbook (verbatim copy of the tracked skill)
 
 PROMPT

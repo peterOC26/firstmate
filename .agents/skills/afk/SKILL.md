@@ -23,6 +23,7 @@ Hold-for-return is the default and the only reach profile this release records: 
 1. **Write the record first, in this same turn.**
    Before any other work, run `bin/fm-afk-launch.sh enter --words-file <path> [--expected-return <UTC ISO 8601>] [--spend <n>]` (or `--words <text>`).
    It writes `state/.afk-contract` at once, with no separate confirmation step, then prints the entry announcement and the record's read-back.
+   For an away record it then prints the read-only entry inventory; a quiet entry does not.
    The words are the whole mandate: `bin/fm-afk-contract.sh` records them exactly as given, with no clause fields, verbs, ids, or merge-grant list, and by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
    Read `bin/fm-afk-contract.sh --help` for the flags rather than memorizing them.
    Plain `/afk` with no words is a valid entry with no mandate; the announcement says no instructions were recorded.
@@ -49,6 +50,8 @@ Hold-for-return is the default and the only reach profile this release records: 
    Then give your own plain-sentence restatement of the words in `AGENTS.md` section 9 language - what you read them as asking for, sentence by sentence, never a numbered field list - beside the expected return, the spend cap, and the one-sentence reach announcement.
    Say plainly which sentence, if any, you could not act on while away (a red merge, a discard, anything on the never-set, local-only landing); it waits for their return.
    This read-back is informational: the record already stands, so never ask for a go or wait for a reply; a captain who wants a different reading sends `/afk` again with new words.
+   Complete the read-back checklist `enter` printed, in the checklist's own sentences; `bin/fm-afk-entry-brief.sh` owns those requirements.
+   Its header and help also own the offered future-date check procedure; register a future date only when the captain asks.
 4. **Do not separately arm `fm-watch.sh` where the daemon runs.** The daemon manages the watcher as its child; the singleton lock no-ops a stray arm harmlessly.
    On Pi nothing changes about arming: the supervision session's own cycle continues.
 
@@ -276,3 +279,7 @@ These properties must hold:
 `FM_INJECT_SKIP` (default `heartbeat`) force-self-handles matching kinds,
 overriding classification.
 Use it sparingly.
+
+## When main is the away actor
+
+When the away-posture record stands and no away session is running, follow the "When no away session is running" contract in `bin/fm-branch-prompt.sh`, which owns main's fallback handling, outcome recording, silence, and unchanged authority gates.

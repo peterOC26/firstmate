@@ -88,7 +88,7 @@ The hook fires on every Stop.
 On each Stop, an eligible primary with supervision need admits one home-scoped owner, which foregrounds `bin/fm-watch-arm.sh` inside the hook-owned process tree.
 If a session exits mid-cycle and leaves an orphaned Stop hook, the replacement session's first eligible Stop supersedes its claim, attaches to the running watcher through `bin/fm-watch-arm.sh`, and delivers the cycle's close.
 [`turnend-guard.md`](turnend-guard.md#auto-arm-generation-claim) owns the open-claim definition.
-While supervision is still needed and away mode remains inactive, an actionable close wakes the idle session through exit 2.
+While supervision is still needed, an actionable close wakes the idle session through exit 2 unless the daemon owns the away or quiet posture; `bin/fm-claude-stop-autoarm.sh`'s AFK header owns the supervision-host exception.
 
 ### Claude session-lock ownership
 
@@ -106,6 +106,8 @@ That verdict accepts either of two cases:
 With that verdict, a background session keeps arming after its transient helper chain is recycled.
 [`turnend-guard.md`](turnend-guard.md#guard-predicates) owns the Claude guard's behavior when that live owner is genuinely another session.
 The stale-owner claim occurs only after the existing AFK and supervision-need gates pass.
+After those gates pass, a same-process `/clear` re-key with an ancestry-owned lock refreshes a stale session-id sidecar through `bin/fm-lock.sh` before arming.
+A failed refresh still permits arming because ancestry already proves ownership; it never authorizes reclaiming a live foreign owner.
 
 ### Claude arm failures
 
@@ -493,7 +495,7 @@ The same suite covers inbox delivery from a handling successor, suppression unti
 
 - The auto-arm's scope.
 - Stale and live session owners.
-- Unchanged AFK and need boundaries.
+- Daemon-owned away and quiet inertness, the away-host exception, and same-process `/clear` re-key recovery with a stale session-id sidecar.
 - Single-flight.
 - Supersession of a dead session's orphaned claim by the replacement session's first Stop, including a resumed session that carries the dead one's conversation id, and a claim with no readable session lock.
 - A recycled background bridge keeping its live claim on the trusted session id pinned to the lock holder's recorded pid-identity.

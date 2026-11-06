@@ -1986,6 +1986,86 @@ test_fm_lock_status_still_works_with_shared_lib() {
   pass "fm-lock: shared session-lock lib preserves the status path"
 }
 
+# A /clear re-keys the session id inside a live process and leaves the previous
+# id in state/.lock-session. On a home that runs the supervision host, that host
+# is the away session, so a leftover state/.afk must not skip it, and the
+# sidecar must name the new id before arming. A daemon-owned away and a quiet
+# record stay inert, sidecar included. Attended arming still starts the host.
+test_clear_rekey_stale_sidecar_starts_the_away_host() {
+  local dir out status saved_id=${CLAUDE_CODE_SESSION_ID-}
+  unset CLAUDE_CODE_SESSION_ID CLAUDE_PID || true
+
+  run_rekey() {  # <dir>
+    FM_HOME="$1" "$FAKE_CLAUDE" -c '
+      export CLAUDE_PID=$$
+      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "{\"session_id\":\"new-session\",\"stop_hook_active\":false}" \
+        | "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
+    ' 2>&1
+  }
+
+  dir=$(make_primary_dir "$TMP_ROOT/clear-rekey-away")
+  rm -f "$dir/config/supervision-host-off"
+  : > "$dir/state/task.meta"
+  : > "$dir/state/.afk-contract"
+  : > "$dir/state/.afk"
+  printf 'old-session\n' > "$dir/state/.lock-session"
+  write_host_fixture "$dir" boundary
+  export CLAUDE_CODE_SESSION_ID=new-session
+  out=$(run_rekey "$dir"); status=$?
+  if [ ! -e "$dir/state/host-ran" ]; then
+    fail "a live lock under a new session id with a stale sidecar and an away record did not start the host: $out"
+  fi
+  [ "$(cat "$dir/state/.lock-session" 2>/dev/null)" = new-session ] \
+    || fail "the stale sidecar was not re-anchored to the new session: $(cat "$dir/state/.lock-session" 2>/dev/null || true)"
+  [ "$status" -eq 2 ] || fail "the away host's hand-back must still reach main (status $status): $out"
+
+  dir=$(make_primary_dir "$TMP_ROOT/clear-rekey-attended")
+  rm -f "$dir/config/supervision-host-off"
+  : > "$dir/state/task.meta"
+  printf 'old-session\n' > "$dir/state/.lock-session"
+  write_host_fixture "$dir" boundary
+  out=$(run_rekey "$dir"); status=$?
+  [ -e "$dir/state/host-ran" ] || fail "an attended re-key did not start the host: $out"
+  [ "$status" -eq 2 ] || fail "an attended re-key must still rewake (status $status): $out"
+  [ "$(cat "$dir/state/.lock-session" 2>/dev/null)" = new-session ] \
+    || fail "an attended re-key left the stale sidecar: $(cat "$dir/state/.lock-session" 2>/dev/null || true)"
+
+  dir=$(make_primary_dir "$TMP_ROOT/clear-rekey-daemon")
+  : > "$dir/state/task.meta"
+  : > "$dir/state/.afk-contract"
+  : > "$dir/state/.afk"
+  printf 'old-session\n' > "$dir/state/.lock-session"
+  write_arm_fixture "$dir" actionable
+  write_host_fixture "$dir" boundary
+  out=$(run_rekey "$dir"); status=$?
+  expect_code 0 "$status" "a daemon-owned away must stay inert"
+  [ ! -e "$dir/state/arm-ran" ] || fail "a daemon-owned away armed"
+  [ ! -e "$dir/state/host-ran" ] || fail "a daemon-owned away started the host"
+  [ "$(cat "$dir/state/.lock-session")" = old-session ] || fail "a daemon-owned away refreshed the sidecar"
+  [ ! -e "$dir/state/.afk-away-session-alarm" ] || fail "a daemon-owned away recorded an away-session alarm"
+
+  dir=$(make_primary_dir "$TMP_ROOT/clear-rekey-quiet")
+  rm -f "$dir/config/supervision-host-off"
+  : > "$dir/state/task.meta"
+  printf 'mode: quiet\n' > "$dir/state/.afk-contract"
+  : > "$dir/state/.afk"
+  printf 'old-session\n' > "$dir/state/.lock-session"
+  write_host_fixture "$dir" boundary
+  out=$(run_rekey "$dir"); status=$?
+  expect_code 0 "$status" "quiet mode must stay inert while the daemon flag stands"
+  [ ! -e "$dir/state/host-ran" ] || fail "quiet mode started the host while the daemon flag stood: $out"
+  [ "$(cat "$dir/state/.lock-session")" = old-session ] || fail "quiet mode refreshed the sidecar"
+
+  if [ -n "$saved_id" ]; then
+    export CLAUDE_CODE_SESSION_ID=$saved_id
+  else
+    unset CLAUDE_CODE_SESSION_ID
+  fi
+  unset CLAUDE_PID || true
+  pass "auto-arm: a /clear re-key with a stale sidecar starts the away host and re-anchors the sidecar"
+}
+
 test_inert_in_child_worktree
 test_inert_without_session_lock
 test_reclaims_stale_session_lock_before_arming
@@ -2049,3 +2129,4 @@ test_host_crash_is_retried_then_reported
 test_arguments_never_arm
 test_fm_lock_status_still_works_with_shared_lib
 test_stands_down_only_on_pi_code_transcript_path
+test_clear_rekey_stale_sidecar_starts_the_away_host

@@ -39,6 +39,10 @@ install_runner() {  # <case-dir>
   cp "$ROOT/bin/fm-backlog-transition-lib.sh" "$dir/bin/"
   # The merge-notification marker reader behind the brief's landed section.
   cp "$ROOT/bin/fm-pr-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-register.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-check-unregister.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-afk-entry-brief.sh" "$dir/bin/"
   fm_test_tasks_toml "$dir/home/.tasks.toml"
   printf '## In flight\n\n## Queued\n\n## Done\n' > "$dir/home/data/backlog.md"
   # The fake stop mirrors the real one's ordering: the away flag goes, then the
@@ -605,7 +609,7 @@ EOF
 }
 
 test_return_brief_lists_landed_work_awaiting_cleanup() {
-  local dir out landed_line failed_line handled_line
+  local dir out landed_line failed_line handled_line landed_section
   dir="$TMP_ROOT/brief-landed"
   install_runner "$dir"
   contract_in "$dir" enter --words 'merge the exemption changes when green' >/dev/null 2>&1 || fail "could not confirm the away-posture record"
@@ -640,9 +644,10 @@ test_return_brief_lists_landed_work_awaiting_cleanup() {
   [ -n "$landed_line" ] && [ -n "$failed_line" ] && [ -n "$handled_line" ] || fail "the brief is missing a section: $out"
   [ "$failed_line" -lt "$landed_line" ] && [ "$landed_line" -lt "$handled_line" ] \
     || fail "landed work is out of order (failed $failed_line, landed $landed_line, handled $handled_line)"
+  landed_section=$(printf '%s\n' "$out" | sed -n '/^Landed, cleanup due:$/,/^Handled while away:$/p')
   assert_contains "$out" '  - landed: https://github.com/example/landed/pull/7 is merged and the worker is still up; close it with bin/fm-teardown.sh landed once catch-up clears' "the landed worker was not listed for cleanup"
-  assert_not_contains "$out" '  - open:' "a done worker with no durable merge evidence was listed as landed"
-  assert_not_contains "$out" '  - axi-mate:' "a persistent secondmate was listed as landed work"
+  assert_not_contains "$landed_section" '  - open:' "a done worker with no durable merge evidence was listed as landed"
+  assert_not_contains "$landed_section" '  - axi-mate:' "a persistent secondmate was listed as landed work"
   assert_not_contains "$out" 'bin/fm-teardown.sh axi-mate' "the brief offered a persistent secondmate for teardown"
   assert_not_contains "$out" 'example/child/pull/7' "a secondmate's recorded PR surfaced in the brief"
   assert_contains "$out" 'catch-up clear' "landed work must not hold the gate"
@@ -1283,7 +1288,149 @@ test_return_brief_without_a_record_reports_the_legacy_flag() {
   pass "a return with only the legacy away flag still renders the brief and measures the window from the flag"
 }
 
+test_return_brief_reports_an_unreadable_not_started_list() {
+  local dir out rc section
+  dir="$TMP_ROOT/unreadable-not-started"
+  install_runner "$dir"
+  printf 'window=synthetic:live-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/live-job.meta"
+  printf 'working: building\nNext: bin/fm-send.sh live-job continue\n' > "$dir/home/state/live-job.status"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  chmod 000 "$dir/home/data/backlog.md"
+  set +e
+  out=$(run_return "$dir" begin)
+  rc=$?
+  set -e
+  chmod 644 "$dir/home/data/backlog.md" || true
+  [ "$rc" -eq 3 ] || fail "an unreadable backlog should keep catch-up gated (rc=$rc): $out"
+  assert_contains "$out" 'held listing unavailable:' "Waiting on you lost the unreadable held listing"
+  section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+  assert_contains "$section" 'unreadable' "Not started hid the backlog read failure"
+  assert_not_contains "$section" '(nothing)' "Not started claimed nothing was pending while the backlog could not be read"
+  pass "an unreadable backlog is reported in Not started instead of an empty list"
+}
 
+test_return_brief_keeps_next_steps_ahead_of_held_rows() {
+  local dir out section waiting line1 line2 budget
+  dir="$TMP_ROOT/unstarted-cap"
+  install_runner "$dir"
+  (cd "$dir/home" \
+    && tasks-axi add aaa-1 'held one' --file data/backlog.md >/dev/null \
+    && tasks-axi hold aaa-1 --reason 'captain one' --kind captain --file data/backlog.md >/dev/null \
+    && tasks-axi add aaa-2 'held two' --file data/backlog.md >/dev/null \
+    && tasks-axi hold aaa-2 --reason 'captain two' --kind captain --file data/backlog.md >/dev/null \
+    && tasks-axi add aaa-3 'held three' --file data/backlog.md >/dev/null \
+    && tasks-axi hold aaa-3 --reason 'captain three' --kind captain --file data/backlog.md >/dev/null \
+    && tasks-axi add zz-next-one 'first next' --file data/backlog.md >/dev/null \
+    && tasks-axi update zz-next-one --body 'Next: bin/fm-send.sh zz-next-one go' --file data/backlog.md >/dev/null \
+    && tasks-axi add zz-next-two 'second next' --file data/backlog.md >/dev/null \
+    && tasks-axi update zz-next-two --body 'Next: bin/fm-send.sh zz-next-two go' --file data/backlog.md >/dev/null) \
+    || fail "could not seed the crowded not-started backlog"
+  printf 'window=synthetic:zz-next-one\nbackend=tmux\nkind=ship\n' > "$dir/home/state/zz-next-one.meta"
+  printf 'done: finished\n' > "$dir/home/state/zz-next-one.status"
+  printf 'window=synthetic:zz-next-two\nbackend=tmux\nkind=ship\n' > "$dir/home/state/zz-next-two.meta"
+  printf 'paused: waiting\n' > "$dir/home/state/zz-next-two.status"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
+  line1='  - zz-next-one: bin/fm-send.sh zz-next-one go'
+  line2='  - zz-next-two: bin/fm-send.sh zz-next-two go'
+  budget=$((${#line1} + 1 + ${#line2} + 1))
+  out=$(FM_AFK_NOT_STARTED_BUDGET="$budget" run_return "$dir" begin) || fail "return failed: $out"
+  section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+  assert_contains "$section" "$line1" "the first next command was cut from Not started"
+  assert_contains "$section" "$line2" "the second next command was cut from Not started"
+  assert_not_contains "$section" 'bin/fm-tasks-axi.sh show aaa-1' "a held row was printed again in Not started"
+  assert_not_contains "$section" 'bin/fm-tasks-axi.sh show aaa-2' "a held row was printed again in Not started"
+  assert_not_contains "$section" 'bin/fm-tasks-axi.sh show aaa-3' "a held row was printed again in Not started"
+  [ "$(printf '%s\n' "$section" | grep -c 'zz-next-one')" -eq 1 ] || fail "the first next command appeared more than once: $section"
+  [ "$(printf '%s\n' "$section" | grep -c 'zz-next-two')" -eq 1 ] || fail "the second next command appeared more than once: $section"
+  waiting=$(printf '%s\n' "$out" | awk '/^Waiting on you:/{show=1} /^Tried and failed/{show=0} show')
+  assert_contains "$waiting" 'aaa-1' "Waiting on you lost a held row"
+  assert_contains "$waiting" 'aaa-2' "Waiting on you lost a held row"
+  assert_contains "$waiting" 'aaa-3' "Waiting on you lost a held row"
+  pass "next commands appear once and held rows stay in Waiting on you"
+}
+
+test_not_started_budget_counts_bytes() {
+  local dir out section line bytes budget utf8_locale
+  utf8_locale=$(locale -a | awk 'tolower($0) ~ /utf-?8/ { print; exit }')
+  [ -n "$utf8_locale" ] || fail "a UTF-8 locale is required for byte-budget coverage"
+  dir="$TMP_ROOT/unstarted-byte-cap"
+  install_runner "$dir"
+  (cd "$dir/home" \
+    && tasks-axi add a-job 'multibyte next step' --file data/backlog.md >/dev/null \
+    && tasks-axi add z-job 'short next step' --file data/backlog.md >/dev/null) \
+    || fail "could not seed the byte-budget backlog"
+  printf 'window=synthetic:a-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/a-job.meta"
+  printf 'working: building\nNext: bin/fm-send.sh a-job café\n' > "$dir/home/state/a-job.status"
+  printf 'window=synthetic:z-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/z-job.meta"
+  printf 'working: building\nNext: bin/go\n' > "$dir/home/state/z-job.status"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  line='  - a-job: bin/fm-send.sh a-job café'
+  bytes=$(printf '%s\n' "$line" | wc -c)
+  for budget in "$((bytes - 1))" "$bytes"; do
+    contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
+    out=$(LC_ALL="$utf8_locale" FM_AFK_NOT_STARTED_BUDGET="$budget" run_return "$dir" begin) || fail "return failed: $out"
+    section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+    if [ "$budget" -lt "$bytes" ]; then
+      assert_not_contains "$section" "$line" "a multibyte line exceeded its byte budget"
+      assert_contains "$section" '  - z-job: bin/go' "a skipped oversized line prevented a later short line fitting"
+    else
+      assert_contains "$section" "$line" "a complete multibyte line did not fit its exact byte budget"
+      assert_not_contains "$section" '  - z-job: bin/go' "the subsection exceeded its cumulative byte budget"
+    fi
+    assert_contains "$section" '(1 more not shown)' "the omission notice was lost"
+  done
+  pass "not-started charges bytes including newlines under a UTF-8 locale"
+}
+
+test_return_brief_names_unstarted_work() {
+  local dir out rc section waiting
+  dir="$TMP_ROOT/unstarted"
+  install_runner "$dir"
+  (cd "$dir/home" \
+    && tasks-axi add hold-job 'a held job' --file data/backlog.md >/dev/null \
+    && tasks-axi hold hold-job --reason 'wait for captain' --kind captain --file data/backlog.md >/dev/null \
+    && tasks-axi add next-job 'a next step' --file data/backlog.md >/dev/null \
+    && tasks-axi update next-job --body 'Next: bin/fm-send.sh next-job the follow-up' --file data/backlog.md >/dev/null) \
+    || fail "could not seed the not-started backlog"
+  printf 'window=synthetic:hold-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/hold-job.meta"
+  printf 'paused: waiting\n' > "$dir/home/state/hold-job.status"
+  printf 'window=synthetic:next-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/next-job.meta"
+  printf 'done: finished\n' > "$dir/home/state/next-job.status"
+  printf 'window=synthetic:blocked-job\nbackend=tmux\nkind=ship\n' > "$dir/home/state/blocked-job.meta"
+  printf 'blocked [at=100] [key=stuck]: still waiting\n' > "$dir/home/state/blocked-job.status"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not confirm the away record"
+  set +e
+  out=$(run_return "$dir" begin)
+  rc=$?
+  set -e
+  [ "$rc" -eq 3 ] || fail "an open blocker should keep the return gated (rc=$rc): $out"
+  assert_contains "$out" 'no detected gap' "health lost the no-gap line"
+  assert_contains "$out" 'blocked-job [key=stuck] still blocked, firstmate remediates before ordinary work: still waiting' "the blocker line lost its existing prefix"
+  assert_contains "$out" '  - next-job: bin/fm-send.sh next-job the follow-up' "the next command was missing"
+  section=$(printf '%s\n' "$out" | awk '/^Not started:$/,/^Cost:/')
+  assert_not_contains "$section" 'bin/fm-tasks-axi.sh show hold-job' "a held row with no next command was repeated"
+  assert_not_contains "$section" 'blocked-job' "an open blocked task was listed as not started"
+  waiting=$(printf '%s\n' "$out" | awk '/^Waiting on you:/{show=1} /^Tried and failed/{show=0} show')
+  assert_contains "$waiting" 'hold-job' "the held job disappeared from Waiting on you"
+  set +e
+  out=$(FM_AFK_NOT_STARTED_BUDGET=1 run_return "$dir" check)
+  rc=$?
+  set -e
+  assert_contains "$out" 'Not started:' "the capped check dropped the not-started heading"
+  assert_contains "$out" 'more not shown' "a one-byte budget did not omit a line"
+  printf 'resolved [key=stuck]: recovered\n' >> "$dir/home/state/blocked-job.status"
+  out=$(run_return "$dir" check) || fail "resolved return failed: $out"
+  FM_AFK_MODE=quiet contract_in "$dir" enter --words 'stay quiet' >/dev/null 2>&1 || fail "quiet entry failed"
+  out=$(run_return "$dir" begin) || fail "quiet return failed: $out"
+  pass "the return names unstarted work and supports a later quiet window"
+
+}
 
 test_unreadable_superseded_archive_keeps_return_gated() {
   local dir out rc epoch archive backup
@@ -1386,3 +1533,8 @@ test_return_brief_keeps_trip_row_count_after_probe
 test_return_brief_ignores_previous_main_session
 test_return_brief_keeps_in_window_history_across_main_restart
 test_return_brief_without_a_record_reports_the_legacy_flag
+test_return_brief_reports_an_unreadable_not_started_list
+test_return_brief_keeps_next_steps_ahead_of_held_rows
+test_return_brief_names_unstarted_work
+
+test_not_started_budget_counts_bytes
