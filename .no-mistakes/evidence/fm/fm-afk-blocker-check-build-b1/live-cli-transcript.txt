@@ -1,0 +1,560 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t
+
+exit=0
+$ bin/fm-afk-contract.sh enter --words Live validation of blocker response timing
+Away posture recorded at 2026-11-06T11:44:53Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-06T11:44:53Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Live validation of blocker response timing
+
+exit=0
+worker appends live-stall: blocked [key=default] [at=1793965493]: live validation event
+worker appends live-question: needs-decision [key=default] [at=1793965493]: live validation event
+worker appends live-stall: working [key=default] [at=1793965494]: live validation event
+worker appends live-stall: paused [key=default] [at=1793965494]: live validation event
+worker appends live-stall: blocked [key=default]: live validation event
+$ bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/afk-contracts/1793965493.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:00Z, 7s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; no action for 7s, the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 2 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Live unresolved blocker reports no-action dwell despite working, paused and untimed reassertion
+PASS Untimed event gets honesty note and a question produces no blocker dwell
+$ bin/fm-afk-return.sh guard
+fm-afk-return: return catch-up is pending; remediate or durably reclassify every listed blocker, then run bin/fm-afk-return.sh check
+firstmate-actionable blocker: live-stall [key=default] live validation event
+
+exit=4
+$ bin/fm-afk-return.sh catchup-summary
+1	
+
+exit=0
+PASS Catchup-summary leaves gate bytes unchanged
+$ bash -c . bin/fm-task-inbox-lib.sh; fm_task_inbox_write "$FM_HOME/state" "$1" "$2" steer live-stall Continue the blocked task; prose at=1970-01-01T00:00:00Z is not a header
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-stall.inbox/001.msg
+exit=0
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:04Z, 11s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 2 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Late root steering reports first action and retains remediation gate
+worker appends live-boundary: blocked [key=route] [at=1793965505]: live validation event
+worker appends live-boundary: blocked [key=route] [at=1793965506]: live validation event
+worker appends live-boundary: resolved [key=route] [at=1793965507]: live validation event
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 12s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:09Z, 16s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - live-boundary [key=route] blocked 2026-11-06T11:45:05Z; first action 2026-11-06T11:45:07Z (2s later); closed 2026-11-06T11:45:07Z: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 3 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Keyed closure exactly at grace reports true opening through timed reassertion
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 15s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:13Z, 20s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 3 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Same interval below configured grace is suppressed
+worker appends live-root: blocked [key=default] [at=1793965514]: live validation event
+$ bash -c . bin/fm-task-inbox-lib.sh; fm_task_inbox_write "$FM_HOME/state" "$1" "$2" steer live-root Continue the blocked task; prose at=1970-01-01T00:00:00Z is not a header
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-root.inbox/001.msg
+exit=0
+worker appends live-acked: blocked [key=default] [at=1793965516]: live validation event
+$ bash -c . bin/fm-task-inbox-lib.sh; fm_task_inbox_write "$FM_HOME/state" "$1" "$2" steer live-acked Continue the blocked task; prose at=1970-01-01T00:00:00Z is not a header
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-acked.inbox/001.msg
+exit=0
+worker appends live-terminal: blocked [key=build] [at=1793965517]: live validation event
+worker appends live-terminal: done [key=default] [at=1793965518]: live validation event
+worker appends live-held: blocked [key=review] [at=1793965518]: live validation event
+worker appends live-held: captain-held [key=review] [at=1793965519]: live validation event
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 24s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:22Z, 29s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-stall [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Prompt root/acknowledged steers, ship done and captain-held closure add no dwell noise
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 29s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:27Z, 34s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 34s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:31Z, 38s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS pi bookkeeping cannot alter measured live-stall action
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 38s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:36Z, 43s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS host bookkeeping cannot alter measured live-stall action
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 43s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:41Z, 48s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-stall [key=default] blocked 2026-11-06T11:44:53Z; first action 2026-11-06T11:45:01Z (8s later), the longest wait this window; still blocked, firstmate remediates before ordinary work: live validation event
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS daemon bookkeeping cannot alter measured live-stall action
+worker appends live-boundary: blocked [key=route] [at=1793965543]: live validation event
+worker appends live-boundary: resolved [key=route] [at=1793965544]: live validation event
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 50s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:48Z, 55s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-root [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - live-stall [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+firstmate-actionable blocker: live-acked [key=default] live validation event
+firstmate-actionable blocker: live-root [key=default] live validation event
+firstmate-actionable blocker: live-stall [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Same-key reopening evaluates its latest interval
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 57s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:45:55Z, 1m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+  - status file unreadable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-missing.status; catch-up stays gated
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+  - note: live-missing status log missing or unreadable; blocker wait could not be judged
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 8 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+catch-up lifecycle: status file unreadable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-missing.status; catch-up stays gated
+firstmate-actionable blocker: live-acked [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Missing status is named and gate retained
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 62s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:46:00Z, 1m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+  - status file unreadable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-missing.status; catch-up stays gated
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - live-acked [key=default] still blocked, firstmate remediates before ordinary work: live validation event
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+  - note: live-missing status log missing or unreadable; blocker wait could not be judged
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 8 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+catch-up lifecycle: status file unreadable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-dwell-_aokh_7t/state/live-missing.status; catch-up stays gated
+firstmate-actionable blocker: live-acked [key=default] live validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Unreadable symlink status is named and gate retained
+worker appends live-missing: done [key=default] [at=1793965562]: live validation event
+worker appends live-stall: resolved [key=default] [at=1793965562]: live validation event
+worker appends live-root: resolved [key=default] [at=1793965562]: live validation event
+worker appends live-acked: resolved [key=default] [at=1793965562]: live validation event
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 68s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:44:53Z -> 2026-11-06T11:46:06Z, 1m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live validation of blocker response timing
+  the away session took no action under them.
+Waiting on you:
+  - live-question [key=default] needs your decision: live validation event
+Tried and failed, or could not be fixed:
+  - note: 1 blocked event(s) carried no time stamp and could not be attributed to this window
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 8 task(s) live at return.
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: live-question needs-decision: live validation event
+catch-up wake: live-stall blocked: live validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: live-terminal done [key=default] [at=1793965518]: live validation event
+catch-up wake: live-acked blocked: live validation event
+catch-up wake: live-root blocked: live validation event
+catch-up wake: live-missing done [key=default] [at=1793965562]: live validation event
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+exit=0
+PASS Resolving open blockers clears gate while question remains
+$ bin/fm-afk-return.sh guard
+
+exit=0
+Removed disposable lab home; no harness or fleet endpoints were launched.

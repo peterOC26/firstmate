@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Pre-entry event stays excluded despite fresh status mtime",
+    "pass": true
+  },
+  {
+    "name": "Future event cannot be attributed to this window",
+    "pass": true
+  },
+  {
+    "name": "Pre-block inbox, body timestamps and rotated daemon ledger are not real action",
+    "pass": true
+  },
+  {
+    "name": "Longest wait comes first and is marked exactly once",
+    "pass": true
+  },
+  {
+    "name": "A late ship failure preserves earlier wait and shows closed context",
+    "pass": true
+  }
+]

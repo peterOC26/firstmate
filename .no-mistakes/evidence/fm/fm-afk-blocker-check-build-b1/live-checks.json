@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Live unresolved blocker reports no-action dwell despite working, paused and untimed reassertion",
+    "pass": true
+  },
+  {
+    "name": "Untimed event gets honesty note and a question produces no blocker dwell",
+    "pass": true
+  },
+  {
+    "name": "Catchup-summary leaves gate bytes unchanged",
+    "pass": true
+  },
+  {
+    "name": "Late root steering reports first action and retains remediation gate",
+    "pass": true
+  },
+  {
+    "name": "Keyed closure exactly at grace reports true opening through timed reassertion",
+    "pass": true
+  },
+  {
+    "name": "Same interval below configured grace is suppressed",
+    "pass": true
+  },
+  {
+    "name": "Prompt root/acknowledged steers, ship done and captain-held closure add no dwell noise",
+    "pass": true
+  },
+  {
+    "name": "pi bookkeeping cannot alter measured live-stall action",
+    "pass": true
+  },
+  {
+    "name": "host bookkeeping cannot alter measured live-stall action",
+    "pass": true
+  },
+  {
+    "name": "daemon bookkeeping cannot alter measured live-stall action",
+    "pass": true
+  },
+  {
+    "name": "Same-key reopening evaluates its latest interval",
+    "pass": true
+  },
+  {
+    "name": "Missing status is named and gate retained",
+    "pass": true
+  },
+  {
+    "name": "Unreadable symlink status is named and gate retained",
+    "pass": true
+  },
+  {
+    "name": "Resolving open blockers clears gate while question remains",
+    "pass": true
+  }
+]

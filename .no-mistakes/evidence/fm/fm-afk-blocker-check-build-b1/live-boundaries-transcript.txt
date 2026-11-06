@@ -1,0 +1,117 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-boundaries-k5m01y8v
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-boundaries-k5m01y8v
+
+exit=0
+worker appends before-entry: blocked [at=1793965609]: validation event
+$ bin/fm-afk-contract.sh enter --words Live boundary validation
+Away posture recorded at 2026-11-06T11:46:50Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-06T11:46:50Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Live boundary validation
+
+exit=0
+$ bash -c . bin/fm-task-inbox-lib.sh; fm_task_inbox_write "$FM_HOME/state" prose-only "A message body mentions at=2099-01-01T00:00:00Z; it is not action during the blocked interval"
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-boundaries-k5m01y8v/state/prose-only.inbox/001.msg
+exit=0
+worker appends prose-only: blocked [at=1793965612]: validation event
+worker appends younger: blocked [at=1793965613]: validation event
+worker appends future-event: blocked [at=1793969213]: validation event
+$ bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6R9JQBC9XXM9G75QQXE88JY/.fm-lab-boundaries-k5m01y8v/state/afk-contracts/1793965610.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  4 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== Return brief (away 2026-11-06T11:46:50Z -> 2026-11-06T11:46:59Z, 9s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live boundary validation
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  - prose-only [key=default] blocked 2026-11-06T11:46:52Z; no action for 7s, the longest wait this window; still blocked, firstmate remediates before ordinary work: validation event
+  - younger [key=default] blocked 2026-11-06T11:46:53Z; no action for 6s; still blocked, firstmate remediates before ordinary work: validation event
+  - before-entry [key=default] still blocked, firstmate remediates before ordinary work: validation event
+  - future-event [key=default] still blocked, firstmate remediates before ordinary work: validation event
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 4 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: before-entry blocked: validation event
+catch-up wake: future-event blocked: validation event
+catch-up wake: prose-only blocked: validation event
+catch-up wake: younger blocked: validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: before-entry [key=default] validation event
+firstmate-actionable blocker: future-event [key=default] validation event
+firstmate-actionable blocker: prose-only [key=default] validation event
+firstmate-actionable blocker: younger [key=default] validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS Pre-entry event stays excluded despite fresh status mtime
+PASS Future event cannot be attributed to this window
+PASS Pre-block inbox, body timestamps and rotated daemon ledger are not real action
+PASS Longest wait comes first and is marked exactly once
+worker appends prose-only: failed [at=1793965620]: validation event
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: 6s ago, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T11:46:50Z -> 2026-11-06T11:47:03Z, 13s) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+Your instructions:
+  your words at entry:
+    Live boundary validation
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  - younger [key=default] blocked 2026-11-06T11:46:53Z; no action for 10s, the longest wait this window; still blocked, firstmate remediates before ordinary work: validation event
+  - prose-only [key=default] blocked 2026-11-06T11:46:52Z; first action 2026-11-06T11:47:00Z (8s later); closed 2026-11-06T11:47:00Z: validation event
+  - before-entry [key=default] still blocked, firstmate remediates before ordinary work: validation event
+  - future-event [key=default] still blocked, firstmate remediates before ordinary work: validation event
+  - prose-only: failed [at=1793965620]: validation event
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 4 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 0s old at return)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: before-entry blocked: validation event
+catch-up wake: future-event blocked: validation event
+catch-up wake: prose-only blocked: validation event
+catch-up wake: younger blocked: validation event
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: prose-only failed [at=1793965620]: validation event
+firstmate-actionable blocker: before-entry [key=default] validation event
+firstmate-actionable blocker: future-event [key=default] validation event
+firstmate-actionable blocker: younger [key=default] validation event
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit=3
+PASS A late ship failure preserves earlier wait and shows closed context
+Removed disposable lab home.
