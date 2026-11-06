@@ -1686,6 +1686,12 @@ write_host_fixture() {
         printf "printf 'signal: fixture.status\\n'\n"
         printf "printf 'supervision-host: the away session could not take this wake: fixture; this wake is yours\\n'\n"
         ;;
+      captain-note)
+        printf "printf 'pending:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
+        printf 'touch "$FM_HOME/state/.last-watcher-beat"\n'
+        printf "printf 'check: captain inbox note fixture-note\\n'\n"
+        printf "printf 'supervision-host: the captain sent a note and away mode should end (captain inbox note fixture-note queued)\\n'\n"
+        ;;
       stood-down)
         printf "printf 'supervision-host stood down: this session no longer owns supervision\\n'\n"
         ;;
@@ -1796,6 +1802,24 @@ test_host_handback_under_away_record_is_not_a_return() {
   assert_contains "$out" "supervision-host: the away session could not take this wake" "the handed-back wake must say why"
   assert_contains "$out" "not from the captain: it is not a return" "an away-posture handback must say it is not the captain's return"
   pass "auto-arm: a wake the host hands back under the away record says it is automatic supervision, not a return"
+}
+
+# The inbox-note hand-back is the return. The away record is still on disk,
+# and the hook must not tell main that this wake is not one.
+test_host_captain_note_handback_is_not_called_automatic_supervision() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/host-captain-note")
+  mkdir -p "$dir/config"
+  rm -f "$dir/config/supervision-host-off"
+  : > "$dir/state/task.meta"
+  : > "$dir/state/.afk-contract"
+  write_host_fixture "$dir" captain-note
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "a captain-note hand-back must rewake main"
+  assert_contains "$out" "check: captain inbox note fixture-note" "the captain-note hand-back must carry its reason line"
+  assert_contains "$out" "the captain sent a note and away mode should end" "the captain-note hand-back must keep the host's return line"
+  assert_not_contains "$out" "not a return" "a captain-note hand-back must not tell main it is not a return"
+  pass "auto-arm: a captain-note hand-back under the away record is not labeled automatic supervision"
 }
 
 # Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
@@ -2118,6 +2142,7 @@ test_host_off_flag_keeps_the_arm
 test_host_absent_flag_runs_the_host
 test_host_boundary_rewakes_with_the_host_line
 test_host_handback_under_away_record_is_not_a_return
+test_host_captain_note_handback_is_not_called_automatic_supervision
 test_host_handback_beside_a_quiet_record_carries_no_away_note
 test_plain_arm_banner_keeps_its_wake_line_cap
 test_host_handback_carries_every_host_line

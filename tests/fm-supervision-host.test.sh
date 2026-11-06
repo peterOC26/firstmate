@@ -1359,6 +1359,157 @@ test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn() {
 }
 
 
+# An away record plus a queued inbox note is the return: main gets that close
+# and the naming line, and the engine does not take the note. A prior routine
+# wake may already have run, which is what parks a stable watcher. The record
+# stays until main runs the return.
+test_away_inbox_note_is_handed_back_so_main_can_end_away_mode() {
+  local home id
+  home=$(make_home away-inbox away)
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "away inbox: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 handled_at_least "$home" 1 || fail "away inbox: the prior wake never completed: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 host_exited "$home" || fail "away inbox: note never reached main: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "away inbox: host failed"
+  assert_grep "check: captain inbox note $id" "$home/host.out" "away inbox: reason missing"
+  assert_grep "the captain sent a note and away mode should end" "$home/host.out" "away inbox: return line missing"
+  assert_grep $'pass-through\taway\tmain-only (captain inbox note '"$id"' queued)' \
+    "$home/state/.supervision-host.log" "away inbox: missing away hand-back verdict"
+  [ "$(engine_calls "$home")" = 1 ] || fail "away inbox: engine took the note ($(engine_calls "$home") calls)"
+  assert_no_re "inbox:$id" "$home/engine-drain.1" "away inbox: the prior turn was shown the note"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = away ] || fail "away inbox: the host changed the away record"
+  watcher_live "$home" || fail "away inbox: no live successor for main"
+  stop_home_processes "$home"
+  pass "host: an away inbox note is handed back so main can end away mode, and the engine does not take it"
+}
+
+# The same posture with no note is unchanged: the engine takes the close and
+# main stays parked.
+test_away_wake_without_an_inbox_note_stays_on_the_engine() {
+  local home
+  home=$(make_home away-no-note away)
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "away no-note: no initial watcher"
+  append_status "$home" 'routine fleet wake'
+  wait_until 250 handled_at_least "$home" 1 \
+    || fail "away no-note: engine did not take the wake: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  [ "$(engine_calls "$home")" -ge 1 ] || fail "away no-note: engine did not run"
+  assert_grep $'posture=away' "$home/state/.supervision-host.log" "away no-note: the handled turn was not away"
+  assert_no_grep "away mode should end" "$home/host.out" "away no-note: a note-free wake was called a return"
+  [ ! -s "$home/host.rc" ] || fail "away no-note: the host exited to main: $(cat "$home/host.out")"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = away ] || fail "away no-note: the away record changed"
+  stop_home_processes "$home"
+  pass "host: an away wake with no inbox note stays on the engine"
+}
+
+# Quiet mode is a present captain. An inbox note takes the attended hand-back
+# and never the away return line. A prior routine wake parks a stable watcher,
+# the same shape as the attended inbox test.
+test_quiet_inbox_note_stays_an_attended_handback() {
+  local home id
+  home=$(make_home quiet-inbox quiet)
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "quiet inbox: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 handled_at_least "$home" 1 || fail "quiet inbox: the prior wake never completed: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 host_exited "$home" || fail "quiet inbox: note never reached main: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "quiet inbox: host failed"
+  assert_grep "check: captain inbox note $id" "$home/host.out" "quiet inbox: reason missing"
+  assert_no_grep "away mode should end" "$home/host.out" "quiet inbox: away return line appeared"
+  assert_no_re '^supervision-host:' "$home/host.out" "quiet inbox: a supervision-host line was added"
+  assert_grep $'pass-through\tattended\tmain-only\tcheck: captain inbox note' \
+    "$home/state/.supervision-host.log" "quiet inbox: note was not an attended hand-back"
+  [ "$(engine_calls "$home")" = 1 ] || fail "quiet inbox: engine took the note ($(engine_calls "$home") calls)"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = quiet ] || fail "quiet inbox: mode changed"
+  stop_home_processes "$home"
+  pass "host: a quiet-mode inbox note stays an attended hand-back"
+}
+
+# A note that arrives after the successor has already closed is still
+# unsurfaced. The next close is some other wake; the helper path hands that
+# close back before another engine turn.
+test_away_inbox_note_beside_a_closed_successor_reaches_main() {
+  local home successor id marker beat i
+  home=$(make_home away-inbox-coincide away)
+  echo held > "$home/stub-mode"
+  mkfifo "$home/stub-release"
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "away coincide: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 test -s "$home/engine-drain.1" || fail "away coincide: engine did not reach its hold: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  successor=$(cat "$home/state/.watch.lock/pid")
+  append_status "$home" 'second wake while first turn is held'
+  wait_until 250 bash -c '! kill -0 "$1" 2>/dev/null' _ "$successor" \
+    || fail "away coincide: successor did not close on the second signal"
+  id=$(queue_host_inbox_note "$home")
+  printf 'continue\n' > "$home/stub-release"
+  wait_until 250 host_exited "$home" || fail "away coincide: main was not reached: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "away coincide: host failed"
+  assert_absent "$home/engine-drain.2" "away coincide: a second engine turn started"
+  assert_grep "the captain sent a note and away mode should end" "$home/host.out" "away coincide: return line missing"
+  assert_grep "captain inbox note $id queued" "$home/host.out" "away coincide: note id missing from the return line"
+  assert_grep $'pass-through\taway\tmain-only (captain inbox note '"$id"' queued)' \
+    "$home/state/.supervision-host.log" "away coincide: missing away hand-back verdict"
+  [ "$(engine_calls "$home")" = 1 ] || fail "away coincide: engine call count is $(engine_calls "$home")"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = away ] || fail "away coincide: the host changed the away record"
+  marker="$home/state/.seen-inbox-$(printf 'inbox:%s' "$id" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+  [ -f "$marker" ] || fail "away coincide: host did not mark the note before starting main's successor"
+  watcher_live "$home" || fail "away coincide: no live successor for main"
+  successor=$(cat "$home/state/.watch.lock/pid")
+  beat=$(FM_HOME="$home" bash -c '. "$1"; fm_path_mtime "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/.last-watcher-beat")
+  i=0
+  while [ "$(FM_HOME="$home" bash -c '. "$1"; fm_path_mtime "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state/.last-watcher-beat")" = "$beat" ] && [ "$i" -lt 150 ]; do
+    sleep 0.1; i=$((i + 1))
+  done
+  [ "$i" -lt 150 ] || fail "away coincide: successor did not complete a poll"
+  kill -0 "$successor" 2>/dev/null || fail "away coincide: successor surfaced the note twice"
+  stop_home_processes "$home"
+  pass "host: an unsurfaced inbox note beside an away close is handed back before another engine turn"
+}
+
+# The report's case: the watcher's first poll has finished, a note is queued
+# one second later, and the test clock reaches the park bound before the next poll.
+# The bound must name the note as the return. The record stays until main
+# runs the return, and the note stays queued for that drain.
+test_away_inbox_note_at_the_park_bound_is_the_return() {
+  local home id
+  home=$(make_home away-park-bound away)
+  # Advance only after the note is saved, so scheduling cannot end the park
+  # between the pre-queue exit check and the inbox producer's append.
+  FM_POLL=15 FM_SUPERVISION_HOST_PARK_SECONDS=60 FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "park bound: no initial watcher"
+  wait_until 150 test -e "$home/state/.last-watcher-beat" \
+    || fail "park bound: the first poll did not complete: $(cat "$home/host.out" 2>/dev/null)"
+  sleep 1
+  if host_exited "$home"; then
+    fail "park bound: the host exited before the note was queued: $(cat "$home/host.out" 2>/dev/null)"
+  fi
+  id=$(queue_host_inbox_note "$home")
+  printf '60\n' > "$home/park-clock"
+  wait_until 250 host_exited "$home" \
+    || fail "park bound: the host did not return: $(cat "$home/host.out" 2>/dev/null; echo '---'; cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "park bound: host failed"
+  assert_grep "supervision-host: cycle boundary" "$home/host.out" "park bound: the boundary line is missing"
+  assert_grep "the captain sent a note and away mode should end" "$home/host.out" "park bound: return line missing"
+  assert_grep "captain inbox note $id queued" "$home/host.out" "park bound: note id missing from the return line"
+  assert_grep $'pass-through\taway\tmain-only (captain inbox note '"$id"' queued)' \
+    "$home/state/.supervision-host.log" "park bound: missing away hand-back verdict"
+  [ "$(engine_calls "$home")" = 0 ] || fail "park bound: the engine took a wake ($(engine_calls "$home") calls)"
+  [ "$(FM_HOME="$home" "$CONTRACT" mode)" = away ] || fail "park bound: the host changed the away record"
+  FM_HOME="$home" bash -c '. "$1"; fm_wake_queued_keys check' _ "$ROOT/bin/fm-wake-lib.sh" > "$home/queued"
+  assert_grep "inbox:$id" "$home/queued" "park bound: the note was consumed before main could drain it"
+  stop_home_processes "$home"
+  pass "host: an inbox note queued after the first poll is the return at the park bound"
+}
+
 test_inbox_note_queued_while_parked_reaches_main
 test_claude_stop_hook_delivers_an_inbox_note_queued_mid_engine_turn
 test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn
+test_away_inbox_note_is_handed_back_so_main_can_end_away_mode
+test_away_wake_without_an_inbox_note_stays_on_the_engine
+test_quiet_inbox_note_stays_an_attended_handback
+test_away_inbox_note_beside_a_closed_successor_reaches_main
+test_away_inbox_note_at_the_park_bound_is_the_return
