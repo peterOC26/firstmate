@@ -1,0 +1,9 @@
+ok - empty backlog renders entry and return without a false read error
+ok - not-started reports an unreadable backlog on stdout
+ok - a re-deferred future date fires once when it comes due
+ok - entry inventory and not-started each read the backlog once
+ok - entry and not-started omit cut commands and retain complete commands
+ok - entry inventory lists every gate and leaves the home unchanged
+ok - an unreadable backlog is reported and left untouched
+ok - a future date registers one check and a passed date does not
+ok - away enter prints the inventory and quiet enter omits it

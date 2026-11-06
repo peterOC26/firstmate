@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/zabi/.no-mistakes/evidence/01M6Q1S6BCZ3DT0QKMCSE7DG31/live-entry-boundaries.py", line 33, in <module>
+    assert 'entry inventory:' not in empty_output and not empty_next.strip(), 'Healthy empty backlog produces a spurious error in entry and Not started'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Healthy empty backlog produces a spurious error in entry and Not started

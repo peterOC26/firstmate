@@ -1,0 +1,941 @@
+$ bin/fm-lab-home.sh create $LAB
+/tmp/fm-lab.3aqxm7r9
+
+exit: 0
+$ tmux -L fm-lab new-session -d -s primary -x 120 -y 40 sleep 600
+
+exit: 0
+$ bin/fm-tasks-axi.sh add done-job Live validation done-job
+ok: added done-job -> Queued
+task:
+  id: done-job
+  title: Live validation done-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start done-job` to move it to in flight
+  - Run `tasks-axi block done-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add queued-job Live validation queued-job
+ok: added queued-job -> Queued
+task:
+  id: queued-job
+  title: Live validation queued-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start queued-job` to move it to in flight
+  - Run `tasks-axi block queued-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add hold-a Live validation hold-a
+ok: added hold-a -> Queued
+task:
+  id: hold-a
+  title: Live validation hold-a
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start hold-a` to move it to in flight
+  - Run `tasks-axi block hold-a --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add hold-b Live validation hold-b
+ok: added hold-b -> Queued
+task:
+  id: hold-b
+  title: Live validation hold-b
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start hold-b` to move it to in flight
+  - Run `tasks-axi block hold-b --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add dated-job Live validation dated-job
+ok: added dated-job -> Queued
+task:
+  id: dated-job
+  title: Live validation dated-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dated-job` to move it to in flight
+  - Run `tasks-axi block dated-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add future-job Live validation future-job
+ok: added future-job -> Queued
+task:
+  id: future-job
+  title: Live validation future-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start future-job` to move it to in flight
+  - Run `tasks-axi block future-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add cut-job Live validation cut-job
+ok: added cut-job -> Queued
+task:
+  id: cut-job
+  title: Live validation cut-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start cut-job` to move it to in flight
+  - Run `tasks-axi block cut-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add complete-job Live validation complete-job
+ok: added complete-job -> Queued
+task:
+  id: complete-job
+  title: Live validation complete-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start complete-job` to move it to in flight
+  - Run `tasks-axi block complete-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add short-job Live validation short-job
+ok: added short-job -> Queued
+task:
+  id: short-job
+  title: Live validation short-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start short-job` to move it to in flight
+  - Run `tasks-axi block short-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh add status-job Live validation status-job
+ok: added status-job -> Queued
+task:
+  id: status-job
+  title: Live validation status-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start status-job` to move it to in flight
+  - Run `tasks-axi block status-job --by <other>` to record a dependency
+
+exit: 0
+$ bin/fm-tasks-axi.sh block queued-job --by done-job
+ok: block queued-job -> blocked-by done-job
+help[2]:
+  - Run `tasks-axi unblock queued-job --by <other>` to clear it
+  - Run `tasks-axi ready` to see what is still dispatchable
+
+exit: 0
+$ bin/fm-tasks-axi.sh done done-job --note landed
+ok: done done-job -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+
+exit: 0
+$ bin/fm-tasks-axi.sh hold hold-a --reason wait for naming decision --kind captain
+ok: hold hold-a -> held (captain)
+task:
+  id: hold-a
+  title: Live validation hold-a
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: wait for naming decision
+  hold_kind: captain
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold hold-a` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+
+exit: 0
+$ bin/fm-captain-hold.sh hold hold-b --reason Choose the public name
+hold-b
+
+exit: 0
+$ bin/fm-tasks-axi.sh hold dated-job --reason date passed --kind future --until 2026-11-05
+ok: hold dated-job -> held (future, until 2026-11-05)
+task:
+  id: dated-job
+  title: Live validation dated-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: date passed
+  hold_kind: future
+  hold_until: 2026-11-05
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold dated-job` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+
+exit: 0
+$ bin/fm-tasks-axi.sh hold future-job --reason later --kind future --until 2026-11-09
+ok: hold future-job -> held (future, until 2026-11-09)
+task:
+  id: future-job
+  title: Live validation future-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: later
+  hold_kind: future
+  hold_until: 2026-11-09
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold future-job` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+
+exit: 0
+$ bin/fm-afk-launch.sh enter --words watch the fleet
+Do not merge anything. Stop after three failed checks.
+Away posture recorded at 2026-11-06T00:03:34Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 5 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-06T00:03:34Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    watch the fleet
+    Do not merge anything. Stop after three failed checks.
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job do not run
+  done-job: done
+  paused-job: paused
+  running-job: working; next: bin/fm-send.sh running-job continue
+  stuck-job: failed
+
+Held for the captain:
+  future-job: later
+  hold-a: wait for naming decision
+  hold-b: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  done-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-05
+
+Future dates, not registered:
+  future-job: hold until 2026-11-09; bin/fm-afk-entry-brief.sh --register-future future-job
+
+Stop point, three failed checks:
+  stuck-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+exit: 0
+$ bin/fm-afk-contract.sh words
+watch the fleet
+Do not merge anything. Stop after three failed checks.
+exit: 0
+$ bin/fm-afk-entry-brief.sh
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job do not run
+  done-job: done
+  paused-job: paused
+  running-job: working; next: bin/fm-send.sh running-job continue
+  stuck-job: failed
+
+Held for the captain:
+  future-job: later
+  hold-a: wait for naming decision
+  hold-b: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  done-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-05
+
+Future dates, not registered:
+  future-job: hold until 2026-11-09; bin/fm-afk-entry-brief.sh --register-future future-job
+
+Stop point, three failed checks:
+  stuck-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+exit: 0
+SCENARIO PASS: Enter away mode, preserve verbatim words, and print a stable read-only inventory with holds, cleared blockers, green PRs, dates, and failed checks
+$ bin/fm-afk-entry-brief.sh
+entry inventory: backlog file is unreadable
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job do not run
+  done-job: done
+  paused-job: paused
+  running-job: working; next: bin/fm-send.sh running-job continue
+  stuck-job: failed
+
+Green, waiting on a merge sentence:
+  done-job: https://github.com/example/repo/pull/9
+
+Stop point, three failed checks:
+  stuck-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+exit: 0
+$ bin/fm-afk-entry-brief.sh not-started
+  entry inventory: backlog file is unreadable
+  - running-job: bin/fm-send.sh running-job continue
+
+exit: 0
+SCENARIO PASS: Read an unreadable backlog: report the error, exit zero, and preserve its contents
+$ bin/fm-afk-entry-brief.sh --register-future dated-job
+dated-job hold until 2026-11-05 is already due
+
+exit: 0
+$ bin/fm-afk-entry-brief.sh --register-future future-job
+registered: state/fm-afk-future-future-job.check.sh
+
+exit: 0
+$ $LAB/state/fm-afk-future-future-job.check.sh
+
+exit: 0
+$ bin/fm-tasks-axi.sh hold future-job --reason rescheduled for today --kind future --until 2026-11-06
+ok: hold future-job -> held (future, until 2026-11-06)
+task:
+  id: future-job
+  title: Live validation future-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: rescheduled for today
+  hold_kind: future
+  hold_until: 2026-11-06
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold future-job` to resume dispatch
+  - Run `tasks-axi ready --include-held` to review paused work
+
+exit: 0
+$ $LAB/state/fm-afk-future-future-job.check.sh
+future-job hold until 2026-11-06 is due
+
+exit: 0
+$ $LAB/state/fm-afk-future-future-job.check.sh
+
+exit: 0
+SCENARIO PASS: Offer future checks without registering; explicitly register one, refuse already-due registration, and fire once after the date becomes due
+$ bin/fm-tasks-axi.sh update cut-job --body 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Next: bin/fm-send.sh cut-job please continue the work
+ok: updated cut-job (body)
+task:
+  id: cut-job
+  title: Live validation cut-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 534 chars total - use show cut-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show cut-job --full` to see the result
+
+exit: 0
+$ bin/fm-tasks-axi.sh update complete-job --body Next: bin/fm-send.sh complete-job continue
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 trailing text
+ok: updated complete-job (body)
+task:
+  id: complete-job
+  title: Live validation complete-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "Next: bin/fm-send.sh complete-job continue\n0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n... (truncated, 537 chars total - use show complete-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show complete-job --full` to see the result
+
+exit: 0
+$ bin/fm-tasks-axi.sh update short-job --body Next: bin/fm-send.sh short-job continue
+ok: updated short-job (body)
+task:
+  id: short-job
+  title: Live validation short-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "Next: bin/fm-send.sh short-job continue"
+help[1]:
+  - Run `tasks-axi show short-job --full` to see the result
+
+exit: 0
+$ bin/fm-tasks-axi.sh update status-job --body 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Next: bin/fm-send.sh status-job partial body
+ok: updated status-job (body)
+task:
+  id: status-job
+  title: Live validation status-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 525 chars total - use show status-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show status-job --full` to see the result
+
+exit: 0
+$ bin/fm-tasks-axi.sh list --fields body
+count: 10
+tasks[10]{id,state,kind,repo,title,body}:
+  queued-job,queued,task,"-",Live validation queued-job,""
+  hold-a,queued,task,"-",Live validation hold-a,""
+  hold-b,queued,task,"-",Live validation hold-b,"Captain hold set: 2026-11-06T00:03:33Z"
+  dated-job,queued,task,"-",Live validation dated-job,""
+  future-job,queued,task,"-",Live validation future-job,""
+  cut-job,queued,task,"-",Live validation cut-job,"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 534 chars total - use show cut-job --full to see complete text)"
+  complete-job,queued,task,"-",Live validation complete-job,"Next: bin/fm-send.sh complete-job continue\n0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n... (truncated, 537 chars total - use show complete-job --full to see complete text)"
+  short-job,queued,task,"-",Live validation short-job,"Next: bin/fm-send.sh short-job continue"
+  status-job,queued,task,"-",Live validation status-job,"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 525 chars total - use show status-job --full to see complete text)"
+  done-job,done,task,"-",Live validation done-job,landed
+help[2]:
+  - Run `tasks-axi show <id>` for full notes on a task
+  - Run `tasks-axi ready` to see unblocked queued work
+
+exit: 0
+$ bin/fm-afk-entry-brief.sh inventory
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job do not run
+  complete-job: working; next: bin/fm-send.sh complete-job continue
+  cut-job: working
+  done-job: done
+  paused-job: paused
+  running-job: working; next: bin/fm-send.sh running-job continue
+  short-job: working; next: bin/fm-send.sh short-job continue
+  status-job: working; next: bin/fm-send.sh status-job use status instead
+  stuck-job: failed
+
+Held for the captain:
+  hold-a: wait for naming decision
+  hold-b: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  done-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-05
+  future-job: hold until 2026-11-06
+
+Stop point, three failed checks:
+  stuck-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+exit: 0
+$ bin/fm-afk-entry-brief.sh not-started
+  - complete-job: bin/fm-send.sh complete-job continue
+  - running-job: bin/fm-send.sh running-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job use status instead
+
+exit: 0
+SCENARIO PASS: Omit a Next command cut by real tasks-axi truncation while preserving complete earlier lines, short bodies, and status precedence
+$ bin/fm-afk-main-outcome.sh --task running-job --summary Reviewed pending advisory suite; continue waiting --wake signal: running-job.status
+1
+
+exit: 0
+$ bin/fm-afk-main-outcome.sh --task running-job --summary forbidden --verdict captain
+
+stderr: fm-afk-main-outcome.sh - one routine outcome for an event main handled
+while the away record stood and no away session was running.
+
+Usage:
+  fm-afk-main-outcome.sh --task <id> --summary <text> [--wake <text>] [--silent true|false]
+      Append one routine outcome row. --silent defaults to true, so a routine
+      note stays out of the captain's chat. This is not new authority.
+      A captain call stays a held backlog task through bin/fm-captain-hold.sh.
+      --verdict and --continuation are refused.
+  fm-afk-main-outcome.sh --help
+set -u
+
+exit: 2
+$ bin/fm-afk-main-outcome.sh --task running-job --summary forbidden --continuation merge immediately
+
+stderr: fm-afk-main-outcome.sh - one routine outcome for an event main handled
+while the away record stood and no away session was running.
+
+Usage:
+  fm-afk-main-outcome.sh --task <id> --summary <text> [--wake <text>] [--silent true|false]
+      Append one routine outcome row. --silent defaults to true, so a routine
+      note stays out of the captain's chat. This is not new authority.
+      A captain call stays a held backlog task through bin/fm-captain-hold.sh.
+      --verdict and --continuation are refused.
+  fm-afk-main-outcome.sh --help
+set -u
+
+exit: 2
+$ bin/fm-captain-hold.sh hold naming-decision --title Choose the name --reason Choose the public name
+naming-decision
+
+exit: 0
+$ bin/fm-tasks-axi.sh show naming-decision
+task:
+  id: naming-decision
+  title: Choose the name
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "Choose the public name"
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: firstmate
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-11-06T00:03:38Z"
+
+exit: 0
+Persisted outcome contract:
+{"seq":1,"epoch":1793923418,"task":"running-job","wake":"signal: running-job.status","verdict":"routine","summary":"Reviewed pending advisory suite; continue waiting","silent":true,"statusEndpoint":60,"statusIdent":"strong:35:8706172:2026-11-06 01:03:34.400301662 +0100"}
+
+SCENARIO PASS: Record a silent routine outcome, refuse captain verdicts and continuations, and persist a captain-owned decision as a held task
+$ bin/fm-afk-return.sh begin
+=== Return brief (away 2026-11-06T00:03:34Z -> 2026-11-06T00:03:44Z, 10s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    watch the fleet
+    Do not merge anything. Stop after three failed checks.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  - blocked-job [key=dep] still blocked, firstmate remediates before ordinary work: waiting
+  - stuck-job: failed: one
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - complete-job: bin/fm-send.sh complete-job continue
+  - running-job: bin/fm-send.sh running-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job use status instead
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 9 task(s) live at return.
+
+stderr: fm-afk-launch: away-posture record archived at /tmp/fm-lab.3aqxm7r9/state/afk-contracts/1793923414.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  9 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: done-job done: https://github.com/example/repo/pull/9 checks green
+catch-up wake: stuck-job check failed: three
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked-job [key=dep] blocked: waiting
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: blocked-job [key=dep] waiting
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+exit: 3
+$ bin/fm-afk-return.sh check
+=== Return brief (away 2026-11-06T00:03:34Z -> 2026-11-06T00:03:49Z, 15s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    watch the fleet
+    Do not merge anything. Stop after three failed checks.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  - stuck-job: failed: one
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - blocked-job: bin/fm-send.sh blocked-job do not run
+  - complete-job: bin/fm-send.sh complete-job continue
+  - running-job: bin/fm-send.sh running-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job use status instead
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 9 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: done-job done: https://github.com/example/repo/pull/9 checks green
+catch-up wake: stuck-job check failed: three
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked-job [key=dep] blocked: waiting
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit: 0
+SCENARIO PASS: Return with exact next commands once, omit open blocked work, and retain the catch-up gate until the blocker resolves
+UTF-8 line has 56 characters and 60 bytes including newline; shorter ASCII line has 43 bytes.
+$ bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  (2 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit: 0
+$ bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - zzz-short: bin/fm-send.sh zzz-short go
+  (1 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit: 0
+$ bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - aaa-long: bin/fm-send.sh aaa-long résumé — continue
+  (1 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit: 0
+$ bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[3]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-a,queued,task,"-",Live validation hold-a,captain,wait for naming decision,"-"
+      hold-b,queued,task,"-",Live validation hold-b,captain,"Choose the public name","-"
+      naming-decision,queued,captain,firstmate,Choose the name,captain,"Choose the public name","-"
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - aaa-long: bin/fm-send.sh aaa-long résumé — continue
+  - zzz-short: bin/fm-send.sh zzz-short go
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+stderr: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+exit: 0
+SCENARIO PASS: Enforce the return byte budget including newlines under UTF-8, omit oversized lines, and let later shorter commands fit
+Disposable lab home and private tmux server removed.

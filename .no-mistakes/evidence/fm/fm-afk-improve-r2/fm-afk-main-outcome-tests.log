@@ -1,0 +1,3 @@
+ok - every missing option value exits with usage status
+ok - main records a silent routine outcome and refuses a captain verdict
+ok - the prompt states the main-actor contract and stays stable

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Enter away mode, preserve verbatim words, and print a stable read-only inventory with holds, cleared blockers, green PRs, dates, and failed checks",
+    "result": "pass"
+  },
+  {
+    "name": "Read an unreadable backlog: report the error, exit zero, and preserve its contents",
+    "result": "pass"
+  },
+  {
+    "name": "Offer future checks without registering; explicitly register one, refuse already-due registration, and fire once after the date becomes due",
+    "result": "pass"
+  },
+  {
+    "name": "Omit a Next command cut by real tasks-axi truncation while preserving complete earlier lines, short bodies, and status precedence",
+    "result": "pass"
+  },
+  {
+    "name": "Record a silent routine outcome, refuse captain verdicts and continuations, and persist a captain-owned decision as a held task",
+    "result": "pass"
+  },
+  {
+    "name": "Return with exact next commands once, omit open blocked work, and retain the catch-up gate until the blocker resolves",
+    "result": "pass"
+  },
+  {
+    "name": "Enforce the return byte budget including newlines under UTF-8, omit oversized lines, and let later shorter commands fit",
+    "result": "pass"
+  }
+]

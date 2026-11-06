@@ -1,0 +1,906 @@
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/.l
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/.l
+
+[exit 0]
+
+=== Healthy empty backlog ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh not-started
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+
+=== Inventory with gates and read-only proof ===
+$ tasks-axi add done-job done-job --file data/backlog.md
+ok: added done-job -> Queued
+task:
+  id: done-job
+  title: done-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start done-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block done-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add queued-job queued-job --file data/backlog.md
+ok: added queued-job -> Queued
+task:
+  id: queued-job
+  title: queued-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start queued-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block queued-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add hold-job hold-job --file data/backlog.md
+ok: added hold-job -> Queued
+task:
+  id: hold-job
+  title: hold-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start hold-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block hold-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add dated-job dated-job --file data/backlog.md
+ok: added dated-job -> Queued
+task:
+  id: dated-job
+  title: dated-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start dated-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block dated-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add future-job future-job --file data/backlog.md
+ok: added future-job -> Queued
+task:
+  id: future-job
+  title: future-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start future-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block future-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add retired-job retired-job --file data/backlog.md
+ok: added retired-job -> Queued
+task:
+  id: retired-job
+  title: retired-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start retired-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block retired-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add short-job short-job --file data/backlog.md
+ok: added short-job -> Queued
+task:
+  id: short-job
+  title: short-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start short-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block short-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add cut-job cut-job --file data/backlog.md
+ok: added cut-job -> Queued
+task:
+  id: cut-job
+  title: cut-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start cut-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block cut-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add complete-job complete-job --file data/backlog.md
+ok: added complete-job -> Queued
+task:
+  id: complete-job
+  title: complete-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start complete-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block complete-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi add status-job status-job --file data/backlog.md
+ok: added status-job -> Queued
+task:
+  id: status-job
+  title: status-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start status-job --file=data/backlog.md` to move it to in flight
+  - Run `tasks-axi block status-job --by <other> --file=data/backlog.md` to record a dependency
+
+[exit 0]
+$ tasks-axi block queued-job --by done-job --file data/backlog.md
+ok: block queued-job -> blocked-by done-job
+help[2]:
+  - Run `tasks-axi unblock queued-job --by <other> --file=data/backlog.md` to clear it
+  - Run `tasks-axi ready --file=data/backlog.md` to see what is still dispatchable
+
+[exit 0]
+$ tasks-axi done done-job --note landed --file data/backlog.md
+ok: done done-job -> Done
+help[1]:
+  - Run `tasks-axi ready --file=data/backlog.md` to dispatch work unblocked by this
+
+[exit 0]
+$ tasks-axi done retired-job --note landed --file data/backlog.md
+ok: done retired-job -> Done
+help[1]:
+  - Run `tasks-axi ready --file=data/backlog.md` to dispatch work unblocked by this
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-captain-hold.sh hold hold-job --reason Choose the public name
+hold-job
+
+[exit 0]
+$ tasks-axi hold dated-job --reason earlier --kind future --until 2026-11-01 --file data/backlog.md
+ok: hold dated-job -> held (future, until 2026-11-01)
+task:
+  id: dated-job
+  title: dated-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: earlier
+  hold_kind: future
+  hold_until: 2026-11-01
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold dated-job --file=data/backlog.md` to resume dispatch
+  - Run `tasks-axi ready --include-held --file=data/backlog.md` to review paused work
+
+[exit 0]
+$ tasks-axi hold future-job --reason later --kind future --until 2026-12-01 --file data/backlog.md
+ok: hold future-job -> held (future, until 2026-12-01)
+task:
+  id: future-job
+  title: future-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: later
+  hold_kind: future
+  hold_until: 2026-12-01
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold future-job --file=data/backlog.md` to resume dispatch
+  - Run `tasks-axi ready --include-held --file=data/backlog.md` to review paused work
+
+[exit 0]
+$ tasks-axi update short-job --body Next: bin/fm-send.sh short-job continue --file data/backlog.md
+ok: updated short-job (body)
+task:
+  id: short-job
+  title: short-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "Next: bin/fm-send.sh short-job continue"
+help[1]:
+  - Run `tasks-axi show short-job --full --file=data/backlog.md` to see the result
+
+[exit 0]
+$ tasks-axi update cut-job --body 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Next: bin/fm-send.sh cut-job please continue the work --file data/backlog.md
+ok: updated cut-job (body)
+task:
+  id: cut-job
+  title: cut-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 534 chars total - use show cut-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show cut-job --full --file=data/backlog.md` to see the result
+
+[exit 0]
+$ tasks-axi update complete-job --body Next: bin/fm-send.sh complete-job continue
+000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 trailing text --file data/backlog.md
+ok: updated complete-job (body)
+task:
+  id: complete-job
+  title: complete-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "Next: bin/fm-send.sh complete-job continue\n0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n... (truncated, 537 chars total - use show complete-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show complete-job --full --file=data/backlog.md` to see the result
+
+[exit 0]
+$ tasks-axi update status-job --body 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+Next: bin/fm-send.sh status-job cut body command --file data/backlog.md
+ok: updated status-job (body)
+task:
+  id: status-job
+  title: status-job
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 529 chars total - use show status-job --full to see complete text)"
+help[1]:
+  - Run `tasks-axi show status-job --full --file=data/backlog.md` to see the result
+
+[exit 0]
+$ tasks-axi list --fields body --file data/backlog.md
+count: 10
+tasks[10]{id,state,kind,repo,title,body}:
+  queued-job,queued,task,"-",queued-job,""
+  hold-job,queued,task,"-",hold-job,"Captain hold set: 2026-11-06T00:09:38Z"
+  dated-job,queued,task,"-",dated-job,""
+  future-job,queued,task,"-",future-job,""
+  short-job,queued,task,"-",short-job,"Next: bin/fm-send.sh short-job continue"
+  cut-job,queued,task,"-",cut-job,"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 534 chars total - use show cut-job --full to see complete text)"
+  complete-job,queued,task,"-",complete-job,"Next: bin/fm-send.sh complete-job continue\n0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n... (truncated, 537 chars total - use show complete-job --full to see complete text)"
+  status-job,queued,task,"-",status-job,"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\nNext: bin/fm-send.s\n... (truncated, 529 chars total - use show status-job --full to see complete text)"
+  retired-job,done,task,"-",retired-job,landed
+  done-job,done,task,"-",done-job,landed
+help[2]:
+  - Run `tasks-axi show <id> --file=data/backlog.md` for full notes on a task
+  - Run `tasks-axi ready --file=data/backlog.md` to see unblocked queued work
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job continue
+  complete-job: working; next: bin/fm-send.sh complete-job continue
+  cut-job: working
+  failed-job: failed
+  green-job: done
+  short-job: working; next: bin/fm-send.sh short-job continue
+  status-job: working; next: bin/fm-send.sh status-job café
+
+Held for the captain:
+  future-job: later
+  hold-job: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  green-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-01
+
+Future dates, not registered:
+  future-job: hold until 2026-12-01; bin/fm-afk-entry-brief.sh --register-future future-job
+
+Stop point, three failed checks:
+  failed-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+[exit 0]
+Read-only proof: data/state file paths and SHA-256 contents identical before and after inventory. No future check registered by inventory.
+
+=== Exact next commands and truncation ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh not-started
+  - complete-job: bin/fm-send.sh complete-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job café
+
+[exit 0]
+
+=== Entry records words then prints inventory; replaces words verbatim ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-launch.sh enter --words A green PR may merge only with my explicit sentence. Await the slower advisory suite. Stop after three failed checks.
+Away posture recorded at 2026-11-06T00:09:42Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 7 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-06T00:09:42Z
+  expected return: not given
+  spend cap: 7 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    A green PR may merge only with my explicit sentence. Await the slower advisory suite. Stop after three failed checks.
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job continue
+  complete-job: working; next: bin/fm-send.sh complete-job continue
+  cut-job: working
+  failed-job: failed
+  green-job: done
+  short-job: working; next: bin/fm-send.sh short-job continue
+  status-job: working; next: bin/fm-send.sh status-job café
+
+Held for the captain:
+  future-job: later
+  hold-job: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  green-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-01
+
+Future dates, not registered:
+  future-job: hold until 2026-12-01; bin/fm-afk-entry-brief.sh --register-future future-job
+
+Stop point, three failed checks:
+  failed-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-launch.sh enter --words Stop after three failed checks.
+fm-afk-contract: replaced the earlier away posture; its record is archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/.l/state/afk-contracts/1793923782-superseded-1793923783.afk-contract
+Away posture recorded at 2026-11-06T00:09:43Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 7 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-06T00:09:42Z
+  expected return: not given
+  spend cap: 7 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Stop after three failed checks.
+Live work:
+  blocked-job: blocked; next: bin/fm-send.sh blocked-job continue
+  complete-job: working; next: bin/fm-send.sh complete-job continue
+  cut-job: working
+  failed-job: failed
+  green-job: done
+  short-job: working; next: bin/fm-send.sh short-job continue
+  status-job: working; next: bin/fm-send.sh status-job café
+
+Held for the captain:
+  future-job: later
+  hold-job: Choose the public name
+
+Queued, blocker cleared:
+  queued-job: blocked-by done-job is done
+
+Green, waiting on a merge sentence:
+  green-job: https://github.com/example/repo/pull/9
+
+Dates that have passed:
+  dated-job: hold until 2026-11-01
+
+Future dates, not registered:
+  future-job: hold until 2026-12-01; bin/fm-afk-entry-brief.sh --register-future future-job
+
+Stop point, three failed checks:
+  failed-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+[exit 0]
+
+=== Future-date opt-in and one-shot behavior ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh --register-future dated-job
+dated-job hold until 2026-11-01 is already due
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh --register-future future-job
+registered: state/fm-afk-future-future-job.check.sh
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh future-check future-job
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh future-check future-job
+future-job hold until 2026-12-01 is due
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh future-check future-job
+
+[exit 0]
+
+=== Silent routine outcome and rejected authority expansion ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-main-outcome.sh --task short-job --summary Reviewed the next action --wake signal: short-job.status
+1
+
+[exit 0]
+{"seq":1,"epoch":1793923786,"task":"short-job","wake":"signal: short-job.status","verdict":"routine","summary":"Reviewed the next action","silent":true,"statusEndpoint":18,"statusIdent":"strong:65028:14332666:2026-11-06 01:09:40.491437639 +0100"}
+
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-main-outcome.sh --task short-job --summary request authority --verdict captain
+fm-afk-main-outcome.sh - one routine outcome for an event main handled
+while the away record stood and no away session was running.
+
+Usage:
+  fm-afk-main-outcome.sh --task <id> --summary <text> [--wake <text>] [--silent true|false]
+      Append one routine outcome row. --silent defaults to true, so a routine
+      note stays out of the captain's chat. This is not new authority.
+      A captain call stays a held backlog task through bin/fm-captain-hold.sh.
+      --verdict and --continuation are refused.
+  fm-afk-main-outcome.sh --help
+set -u
+
+[exit 2]
+
+=== Return preserves blockers and omits them from Not started ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/.l/state/afk-contracts/1793923782.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  7 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== Return brief (away 2026-11-06T00:09:42Z -> 2026-11-06T00:09:51Z, 9s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words superseded at unknown:
+    A green PR may merge only with my explicit sentence. Await the slower advisory suite. Stop after three failed checks.
+  your words at entry:
+    Stop after three failed checks.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  - blocked-job [key=dep] still blocked, firstmate remediates before ordinary work: waiting
+  - failed-job: failed: one
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - complete-job: bin/fm-send.sh complete-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job café
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 7 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: failed-job check failed: three
+catch-up wake: green-job done: https://github.com/example/repo/pull/9 checks green
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked-job [key=dep] blocked: waiting
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: blocked-job [key=dep] waiting
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+
+[exit 3]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T00:09:42Z -> 2026-11-06T00:09:57Z, 15s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words superseded at unknown:
+    A green PR may merge only with my explicit sentence. Await the slower advisory suite. Stop after three failed checks.
+  your words at entry:
+    Stop after three failed checks.
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  - failed-job: failed: one
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - blocked-job: bin/fm-send.sh blocked-job continue
+  - complete-job: bin/fm-send.sh complete-job continue
+  - short-job: bin/fm-send.sh short-job continue
+  - status-job: bin/fm-send.sh status-job café
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 7 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+catch-up wake: failed-job check failed: three
+catch-up wake: green-job done: https://github.com/example/repo/pull/9 checks green
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: blocked-job [key=dep] blocked: waiting
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+
+=== UTF-8 byte budget including newline; skip long line and admit shorter ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - z-job: bin/go
+  (1 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+Measured emitted command bytes: 18; configured budget: 37; multibyte line requires: 38
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  - a-job: bin/fm-send.sh a-job café
+  (1 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+Measured emitted command bytes: 38; configured budget: 38; multibyte line requires: 38
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  1 outcome(s) handled by the away session (1 routine, 0 escalated above)
+  1 routine outcome(s) recorded; none were visible.
+Not started:
+  (2 more not shown)
+Cost: 1 supervision outcome(s) recorded (1 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+Measured emitted command bytes: 0; configured budget: 1; multibyte line requires: 38
+
+=== Unreadable backlog preserves exit 0 and does not invent an empty list ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh
+entry inventory: backlog file is unreadable
+Live work:
+  a-job: working; next: bin/fm-send.sh a-job café
+  z-job: working; next: bin/go
+
+Green, waiting on a merge sentence:
+  green-job: https://github.com/example/repo/pull/9
+
+Stop point, three failed checks:
+  failed-job: 3 consecutive failed checks
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-entry-brief.sh not-started
+  entry inventory: backlog file is unreadable
+  - a-job: bin/fm-send.sh a-job café
+  - z-job: bin/go
+
+[exit 0]
+
+=== Quiet entry omits away inventory ===
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-launch.sh enter --words stay quiet
+Quiet mode recorded at 2026-11-06T00:10:16Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-06T00:10:16Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    stay quiet
+
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6Q1S6BCZ3DT0QKMCSE7DG31/.l/state/afk-contracts/1793923816.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-11-06T00:10:16Z -> 2026-11-06T00:10:20Z, 4s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    stay quiet
+  the away session took no action under them.
+Waiting on you:
+  held in the backlog:
+    tasks[2]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      hold-job,queued,task,"-",hold-job,captain,"Choose the public name","-"
+      future-job,queued,task,"-",future-job,future,later,2026-12-01
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  - a-job: bin/fm-send.sh a-job café
+  - z-job: bin/go
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 2 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+[exit 0]
+
+All direct CLI scenarios passed; no mocked executable was used. Metadata and backlog records were seeded in the disposable lab; no fleet endpoint or forge operation was performed.
+Disposable CLI lab removed.

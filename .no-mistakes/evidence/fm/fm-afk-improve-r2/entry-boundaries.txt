@@ -1,0 +1,89 @@
+$ bin/fm-lab-home.sh create $LAB
+/tmp/fm-lab.nxr5bzn_
+exit: 0
+$ bin/fm-tasks-axi.sh list --fields held,hold_reason,hold_until,blocked,blocked_by,deps,body
+count: 0
+tasks: 0 tasks in this backlog
+help[2]:
+  - "Run `tasks-axi add <id> \"<title>\"` to add a task"
+  - Run `tasks-axi list --state done` to see completed work
+exit: 0
+$ bin/fm-afk-entry-brief.sh
+entry inventory: backlog list had no task table
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+exit: 0
+$ bin/fm-afk-entry-brief.sh not-started
+  entry inventory: backlog list had no task table
+exit: 0
+$ bin/fm-afk-return.sh check
+=== Return brief ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  entry inventory: backlog list had no task table
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+exit: 0
+$ bin/fm-tasks-axi.sh add one-job One ordinary task
+ok: added one-job -> Queued
+task:
+  id: one-job
+  title: One ordinary task
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-06
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start one-job` to move it to in flight
+  - Run `tasks-axi block one-job --by <other>` to record a dependency
+exit: 0
+$ bin/fm-afk-entry-brief.sh
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+exit: 0
+Adding one task removes the diagnostic without changing tool configuration.
+$ bin/fm-afk-launch.sh enter --words stay quiet
+Quiet mode recorded at 2026-11-06T00:04:59Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-06T00:04:59Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    stay quiet
+exit: 0
+$ bin/fm-afk-contract.sh mode
+quiet
+exit: 0
+$ bin/fm-afk-contract.sh words
+stay quietexit: 0
+Quiet entry preserves quiet posture and does not print the away inventory.
+Disposable lab removed.
