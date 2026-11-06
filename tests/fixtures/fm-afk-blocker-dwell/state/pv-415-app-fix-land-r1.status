@@ -1,0 +1,17 @@
+working [at=1793919913]: isolated branch created; merging origin/master into fix 892f3df46; 18 conflict files under reconciliation
+paused [at=1793919998]: Stage 1 dependency install and scoped offline validation; resume when commands finish
+paused [at=1793920156]: Stage 1 private DB harness waiting on shared test slot, then 33 affected suites including #415; resume after harness cleanup and offline results
+blocked [at=1793920852] [key=stage1-f1-replay]: F1 answered recovery replay still saves 0 vs expected 1 after merge compatibility repair (second failure); stopping under rule 5; active private recheck finishing cleanup, broad validation stopped
+resolved [key=stage1-f1-replay] [at=1793920981]: answered: Firstmate decision: right to stop. Do not try a third repair in this session. Write HANDOFF.md: each conflict and how you resolved it, the two failin [truncated]
+blocked [at=1793921057] [key=stage1-push]: authorized WIP push rejected twice by GitHub fatal error in commit_refs_rules; clean local head f5a3debabe40a03aefaeb0632cd4468962a5442c; 2 test failures documented; see /root/firstmate/data/pv-415-app-fix-land-r1/HANDOFF.md
+resolved [key=stage1-push] [at=1793921243]: answered: Firstmate decision: GitHub internal error is likely transient; the work is safe in this copy at f5a3debab. The fresh session retries the push first.
+working [at=1793921306]: WIP safety push succeeded; fresh session investigating F1 recovery and private fail-admission fixture compatibility
+paused [at=1793921385]: Stage 1 full offline selector and private DB validation; waiting for owned harness completion/cleanup and test results, until 2026-11-06T00:30Z
+resolved [at=1793923886]: first validation completed; private DB 347/347 and ops 20/20; broader sweep exposed missing follow-up fixture in busy harness, now repaired with focused 8/8 pass
+paused [at=1793923886]: final Stage 1 offline remainder and affected private busy-admission suite; resume on test completion and owned DB cleanup, until 2026-11-06T00:30Z
+resolved [at=1793924444]: Stage 1 validation complete; all 916 offline files covered with 15882 pass/14 skip, private DB 347/347 plus affected 15/15, operational 20/20; owned harness cleanup finished
+done [at=1793924486]: stage 1 green, head f9bf41f4afb8a1d34bb3545f9b4d6c4b39905a87
+needs-decision [at=1793924725] [key=stage2-allocation]: Stage 2 authorized but no assigned free keys or port pair supplied; assign keys/pair and stack slot, or approve serial proposal in /root/firstmate/data/pv-415-app-fix-land-r1/stage2/PREFLIGHT.md; no calls or stack started
+resolved [key=stage2-allocation] [at=1793924807]: answered: Approved (supervision branch, ~90% sure, inside the approved Stage 2). Keys: free14, free16 and free13 (own projects, unused today; ledger updated,  [truncated]
+needs-decision [at=1793925469] [key=stage2-smoke-safety]: fix smoke R8 spoke $50.80 before quote $40.80; R7 checker 504. Options: authorize diagnosis/repair or bounded diagnostic rerun/comparison preserving failure. Evidence=/root/firstmate/data/pv-415-app-fix-land-r1/stage2/NEEDS-DECISION.md; no aimed or 22+22, resources released
+resolved [key=stage2-smoke-safety] [at=1793948284]: answered: Firstmate decision on stage2-smoke-safety (captain away; decided under his away words, confidence 80%): take option 2. Keep R8 recorded as a failu [truncated]

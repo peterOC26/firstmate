@@ -607,6 +607,10 @@
     {
       "path": ".agents/skills/validation-supervision/SKILL.md",
       "audience": "agent-runtime"
+    },
+    {
+      "path": "tests/fixtures/fm-afk-blocker-dwell/SOURCES.txt",
+      "audience": "maintainer-verification"
     }
   ]
 }

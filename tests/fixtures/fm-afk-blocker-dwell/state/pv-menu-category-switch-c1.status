@@ -1,0 +1,2 @@
+blocked [at=1793865149]: shared test lock blocked both required master golden capture and red baseline; cancelled own queued commands, production unchanged; prepared tests and resume notes in /root/firstmate/data/pv-menu-category-switch-c1/notes.md
+resolved [at=1793865537]: re-queued under shared lock per firstmate

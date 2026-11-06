@@ -1,0 +1,6 @@
+blocked: no-mistakes test analyzer rejected both Claude-reviewed runs because passing scenarios lacked live validation; third ship retry prohibited
+blocked: final authorized ship attempt still fails no-mistakes test analyzer because the test agent cannot perform live validation; no further retry
+blocked: revised ship run still hard-failed test analyzer scenario 5 requiring agent-owned live validation instead of ask-user escalation; no blind retry
+blocked: same live-browser validation obstacle failed twice in consecutive no-mistakes review fix rounds; stopped per captain instruction
+needs-decision: [key=intent-live-validation-not-performed] review gate finding in .planning/quick/260909-pv-delivery-hide-leftovers-l1/HANDOFF.md: required test-helper live click-through on writable :
+needs-decision: [key=live-validation-still-not-performed] and [key=delivery-prep-loading-flicker-shifted-to-enabled-shops] review gate findings require Firstmate decision; live :3017 validation remain

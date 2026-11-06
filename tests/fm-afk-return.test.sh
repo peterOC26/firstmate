@@ -27,6 +27,8 @@ install_runner() {  # <case-dir>
   cp "$ROOT/bin/fm-lock-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-backend.sh" "$dir/bin/"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/"
@@ -1499,6 +1501,214 @@ test_missing_final_archive_keeps_retained_contract_gated() {
   assert_contains "$out" 'catch-up clear' "a valid restored final archive did not clear catch-up"
   pass "the retained contract epoch requires its final archive on every check"
 }
+
+# Dwell fixtures are excerpts of real worker records; SOURCES.txt labels the
+# reconstructed incident and the one explicitly timestamp-augmented reopen case.
+dwell_prepare() {  # <case-dir> <entered-epoch>
+  local dir=$1 since=$2 real_date
+  install_runner "$dir"
+  cp -R "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/." "$dir/home/state/"
+  mkdir -p "$dir/clock"
+  real_date=$(command -v date)
+  printf '#!/usr/bin/env bash\nREAL_DATE=%q\n' "$real_date" > "$dir/clock/date"
+  cat >> "$dir/clock/date" <<'CLOCK'
+if [ "$*" = +%s ]; then printf '%s\n' "$FM_TEST_DWELL_NOW"; exit; fi
+if [ "$*" = '-u +%Y-%m-%dT%H:%M:%SZ' ]; then
+  "$REAL_DATE" -u -r "$FM_TEST_DWELL_NOW" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
+    || "$REAL_DATE" -u -d "@$FM_TEST_DWELL_NOW" '+%Y-%m-%dT%H:%M:%SZ'
+  exit
+fi
+exec "$REAL_DATE" "$@"
+CLOCK
+  chmod +x "$dir/clock/date"
+  PATH="$dir/clock:$PATH" FM_TEST_DWELL_NOW="$since" contract_in "$dir" enter >/dev/null 2>&1 \
+    || fail "could not seed dwell window"
+  touch "$dir/home/state/.last-watcher-beat"
+}
+
+dwell_return() {  # <case-dir> <evaluation-epoch> [begin|check]
+  local dir=$1 now=$2 mode=${3:-begin} out rc=0
+  out=$(PATH="$dir/clock:$PATH" FM_TEST_DWELL_NOW="$now" run_return "$dir" "$mode") || rc=$?
+  [ "$rc" -eq 0 ] || [ "$rc" -eq 3 ] || fail "dwell return failed ($rc): $out"
+  printf '%s\n' "$out"
+}
+
+dwell_section() {
+  awk '/^Tried and failed, or could not be fixed:$/ { printing=1; next } /^Landed, cleanup due:$/ { printing=0 } printing'
+}
+
+test_blocker_dwell_real_samples() {
+  local dir="$TMP_ROOT/dwell-real" out
+  dwell_prepare "$dir" 1793861166
+  rm "$dir/home/state/servora-s15-ics-feed.meta"
+  out=$(dwell_return "$dir" 1793922631 | dwell_section)
+  assert_not_contains "$out" 'blocked 2026-' "handled real blockers produced dwell noise"
+  assert_contains "$out" '4 blocked event(s) carried no time stamp' "legacy sample skips were hidden"
+  # Without a window boundary these same logs cannot be attributed.
+  rm -f "$dir/home/state/.afk-return-catchup"
+  out=$(dwell_return "$dir" 1793922631 | dwell_section)
+  assert_not_contains "$out" 'blocked 2026-' "an unknown window attributed a historical blocker"
+  pass "real keyed, keyless, answered, and pre-entry blockers produce no dwell noise"
+}
+
+test_blocker_dwell_incident_and_late_rescue() {
+  local dir="$TMP_ROOT/dwell-incident" out first
+  dwell_prepare "$dir" 1793861166
+  out=$(dwell_return "$dir" 1793891700 | dwell_section)
+  assert_contains "$out" 'servora-s15-ics-feed [key=default] blocked 2026-11-05T09:43:00Z; no action for 5h32m, the longest wait this window' "the reconstructed incident's wait was not reported"
+  assert_contains "$out" 'still blocked, firstmate remediates before ordinary work:' "dwell lost gate remediation wording"
+  first=$(printf '%s\n' "$out" | sed -n '1p')
+  assert_contains "$first" 'servora-s15-ics-feed' "longest wait was not first"
+  # A delayed steer uses the real sample's header timestamp as a controlled
+  # action on the reconstructed incident; no claim of a historical steer.
+  mkdir -p "$dir/home/state/servora-s15-ics-feed.inbox"
+  cp "$dir/home/state/pv-dashboard-load-speed-f1.inbox/handled/001.msg" "$dir/home/state/servora-s15-ics-feed.inbox/001.msg"
+  out=$(dwell_return "$dir" 1793891700 check | dwell_section)
+  assert_contains "$out" 'first action 2026-11-05T11:33:19Z (1h50m later)' "a late rescue erased the historical wait"
+  [ -s "$dir/home/state/.afk-return-catchup" ] || fail "a steer changed the open-blocker gate"
+  # Remove only a real closure to create a second long-lived blocker. This
+  # synthetic open variant proves descending order with two measured waits.
+  sed -n '1p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-menu-category-switch-c1.status" > "$dir/home/state/pv-menu-category-switch-c1.status"
+  out=$(dwell_return "$dir" 1793891700 check | dwell_section)
+  first=$(printf '%s\n' "$out" | sed -n '1p')
+  assert_contains "$first" 'pv-menu-category-switch-c1' "two dwell rows were not sorted longest first"
+  [ "$(printf '%s\n' "$out" | grep -c 'the longest wait this window')" -eq 1 ] || fail "longest wait was marked more than once"
+  pass "the incident reports 5h32m; late action preserves history, descending order, and the gate"
+}
+
+test_blocker_dwell_boundary_and_reopen() {
+  local dir="$TMP_ROOT/dwell-boundary" out n
+  dwell_prepare "$dir" 1793861166
+  for n in 1793872679 1793872680; do
+    out=$(dwell_return "$dir" "$n" | dwell_section)
+    if [ "$n" -eq 1793872679 ]; then
+      assert_not_contains "$out" 'servora-s15-ics-feed [key=default] blocked 2026-' "dwell fired before grace"
+    else
+      assert_contains "$out" 'no action for 15m' "dwell did not fire at inclusive grace"
+    fi
+  done
+  out=$(FM_AFK_BLOCKER_GRACE=901 dwell_return "$dir" 1793872680 check | dwell_section)
+  assert_not_contains "$out" 'servora-s15-ics-feed [key=default] blocked 2026-' "the single grace override was ignored"
+  # Stamp three verbatim legacy blocker notes and the real keyless closure.
+  # This is the explicitly synthetic timing variant required by acceptance K.
+  {
+    sed -n '1p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-delivery-hide-leftovers-l1.status" | sed 's/^blocked:/blocked [at=1793871780]:/'
+    sed -n '2p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-dashboard-load-speed-f1.status"
+    sed -n '2p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-delivery-hide-leftovers-l1.status" | sed 's/^blocked:/blocked [at=1793891700]:/'
+  } > "$dir/home/state/servora-s15-ics-feed.status"
+  out=$(dwell_return "$dir" 1793892599 check | dwell_section)
+  assert_not_contains "$out" 'servora-s15-ics-feed [key=default] blocked 2026-' "a reopened key inherited the prior interval"
+  out=$(dwell_return "$dir" 1793892600 check | dwell_section)
+  assert_contains "$out" 'blocked 2026-11-05T15:15:00Z; no action for 15m' "the reopened key's own interval was missed"
+  pass "grace is inclusive and configurable; a reopened key uses only its latest interval"
+}
+
+test_blocker_dwell_reassertions() {
+  local dir="$TMP_ROOT/dwell-reassertions" out key stamp
+  dwell_prepare "$dir" 900
+  for key in default route; do
+    for stamp in '[at=20000]' ''; do
+      printf '%s\n' "blocked [key=$key] [at=1000]: waiting" \
+        'working [at=1100]: retrying' 'paused [at=1200]: waiting' \
+        "blocked [key=$key] $stamp: still waiting" > "$dir/home/state/servora-s15-ics-feed.status"
+      out=$(dwell_return "$dir" 20300 | dwell_section)
+      assert_contains "$out" "[key=$key] blocked 1970-01-01T00:16:40Z; no action for 5h21m" "reassertion replaced the interval opening"
+      printf 'resolved [key=%s] [at=20400]: answered\n' "$key" >> "$dir/home/state/servora-s15-ics-feed.status"
+      out=$(dwell_return "$dir" 20500 check | dwell_section)
+      assert_contains "$out" 'first action 1970-01-01T05:40:00Z (5h23m later)' "closure lost the original interval"
+    done
+  done
+  pass "timed and untimed reassertions preserve default and named blocker intervals"
+}
+
+test_blocker_dwell_ignores_supervision_sidecars() {
+  local dir="$TMP_ROOT/dwell-shapes" expected out shape
+  dwell_prepare "$dir" 1793861166
+  expected=$(dwell_return "$dir" 1793891700 | dwell_section)
+  for shape in pi host daemon rotated; do
+    rm -f "$dir/home/state/.supervision-host.log" "$dir/home/state/.supervise-daemon.log" "$dir/home/state/branch-outcomes.jsonl"
+    case "$shape" in
+      pi) cp "$ROOT/tests/fixtures/fm-afk-blocker-dwell/sidecars/outcomes.tsv" "$dir/home/state/branch-outcomes.jsonl" ;;
+      host|rotated) cp "$ROOT/tests/fixtures/fm-afk-blocker-dwell/sidecars/host.log" "$dir/home/state/.supervision-host.log" ;;
+      daemon)
+        cp "$ROOT/tests/fixtures/fm-afk-blocker-dwell/sidecars/daemon.log" "$dir/home/state/.supervise-daemon.log"
+        # Retarget the real already-escalated row to the incident, as F2 asks.
+        sed 's/fm-fm-spawn-readable-branch-s1/servora-s15-ics-feed/g; s/readable-branch-review-gate/default/g' \
+          "$ROOT/tests/fixtures/fm-afk-blocker-dwell/sidecars/daemon.log" >> "$dir/home/state/.supervise-daemon.log"
+        ;;
+    esac
+    out=$(dwell_return "$dir" 1793891700 check | dwell_section)
+    [ "$out" = "$expected" ] || fail "$shape bookkeeping changed blocker dwell: $out"
+  done
+  pass "Pi, host, daemon, already-escalated notices, and rotated ledger sidecars cannot alter dwell"
+}
+
+test_blocker_dwell_questions_and_missing_logs() {
+  local dir="$TMP_ROOT/dwell-questions" out
+  dwell_prepare "$dir" 1793922632
+  out=$(dwell_return "$dir" 1793955000 | dwell_section)
+  assert_not_contains "$out" 'blocked 2026-' "W2 questions or pre-entry blockers became dwell rows"
+  rm "$dir/home/state/pv-dashboard-load-speed-f1.status"
+  out=$(dwell_return "$dir" 1793955000 check)
+  assert_contains "$out" 'pv-dashboard-load-speed-f1 status log missing or unreadable; blocker wait could not be judged' "a vanished status log was silently skipped"
+  [ -s "$dir/home/state/.afk-return-catchup" ] || fail "a missing status log cleared catch-up"
+  pass "questions stay out of dwell; missing live status logs remain visible and gated"
+}
+
+# The design explicitly requests a structural guard on the NEW computation,
+# scoped away from the existing return brief's legitimate outcome-store reader.
+test_blocker_dwell_source_boundary() {
+  local source
+  source=$(sed -n '/^scan_blocker_dwell()/,/^write_pending_seed()/p' "$ROOT/bin/fm-afk-return.sh")
+  if printf '%s\n' "$source" | grep -E '\.supervision-host\.log|\.supervise-daemon\.log|branch-outcomes'; then
+    fail "dwell computation acquired a supervision bookkeeping dependency"
+  fi
+  pass "dwell's structural boundary excludes all three supervision bookkeeping inputs"
+}
+
+test_blocker_dwell_closure_and_terminal_actions() {
+  local dir="$TMP_ROOT/dwell-closure" out
+  dwell_prepare "$dir" 1793861166
+  # Synthetic recombination of real S2 transitions and a much later S4 steer.
+  # A7's reported Nov 5 source could not be verified; this is not an A7 fixture.
+  rm -f "$dir/home/state/servora-s15-ics-feed.meta"
+  cp "$dir/home/state/pv-415-app-fix-land-r1.inbox/handled/001.msg" "$dir/home/state/pv-dashboard-load-speed-f1.inbox/handled/001.msg"
+  out=$(dwell_return "$dir" 1793922631 | dwell_section)
+  assert_not_contains "$out" 'pv-dashboard-load-speed-f1 [key=default] blocked 2026-' "a late steer overrode the earlier keyed closure"
+  # Synthetic same-key reuse: the real S2 blocker already resolved promptly;
+  # later legacy question prose on its default key must not erase that action.
+  printf 'needs-decision [at=1793881000]: later question on the same key\n' >> "$dir/home/state/pv-dashboard-load-speed-f1.status"
+  out=$(dwell_return "$dir" 1793922631 check | dwell_section)
+  assert_not_contains "$out" 'pv-dashboard-load-speed-f1 [key=default] blocked 2026-' "a later question erased the earlier blocker closure"
+  # Synthetic terminal timing: move only S2's opener to two minutes before its
+  # real done line, omit its resolve, and keep the delayed steer after done.
+  {
+    sed -n '1p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-dashboard-load-speed-f1.status" | sed 's/1793878321/1793880346/'
+    sed -n '3p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-dashboard-load-speed-f1.status"
+  } > "$dir/home/state/pv-dashboard-load-speed-f1.status"
+  out=$(dwell_return "$dir" 1793922631 check | dwell_section)
+  assert_not_contains "$out" 'pv-dashboard-load-speed-f1 [key=default] blocked 2026-' "a ship terminal did not count as action"
+  # A closed late interval must still appear; being done cannot erase a stall.
+  sed 's/1793880346/1793878321/' "$dir/home/state/pv-dashboard-load-speed-f1.status" > "$dir/late.status"
+  mv "$dir/late.status" "$dir/home/state/pv-dashboard-load-speed-f1.status"
+  out=$(dwell_return "$dir" 1793922631 check | dwell_section)
+  assert_contains "$out" 'first action 2026-11-05T12:07:46Z (35m later)' "terminal closure erased a late historical action"
+  assert_contains "$out" 'closed 2026-11-05T12:07:46Z' "terminal closure time was not shown"
+  sed -n '1p' "$ROOT/tests/fixtures/fm-afk-blocker-dwell/state/pv-tests-pass-without-testing-s3.status" > "$dir/home/state/pv-tests-pass-without-testing-s3.status"
+  rm "$dir/home/state/pv-tests-pass-without-testing-s3.inbox/handled/002.msg"
+  out=$(dwell_return "$dir" 1793922631 check | dwell_section)
+  assert_contains "$out" 'pv-tests-pass-without-testing-s3 [key=ci-log-capture] blocked 2026-11-05T10:12:54Z; no action' "a pre-block steer counted as action"
+  pass "synthetic recombinations prove closure/terminal action and reject pre-block steers"
+}
+
+test_blocker_dwell_real_samples
+test_blocker_dwell_incident_and_late_rescue
+test_blocker_dwell_boundary_and_reopen
+test_blocker_dwell_reassertions
+test_blocker_dwell_ignores_supervision_sidecars
+test_blocker_dwell_questions_and_missing_logs
+test_blocker_dwell_source_boundary
+test_blocker_dwell_closure_and_terminal_actions
 
 test_return_gate_owns_remediation_and_reports_catchup_to_bearings
 test_explicit_reclassification_requires_durable_reason
