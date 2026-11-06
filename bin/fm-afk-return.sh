@@ -14,7 +14,8 @@
 # records, never from conversation memory: the archived away-posture record
 # (bin/fm-afk-contract.sh), the supervision outcome store
 # (bin/fm-branch-outcome.sh), the held set in the backlog (tasks-axi), and the
-# status logs. Its order is fixed: supervisor health across the away window
+# worker status logs and steering inboxes.
+# Its order is fixed: supervisor health across the away window
 # first, then the captain's away instructions - their words verbatim, including
 # superseded in-session mandates - followed by the away session's account of
 # every visible action it took under them (each non-silent outcome-store row
@@ -34,14 +35,35 @@
 # bytes for complete command lines including their newlines; its heading
 # and omission-count notice are outside that budget.
 #
+# BLOCKER WAITS. On begin and every check, "Tried and failed, or could not be
+# fixed" reports the latest blocked interval per decision key on each task
+# with a still-live metadata record, longest wait first.
+# Only an opening timestamp inside entered_epoch through evaluation time
+# attributes an interval to this window; file mtime and observation time do not.
+# The keyed status fold owns interval transitions: repeated blocked lines keep
+# the original opening, working/paused do not close it, and keyed resolved or
+# captain-held lines and ship/scout done/failed lines can close it.
+# First action is the earliest timestamp strictly after opening, and no later
+# than evaluation, from that interval's closure or a steering-inbox record's
+# header at field in the inbox root or handled/.
+# Message prose and supervision escalation notices or bookkeeping are not action.
+# With no action, measure through evaluation; a late action retains the wait.
+# FM_AFK_BLOCKER_GRACE (default 900 seconds) is the inclusive reporting threshold;
+# shorter waits produce no dwell row, but open blockers still appear for remediation.
+# Rows show task/key, blocked UTC time, first action and gap or no-action duration,
+# and open/closed context, preserving remediation wording for still-open blockers.
+# Untimed blocked events are counted without attributing them to the window;
+# missing or unreadable status logs are named, and removed task records are not scanned.
+# These rows inform while the gate below decides; guard and catchup-summary do not scan waits.
+# Regression coverage: tests/fm-afk-return.test.sh; fixture provenance and the
+# reconstructed incident are labelled in tests/fixtures/fm-afk-blocker-dwell/SOURCES.txt.
+#
 # THE GATE. `blocked:` is the crewmate protocol's firstmate-actionable verb. A
 # live task's open blocked event must be remediated and closed with
 # `resolved [key=...]`, or explicitly reclassified in the status stream with a
 # durable reason, before an ordinary captain request may proceed.
 # `needs-decision:` is deliberately not part of this blocker gate. The gate
 # keeps every open blocker until that blocker's own resolution is proven.
-# Blocker dwell rows inform while this gate decides; FM_AFK_BLOCKER_GRACE
-# (default 900 seconds) is the inclusive response-time reporting threshold.
 # Captain-verdict outcomes are listed under "waiting on you", but cannot exempt
 # a blocker: per-blocker decision-key provenance is deferred, with no owner,
 # because the gate fails safe by keeping every open blocker. Away-window
@@ -212,9 +234,7 @@ EOF
   done
 }
 
-# Last blocked interval per key, using the decision fold for transition validity
-# and its closing reader for keyed and ship/scout terminal closure. Only live
-# metadata records are attributable; missing status logs are named separately.
+# Worker-record reporting contract: see BLOCKER WAITS in this file's header.
 BLOCKER_DWELL_ROWS=
 BLOCKER_DWELL_UNTIMED=0
 BLOCKER_DWELL_MISSING=
