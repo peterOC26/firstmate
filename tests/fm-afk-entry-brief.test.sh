@@ -33,6 +33,34 @@ snap() {  # <dir>
   (cd "$1" && find state data -printf '%P %s\n' | sort)
 }
 
+test_empty_backlog_has_no_read_error() {
+  local dir listing out before after records
+  dir="$TMP_ROOT/empty"
+  seed_home "$dir"
+  listing=$(axi "$dir" list --fields held,hold_reason,hold_until,blocked,blocked_by,deps,body) \
+    || fail "empty backlog listing failed: $listing"
+  assert_contains "$listing" 'count: 0' "fixture backlog was not empty"
+  before=$(sha256sum "$dir/data/backlog.md")
+  records=$(snap "$dir")
+
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    "$BRIEF" 2>&1) || fail "empty inventory exited nonzero: $out"
+  assert_contains "$out" 'Read-back checklist:' "empty inventory lost its checklist"
+  assert_not_contains "$out" 'entry inventory:' "empty inventory reported a backlog read error"
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    "$BRIEF" not-started 2>&1) || fail "empty not-started exited nonzero: $out"
+  [ -z "$out" ] || fail "empty not-started printed unexpected content: $out"
+  after=$(sha256sum "$dir/data/backlog.md")
+  [ "$before" = "$after" ] || fail "empty inventory changed the backlog"
+  [ "$records" = "$(snap "$dir")" ] || fail "empty inventory created records"
+
+  out=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_DATA_OVERRIDE="$dir/data" \
+    "$ROOT/bin/fm-afk-return.sh" check 2>&1) || fail "empty return exited nonzero: $out"
+  assert_contains "$out" $'Not started:\n  (nothing)\n' "empty return did not report nothing to start"
+  assert_not_contains "$out" 'entry inventory:' "empty return reported a backlog read error"
+  pass "empty backlog renders entry and return without a false read error"
+}
+
 test_inventory_lists_live_held_cleared_green_dates_and_the_stop_point() {
   local dir out ids
   dir="$TMP_ROOT/inventory"
@@ -325,6 +353,7 @@ test_enter_prints_live_ids_and_quiet_omits_inventory() {
   pass "away enter prints the inventory and quiet enter omits it"
 }
 
+test_empty_backlog_has_no_read_error
 test_not_started_reports_an_unreadable_backlog_on_stdout
 test_redeferred_future_date_fires_when_it_comes_due
 test_inventory_reads_the_backlog_once

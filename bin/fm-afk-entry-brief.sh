@@ -138,6 +138,7 @@ backlog_rows_pack() {
     use warnings;
     my @cols;
     my $saw_header = 0;
+    my $empty = 0;
     sub decode_quoted {
       my ($raw) = @_;
       return $raw if length($raw) < 2 || substr($raw, 0, 1) ne "\"";
@@ -209,6 +210,7 @@ backlog_rows_pack() {
     }
     while (my $line = <STDIN>) {
       $line =~ s/\r?\n\z//;
+      $empty = 1 if $line eq "count: 0";
       if ($line =~ /^tasks\[\d+\]\{([^}]*)\}:$/) {
         @cols = split /,/, $1;
         $saw_header = 1;
@@ -229,7 +231,7 @@ backlog_rows_pack() {
       my @vals = map { $row{$_} } qw(id state held hold_reason hold_until blocked blocked_by deps body);
       print join("\x1f", map { enc($_) } @vals), "\x1e";
     }
-    die "backlog list had no task table\n" unless $saw_header;
+    die "backlog list had no task table\n" unless $saw_header || $empty;
     exit 0;
   '
 }
