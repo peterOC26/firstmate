@@ -17,9 +17,12 @@
 # away words, does not mark a job seen, and does not create a backlog file.
 # An unreadable backlog is reported and the command still exits 0.
 # FM_AFK_ENTRY_TODAY (YYYY-MM-DD) pins "today" for tests.
-# The next command is an explicit "Next: bin/..." line in the status file or
-# the backlog body when one exists. A held row without that command is not
-# repeated. Finished work has no inferred next command.
+# The next command is an explicit "Next: bin/..." line, preferring the status
+# file over the backlog body. Backlog text at the listing's truncation boundary
+# is omitted rather than offered as a complete command; earlier complete lines
+# remain usable. Status-file commands are not subject to body truncation.
+# A held row without that command is not repeated.
+# Finished work has no inferred next command.
 # An open blocked event stays out of the not-started list.
 # A future-date check fires once for a hold date. Deferring the same task to a
 # later date fires again when that date arrives.
