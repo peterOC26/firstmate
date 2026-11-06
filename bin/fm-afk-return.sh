@@ -220,12 +220,14 @@ BLOCKER_DWELL_UNTIMED=0
 BLOCKER_DWELL_MISSING=
 scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL_*
   local since=$1 now=$2 meta id status line verb key epoch latest valid kind folded previous
-  local opened summary close_epoch first steer gap open state rows='' steers grace
+  local opened summary close_epoch first steer gap open state rows='' steers grace resolve held
   BLOCKER_DWELL_ROWS='' BLOCKER_DWELL_UNTIMED=0 BLOCKER_DWELL_MISSING=''
   case "$since" in ''|*[!0-9]*) return 0 ;; esac
   grace=${FM_AFK_BLOCKER_GRACE:-900}
   case "$grace" in ''|*[!0-9]*|0[0-9]*) grace=900 ;; esac
   [ "${#grace}" -le 12 ] || grace=900
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   # Load only on the reporting path; guard and catchup-summary stay read-only.
   # shellcheck source=bin/fm-task-inbox-lib.sh
   . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
@@ -240,15 +242,15 @@ scan_blocker_dwell() {  # <entered-epoch> <evaluation-epoch>; sets BLOCKER_DWELL
     kind=$(_fm_status_kind "$status")
     latest='' folded=''
     while IFS= read -r line || [ -n "$line" ]; do
-      previous=$folded
-      folded=$(_fm_decision_fold_line "$folded" "$line" \
-        "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
-        "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" "$kind")
       status_line_verb "$line" verb
+      case "$verb" in
+        needs-decision|blocked|done|failed|"$resolve"|"$held") ;;
+        *) continue ;;
+      esac
+      previous=$folded
+      folded=$(_fm_decision_fold_line "$folded" "$line" "$resolve" "$held" "$kind")
       [ "$verb" = blocked ] || continue
-      valid=$(_fm_decision_fold_line '' "$line" \
-        "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
-        "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" "$kind")
+      valid=$(_fm_decision_fold_line '' "$line" "$resolve" "$held" "$kind")
       [ -n "$valid" ] || continue
       key=$(_fm_decision_key "$line") || continue
       epoch=$(status_line_at_epoch "$line") || epoch=-
