@@ -2226,7 +2226,8 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 | `tern` | `tern`, `jq`, `treehouse` |
 | `hc` | `hc`, `jq`, `treehouse` |
 
-Treehouse lease JSON needs `jq` on `tmux` as well as the JSON-emitting adapters (`herdr`, `zellij`, `cmux`, `paseo`, `rex`, `tern`, `hc`), which also parse backend JSON in their spawn and liveness paths.
+The backend tool list above is supplemented by the [shared Treehouse lease gate](../bin/fm-wake-lib.sh), which also requires `jq` for T3 Code worker allocation.
+All Treehouse-backed worker spawns use `jq` to parse lease JSON, including backends that do not otherwise emit JSON.
 Every session-provider-only backend (`tmux`, `herdr`, `zellij`, `cmux`, `paseo`, `rex`, `t3code`, `tern`, `hc`) uses `treehouse` for worktrees.
 Ordinary worker allocation requires Treehouse v2.3.0 or newer with JSON lease allocation and identity-conditional return; unsupported installations refuse before allocation or endpoint mutation.
 Fresh allocation alongside retained pre-lease task records naming pool copies of the same project additionally requires a version verified to exclude copies in use; [the shared ownership contract](../bin/fm-wake-lib.sh) owns this admission gate and its verified-version list, with source and regression evidence in [runtime backend verification](verification/runtime-backends.md#durable-task-copy-reservations).

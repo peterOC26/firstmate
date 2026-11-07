@@ -229,16 +229,21 @@
 #   JSON, then identity gains treehouse_lease_id. A legacy-copy hold refusal
 #   before get removes only this attempt's never-acquired journal. Once get
 #   may have run, it survives until explicit teardown or a safe Herdr/t3code
-#   abort returns the copy with its recorded lease ID and holder. Only a
-#   successful return permits removal of the journal. A same-id retry refuses
-#   that journal; other tasks may allocate only after its lease is verified.
+#   abort returns the copy with its recorded lease ID and holder. An abort
+#   return requires completed record rollback when needed and no remaining task
+#   metadata.
+#   Before releasing this task's slot claim, cleanup holds or reacquires the
+#   project lock, waiting at most 60 seconds for contention to clear. A timeout
+#   or an unproved claim release skips the return and retains the journal.
+#   Only a successful return permits removal of the journal. A same-id retry
+#   refuses that journal; other tasks may allocate only after its lease is verified.
 #   Polytoken's failed pre-launch endpoint/wiring cleanup still runs; Herdr
 #   returns only a clean copy whose pane is proven gone. No conflicting claim
 #   is overwritten.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
-#   contention refuses rather than waits.
+#   fresh allocation contention refuses rather than waits.
 #   Project capacity: when this machine declares how many workers a project
 #   admits at once (config/project-capacity; bin/fm-project-capacity-lib.sh owns
 #   the declaration, what holds a place, and the race argument), a fresh ship or
@@ -2011,8 +2016,8 @@ spawn_abort_cleanup() {
   fi
   # A fresh polytoken spawn that fails and leaves no record must leave the pool
   # without an endpoint or wiring leak. Before its launch is delivered, closing
-  # the shell leaves no window or tab for recovery to trip over; the durable
-  # lease and acquisition journal remain reserved for reconciliation. The
+  # the shell leaves no window or tab for recovery to trip over; any safe Herdr
+  # lease return is handled below, otherwise the acquisition stays reserved. The
   # Firstmate wiring, task temp root, and staged launch file it wrote go with it.
   # Once a launch was delivered into an endpoint still open, a worker may be
   # running there, so those stay for the operator, as the refusal says.

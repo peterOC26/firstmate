@@ -78,6 +78,23 @@ case "${1:-} ${2:-}" in
     if [ -f "$D/conflicting-claim" ]; then
       printf 'task=another-task\nhome=%s\n' "$FM_HOME" > "$(dirname "$FM_FAKE_SLOT")/.fm-slot-owner"
     fi
+    if [ -f "$D/contend-project-lock" ]; then
+      bash -c '
+        . "$1/bin/fm-wake-lib.sh"
+        lock=$(fm_treehouse_project_lock_path "$2/project") || exit 1
+        fm_lock_try_acquire "$lock" || exit 1
+        : > "$2/fake/contender-ready"
+        /bin/sleep 1
+        fm_lock_release "$lock" || exit 1
+        : > "$2/fake/contender-released"
+      ' _ "$FM_TEST_CODE_ROOT" "$(dirname "$D")" > "$D/contender.log" 2>&1 &
+      contender=$!
+      for ((i=0; i<100; i++)); do
+        [ ! -f "$D/contender-ready" ] || break
+        /bin/sleep 0.01
+      done
+      [ -f "$D/contender-ready" ] || { kill "$contender" 2>/dev/null; exit 1; }
+    fi
     : > "$D/pane-gone"; exit 0 ;;
   'pane get')
     [ ! -f "$D/pane-gone" ] || { printf '{"error":{"code":"pane_not_found"}}\n'; exit 0; }
@@ -97,6 +114,7 @@ case "${1:-} ${2:-}" in
       ". '"*"'") staged=${payload#". '"}; staged=${staged%"'"}; [ ! -f "$staged" ] || payload=$(cat "$staged") ;;
     esac
     case "$payload" in
+      'export FM_TASK_ID='*) [ ! -f "$D/prelaunch-export-fails" ] || exit 1 ;;
       'cd -- '*) path=${payload#cd -- }; path=${path#\'}; path=${path%\'}
         sends=$(cat "$D/cd-sends" 2>/dev/null || printf 0)
         sends=$((sends + 1)); printf '%s' "$sends" > "$D/cd-sends"
@@ -148,8 +166,8 @@ run_lease_spawn() {  # <case-dir> <id> [extra spawn args...]
   env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
     -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
     PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
-    FM_FAKE_SLOT="$dir/slot" HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' \
-    FM_SPAWN_NO_GUARD=1 \
+    FM_FAKE_SLOT="$dir/slot" HOME="$dir/user-home" XDG_CONFIG_HOME="$dir/user-home/.config" CLAUDE_CONFIG_DIR='' \
+    FM_SPAWN_NO_GUARD=1 FM_TEST_CODE_ROOT="$ROOT" \
     "$SPAWN" "$id" "$dir/project" --backend herdr --mode no-mistakes --yolo off "$@" 2>&1
 }
 
@@ -254,6 +272,25 @@ test_abort_returns_a_clean_lease_once_the_pane_is_gone() {
   pass "an abort whose pane Herdr reports gone returns a clean lease"
 }
 
+test_abort_waits_for_a_contended_project_lock() {
+  local id=lease-lock-contention dir out status
+  dir=$(make_lease_case "$id" polytoken)
+  mkdir -p "$dir/user-home/.config/polytoken"
+  printf 'version: 4\n' > "$dir/user-home/.config/polytoken/config.yaml"
+  touch "$dir/fake/prelaunch-export-fails" "$dir/fake/session-lockable" "$dir/fake/contend-project-lock"
+  out=$(run_lease_spawn "$dir" "$id" --model zai/glm-5.3-flash --effort low)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn unexpectedly succeeded"
+  [ -f "$dir/fake/contender-ready" ] || fail "a competing process never held the project lock: $(cat "$dir/fake/contender.log" 2>/dev/null); $out"
+  [ -f "$dir/fake/contender-released" ] || fail "cleanup did not wait for the competing process"
+  [ -f "$dir/fake/returned" ] || fail "temporary contention stranded the lease: $out"
+  [ ! -e "$dir/home/state/$id.meta" ] || fail "abort retained its task record"
+  [ ! -e "$dir/home/state/$id.treehouse-acquire" ] || fail "successful return retained its journal"
+  [ ! -e "$dir/.fm-slot-owner" ] || fail "successful return retained its slot claim"
+  [ ! -e "$dir/fake/claim-at-return" ] || fail "the copy was returned before releasing its claim"
+  pass "abort waits through real project-lock contention before releasing the claim and returning the lease"
+}
+
 test_conflicting_claim_keeps_lease_journal() {
   local id=lease-claim-conflict dir out status
   dir=$(make_lease_case "$id" polytoken)
@@ -352,6 +389,7 @@ test_aborted_spawn_names_the_lease_it_keeps
 test_rolled_back_spawn_after_launch_names_the_lease_it_keeps
 test_abort_returns_a_clean_lease_once_the_pane_is_gone
 test_failed_return_keeps_lease_journal
+test_abort_waits_for_a_contended_project_lock
 test_conflicting_claim_keeps_lease_journal
 test_abort_keeps_a_dirty_lease_once_the_pane_is_gone
 test_abort_keeps_the_lease_while_the_pane_is_present
