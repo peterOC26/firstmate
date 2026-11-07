@@ -3110,7 +3110,7 @@ scan_signals() {
 # (docs/watcher-continuity.md), and headlining it here would hide that close.
 # The queue lock still spans a marker prune so an acknowledged note's delivery
 # marker does not outlive its row.
-queued_check_surface_after_output() {
+procevent_surface_after_output() {
   local output_status=$1 key status=0
   if [ "$output_status" -eq 0 ]; then
     for key in $QUEUED_CHECK_SURFACED; do
@@ -3121,7 +3121,7 @@ queued_check_surface_after_output() {
   return "$status"
 }
 
-queued_check_surface_queued() {
+procevent_surface_queued() {
   local key marker reason captured="" stranded="" unstarted=""
   QUEUED_CHECK_SURFACED=
   # Preserve the empty-queue fast path (also when a home was torn down), but
@@ -3160,7 +3160,7 @@ queued_check_surface_queued() {
     reason="$reason process-event source failed to start:$unstarted"
   fi
   # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
-  FM_WAKE_POST_OUTPUT_ACTION=queued_check_surface_after_output
+  FM_WAKE_POST_OUTPUT_ACTION=procevent_surface_after_output
   wake "$reason"
 }
 
@@ -4012,7 +4012,7 @@ while :; do
   # Then deliver queued-but-unsurfaced process-event results, including
   # records published while this watcher was between cycles. Inbox rows stay
   # queued for the recovery close that follows.
-  queued_check_surface_queued
+  procevent_surface_queued
 
   # A process-event result carries richer adapter-owned wake context than the
   # generic recovery reason, so give that owner first refusal.
