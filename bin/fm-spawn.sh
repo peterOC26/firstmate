@@ -1768,7 +1768,7 @@ spawn_return_treehouse_slot() {
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
     if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" != 1 ]; then
       [ -n "$SPAWN_TREEHOUSE_PROJECT_LOCK" ] &&
-        fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" || return 1
+        fm_lock_acquire_wait_max "$SPAWN_TREEHOUSE_PROJECT_LOCK" 60 || return 1
       SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
     fi
   fi
