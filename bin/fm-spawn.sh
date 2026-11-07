@@ -1765,6 +1765,26 @@ spawn_lease_treehouse_slot() {
 spawn_return_treehouse_slot() {
   [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] && [ -n "$TREEHOUSE_LEASE_ID" ] &&
     [ -n "$TREEHOUSE_LEASE_HOLDER" ] || return 1
+  if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
+    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" != 1 ]; then
+      [ -n "$SPAWN_TREEHOUSE_PROJECT_LOCK" ] &&
+        fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" || return 1
+      SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+    fi
+  fi
+  [ "$SPAWN_FRESH_COMMIT_PENDING" = 0 ] &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] || return 1
+  if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
+    fm_treehouse_slot_owner_state "$WT" "$ID" "$FM_HOME"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine) fm_treehouse_slot_owner_release "$WT" "$ID" || return 1 ;;
+      absent) ;;
+      *) return 1 ;;
+    esac
+    fm_treehouse_slot_owner_state "$WT" "$ID" "$FM_HOME"
+    [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || return 1
+    SPAWN_SLOT_CLAIMED=0
+  fi
   (cd "$PROJ_ABS" && treehouse return --force "$WT" \
     --if-lease-id "$TREEHOUSE_LEASE_ID" --if-lease-holder "$TREEHOUSE_LEASE_HOLDER") || return 1
   rm -rf -- "$TREEHOUSE_ACQUIRE_JOURNAL" || return 1
@@ -1959,7 +1979,18 @@ spawn_abort_cleanup() {
     fm_backend_t3code_home_env_cleanup "$PROJ_ABS" \
       || echo "warning: could not remove the T3 environment this spawn wrote into $PROJ_ABS for $ID; remove it before the home runs again" >&2
   fi
-  if [ "$T3CODE_LEASED" = 1 ] && [ -n "${WT:-}" ]; then
+  if [ "$SPAWN_TASK_LOCK_HELD" = 1 ]; then
+    SPAWN_TASK_LOCK_HELD=0
+    fm_lock_release "$SPAWN_TASK_LOCK" || true
+  fi
+  if [ "$SPAWN_FRESH_COMMIT_PENDING" = 1 ]; then
+    if ! spawn_fresh_commit_rollback; then
+      status=1
+    fi
+  fi
+  if [ "$T3CODE_LEASED" = 1 ] && [ -n "${WT:-}" ] &&
+    [ "$SPAWN_FRESH_COMMIT_PENDING" = 0 ] &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
     T3CODE_LEASED=0
     rm -f "$WT/.claude/settings.local.json" 2>/dev/null || true
     # Only a CLAUDE.local.md this spawn wrote: the channel install refuses one
@@ -1972,15 +2003,6 @@ spawn_abort_cleanup() {
     else
       spawn_return_treehouse_slot >/dev/null 2>&1 \
         || echo "warning: could not return the leased worktree $WT for $ID; follow the journal recovery steps below" >&2
-    fi
-  fi
-  if [ "$SPAWN_TASK_LOCK_HELD" = 1 ]; then
-    SPAWN_TASK_LOCK_HELD=0
-    fm_lock_release "$SPAWN_TASK_LOCK" || true
-  fi
-  if [ "$SPAWN_FRESH_COMMIT_PENDING" = 1 ]; then
-    if ! spawn_fresh_commit_rollback; then
-      status=1
     fi
   fi
   if [ "$SPAWN_META_LOCK_HELD" = 1 ]; then
@@ -2065,27 +2087,9 @@ spawn_abort_cleanup() {
     echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
     spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
   fi
-  # A spawn that aborts after claiming its slot but before its record survives
-  # must not leave a claim naming a task no record describes. The release is a
-  # read-then-remove, so it runs only while the project lock that wrote the
-  # claim is still held (aborts before metadata publication); a later abort has
-  # already released that lock and leaves the claim for the next spawn's
-  # atomic replacement rather than racing it. A polytoken spawn instead retakes
-  # that lock once for a later failure whose record was rolled back. The
-  # release itself never removes another task's claim.
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
-    fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-    SPAWN_SLOT_CLAIMED=0
-    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-    elif [ "${HARNESS:-}" = polytoken ] && [ -n "$SPAWN_TREEHOUSE_PROJECT_LOCK" ] &&
-      fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
-      fm_treehouse_slot_owner_release "$WT" "$ID" || true
-      fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
-    else
-      echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
-    fi
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    echo "warning: retaining task $ID's slot claim on $WT; reconcile its ownership using the acquisition journal before reuse" >&2
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0

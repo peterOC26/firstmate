@@ -2011,6 +2011,8 @@ test_refused_launch_turn_archives_thread_and_returns_lease() {
     [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.indexOf("return --force") === 0')" -gt \
       "$(t3_log_line_of 'r.tool === "t3_thread_organize"')" ] || fail "the lease must return after the archive"$'\n'"$out"
     assert_absent "$CASE_DIR/state/$id.meta" "the rolled-back dispatch leaves no record"
+    assert_absent "$CASE_DIR/.fm-slot-owner" "a returned slot must not retain its claim"
+    assert_absent "$CASE_DIR/state/$id.treehouse-acquire" "a returned slot must not retain its journal"
     assert_absent "$WORKER_WT/.claude/settings.local.json" "a returned $harness slot must not keep the aborted spawn's Claude settings"
     assert_absent "$WORKER_WT/CLAUDE.local.md" "a returned $harness slot must not keep the aborted spawn's channel statement"
     assert_absent "$WORKER_WT/.codex/config.toml" "a returned $harness slot must not keep the aborted spawn's Codex environment"

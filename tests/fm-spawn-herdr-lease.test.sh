@@ -36,7 +36,7 @@ make_lease_case() {
   mkdir -p "$d" "$fb" "$dir/user-home"
   fm_test_spawn_home "$home" "$harness"
   fm_git_init_commit "$proj"
-  git clone -q "$proj" "$wt"
+  git -C "$proj" worktree add -q --detach "$wt"
   fm_test_spawn_brief "$home" "$name" "Exercise the Herdr task-copy lease for $name."
   printf '%s' "$proj" > "$d/cwd"
   printf '%s' "$proj" > "$d/fg"
@@ -51,7 +51,11 @@ D=$FM_FAKE_DIR
 printf '%s\n' "$*" >> "$D/treehouse-log"
 case "$*" in
   'get --lease '*) [ ! -f "$D/lease-fails" ] || { echo 'lease failed' >&2; exit 1; } ;;
-  'return --force '*) [ ! -f "$D/return-fails" ] || exit 1; : > "$D/returned" ;;
+  'return --force '*)
+    [ ! -e "$(dirname "$FM_FAKE_SLOT")/.fm-slot-owner" ] || : > "$D/claim-at-return"
+    [ ! -f "$D/return-fails" ] || exit 1
+    : > "$D/returned" ;;
+
 esac
 exec "$(dirname "$0")/treehouse-allocator" "$@"
 SH
@@ -69,7 +73,12 @@ case "${1:-} ${2:-}" in
   'session list')
     [ ! -f "$D/session-lockable" ] || printf '{"sessions":[{"name":"default","running":true,"socket_path":"%s/herdr.sock"}]}\n' "$D"
     exit 0 ;;
-  'pane close') : > "$D/pane-gone"; exit 0 ;;
+  'pane close')
+    [ ! -f "$(dirname "$FM_FAKE_SLOT")/.fm-slot-owner" ] || cp "$(dirname "$FM_FAKE_SLOT")/.fm-slot-owner" "$D/claim-at-close"
+    if [ -f "$D/conflicting-claim" ]; then
+      printf 'task=another-task\nhome=%s\n' "$FM_HOME" > "$(dirname "$FM_FAKE_SLOT")/.fm-slot-owner"
+    fi
+    : > "$D/pane-gone"; exit 0 ;;
   'pane get')
     [ ! -f "$D/pane-gone" ] || { printf '{"error":{"code":"pane_not_found"}}\n'; exit 0; }
     if [ -f "$D/cd-sent" ] && [ -f "$D/delay-reads" ]; then
@@ -236,10 +245,28 @@ test_abort_returns_a_clean_lease_once_the_pane_is_gone() {
   assert_grep 'pane close' "$LEASE_DIR/fake/herdr-log" "the abort did not close its pane"$'\n'"$LEASE_OUT"
   [ -e "$LEASE_DIR/fake/returned" ] || fail "the abort kept a clean lease although its pane is gone"$'\n'"$LEASE_OUT"
   [ ! -e "$LEASE_DIR/home/state/$id.treehouse-acquire" ] || fail "successful return retained its acquisition journal"
+  assert_grep "task=$id" "$LEASE_DIR/fake/claim-at-close" "the abort did not exercise a claimed copy"
+  [ ! -e "$LEASE_DIR/.fm-slot-owner" ] || fail "successful return retained its slot claim"
+  [ ! -e "$LEASE_DIR/fake/claim-at-return" ] || fail "copy was returned before its claim was removed"
   grep -Eq '^return --force .* --if-lease-id .+ --if-lease-holder .+' "$LEASE_DIR/fake/treehouse-log" || fail "return omitted its lease identity"
   jq -e --arg path "$LEASE_DIR/slot" '.worktrees[] | select(.path == $path) | .leased != true' \
     "$TMP_ROOT/treehouse-state.json" >/dev/null || fail "successful return left the copy leased"
   pass "an abort whose pane Herdr reports gone returns a clean lease"
+}
+
+test_conflicting_claim_keeps_lease_journal() {
+  local id=lease-claim-conflict dir out status
+  dir=$(make_lease_case "$id" polytoken)
+  touch "$dir/fake/launch-send-fails" "$dir/fake/session-lockable" "$dir/fake/conflicting-claim"
+  out=$(run_lease_spawn "$dir" "$id" --model zai/glm-5.3-flash --effort low)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn unexpectedly succeeded"
+  assert_grep "task=$id" "$dir/fake/claim-at-close" "spawn never owned the slot"
+  assert_grep 'task=another-task' "$dir/.fm-slot-owner" "abort removed another task's claim"
+  [ ! -e "$dir/fake/returned" ] || fail "abort returned a copy with an unreleased claim"
+  [ -d "$dir/home/state/$id.treehouse-acquire" ] || fail "unreleased claim lost its acquisition journal"
+  assert_contains "$out" "Manual recovery:" "unreleased claim omitted recovery steps"
+  pass "an unreleased claim preserves the lease and journal"
 }
 
 test_failed_return_keeps_lease_journal() {
@@ -325,6 +352,7 @@ test_aborted_spawn_names_the_lease_it_keeps
 test_rolled_back_spawn_after_launch_names_the_lease_it_keeps
 test_abort_returns_a_clean_lease_once_the_pane_is_gone
 test_failed_return_keeps_lease_journal
+test_conflicting_claim_keeps_lease_journal
 test_abort_keeps_a_dirty_lease_once_the_pane_is_gone
 test_abort_keeps_the_lease_while_the_pane_is_present
 
