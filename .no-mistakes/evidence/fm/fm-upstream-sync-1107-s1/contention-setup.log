@@ -1,0 +1,46 @@
+not ok - a competing process never held the project lock: ; HERDR: status --json --session default
+status --json
+status --json --session default
+workspace list --session default
+workspace create --cwd /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/project --label firstmate --no-focus --session default
+tab list --workspace wsnew --session default
+tab create --workspace wsnew --cwd /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/project --label fm-lease-lock-contention --no-focus --session default
+tab list --workspace wsnew --session default
+status --json --session default
+pane run %9 cd -- '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/slot' --session default
+status --json --session default
+pane get %9 --session default
+pane get %9 --session default
+status --json --session default
+pane read %9 --source recent --lines 200 --session default
+status --json --session default
+pane read %9 --source recent --lines 200 --session default
+status --json --session default
+pane run %9 export GOTMPDIR=/tmp/fm-lease-lock-contention/gotmp --session default
+status --json --session default
+pane run %9 export COMPACT_ADVISER_DISABLE=1 --session default
+status --json --session default
+pane run %9 export FM_TASK_ID=lease-lock-contention --session default
+status --json --session default
+pane send-text %9 . '/tmp/fm-lease-lock-contention+c3530ae055c7a64c48a2b77ed49776752e43a1d15875469ce6b86466bb503096/launch.s1794092158.1419526.12396.sh' --session default; warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/home/data/lease-lock-contention/launch-brief.md records no ship branch; defaulting to legacy branch fm/lease-lock-contention
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/home/data/lease-lock-contention/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+warning: the selected herdr release could not be read, so the 0.8.0 floor for presentation spaces cannot be verified; using the ordinary flat layout instead. Upgrade herdr to 0.8.0 or newer (herdr update) to restore the projection, or write "on" into config/herdr-presentation-spaces to force it on this release.
+warning: the worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/slot stays leased to lease-lock-contention after the failed spawn; once inspected, follow the journal recovery steps below
+warning: retaining Treehouse lease recovery journal /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/home/state/lease-lock-contention.treehouse-acquire; reconcile this acquisition before retrying task lease-lock-contention
+Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything.
+journal=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/home/state/lease-lock-contention.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+warning: retaining task lease-lock-contention's slot claim on /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ/.test-tmp/fm-spawn-herdr-lease.iNNhX7/lease-lock-contention/slot; reconcile its ownership using the acquisition journal before reuse

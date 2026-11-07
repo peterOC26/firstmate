@@ -1,0 +1,57 @@
+page:
+  title: Bearings - fleet board · Lavish
+  url: "http://127.0.0.1:4397/session/2cb4963948b44c28"
+  refs: 47
+snapshot:
+uid=g3:3_0 RootWebArea "Bearings - fleet board · Lavish" url="http://127.0.0.1:4397/session/2cb4963948b44c28"
+  uid=g3:3_1 "Lavish"
+  uid=g3:3_2 button "Annotate" description="Toggle annotate/explore mode (⌘I / Ctrl+I)" pressed
+  uid=g3:3_3 button "More" expandable haspopup="menu"
+  uid=g3:3_4 Iframe
+    uid=g3:3_5 RootWebArea "Bearings - fleet board" url="http://127.0.0.1:4397/artifact/2cb4963948b44c28/index.html?artifact_revision=1&artifact_load_token=ITJJgl4X8nvV7WWjTJiyg-bZYP3r67kK"
+      uid=g3:3_6 banner
+        uid=g3:3_7 "bearings"
+      uid=g3:3_8 main
+        uid=g3:3_9 "0"
+        uid=g3:3_10 "NEED YOU"
+        uid=g3:3_11 "1"
+        uid=g3:3_12 "UNDERWAY"
+        uid=g3:3_13 "0"
+        uid=g3:3_14 "LANDED RECENTLY"
+        uid=g3:3_15 "1"
+        uid=g3:3_16 "CHARTED NEXT"
+        uid=g3:3_17 "CAPTAIN'S CALL"
+        uid=g3:3_18 "NOTHING NEEDS YOU, CAPTAIN"
+        uid=g3:3_19 "Nothing needs your action right now."
+        uid=g3:3_20 "-"
+        uid=g3:3_21 button "Previous card"
+        uid=g3:3_22 button "Next card"
+        uid=g3:3_23 "CHARTED NEXT"
+        uid=g3:3_24 checkbox "Pick queued-example for dispatch"
+        uid=g3:3_25 "Next job"
+        uid=g3:3_26 "waiting for the current job · sample"
+        uid=g3:3_27 "WAITING"
+        uid=g3:3_28 "PICK QUEUED WORK TO DISPATCH"
+        uid=g3:3_29 button "Queue dispatch order" disableable disabled
+        uid=g3:3_30 "UNDERWAY"
+        uid=g3:3_31 "WORKING"
+        uid=g3:3_32 "Preserved job name"
+        uid=g3:3_33 "Validating the upstream update · ship · sample"
+        uid=g3:3_34 "RECENTLY LANDED"
+        uid=g3:3_35 "No recent completions are in the current baseline."
+        uid=g3:3_36 "fm-bearings-board.v1 · 2026-11-07T23:58Z"
+  uid=g3:3_37 complementary
+    uid=g3:3_38 heading "Conversation" level="2"
+    uid=g3:3_39 status atomic live="polite" relevant="additions text"
+      uid=g3:3_40 "Agent listening"
+    uid=g3:3_41 button "Show conversation" expandable
+  uid=g3:3_42 "Checking layout."
+  uid=g3:3_43 LineBreak "
+"
+  uid=g3:3_44 "One moment."
+  uid=g3:3_45 "Lavish is waiting for fonts and final geometry before revealing this artifact."
+  uid=g3:3_46 button "Show anyway"
+help[3]:
+  Run `chrome-devtools-axi click @g3:3_2` to click the "Annotate" button
+  Run `chrome-devtools-axi scroll down` to scroll down
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`

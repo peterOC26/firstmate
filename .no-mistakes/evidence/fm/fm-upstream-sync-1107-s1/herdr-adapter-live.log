@@ -1,0 +1,7 @@
+Created home container: fm-lab-upstream-adapter-1107:w1
+Created task endpoint: fm-lab-upstream-adapter-1107:w1:p2 tab=w1:t2
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ$ printf "FM_ADAPTER_LIVE_OK\n"; pwd
+FM_ADAPTER_LIVE_OK
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6W1RCVXS15VZT05F5RDMYXZ$
+Firstmate adapter confirmed its own endpoint gone after cleanup.
