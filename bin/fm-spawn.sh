@@ -1722,6 +1722,45 @@ SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_STAGED_LAUNCH_FILE=
 
+spawn_lease_treehouse_slot() {
+  local treehouse_home treehouse_acquire_status
+  TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
+  mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
+  treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
+  TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
+  printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
+  if fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
+    :
+  else
+    treehouse_acquire_status=$?
+    if [ "$treehouse_acquire_status" -eq 2 ]; then
+      rm -rf "$TREEHOUSE_ACQUIRE_JOURNAL"
+      TREEHOUSE_ACQUIRE_JOURNAL=
+      echo "error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure" >&2
+    else
+      echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    fi
+    exit 1
+  fi
+  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
+    select(.lease_holder == $holder) | .lease_id |
+    select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
+  ' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  printf 'treehouse_lease_id=%s\n' "$TREEHOUSE_LEASE_ID" >> "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
+  validate_spawn_worktree "treehouse get" "$WT"
+  fm_treehouse_lease_matches "$WT" "$TREEHOUSE_LEASE_ID" "$TREEHOUSE_LEASE_HOLDER" || {
+    echo "REFUSED: allocated Treehouse lease identity does not match pool state; retaining recovery journal" >&2
+    exit 1
+  }
+  fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
+  fm_treehouse_slot_owner_state "$WT" "$ID"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    absent) ;;
+    *) echo "REFUSED: allocated copy $WT carries an existing slot claim; reconcile it before retrying" >&2; exit 1 ;;
+  esac
+}
+
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
     "$FM_ROOT/bin/fm-busy-event.sh" "$STATE" "$ID" "${BUSY_GEN:-}"; then
@@ -5423,12 +5462,7 @@ EOF
       # A durable lease (bin/fm-home-seed.sh's pattern): there is no pane to run
       # the interactive `treehouse get` in, and a slot a live T3 thread points at
       # must never be handed on while that thread could re-create it.
-      WT=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
-        echo "error: treehouse get --lease failed to lease a worktree for $ID from $PROJ_ABS" >&2
-        exit 1
-      }
-      [ -n "$WT" ] || { echo "error: treehouse get --lease did not report a worktree for $ID" >&2; exit 1; }
-      validate_spawn_worktree "treehouse get --lease" "$WT (leased to $ID; once inspected, release it with 'treehouse return --force $WT' from $PROJ_ABS)"
+      spawn_lease_treehouse_slot
       T3CODE_LEASED=1
       freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" "$PROJ_ABS" "$MODE" || {
         if [ "$?" -eq 2 ]; then
@@ -5529,24 +5563,6 @@ spawn_send_key() { # <target> <key>
     fi
     ;;
   esac
-}
-
-# Lease the task copy durably instead of typing the interactive `treehouse get`
-# into the pane. That command runs a subshell, so the later `cd` lands inside
-# it and the pane's top-level shell stays in the project; Herdr restores a pane
-# from that top-level shell's cwd, so a host restart reopened every worker in
-# the primary clone. A durable lease needs no subshell, which lets the cd in
-# spawn_enter_recorded_worktree move the top-level shell itself. A lease
-# outlives its pane, so an aborted spawn returns it (spawn_abort_cleanup) and
-# bin/fm-teardown.sh returns it for a finished task.
-spawn_lease_herdr_slot() {
-  WT=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
-    echo "error: treehouse get --lease failed to lease a worktree for $ID from $PROJ_ABS; $(spawn_endpoint_hint)" >&2
-    exit 1
-  }
-  [ -n "$WT" ] || { echo "error: treehouse get --lease did not report a worktree for $ID" >&2; exit 1; }
-  HERDR_LEASED=1
-  validate_spawn_worktree "treehouse get --lease" "$WT (leased to $ID; once inspected, release it with 'treehouse return --force $WT' from $PROJ_ABS)"
 }
 
 # Enter the exact copy recorded for this task immediately before trust setup and
@@ -6083,43 +6099,10 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   if [ "$BACKEND" = t3code ]; then
     :
   elif [ "$BACKEND" = herdr ]; then
-    spawn_lease_herdr_slot
+    spawn_lease_treehouse_slot
+    HERDR_LEASED=1
   else
-    TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
-    mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
-    treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
-    TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
-    printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-    if fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
-      :
-    else
-      treehouse_acquire_status=$?
-      if [ "$treehouse_acquire_status" -eq 2 ]; then
-        rm -rf "$TREEHOUSE_ACQUIRE_JOURNAL"
-        TREEHOUSE_ACQUIRE_JOURNAL=
-        echo "error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure" >&2
-      else
-        echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
-      fi
-      exit 1
-    fi
-    WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
-    TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
-      select(.lease_holder == $holder) | .lease_id |
-      select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
-    ' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
-    printf 'treehouse_lease_id=%s\n' "$TREEHOUSE_LEASE_ID" >> "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-    validate_spawn_worktree "treehouse get" "$WT"
-    fm_treehouse_lease_matches "$WT" "$TREEHOUSE_LEASE_ID" "$TREEHOUSE_LEASE_HOLDER" || {
-      echo "REFUSED: allocated Treehouse lease identity does not match pool state; retaining recovery journal" >&2
-      exit 1
-    }
-    fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
-    fm_treehouse_slot_owner_state "$WT" "$ID"
-    case "$FM_TREEHOUSE_SLOT_OWNER" in
-      absent) ;;
-      *) echo "REFUSED: allocated copy $WT carries an existing slot claim; reconcile it before retrying" >&2; exit 1 ;;
-    esac
+    spawn_lease_treehouse_slot
     # Enter the exact leased path through the backend-independent cwd helper.
     spawn_enter_recorded_worktree
     leased_wt_real=$(real_path_or_raw "$WT")
@@ -6206,11 +6189,6 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       exit 1
     fi
   fi
-  # Herdr and t3code do not take the durable worker lease above. Record a slot
-  # claim when the copy is a pool slot so teardown can tell a reassigned slot
-  # from this task's own. Ordinary leased workers already claimed inside the
-  # branch above and keep that claim until reconciliation; their lease journal
-  # is the recovery record.
   if [ "$BACKEND" = t3code ] || [ "$BACKEND" = herdr ]; then
     if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
       if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then

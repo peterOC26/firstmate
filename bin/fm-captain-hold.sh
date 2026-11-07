@@ -391,10 +391,8 @@ require_tasks_axi() {
 # inside a command substitution can still tell a wedged backend from a
 # genuinely unknown id.
 TASK_SHOW_OUTPUT=
-TASK_SHOW_ARCHIVED=0
 task_show() {  # <id>; sets TASK_SHOW_OUTPUT
   local data status=0 reason
-  TASK_SHOW_ARCHIVED=0
   data=$(fm_backlog_data_absolute "$DATA") || fail "data directory cannot be resolved: $DATA"
   TASK_SHOW_OUTPUT=$(fm_backlog_row_show "$data" "$1" --full 2>/dev/null) || status=$?
   if [ "$status" -eq 124 ]; then
@@ -403,84 +401,6 @@ task_show() {  # <id>; sets TASK_SHOW_OUTPUT
       "${reason:-tasks-axi show $1 exceeded its backlog read bound}" >&2
     exit 124
   fi
-  return "$status"
-}
-
-# Resolve the markdown archive with tasks-axi's project-then-home precedence,
-# relative to its working root, and its default beside the addressed backlog.
-captain_archive_path() {  # <backlog-root> <default-archive>
-  perl -e '
-    use strict; use warnings;
-    my ($root, $default, $home) = @ARGV;
-    my $archive;
-    for my $file ("$home/.tasks-axi/config.toml", "$root/.tasks.toml") {
-      next unless -e $file || -l $file;
-      open my $fh, "<", $file or die "cannot read archive configuration $file: $!\n";
-      my $markdown = 0;
-      while (my $line = <$fh>) {
-        if ($line =~ /^\s*\[([^]]+)\]\s*(?:#.*)?$/) {
-          my $section = $1;
-          $section =~ s/^\s+|\s+$//g;
-          $markdown = $section eq "markdown";
-          next;
-        }
-        next unless $markdown && $line =~ /^\s*archive\s*=/;
-        $line =~ /^\s*archive\s*=\s*(["\x27])(.*?)\1\s*(?:#.*)?$/
-          or die "invalid markdown.archive in $file\n";
-        $archive = $2;
-        $archive =~ /\S/ or die "empty markdown.archive in $file\n";
-      }
-      close $fh or die "cannot finish reading $file: $!\n";
-    }
-    $archive = $default unless defined $archive;
-    print $archive =~ m{^/} ? $archive : "$root/$archive";
-  ' -- "$1" "$2" "${HOME:-}"
-}
-
-# Inventory validation alone may read pruned rows. Keep ordinary answer,
-# reconcile and mutation lookups live-only. Reuse tasks-axi's markdown parser
-# on a private snapshot whose archive batch headings are Done sections; never
-# rewrite the archive or feed its note-archive counterpart into this gate.
-task_show_inventory() {  # <id>; sets TASK_SHOW_OUTPUT and TASK_SHOW_ARCHIVED
-  local id=$1 status=0 data root backend archive snapshot count secs
-  task_show "$id" && return 0
-  status=$?
-  printf '%s\n' "$TASK_SHOW_OUTPUT" | grep -q '^code: NOT_FOUND$' || return "$status"
-  data=$(fm_backlog_data_absolute "$DATA") || return 2
-  root=$(fm_backlog_root "$data") || return 2
-  backend=$(fm_tasks_axi_backend "$root") || return 2
-  [ "$backend" = markdown ] || return "$status"
-  archive=$(captain_archive_path "$root" "$data/done-archive.md") || return 2
-  [ -e "$archive" ] || [ -L "$archive" ] || return "$status"
-  [ -f "$archive" ] && [ -r "$archive" ] || fail "done archive cannot be read at $archive"
-  snapshot=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-archive.XXXXXX") \
-    || fail "cannot stage done archive for $id"
-  if ! sed 's/^## Archived .*/## Done/' "$archive" > "$snapshot"; then
-    rm -f -- "$snapshot"
-    fail "cannot read done archive $archive"
-  fi
-  count=$(awk -v prefix="- [x] $id - " 'index($0, prefix) == 1 { n++ } END { print n+0 }' "$snapshot") || {
-    rm -f -- "$snapshot"
-    return 2
-  }
-  if [ "$count" -gt 1 ]; then
-    rm -f -- "$snapshot"
-    fail "captain-call inventory $id is ambiguous in done archive $archive"
-  fi
-  secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
-  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
-  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
-  status=0
-  # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  TASK_SHOW_OUTPUT=$(fm_run_timed "$secs" bash -c \
-    'cd "$1" || exit 1; exec tasks-axi show "$2" --full --backend markdown --file "$3"' \
-    _ "$root" "$id" "$snapshot" 2>&1) || status=$?
-  rm -f -- "$snapshot"
-  if [ "$status" -eq 124 ]; then
-    printf 'fm-captain-hold: tasks-axi show %s exceeded its %ss done archive read bound\n' "$id" "$secs" >&2
-    exit 124
-  fi
-  [ "$status" -ne 0 ] || TASK_SHOW_ARCHIVED=1
   return "$status"
 }
 
@@ -870,15 +790,15 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # beads backend - the migrated row the markdown-to-beads hold migration wrote.
 # Prints "<resolved id> <how>", where <how> is exact, legacy, migrated-note or
 # migrated-prefix, so a caller can record which evidence carried the attestation.
-resolve_entry() {  # <origin-or-empty> <entry> [reader]; prints "<id> <how>" or fails
-  local origin=$1 entry=$2 reader=${3:-task_show} legacy migrated rc
-  if "$reader" "$entry"; then
+resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
+  local origin=$1 entry=$2 legacy migrated rc
+  if task_show "$entry"; then
     printf '%s exact' "$entry"
     return 0
   fi
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
     legacy=$(legacy_hold_id "$origin" "$entry")
-    if "$reader" "$legacy"; then
+    if task_show "$legacy"; then
       printf '%s legacy' "$legacy"
       return 0
     fi

@@ -42,18 +42,18 @@ make_lease_case() {
   printf '%s' "$proj" > "$d/fg"
   : > "$d/treehouse-log"
   : > "$d/herdr-log"
+  fm_test_fake_treehouse "$fb" "$wt"
+  mv "$fb/treehouse" "$fb/treehouse-allocator"
   cat > "$fb/treehouse" <<'SH'
 #!/usr/bin/env bash
 set -u
 D=$FM_FAKE_DIR
 printf '%s\n' "$*" >> "$D/treehouse-log"
 case "$*" in
-  'get --lease '*) [ ! -f "$D/lease-fails" ] || { echo 'lease failed' >&2; exit 1; }
-    printf '%s\n' "$FM_FAKE_SLOT" ;;
-  'get') printf '%s' "$FM_FAKE_SLOT" > "$D/fg" ;;
+  'get --lease '*) [ ! -f "$D/lease-fails" ] || { echo 'lease failed' >&2; exit 1; } ;;
   'return --force '*) : > "$D/returned" ;;
 esac
-exit 0
+exec "$(dirname "$0")/treehouse-allocator" "$@"
 SH
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
@@ -150,7 +150,7 @@ test_fresh_spawn_leases_and_moves_the_top_level_shell() {
   out=$(run_lease_spawn "$dir" "$id")
   status=$?
   expect_code 0 "$status" "spawn should succeed"$'\n'"$out"
-  assert_grep "get --lease --lease-holder $id" "$dir/fake/treehouse-log" \
+  assert_grep "get --lease --lease-holder $dir/home/$id/a" "$dir/fake/treehouse-log" \
     "the task copy was not leased durably under the task id"
   ! grep -qx 'get' "$dir/fake/treehouse-log" \
     || fail "the interactive treehouse get opened a nested shell the restore cannot see"
@@ -158,6 +158,13 @@ test_fresh_spawn_leases_and_moves_the_top_level_shell() {
     || fail "the pane's restorable top-level cwd is '$(cat "$dir/fake/cwd")', not the task copy"
   [ "$(cat "$dir/fake/cd-sends")" = 1 ] || fail "an immediately ready pane received a redundant cd"
   assert_grep "worktree=$dir/slot" "$dir/home/state/$id.meta" "meta did not record the leased copy"
+  FM_HOME="$dir/home" bash -c '
+    . "$1/bin/fm-backend.sh"
+    . "$1/bin/fm-wake-lib.sh"
+    fm_treehouse_record_lease "$2/home/state/$3.meta" &&
+      fm_treehouse_lease_matches "$2/slot" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER" &&
+      fm_treehouse_records_reserved "$2/project" "$2/home/state"
+  ' _ "$ROOT" "$dir" "$id" || fail "published lease cannot pass reservation checks"
   pass "a fresh herdr spawn leases the copy and moves the pane's top-level shell into it"
 }
 
@@ -168,7 +175,7 @@ test_failed_lease_refuses_without_a_record() {
   out=$(run_lease_spawn "$dir" "$id")
   status=$?
   [ "$status" -ne 0 ] || fail "spawn went on without a leased copy"$'\n'"$out"
-  assert_contains "$out" "treehouse get --lease failed" "the refusal did not name the failed lease"
+  assert_contains "$out" "durable Treehouse acquisition failed" "the refusal did not name the failed lease"
   [ ! -e "$dir/home/state/$id.meta" ] || fail "refused spawn published task metadata"
   ! grep -qx 'get' "$dir/fake/treehouse-log" || fail "a refused lease fell back to the interactive form"
   pass "a failed lease refuses the spawn and falls back to nothing"

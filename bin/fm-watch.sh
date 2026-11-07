@@ -4437,7 +4437,7 @@ EOF
                     # Leaving it set sends the next poll of this same hash
                     # through wedge_timer_check, which passes the pane hash and
                     # would report again whenever that hash is not the identity.
-                    rm -f "$ssf"
+                    wedge_episode_end "$key" 0 1
                     clear_write_tracking "$key"
                     triage_log "absorbed stale (delivered terminal status, agent $terminal_agent_state already reported for this identity): $w"
                     dead_reported=0
@@ -4452,7 +4452,7 @@ EOF
                 fm_wake_append stale "$w" "$stale_reason" || exit 1
                 stale_wait_record "$key"
                 printf '%s' "$h" > "$sf"
-                rm -f "$ssf"
+                wedge_episode_end "$key" 0 1
                 clear_write_tracking "$key"
                 stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
                 stale_record=$(status_span_first_actionable_record "$stale_status" 0)
