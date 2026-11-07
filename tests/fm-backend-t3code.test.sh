@@ -12,8 +12,8 @@ set -u
 # Git config they assert on themselves, so drop the inherited one before any git command.
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=tests/t3-fake-lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/t3-fake-lib.sh"
 . "$ROOT/bin/fm-watch-key-lib.sh"
@@ -121,22 +121,23 @@ t3_unknown() {
 make_treehouse_fakebin() {  # <dir> -> echoes fakebin dir
   local fb="$1/fakebin"
   mkdir -p "$fb"
+  fm_test_fake_treehouse "$fb"
+  mv "$fb/treehouse" "$fb/treehouse-allocator"
   cat > "$fb/treehouse" <<'SH'
 #!/usr/bin/env bash
 set -u
 printf '{"tool":"treehouse","args":"%s","cwd":"%s"}\n' "$*" "$PWD" >> "${FM_T3_TREEHOUSE_LOG:?}"
-case "${1:-}" in
-  get)
+case "$*" in
+  'get --lease '*)
     # FM_T3_TREEHOUSE_GET_WORLD changes the fake T3 world while the slot is
     # leased, the moment a real T3 could restart.
     if [ -n "${FM_T3_TREEHOUSE_GET_WORLD:-}" ]; then
       node -e 'const fs = require("fs"); let w = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); eval(process.argv[2]); fs.writeFileSync(process.argv[1], JSON.stringify(w))' \
         "${T3_FAKE_WORLD:?}" "$FM_T3_TREEHOUSE_GET_WORLD"
     fi
-    printf '%s\n' "${FM_T3_TREEHOUSE_WT:?}"
     ;;
 esac
-exit 0
+FM_FAKE_TREEHOUSE_PATH=${FM_T3_TREEHOUSE_WT:-} exec "$(dirname "$0")/treehouse-allocator" "$@"
 SH
   chmod +x "$fb/treehouse"
   printf '%s\n' "$fb"
@@ -1530,8 +1531,8 @@ test_spawn_leases_slot_creates_thread_and_starts_launch_turn() {
   thread=$(bash -c '. "$1"; fm_meta_get "$2" t3_thread_id' _ "$ROOT/bin/fm-backend.sh" "$state/$id.meta")
   case "$thread" in mcp:*) ;; *) fail "meta t3_thread_id should be the id T3 assigned, got '$thread'" ;; esac
   [ "$(t3_dispatch_types)" = "t3_thread_launch t3_thread_send" ] || fail "spawn must launch an idle thread, then send the brief, got '$(t3_dispatch_types)'"
-  [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args === "get --lease --lease-holder '"$id"'" && r.cwd === "'"$proj"'"')" -gt 0 ] \
-    || fail "spawn must lease the slot with treehouse get --lease --lease-holder <id> from the project"
+  [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.startsWith("get --lease --lease-holder '"$CASE_DIR/home/$id"'/a") && r.args.endsWith(" --json") && r.cwd === "'"$proj"'"')" -gt 0 ] \
+    || fail "spawn must lease the slot with treehouse get --lease --lease-holder <home>/<id>/<acquisition> --json from the project"
   local create turn
   create=$(t3_log_line_of 'r.tool === "t3_thread_launch"')
   turn=$(t3_log_line_of 'r.tool === "t3_thread_send"')
@@ -1899,11 +1900,14 @@ test_spawn_abort_returns_lease_only_after_archive() {  # <ok|fail>
   if [ "$archive" = ok ]; then
     [ "$(t3_dispatch_types)" = "t3_thread_launch t3_thread_organize" ] || fail "an abort must archive the idle thread, got '$(t3_dispatch_types)'"
     [ "$return_line" -gt "$(t3_log_line_of 'r.tool === "t3_thread_organize"')" ] || fail "an abort must return the lease after the archive"$'\n'"$out"
+    assert_absent "$CASE_DIR/state/$id.treehouse-acquire" "successful return must remove its journal"
+    [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.startsWith("return --force") && r.args.includes(" --if-lease-id ") && r.args.includes(" --if-lease-holder ")')" -gt 0 ] || fail "return omitted its lease identity"
     pass "fm-spawn.sh --backend t3code: an abort archives the thread, then returns the lease"
   else
+    [ -d "$CASE_DIR/state/$id.treehouse-acquire" ] || fail "failed archive lost its journal"
     [ "$return_line" -eq 0 ] || fail "an abort whose archive failed must keep the lease a live thread still points at"
     assert_contains "$out" "stays leased" "the warning must say the lease was kept"
-    assert_contains "$out" "treehouse return --force" "the warning must name the manual return"
+    assert_contains "$out" "treehouse return --if-lease-id" "the warning must name the manual return"
     pass "fm-spawn.sh --backend t3code: an abort that cannot archive the thread keeps the lease"
   fi
 }
@@ -2040,7 +2044,7 @@ test_dirty_leased_slot_is_kept_without_a_thread() {
   out=$(t3_worker_spawn "$id" claude --model claude-sonnet-5); rc=$?
   expect_code 1 "$rc" "a leased slot holding uncommitted work must refuse the spawn"$'\n'"$out"
   assert_contains "$out" "refusing to discard uncommitted work" "the refusal names the uncommitted work"
-  assert_contains "$out" "treehouse return --force $WORKER_WT" "the refusal must name the manual return"
+  assert_contains "$out" "treehouse return --if-lease-id" "the refusal must name the manual return"
   [ -z "$(t3_dispatch_types)" ] || fail "no thread may be launched on a slot holding uncommitted work, got '$(t3_dispatch_types)'"
   [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.indexOf("return --force") === 0')" -eq 0 ] \
     || fail "a slot holding uncommitted work must never be force-returned"$'\n'"$out"
@@ -2064,6 +2068,7 @@ test_clean_slot_refresh_failure_returns_lease() {
   [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.indexOf("return --force") === 0')" -gt 0 ] \
     || fail "a clean slot whose refresh failed must be returned"$'\n'"$out"
   assert_absent "$CASE_DIR/state/$id.meta" "a refused spawn records nothing"
+  assert_absent "$CASE_DIR/state/$id.treehouse-acquire" "successful return must remove its journal"
   pass "fm-spawn.sh --backend t3code: a clean leased slot whose refresh fails gets no thread and is returned"
 }
 
@@ -2632,7 +2637,7 @@ test_spawn_rejected_lease_is_neither_cleaned_nor_returned() {
   out=$(t3_worker_spawn "$id" claude --model claude-sonnet-5); rc=$?
   expect_code 1 "$rc" "a lease on the spawning project must be refused"$'\n'"$out"
   assert_contains "$out" "did not yield an isolated worktree" "the isolation guard must refuse the project itself"
-  assert_contains "$out" "treehouse return --force $WORKER_PROJ" "the refusal must name the manual return"
+  assert_contains "$out" "treehouse return --if-lease-id" "the refusal must name the manual return"
   assert_grep "Bash(ls)" "$WORKER_PROJ/.claude/settings.local.json" "the abort must leave the project's own settings in place"
   [ "$(t3_log_line_of 'r.tool === "treehouse" && r.args.indexOf("return --force") === 0')" -eq 0 ] \
     || fail "the abort must not return a path the isolation guard rejected"

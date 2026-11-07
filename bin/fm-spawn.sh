@@ -228,12 +228,13 @@
 #   identity records project and holder, allocation.json captures get's raw
 #   JSON, then identity gains treehouse_lease_id. A legacy-copy hold refusal
 #   before get removes only this attempt's never-acquired journal. Once get
-#   may have run, it survives failures and successful launches until explicit
-#   teardown, so an abort never loses an acquisition or silently returns a
-#   copy holding work. A same-id retry refuses
+#   may have run, it survives until explicit teardown or a safe Herdr/t3code
+#   abort returns the copy with its recorded lease ID and holder. Only a
+#   successful return permits removal of the journal. A same-id retry refuses
 #   that journal; other tasks may allocate only after its lease is verified.
-#   Polytoken's failed pre-launch endpoint/wiring cleanup still runs, but never
-#   clears this lease or its claim. No conflicting claim is overwritten.
+#   Polytoken's failed pre-launch endpoint/wiring cleanup still runs; Herdr
+#   returns only a clean copy whose pane is proven gone. No conflicting claim
+#   is overwritten.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -1761,6 +1762,15 @@ spawn_lease_treehouse_slot() {
   esac
 }
 
+spawn_return_treehouse_slot() {
+  [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] && [ -n "$TREEHOUSE_LEASE_ID" ] &&
+    [ -n "$TREEHOUSE_LEASE_HOLDER" ] || return 1
+  (cd "$PROJ_ABS" && treehouse return --force "$WT" \
+    --if-lease-id "$TREEHOUSE_LEASE_ID" --if-lease-holder "$TREEHOUSE_LEASE_HOLDER") || return 1
+  rm -rf -- "$TREEHOUSE_ACQUIRE_JOURNAL" || return 1
+  TREEHOUSE_ACQUIRE_JOURNAL=
+}
+
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
     "$FM_ROOT/bin/fm-busy-event.sh" "$STATE" "$ID" "${BUSY_GEN:-}"; then
@@ -1926,7 +1936,7 @@ spawn_abort_cleanup() {
     T3CODE_HOME_ENV=0
     if [ "$T3CODE_LEASED" = 1 ]; then
       T3CODE_LEASED=0
-      echo "warning: the T3 thread launch for $ID did not report an outcome; the leased worktree $WT stays leased until any thread T3 bound to it is found in T3 Code and archived, then run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+      echo "warning: the T3 thread launch for $ID did not report an outcome; the leased worktree $WT stays leased until any thread T3 bound to it is found in T3 Code and archived, then follow the journal recovery steps below" >&2
     else
       echo "warning: the T3 thread launch for $ID did not report an outcome; find and archive any thread it left in T3 Code, then remove the $PROJ_ABS/config/t3code-token link this spawn added, before reusing its home" >&2
     fi
@@ -1938,7 +1948,7 @@ spawn_abort_cleanup() {
         T3CODE_LEASED=0
         local t3_env_files="$WT/.claude/settings.local.json"
         [ "$T3CODE_CLAUDE_CHANNEL_WRITTEN" != 1 ] || t3_env_files="$t3_env_files and $WT/CLAUDE.local.md"
-        echo "warning: could not stop and archive T3 thread $T for $ID, so the leased worktree $WT stays leased; archive the thread in T3 Code, undo the T3 environment this spawn wrote with '$SCRIPT_DIR/fm-t3code-codex-env.sh cleanup $WT' and by removing $t3_env_files, then run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+        echo "warning: could not stop and archive T3 thread $T for $ID, so the leased worktree $WT stays leased; archive the thread in T3 Code, undo the T3 environment this spawn wrote with '$SCRIPT_DIR/fm-t3code-codex-env.sh cleanup $WT' and by removing $t3_env_files, then follow the journal recovery steps below" >&2
       else
         echo "warning: could not stop and archive T3 thread $T for $ID; archive it in T3 Code, then remove the T3 environment this spawn wrote into $PROJ_ABS: run '$SCRIPT_DIR/fm-t3code-codex-env.sh cleanup $PROJ_ABS', remove the keys FM_T3CODE_ENV_KEYS lists, and FM_T3CODE_ENV_KEYS itself, from its .claude/settings.local.json, and remove its config/t3code-token link" >&2
       fi
@@ -1958,10 +1968,10 @@ spawn_abort_cleanup() {
     if ! "$SCRIPT_DIR/fm-t3code-codex-env.sh" cleanup "$WT" \
       || [ -e "$WT/.claude/settings.local.json" ] \
       || { [ "$T3CODE_CLAUDE_CHANNEL_WRITTEN" = 1 ] && [ -e "$WT/CLAUDE.local.md" ]; }; then
-      echo "warning: could not remove the T3 environment files this spawn wrote into $WT for $ID, so it stays leased; remove them, then run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+      echo "warning: could not remove the T3 environment files this spawn wrote into $WT for $ID, so it stays leased; remove them, then follow the journal recovery steps below" >&2
     else
-      (cd "$PROJ_ABS" && treehouse return --force "$WT") >/dev/null 2>&1 \
-        || echo "warning: could not return the leased worktree $WT for $ID; run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+      spawn_return_treehouse_slot >/dev/null 2>&1 \
+        || echo "warning: could not return the leased worktree $WT for $ID; follow the journal recovery steps below" >&2
     fi
   fi
   if [ "$SPAWN_TASK_LOCK_HELD" = 1 ]; then
@@ -2027,15 +2037,6 @@ spawn_abort_cleanup() {
       fi
     fi
   fi
-  # Durable acquisitions survive aborts. The journal is written before get,
-  # with its raw response captured directly, so even an interrupted publication
-  # leaves identity evidence. Never drop the claim or unconditionally return a
-  # copy that may already contain work or a delivered launch.
-  if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
-    [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
-    echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
-    spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
-  fi
   # A durable Herdr lease outlives the pane, unlike the process lease the
   # interactive command used to take, so an abort that leaves no record returns
   # it, whether or not the launch was sent. Only a pane Herdr reports gone and a
@@ -2049,11 +2050,20 @@ spawn_abort_cleanup() {
     if [ "$SPAWN_ENDPOINT_CLOSED" = 1 ] && fm_backend_herdr_endpoint_confirmed_gone "${T:-}" &&
       herdr_slot_status=$(git -C "$WT" status --porcelain --untracked-files=all 2>/dev/null) &&
       [ -z "$herdr_slot_status" ] &&
-      (cd "$PROJ_ABS" && treehouse return --force "$WT") >/dev/null 2>&1; then
+      spawn_return_treehouse_slot >/dev/null 2>&1; then
       :
     else
-      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, follow the journal recovery steps below" >&2
     fi
+  fi
+  # Durable acquisitions survive aborts. The journal is written before get,
+  # with its raw response captured directly, so even an interrupted publication
+  # leaves identity evidence. Never drop the claim or unconditionally return a
+  # copy that may already contain work or a delivered launch.
+  if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
+    [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
+    echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
+    spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
   fi
   # A spawn that aborts after claiming its slot but before its record survives
   # must not leave a claim naming a task no record describes. The release is a
@@ -5467,7 +5477,7 @@ EOF
       freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" "$PROJ_ABS" "$MODE" || {
         if [ "$?" -eq 2 ]; then
           T3CODE_LEASED=0
-          echo "error: $WT stays leased to $ID; once inspected, release it with 'treehouse return --force $WT' from $PROJ_ABS" >&2
+          echo "error: $WT stays leased to $ID; once inspected, follow the journal recovery steps below" >&2
         fi
         exit 1
       }

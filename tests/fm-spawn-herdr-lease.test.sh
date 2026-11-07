@@ -51,7 +51,7 @@ D=$FM_FAKE_DIR
 printf '%s\n' "$*" >> "$D/treehouse-log"
 case "$*" in
   'get --lease '*) [ ! -f "$D/lease-fails" ] || { echo 'lease failed' >&2; exit 1; } ;;
-  'return --force '*) : > "$D/returned" ;;
+  'return --force '*) [ ! -f "$D/return-fails" ] || exit 1; : > "$D/returned" ;;
 esac
 exec "$(dirname "$0")/treehouse-allocator" "$@"
 SH
@@ -190,7 +190,7 @@ test_aborted_spawn_names_the_lease_it_keeps() {
   [ "$status" -ne 0 ] || fail "spawn launched into a dirty leased copy"$'\n'"$out"
   [ ! -e "$dir/home/state/$id.meta" ] || fail "refused spawn published task metadata"
   assert_contains "$out" "stays leased to $id" "an abort did not name the lease that outlives the pane"
-  assert_contains "$out" "treehouse return --force $dir/slot" "an abort did not name the command that releases it"
+  assert_contains "$out" "treehouse return --if-lease-id" "an abort did not name the command that releases it"
   [ ! -e "$dir/fake/returned" ] || fail "an abort with the endpoint still open returned a slot the operator may want to inspect"
   pass "an aborted spawn keeps the lease and names the command that releases it"
 }
@@ -204,7 +204,7 @@ test_rolled_back_spawn_after_launch_names_the_lease_it_keeps() {
   [ "$status" -ne 0 ] || fail "spawn succeeded although its launch was not delivered"$'\n'"$out"
   [ ! -e "$dir/home/state/$id.meta" ] || fail "the failed spawn kept its task record"
   assert_contains "$out" "stays leased to $id" "a rolled-back spawn after its launch left the lease unnamed"
-  assert_contains "$out" "treehouse return --force $dir/slot" "a rolled-back spawn after its launch did not name the command that releases it"
+  assert_contains "$out" "treehouse return --if-lease-id" "a rolled-back spawn after its launch did not name the command that releases it"
   [ ! -e "$dir/fake/returned" ] || fail "an abort with the endpoint still open returned a slot the operator may want to inspect"
   pass "a spawn rolled back after its launch keeps the lease and names the command that releases it"
 }
@@ -235,7 +235,26 @@ test_abort_returns_a_clean_lease_once_the_pane_is_gone() {
   [ ! -e "$LEASE_DIR/home/state/$id.meta" ] || fail "the failed spawn kept its task record"
   assert_grep 'pane close' "$LEASE_DIR/fake/herdr-log" "the abort did not close its pane"$'\n'"$LEASE_OUT"
   [ -e "$LEASE_DIR/fake/returned" ] || fail "the abort kept a clean lease although its pane is gone"$'\n'"$LEASE_OUT"
+  [ ! -e "$LEASE_DIR/home/state/$id.treehouse-acquire" ] || fail "successful return retained its acquisition journal"
+  grep -Eq '^return --force .* --if-lease-id .+ --if-lease-holder .+' "$LEASE_DIR/fake/treehouse-log" || fail "return omitted its lease identity"
+  jq -e --arg path "$LEASE_DIR/slot" '.worktrees[] | select(.path == $path) | .leased != true' \
+    "$TMP_ROOT/treehouse-state.json" >/dev/null || fail "successful return left the copy leased"
   pass "an abort whose pane Herdr reports gone returns a clean lease"
+}
+
+test_failed_return_keeps_lease_journal() {
+  local id=lease-return-refused dir out status
+  dir=$(make_lease_case "$id" polytoken)
+  touch "$dir/fake/launch-send-fails" "$dir/fake/session-lockable" "$dir/fake/return-fails"
+  out=$(run_lease_spawn "$dir" "$id" --model zai/glm-5.3-flash --effort low)
+  status=$?
+  [ "$status" -ne 0 ] || fail "spawn unexpectedly succeeded"
+  [ -d "$dir/home/state/$id.treehouse-acquire" ] || fail "failed return lost its acquisition journal"
+  [ ! -e "$dir/fake/returned" ] || fail "failed return released its lease"
+  jq -e --arg path "$dir/slot" '.worktrees[] | select(.path == $path) | .leased == true' \
+    "$TMP_ROOT/treehouse-state.json" >/dev/null || fail "failed return lost the pool lease"
+  assert_contains "$out" "Manual recovery:" "failed return omitted journal recovery steps"
+  pass "a failed conditional return preserves the lease and journal"
 }
 
 test_abort_keeps_a_dirty_lease_once_the_pane_is_gone() {
@@ -305,6 +324,7 @@ test_failed_lease_refuses_without_a_record
 test_aborted_spawn_names_the_lease_it_keeps
 test_rolled_back_spawn_after_launch_names_the_lease_it_keeps
 test_abort_returns_a_clean_lease_once_the_pane_is_gone
+test_failed_return_keeps_lease_journal
 test_abort_keeps_a_dirty_lease_once_the_pane_is_gone
 test_abort_keeps_the_lease_while_the_pane_is_present
 
