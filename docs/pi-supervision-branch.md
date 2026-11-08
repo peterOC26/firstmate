@@ -611,6 +611,7 @@ The captain's away words are the whole mandate:
 
 `bin/fm-branch-prompt.sh` "Postures" owns those execution rules.
 It requires every action taken under the words to open its outcome summary with "per your away instructions:".
+An explicit captain autonomy grant in the current task's own note is standing authority for that job only, and that same section owns how the branch reads and judges it.
 
 Each relocated script keeps its own gate, enforcing exactly what a script can check without reading words:
 
