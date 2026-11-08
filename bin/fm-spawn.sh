@@ -1728,74 +1728,6 @@ SPAWN_LAUNCH_SENT=0
 SPAWN_ENDPOINT_CLOSED=0
 SPAWN_STAGED_LAUNCH_FILE=
 
-spawn_lease_treehouse_slot() {
-  local treehouse_home treehouse_acquire_status
-  TREEHOUSE_ACQUIRE_JOURNAL="$STATE/$ID.treehouse-acquire"
-  mkdir -m 700 "$TREEHOUSE_ACQUIRE_JOURNAL" || exit 1
-  treehouse_home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) || exit 1
-  TREEHOUSE_LEASE_HOLDER="$treehouse_home/$ID/a$(date +%s).${BASHPID:-$$}.$RANDOM"
-  printf 'project=%s\ntreehouse_lease_holder=%s\n' "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" > "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-  if fm_treehouse_lease_get "$PROJ_ABS" "$TREEHOUSE_LEASE_HOLDER" "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json"; then
-    :
-  else
-    treehouse_acquire_status=$?
-    if [ "$treehouse_acquire_status" -eq 2 ]; then
-      rm -rf "$TREEHOUSE_ACQUIRE_JOURNAL"
-      TREEHOUSE_ACQUIRE_JOURNAL=
-      echo "error: legacy copy hold failed before Treehouse acquisition; retry after resolving the hold failure" >&2
-    else
-      echo "error: durable Treehouse acquisition failed; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
-    fi
-    exit 1
-  fi
-  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
-  TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
-    select(.lease_holder == $holder) | .lease_id |
-    select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
-  ' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
-  printf 'treehouse_lease_id=%s\n' "$TREEHOUSE_LEASE_ID" >> "$TREEHOUSE_ACQUIRE_JOURNAL/identity"
-  validate_spawn_worktree "treehouse get" "$WT"
-  fm_treehouse_lease_matches "$WT" "$TREEHOUSE_LEASE_ID" "$TREEHOUSE_LEASE_HOLDER" || {
-    echo "REFUSED: allocated Treehouse lease identity does not match pool state; retaining recovery journal" >&2
-    exit 1
-  }
-  fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
-  fm_treehouse_slot_owner_state "$WT" "$ID"
-  case "$FM_TREEHOUSE_SLOT_OWNER" in
-    absent) ;;
-    *) echo "REFUSED: allocated copy $WT carries an existing slot claim; reconcile it before retrying" >&2; exit 1 ;;
-  esac
-}
-
-spawn_return_treehouse_slot() {
-  [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] && [ -n "$TREEHOUSE_LEASE_ID" ] &&
-    [ -n "$TREEHOUSE_LEASE_HOLDER" ] || return 1
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
-    if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" != 1 ]; then
-      [ -n "$SPAWN_TREEHOUSE_PROJECT_LOCK" ] &&
-        fm_lock_acquire_wait_max "$SPAWN_TREEHOUSE_PROJECT_LOCK" 60 || return 1
-      SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
-    fi
-  fi
-  [ "$SPAWN_FRESH_COMMIT_PENDING" = 0 ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] || return 1
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ]; then
-    fm_treehouse_slot_owner_state "$WT" "$ID" "$FM_HOME"
-    case "$FM_TREEHOUSE_SLOT_OWNER" in
-      mine) fm_treehouse_slot_owner_release "$WT" "$ID" || return 1 ;;
-      absent) ;;
-      *) return 1 ;;
-    esac
-    fm_treehouse_slot_owner_state "$WT" "$ID" "$FM_HOME"
-    [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || return 1
-    SPAWN_SLOT_CLAIMED=0
-  fi
-  (cd "$PROJ_ABS" && treehouse return --force "$WT" \
-    --if-lease-id "$TREEHOUSE_LEASE_ID" --if-lease-holder "$TREEHOUSE_LEASE_HOLDER") || return 1
-  rm -rf -- "$TREEHOUSE_ACQUIRE_JOURNAL" || return 1
-  TREEHOUSE_ACQUIRE_JOURNAL=
-}
-
 spawn_fresh_commit_rollback() {
   if fm_backlog_atomic_transition rollback "$STATE/$ID.meta" \
     "$FM_ROOT/bin/fm-busy-event.sh" "$STATE" "$ID" "${BUSY_GEN:-}"; then
@@ -1834,30 +1766,6 @@ spawn_orca_reclaim_launch_file() {
     return 2
   fi
   return 1
-}
-
-spawn_treehouse_recovery_steps() {
-  local journal=$1
-  {
-    echo "Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything."
-    printf 'journal=%q\n' "$journal"
-    cat <<'RECOVERY'
-Read project= and treehouse_lease_holder= from "$journal/identity".
-Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
-If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
-If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
-  rm -rf -- "$journal"
-Preserve any unlanded work and reconcile any retained task record first.
-For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
-Stop if another task owns the claim or lease or orphan status is uncertain.
-With worktree, lease_id, and lease_holder set to those verified values, run:
-  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
-Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
-  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
-  rm -rf -- "$journal"
-Keep the journal and claim if return fails or ownership is uncertain.
-RECOVERY
-  } >&2
 }
 
 spawn_abort_cleanup() {
