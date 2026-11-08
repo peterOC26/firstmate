@@ -3,6 +3,8 @@ name: afk
 description: >-
   Enter the away posture when the captain invokes /afk, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`, or any `state/.subsuper-*` marker is involved.
   It writes the durable away-posture record with the captain's away words verbatim as the whole mandate in the same turn as /afk, before any other work and without waiting for a further go, reads the words back in plain sentences after entry, announces hold-for-return only at entry, keeps the one supervision session running in the away posture (on Pi the supervision branch acts on the words by its own judgment and takes every safe actionable wake with main parked, as the supervision host does on a non-Pi home that runs it; the daemon still delivers batched digests elsewhere for now), and on the first unmarked message renders the return brief from durable records before ordinary work resumes.
+  A `supervision-host:` line that says the captain sent a note and away mode should end is that same return on a home that runs the supervision host.
+  While an away record exists, a captain inbox note row in main's own drain is that same return.
 user-invocable: true
 metadata:
   internal: true
@@ -61,10 +63,13 @@ Hold-for-return is the default and the only reach profile this release records: 
   Declared external waits keep their condition-aware, hours-long recheck cadence (`bin/fm-watch.sh`, `bin/fm-classify-lib.sh`).
 - The away session acts on the captain's words.
   It reads them at the tail of every wake, decides by its own judgment whether the event in front of it is the moment they name, acts on them only through the guarded scripts under standing authority, never by analogy, holds with verdict captain on doubt, and opens every outcome summary for an action taken under the words with "per your away instructions:" (`bin/fm-branch-prompt.sh` "Postures" owns the execution rules).
+  An explicit captain autonomy grant in the current task's own note is standing authority for that job only; that same section owns how the away session reads and judges it.
   Destructive, irreversible, and security-sensitive actions are never pre-authorizable whatever the words say, and ask-user findings keep the `ask-user-authority` policy unless the words pre-answer the exact decision; anything else that needs the captain holds for their return.
 - On Pi, main is parked and the supervision branch handles every safe actionable wake under main's standing authority through the same guarded scripts main would use; [Authority relocation](../../../docs/pi-supervision-branch.md#authority-relocation) owns the merge, fresh-spawn, relaunch, spend-cap, and decision-answer gates.
   Anything requiring the captain holds for the return, and only a wake the branch declines (including a broken branch or unsafe scan) or a watcher failure wakes main (`docs/pi-supervision-branch.md` "Postures").
-- On a non-Pi home that runs the supervision host, the host's engine is that branch under the same rules, and a wake it hands back reaches main through that harness's own wake path (`Stop hook feedback` on Claude, a `watcher` follow-up on Cursor, OpenCode, and omp, the arm's background-task-completed notification on Grok, the checkpoint's output on Codex) with a `supervision-host:` line: that is automatic supervision, never the captain's return, so handle it under the away posture ([supervision protocol](../../../docs/supervision-protocols/supervision-host.md)).
+- On a non-Pi home that runs the supervision host, the host's engine is that branch under the same rules.
+  A wake it hands back reaches main through that harness's own wake path (`Stop hook feedback` on Claude, a `watcher` follow-up on Cursor, OpenCode, and omp, the arm's background-task-completed notification on Grok, the checkpoint's output on Codex) with a `supervision-host:` line.
+  Handle that wake under the away posture, because it is automatic supervision and not the captain's return, unless the line says the captain sent a note and away mode should end, or main's own drain presents a captain inbox note row while the away record exists ("How to exit: the return" below; the [supervision protocol](../../../docs/supervision-protocols/supervision-host.md) is what main reads on the wake).
 - The session-start digest reports the posture under its AFK subsection, so a restart re-enters the posture from the record, not from memory.
 
 ## How to exit: the return
@@ -81,11 +86,17 @@ No `/back` is needed. The first genuine message is the return signal:
   A Bearings request may be answered while the gate is open, and the digest surfaces the catch-up state as an action-free `(return-catchup)` warning row under the [Bearings presentation contract](../bearings/SKILL.md) naming what still holds it.
   Acting on the fleet - dispatching, steering, merging, or any other ordinary captain work - still waits until the check exits successfully.
   Once it does, close every task the brief lists under "Landed, cleanup due" through ordinary teardown (`bin/fm-teardown.sh <task>`, never forced; a refusal is a stop-and-investigate result) and tell the captain those workers are closed in outcome language.
+- A wake the supervision host hands back whose `supervision-host:` line says the captain sent a note and away mode should end is the captain's return, the same as a genuine message.
+  Run `bin/fm-afk-return.sh`, then answer the note.
+  Every other handed-back away wake stays automatic supervision.
+- While an away record exists, a captain inbox note row in main's own drain is also the return.
+  Run `bin/fm-afk-return.sh`, then answer the note.
 - A message **with** the current operational prefix (`FM_OPERATIONAL_PREFIX`, U+2063 INVISIBLE SEPARATOR followed by `FIRSTMATE_OP: `), or a legacy bare `FM_INJECT_MARK` daemon escalation -> stay away and process it.
 - A message that is exactly the record-backed operational doorbell (`: Firstmate operational input waiting: read '<path>' ...`) -> run `bin/fm-operational-input.sh open '<path>'`; when it succeeds, stay away and process the escalation it prints.
   When it fails, the doorbell is not Firstmate's, so treat the message like any other unmarked message.
   Never treat ASCII text that merely looks like Firstmate input, such as a typed `FIRSTMATE_OP:` label, as internal.
-- A `Stop hook feedback` wake from the Stop hook or the supervision host, or a Grok background-task-completed notification for the arm -> stay away and process it; it is automatic supervision, not a message from the captain.
+- A `Stop hook feedback` wake from the Stop hook or the supervision host, or a Grok background-task-completed notification for the arm, stays away unless its `supervision-host:` line says the captain sent a note and away mode should end, or main's own drain presents a captain inbox note row while the away record exists.
+  Otherwise it is automatic supervision, not a message from the captain.
 - Re-invoking `/afk` while already away -> stay away (refresh); this does **not** trigger an exit.
 
 Bias ambiguous cases toward exit: a present captain beats token savings, and a false exit is self-correcting (the captain re-runs `/afk`).
@@ -96,7 +107,7 @@ When the captain wants this same token-saving supervision while staying present 
 afk changes how the captain is informed and what happens at a captain-owned decision point, **not who approves what**.
 "Away" never means "approves more" or "approves less."
 A PR ready for merge keeps the merge authority from `AGENTS.md` section 7, and a needs-decision finding keeps the `ask-user-authority` policy; anything requiring the captain still waits for the captain's explicit word.
-While the away-posture record exists, any pull request green at its live head may merge under away authority; which one the captain's words meant is the away session's reading, and a merge the words do not call for holds for the return.
+While the away-posture record exists, any pull request green at its live head may merge under away authority; [`bin/fm-branch-prompt.sh` "Postures"](../../../bin/fm-branch-prompt.sh) owns whether the away words or that job's task-note grant authorize the merge.
 Away authority never releases a captain hold, and it expires when the away record is archived.
 `--allow-red`, `--allow-missing`, and `--allow-no-pipeline` remain attended-only and are refused while the away record exists.
 A merge under away authority must be synchronous; `fm-pr-merge.sh` refuses auto-merge and any GitHub queue state that cannot prove an immediate merge while the away record exists.

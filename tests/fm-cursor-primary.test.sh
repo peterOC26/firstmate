@@ -486,6 +486,11 @@ write_host_fixture() {  # <dir> <kind>
         printf 'printf "supervision-host: the away session could not take this wake: fixture; this wake is yours\\n"\n'
         printf 'for i in 1 2 3 4 5 6 7 8 9 10; do printf "supervision-host: outcome %%s for demo [routine]: fixture\\n" "$i"; done\n'
         ;;
+      captain-note)
+        printf 'printf "watcher: started pid=%%s (beacon fresh)\\n" "$$"\n'
+        printf 'printf "check: captain inbox note fixture-note\\n"\n'
+        printf 'printf "supervision-host: the captain sent a note and away mode should end (captain inbox note fixture-note queued)\\n"\n'
+        ;;
       boundary)
         printf 'printf "supervision-host: cycle boundary - fixture\\n"\n'
         ;;
@@ -556,6 +561,25 @@ test_park_runs_the_supervision_host_only_when_opted_in() {
   case "$body" in *'supervision-host:'*) ;; *) fail "the quiet-record handback did not reach main: $out" ;; esac
   case "$body" in *'not a return'*) fail "a handback beside a quiet record called itself away-posture supervision: $body" ;; esac
   pass "cursor park: an opted-in home parks on the supervision host and relays every host line"
+}
+
+# The inbox-note hand-back is the return. The away record is still on disk,
+# and the park must not tell main that this wake is not one.
+test_park_captain_note_handback_is_not_called_automatic_supervision() {
+  local dir out body
+  dir=$(make_primary_dir "$TMP_ROOT/park-captain-note")
+  : > "$dir/state/task1.meta"
+  : > "$dir/state/.afk-contract"
+  mkdir -p "$dir/config"
+  : > "$dir/config/supervision-host"
+  write_host_fixture "$dir" captain-note
+  out=$(run_park "$dir")
+  [ "$(kind_of_followup "$out")" = watcher ] || fail "a captain-note hand-back must arrive as a watcher-kind follow-up, got: $out"
+  body=$(followup_of "$out")
+  case "$body" in *'the captain sent a note and away mode should end'*) ;; *) fail "the follow-up lost the host's return line: $body" ;; esac
+  case "$body" in *'check: captain inbox note fixture-note'*) ;; *) fail "the follow-up lost the inbox reason: $body" ;; esac
+  case "$body" in *'not a return'*) fail "a captain-note hand-back called itself not a return: $body" ;; esac
+  pass "cursor park: a captain-note hand-back under the away record is not labeled automatic supervision"
 }
 
 test_park_host_boundary_stand_down_and_death() {
@@ -813,6 +837,7 @@ test_park_serializes_supersession_with_followup_commit
 test_superseded_park_does_not_consume_nag_budget
 test_park_inert_when_afk
 test_park_runs_the_supervision_host_only_when_opted_in
+test_park_captain_note_handback_is_not_called_automatic_supervision
 test_park_host_boundary_stand_down_and_death
 test_park_inert_under_pi_coding_agent
 test_park_still_parks_with_pi_leak_and_cursor_identity

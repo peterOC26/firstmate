@@ -29,7 +29,7 @@ Today it runs beside a Claude, Cursor, OpenCode, omp, Grok, or Codex primary: aw
 - Attended (no away record: no `state/.afk-contract`, or quiet mode's) on Claude and Cursor, the engine takes the wakes the Pi branch would take and never wakes main for a routine outcome; see [Postures](#postures).
   Every other close reaches main exactly as the plain watcher arm delivers it.
 - Attended on OpenCode, omp, Grok, and Codex, the host is a pass-through: every close reaches main as without the host.
-- Away (an away record exists), the host hands each close to the engine.
+- Away (an away record exists), the host hands each close to the engine, except a captain inbox note, which it hands back so main can end away mode; see [Away](#away).
   Main stays parked unless the host hands the wake back.
 - `/afk` launches no away daemon on a home of those harnesses that runs the host, because the host is the away session there.
 - `/quiet` enters nothing where the attended host runs, and elsewhere launches the daemon; see [Quiet mode](#quiet-mode).
@@ -133,7 +133,11 @@ The engine turn runs beside a captain who is present, so its guarded actions tak
 
 ### Away
 
-Every close goes to the engine; captain outcomes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
+Every close goes to the engine, except a close that carries a captain inbox note or coincides with a queued unsurfaced one.
+The [host header](../bin/fm-supervision-host.sh) owns the hand-back, successor continuity, and the check for unsurfaced notes at park-boundary and other exits.
+Main follows the [`/afk` return contract](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) for host signals and notes presented by its own drain.
+An explicit captain autonomy grant in the current task's own note is standing authority for that job only; `bin/fm-branch-prompt.sh` "Postures" owns how the away session reads and judges it.
+Captain outcomes of a close the engine takes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
 Every turn that starts attended meets the attended rule again at its start, and the offer's scan is the scope the turn claims: a close accepted away whose turn starts attended, because the captain returned in between, or an attended close whose task turned main-only (a decision appeared) while the successor started, reaches main unchanged and leaves that successor cycle running, with the handoff that turn had confirmed handed back to downtime.
 A captain who leaves while an attended turn runs turns its captain outcomes into away outcomes: they wait for the return too.
 
@@ -234,7 +238,7 @@ The captain row is still durable, and the next drain presents it until it is ack
 
 ## Failure direction
 
-Every path that cannot finish a wake the engine took hands that wake to main, with one `supervision-host: <why>` line after the close.
+Every path that cannot finish a wake the engine took hands that wake to main, with a `supervision-host: <why>` line after the close; an away hand-back may also carry the [inbox-note return signal](#away).
 Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
@@ -300,7 +304,7 @@ The OpenCode, omp, and Grok owners have no hook timeout and keep the same defaul
 
 ### At the boundary
 
-At the boundary the host stops the home's watcher and exits with one `supervision-host: cycle boundary` line.
+At the boundary the host stops the home's watcher and exits with a `supervision-host: cycle boundary` line; an away exit may also carry the [inbox-note return signal](#away).
 Main drains and acknowledges, and the owner starts the next park:
 
 | Primary | When the next park starts |
@@ -415,7 +419,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 
 | Test | What it covers |
 |---|---|
-| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine; inbox delivery while parked, during a turn through the Claude Stop hook, and after an unrelated successor close. |
+| [tests/fm-supervision-host.test.sh](../tests/fm-supervision-host.test.sh) | Report and drain behavior, including `BRANCH OUTCOMES`, attended wake handling, and main handoff with successor watcher continuity, against a stub engine; inbox delivery while parked, during a turn through the Claude Stop hook, and after an unrelated successor close, plus an away inbox note handed to main with the engine idle, a note-free away wake left on the engine, and a quiet-mode note left on the attended path. |
 | [tests/fm-supervision-host-dialog.test.sh](../tests/fm-supervision-host-dialog.test.sh) | Away-posture wake handling, dialog mirror delivery and permissions, incomplete engine results, and outcome handoff when the captain returns, against a stub engine. |
 | [tests/fm-supervision-host-recovery.test.sh](../tests/fm-supervision-host-recovery.test.sh) | Engine latching and recovery, bounded turns and park boundaries, owner options, repeated outcome suppression, and host ownership, against a stub engine. |
 | `tests/fm-claude-stop-autoarm.test.sh` | The Claude arm owner's host mode against a stub host. |
