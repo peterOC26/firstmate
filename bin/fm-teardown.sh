@@ -2740,8 +2740,10 @@ RECOVERY
 # slot steps on one result; the claimant stays in FM_TREEHOUSE_SLOT_OWNER_ID
 # and FM_TREEHOUSE_SLOT_OWNER_HOME.
 #
-# A legacy claimed copy needs verified unleased state; a new copy needs the
-# metadata's exact durable identity and holder.
+# A legacy claimed copy needs verified unleased state. A copy with durable
+# lease fields in its record needs that exact identity. A pool lease whose
+# holder is this task, with no lease fields in the record, is the Herdr
+# reservation and counts as that identity. Any other held lease refuses.
 TEARDOWN_SLOT_REASSIGNED_RC=3
 require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
   local record_id=$1 worktree=$2 marker meta=${3:-} expected_home=
@@ -2784,8 +2786,10 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
     echo "warning: legacy task $record_id has no slot claim and no other record names $worktree; leaving the copy untouched and running records-only cleanup." >&2
     return "$TEARDOWN_SLOT_REASSIGNED_RC"
   elif [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! fm_treehouse_legacy_unleased "$worktree"; then
-    echo "REFUSED: task $record_id has no verified identity for the copy's pool reservation; nothing was changed" >&2
-    return 1
+    if ! fm_treehouse_task_holds_pool_lease "$worktree" "$record_id"; then
+      echo "REFUSED: task $record_id has no verified identity for the copy's pool reservation; nothing was changed" >&2
+      return 1
+    fi
   fi
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     mine) return 0 ;;

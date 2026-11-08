@@ -1273,6 +1273,73 @@ test_own_and_absent_slot_claims_still_tear_down() {
   pass "fm-teardown: an owned claim returns its copy; an unclaimed legacy record retires without touching its copy"
 }
 
+# Herdr's treehouse get --lease --lease-holder records the task id on the pool
+# entry and writes no treehouse_lease_* lines. That holder is the reservation.
+# A holder that names someone else, or a lease that is being destroyed, is not.
+test_herdr_pool_holder_is_verified_reservation() {
+  local dir id=herdr-holder rc
+
+  dir=$(make_case herdr-holder-own)
+  mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  jq --arg id "$id" \
+    '.worktrees[0] += {leased:true,lease_id:"herdr-lease",lease_holder:$id}' \
+    "$dir/pool/treehouse-state.json" > "$dir/state.new"
+  mv "$dir/state.new" "$dir/pool/treehouse-state.json"
+
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "teardown refused a pool lease held by the same task: $(cat "$dir/stderr")"
+  assert_absent "$dir/home/state/$id.meta" "matching herdr holder left the task record"
+  grep -Fq "treehouse <return>" "$dir/runtime.log" \
+    || fail "matching herdr holder did not return its pool slot: $(cat "$dir/runtime.log")"
+
+  dir=$(make_case herdr-holder-other)
+  mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  jq '.worktrees[0] += {leased:true,lease_id:"herdr-lease",lease_holder:"other-task"}' \
+    "$dir/pool/treehouse-state.json" > "$dir/state.new"
+  mv "$dir/state.new" "$dir/pool/treehouse-state.json"
+
+  set +e
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "teardown returned a pool lease held by another task"
+  assert_present "$dir/home/state/$id.meta" "other-holder refusal removed the task record"
+  assert_present "$dir/worktree/sentinel" "other-holder refusal changed the copy"
+  [ ! -s "$dir/runtime.log" ] \
+    || fail "other-holder refusal reached the runtime: $(cat "$dir/runtime.log")"
+  assert_contains "$(cat "$dir/stderr")" "no verified identity" \
+    "other-holder refusal should name the missing reservation identity"
+
+  dir=$(make_case herdr-holder-destroying)
+  mark_case_as_treehouse_pool "$dir"
+  claim_pool_slot "$dir" "$id"
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  jq --arg id "$id" \
+    '.worktrees[0] += {leased:true,lease_id:"herdr-lease",lease_holder:$id,destroying:true}' \
+    "$dir/pool/treehouse-state.json" > "$dir/state.new"
+  mv "$dir/state.new" "$dir/pool/treehouse-state.json"
+  set +e
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "teardown accepted a pool lease that is being destroyed"
+  assert_present "$dir/home/state/$id.meta" "destroying-lease refusal removed the task record"
+  [ ! -s "$dir/runtime.log" ] \
+    || fail "destroying-lease refusal reached the runtime: $(cat "$dir/runtime.log")"
+
+  pass "fm-teardown: a pool lease held by this task is its reservation; another holder or a destroying lease still refuses"
+}
+
 # The tmux shim used by the endpoint-close tests below: every subcommand
 # reaches the real isolated server, so presence is always read from real tmux.
 # When FM_TEST_BLOCK_KILL is set, `kill-window` alone fails without forwarding,
@@ -1710,6 +1777,7 @@ test_reassigned_pool_slot_keeps_claimant_codex_overlay_on_t3
 test_stale_record_on_claimed_slot_retires_then_claimant_tears_down
 test_lease_mismatch_refuses_before_every_copy_mutation
 test_own_and_absent_slot_claims_still_tear_down
+test_herdr_pool_holder_is_verified_reservation
 test_recorded_endpoint_that_changed_directory_still_tears_down
 test_project_lock_anchors_at_the_local_root_across_home_layouts
 test_remote_seeded_home_returns_its_uncontested_slot

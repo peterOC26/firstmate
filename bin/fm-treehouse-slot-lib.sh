@@ -90,6 +90,15 @@ fm_treehouse_legacy_unleased() {  # <worktree>
   ' >/dev/null 2>&1
 }
 
+# Herdr's treehouse get --lease --lease-holder records the task id on the pool
+# entry and does not write treehouse_lease_* into the task record.
+fm_treehouse_task_holds_pool_lease() {  # <worktree> <task-id>
+  [ -n "$2" ] || return 1
+  fm_treehouse_pool_entry "$1" | jq -e --arg id "$2" '
+    .leased == true and .lease_holder == $id and (.destroying != true)
+  ' >/dev/null 2>&1
+}
+
 # True only when readable pool state proves this acquisition is no longer held,
 # such as after a return whose later teardown steps failed.
 fm_treehouse_lease_released() {  # <worktree> <lease-id>
@@ -180,9 +189,7 @@ fm_treehouse_records_reserved() {  # <project> <state>
         fi
         if [ "$(fm_meta_get "$meta" kind)" = secondmate ]; then
           # The existing home-seed contract labels secondmate leases by id.
-          if fm_treehouse_pool_entry "$path" | jq -e --arg id "$id" '
-            .leased == true and .lease_holder == $id and (.destroying != true)
-          ' >/dev/null 2>&1; then
+          if fm_treehouse_task_holds_pool_lease "$path" "$id"; then
             continue
           fi
         elif fm_treehouse_record_lease "$meta" &&
@@ -195,11 +202,7 @@ fm_treehouse_records_reserved() {  # <project> <state>
           }
           FM_TREEHOUSE_LEGACY_COPIES+=("$path")
           continue
-        elif ! grep -q '^treehouse_lease_' "$meta" && fm_treehouse_pool_entry "$path" | jq -e --arg id "$id" '
-          .leased == true and .lease_holder == $id and (.destroying != true)
-        ' >/dev/null 2>&1; then
-          # Herdr leases with --lease-holder set to the task id and does not
-          # write a JSON lease into the task record.
+        elif ! grep -q '^treehouse_lease_' "$meta" && fm_treehouse_task_holds_pool_lease "$path" "$id"; then
           continue
         fi
         echo "REFUSED: retained task $id ($meta) names pool copy $path without a verified matching durable lease; reconcile its ownership and run guarded cleanup before spawning again. No Treehouse allocation was attempted." >&2
