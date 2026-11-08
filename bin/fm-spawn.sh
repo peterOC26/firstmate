@@ -4604,7 +4604,9 @@ if [ "$KIND" = ship ]; then
   fi
 fi
 
-if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+# Only the t3code durable lease speaks the JSON lease protocol. Herdr and the
+# other backends keep upstream's treehouse get, which does not require it.
+if [ "$KIND" != secondmate ] && [ "$BACKEND" = t3code ]; then
   fm_treehouse_lease_cli || {
     echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
     exit 1
@@ -5584,6 +5586,24 @@ spawn_send_key() { # <target> <key>
   esac
 }
 
+# Lease the task copy durably instead of typing the interactive `treehouse get`
+# into the pane. That command runs a subshell, so the later `cd` lands inside
+# it and the pane's top-level shell stays in the project; Herdr restores a pane
+# from that top-level shell's cwd, so a host restart reopened every worker in
+# the primary clone. A durable lease needs no subshell, which lets the cd in
+# spawn_enter_recorded_worktree move the top-level shell itself. A lease
+# outlives its pane, so an aborted spawn returns it (spawn_abort_cleanup) and
+# bin/fm-teardown.sh returns it for a finished task.
+spawn_lease_herdr_slot() {
+  WT=$(cd "$PROJ_ABS" && treehouse get --lease --lease-holder "$ID") || {
+    echo "error: treehouse get --lease failed to lease a worktree for $ID from $PROJ_ABS; $(spawn_endpoint_hint)" >&2
+    exit 1
+  }
+  [ -n "$WT" ] || { echo "error: treehouse get --lease did not report a worktree for $ID" >&2; exit 1; }
+  HERDR_LEASED=1
+  validate_spawn_worktree "treehouse get --lease" "$WT (leased to $ID; once inspected, release it with 'treehouse return --force $WT' from $PROJ_ABS)"
+}
+
 # Enter the exact copy recorded for this task immediately before trust setup and
 # launch. Herdr restores a pane's shell cwd from its durable tab layout, so the
 # explicit cd must update the top-level shell to keep a later pane restart out
@@ -6118,16 +6138,12 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   if [ "$BACKEND" = t3code ]; then
     :
   elif [ "$BACKEND" = herdr ]; then
-    spawn_lease_treehouse_slot
-    HERDR_LEASED=1
+    spawn_lease_herdr_slot
   else
-    spawn_lease_treehouse_slot
-    # Enter the exact leased path through the backend-independent cwd helper.
-    spawn_enter_recorded_worktree
-    leased_wt_real=$(real_path_or_raw "$WT")
+    spawn_send_text_line "$WT_TARGET" 'treehouse get'
     WT=
 
-    # Wait for the explicit cd: the endpoint must settle in the exact leased copy.
+    # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
     # Target the stable window id, not the name: if the name is ever lost (e.g. an
     # automatic-rename slips through), display-message -t <bad-name> falls back to the
     # active client's window, which would misread firstmate's OWN pane path as the
@@ -6140,7 +6156,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     # A single read that already looks isolated is not proof the pane settled
     # there: on some tmux/WSL setups a brand-new window's pane_current_path
     # transiently reports an unrelated stale path (seen live as another real git
-    # checkout entirely) before the shell catches up with the explicit cd. That
+    # checkout entirely) before the shell catches up with treehouse get's cd. That
     # stale path passes spawn_worktree_isolated too (it resolves to a real,
     # distinct worktree top-level), so accepting it on one read alone silently
     # records the wrong worktree= in state/<id>.meta. Require two consecutive
@@ -6165,8 +6181,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     for _ in $(seq 1 60); do
       p=$(spawn_current_path "$WT_TARGET" || true)
       [ -z "$p" ] || last_seen="$p"
-      if [ -n "$p" ] && spawn_worktree_isolated "$p" &&
-        [ "$(real_path_or_raw "$p")" = "$leased_wt_real" ]; then
+      if [ -n "$p" ] && spawn_worktree_isolated "$p"; then
         p_real=$(real_path_or_raw "$p")
         last_reason="it is an isolated worktree, but no second read agreed with it"
         if [ -n "$candidate" ] && [ "$p_real" = "$candidate" ]; then
@@ -6191,31 +6206,23 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       validate_spawn_worktree "treehouse get" "$T"
     fi
 
-    # Recheck before claim/publication under the same project lock. Never
-    # replace a conflicting claim as an automatic repair.
-    fm_treehouse_record_exclusive "$STATE" "$WT" || exit 1
-    fm_treehouse_slot_owner_state "$WT" "$ID"
-    [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] || {
-      echo "REFUSED: allocated copy $WT acquired a conflicting slot claim; retaining the lease for reconciliation" >&2
-      exit 1
-    }
-    fm_treehouse_pool_slot "$PROJ_ABS" "$WT" || {
-      echo "REFUSED: leased copy $WT is not a recognized Treehouse pool slot for $PROJ_ABS; retaining the acquisition journal before publication" >&2
-      exit 1
-    }
+  fi
+  # Claim the pool slot for this task. Except on Herdr, whose slot
+  # spawn_lease_herdr_slot leased durably, the interactive `treehouse get` sent
+  # to the pane above records only a process lease, so Treehouse cannot say
+  # which task a slot belongs to once that task's worker exits - and that is
+  # exactly when the slot is handed on and this task's worktree= line goes
+  # stale. The claim is what lets
+  # bin/fm-teardown.sh leave a slot that has since been reassigned untouched, so
+  # a slot that cannot be claimed is refused here, at the cheapest point, rather
+  # than launching a worker whose slot teardown could later release out from
+  # under its successor.
+  if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
       echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; $(spawn_endpoint_hint)" >&2
       exit 1
     fi
-  fi
-  if [ "$BACKEND" = t3code ] || [ "$BACKEND" = herdr ]; then
-    if fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
-      if ! fm_treehouse_slot_owner_claim "$WT" "$ID" "$FM_HOME"; then
-        echo "error: could not claim Treehouse pool slot $WT for task $ID; refusing to launch a worker whose slot cannot later be proved to be its own; $(spawn_endpoint_hint)" >&2
-        exit 1
-      fi
-      SPAWN_SLOT_CLAIMED=1
-    fi
+    SPAWN_SLOT_CLAIMED=1
   fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != t3code ]; then

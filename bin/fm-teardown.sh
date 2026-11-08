@@ -2743,7 +2743,16 @@ RECOVERY
 TEARDOWN_SLOT_REASSIGNED_RC=3
 require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
   local record_id=$1 worktree=$2 marker meta=${3:-} expected_home=
-  [ -z "$meta" ] || expected_home=$(dirname "$(dirname "$meta")")
+  # The claim records the home spawn used. This task's home is FM_HOME, including
+  # when its state directory is overridden and no longer sits inside that home.
+  # Another record's meta still names that record's own home/state layout.
+  if [ -n "$meta" ]; then
+    if [ "$record_id" = "${ID:-}" ] && [ -n "${FM_HOME:-}" ]; then
+      expected_home=$FM_HOME
+    else
+      expected_home=$(dirname "$(dirname "$meta")")
+    fi
+  fi
   fm_treehouse_slot_owner_state "$worktree" "$record_id" "$expected_home"
   if [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
     fm_treehouse_record_lease "$meta" || {
