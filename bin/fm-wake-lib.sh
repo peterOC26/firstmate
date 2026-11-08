@@ -12,9 +12,12 @@ FM_WAKE_QUEUE_LOCK="${FM_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
 FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # shellcheck source=bin/fm-path-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
-# Slot leases are their own lint root so spawn's source-aware check stays under the 8G resident cap.
+# Slot leases and queued-check markers are their own lint roots so spawn's
+# source-aware check stays under the 8G resident cap.
 # shellcheck disable=SC1091
 . "$FM_WAKE_LIB_DIR/fm-treehouse-slot-lib.sh"
+# shellcheck disable=SC1091
+. "$FM_WAKE_LIB_DIR/fm-wake-surface-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -2728,52 +2731,7 @@ fm_wake_queued_keys_locked() {
     "$FM_WAKE_QUEUE" 2>/dev/null || true
 }
 
-# Queued-check delivery markers are shared by the watcher and attended host.
-# Call the readers/writer under FM_WAKE_QUEUE_LOCK; only mark when handing a
-# close to its owner (the watcher does so after successful output).
-fm_wake_surfaced_marker() {  # <procevent:...|inbox:...>
-  local key=$1
-  case "$key" in procevent:*|inbox:*) ;; *) return 1 ;; esac
-  printf '%s/.seen-%s-%s' "$STATE" "${key%%:*}" "$(printf '%s' "$key" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
-}
-
-fm_wake_surfaced_mark_locked() {  # <procevent:...|inbox:...>
-  local key=$1 marker tmp
-  marker=$(fm_wake_surfaced_marker "$key") || return 1
-  tmp=$(umask 077; mktemp "$STATE/.seen-${key%%:*}.XXXXXX") || return 1
-  if ! mv -f -- "$tmp" "$marker"; then
-    rm -f -- "$tmp"
-    return 1
-  fi
-}
-
-# List only inbox delivery markers, excluding per-task signal markers.
-fm_wake_inbox_surfaced_markers() {
-  local marker
-  for marker in "$STATE"/.seen-inbox-*; do
-    [ -e "$marker" ] || [ -L "$marker" ] || continue
-    case "${marker##*/.seen-inbox-}" in ''|*[!0-9a-f]*) continue ;; esac
-    printf '%s\n' "$marker"
-  done
-}
-
-# Prints unsurfaced inbox keys and prunes markers for rows no longer queued.
-fm_wake_inbox_unsurfaced_keys_locked() {
-  local key marker queued_markers=$'\n'
-  while IFS= read -r key; do
-    case "$key" in inbox:*) ;; *) continue ;; esac
-    marker=$(fm_wake_surfaced_marker "$key") || return 1
-    queued_markers="$queued_markers$marker"$'\n'
-    [ -e "$marker" ] || printf '%s\n' "$key"
-  done < <(fm_wake_queued_keys_locked check)
-  while IFS= read -r marker; do
-    case "$queued_markers" in
-      *$'\n'"$marker"$'\n'*) ;;
-      *) rm -f -- "$marker" || return 1 ;;
-    esac
-  done < <(fm_wake_inbox_surfaced_markers)
-}
-
+# Queued-check delivery markers live in bin/fm-wake-surface-lib.sh.
 # fm_wake_queued_carries_locked: 0 iff an unacknowledged queued row of <kind>
 # for exactly <key> carries <needle> in its payload. The payload-shaped twin of
 # fm_wake_queued_keys_locked, for a publisher that must write one wake of a
