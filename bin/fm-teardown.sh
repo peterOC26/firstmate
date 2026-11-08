@@ -158,7 +158,9 @@
 # the normal completion and landed-work gates unless --force bypasses them
 # under explicit discard authority; inspection disables optional Git locks, and a blocking Git
 # lock refuses without removing it. The copy is never modified, reaped, reset,
-# or returned on that path. tests/fm-spawn-slot-ownership.test.sh pins these
+# or returned on that path, except a t3code record, which still removes the
+# env files it wrote and returns the slot. A claim that names another task
+# stays untouched either way. tests/fm-spawn-slot-ownership.test.sh pins these
 # legacy exclusivity and unlanded-work boundaries.
 # Durable identities are checked before reaping, hook/branch edits,
 # and scratch cleanup, and both identity and holder constrain every return
@@ -4168,7 +4170,23 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   fi
   fm_backend_remove_worktree "$BACKEND" "$ORCA_WORKTREE_ID"
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
-  :
+  # t3code's generated env is this task's channel, not another task's work.
+  # Reassignment (a claim naming someone else) still leaves the slot alone.
+  if [ "$BACKEND" = t3code ] && [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ] && [ -d "$WT" ]; then
+    "$SCRIPT_DIR/fm-t3code-codex-env.sh" cleanup "$WT" || exit 1
+    git -C "$WT" ls-files --error-unmatch CLAUDE.local.md >/dev/null 2>&1 || rm -f "$WT/CLAUDE.local.md"
+    if [ "$KIND" = scout ] || [ "$FORCE" = "--force" ]; then
+      teardown_scrub_scratch_copy "$WT" || exit 1
+    fi
+    wt_pool_slot=0
+    fm_treehouse_pool_slot "$PROJ" "$WT" && wt_pool_slot=1
+    teardown_treehouse_return "$WT" "$PROJ" "worktree" "" "$META" || {
+      echo "error: treehouse return failed for worktree $WT; teardown aborted" >&2
+      exit 1
+    }
+    [ "$wt_pool_slot" = 0 ] || teardown_note_dirty_return "$WT"
+    fm_treehouse_slot_owner_release "$WT" "$ID"
+  fi
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
   if [ "$branch" != "HEAD" ]; then

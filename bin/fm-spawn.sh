@@ -4604,15 +4604,6 @@ if [ "$KIND" = ship ]; then
   fi
 fi
 
-# Only the t3code durable lease speaks the JSON lease protocol. Herdr and the
-# other backends keep upstream's treehouse get, which does not require it.
-if [ "$KIND" != secondmate ] && [ "$BACKEND" = t3code ]; then
-  fm_treehouse_lease_cli || {
-    echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
-    exit 1
-  }
-fi
-
 BRIEF_DIR_REAL=$(cd "$(dirname "$BRIEF")" && pwd -P)
 BRIEF_REAL="$BRIEF_DIR_REAL/$(basename "$BRIEF")"
 
@@ -5456,6 +5447,14 @@ EOF
     if [ "$HARNESS" = claude ] && [ "$KIND" != secondmate ] && git -C "$PROJ_ABS" ls-files --error-unmatch CLAUDE.local.md >/dev/null 2>&1; then
       echo "error: $PROJ_ABS tracks CLAUDE.local.md, which backend=t3code writes as the Claude task-worker channel statement; refusing to overwrite project instructions" >&2
       exit 1
+    fi
+    # The JSON lease is t3code's only treehouse call. Project-policy refusals
+    # above must win before any treehouse invocation, including the CLI probe.
+    if [ "$KIND" != secondmate ]; then
+      fm_treehouse_lease_cli || {
+        echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
+        exit 1
+      }
     fi
     # The T3 project is the directory the agent runs in: the project for a
     # worker, the home itself for a secondmate.

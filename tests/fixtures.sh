@@ -488,10 +488,21 @@ if [ "$cmd" = get ]; then
 elif [ "$cmd" = return ]; then
   path=$(cd "$path" && pwd -P)
   state="$(dirname "$(dirname "$path")")/treehouse-state.json"
+  # Unconditional --force of a path the pool does not list is a no-op.
+  # A return that names a lease id or holder still requires that entry.
+  if [ ! -f "$state" ]; then
+    if [ -z "$expected_id" ] && [ -z "$expected_holder" ]; then
+      exit 0
+    fi
+    echo "lease precondition failed" >&2
+    exit 1
+  fi
   jq --arg path "$path" --arg id "$expected_id" --arg holder "$expected_holder" '
     if any(.worktrees[]; .path == $path and
       ($id == "" or .lease_id == $id) and ($holder == "" or .lease_holder == $holder)) then
       .worktrees |= map(if .path == $path then del(.leased,.lease_id,.lease_holder) else . end)
+    elif $id == "" and $holder == "" then
+      .
     else error("lease precondition failed") end
   ' "$state" > "$state.tmp"
   mv "$state.tmp" "$state"
