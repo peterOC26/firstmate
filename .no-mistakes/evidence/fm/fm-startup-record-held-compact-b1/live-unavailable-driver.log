@@ -1,0 +1,6 @@
+{
+  "scenario": "Absent real tasks-axi uses compact fallback with exact counts, valid UTF-8, full protected holds, bounded ready rows, and unchanged backlog",
+  "result": "pass",
+  "sha256_before_and_after": "96345d622c77d570a6dc26173bc4e69afe5c795ddd85c2f9e548b0b5e2b1abf7"
+}
+Disposable unavailable-tool lab home removed.

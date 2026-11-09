@@ -1,0 +1,368 @@
+RE-EMIT CUE: if this output ends with "Output too large ... Full output saved to <path>",
+read that whole file now, before acting. Otherwise read data/captain.md, data/captain-shared.md,
+and data/learnings.md under /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.fm-live-startup-ct2_hrho/data now if any of them is missing below.
+
+================================================================================
+SESSION START (CONTEXT RE-EMIT) - /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.fm-live-startup-ct2_hrho
+================================================================================
+This session already took the helm at its own startup and has only lost its
+context. Lock ownership is re-verified and the durable records below are
+reprinted, but the sweeps startup already reconciled - project clone refresh,
+secondmate convergence and liveness, pending remote handoff
+retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.
+Queued wakes ARE still drained: they arrived after startup and are this turn work.
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 1810702
+
+HOME ROLE
+--------------------------------------------------------------------------------
+fm-role: user (default)
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: follow the continuation in the harness protocol below; do not use shell &.
+
+Mode: Unknown harness fallback.
+
+This primary harness does not have a verified watcher wake adapter.
+Follow the generic supervision contract in `AGENTS.md`.
+First cycle: drain queued wakes, then choose a supervision wait that the harness can actually wake from.
+Ordinary wake: drain, handle all emitted wakes, reconcile open decisions and unread status lines, and run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`, then repeat that verified wait while supervision is still required.
+Before that acknowledgement, interruption leaves the work durable for idempotent re-handling.
+Use `bin/fm-watch-arm.sh` only when the harness has a tracked background mechanism that survives the tool call and notifies the model on process exit.
+Use a bounded foreground wait over `bin/fm-watch.sh` when that wake mechanism is not verified.
+Never use shell `&` for watcher supervision.
+Failure or missing cycle only: inspect the failure and restore the same verified wait shape.
+
+Record new verification evidence before promoting an unknown harness to a named snippet.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled,
+  - or a context re-emit opened with a read cue because the
+    harness cut the digest short.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+compact backlog listing (manual backend; done rows omitted; in-flight, blocked and other captain holds kept whole; parked/watch holds shortened; other queued bounded to 1; indented task bodies omitted)
+## In flight
+- [ ] watch-live - Live watch job (since 2026-11-09) (hold: "Wait LIVE-WATCH-DETAILS-KEPT\nsecond live line") (hold-kind: captain)
+- [ ] parked-live - Live parked job (since 2026-11-09) (hold: LIVE-PARKED-DETAILS-KEPT) (hold-kind: parked)
+## Queued
+- [ ] quiet-1 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-2 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-3 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-4 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-5 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-6 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: parked; reason omitted)
+- [ ] quiet-7 - Quiet, "quoted" job 7 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-8 - Quiet, "quoted" job 8 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-9 - Quiet, "quoted" job 9 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-10 - Quiet, "quoted" job 10 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-11 - Quiet, "quoted" job 11 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-12 - Quiet, "quoted" job 12 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-13 - Quiet, "quoted" job 13 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-14 - Quiet, "quoted" job 14 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-15 - Quiet, "quoted" job 15 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-16 - Quiet, "quoted" job 16 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-17 - Quiet, "quoted" job 17 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-18 - Quiet, "quoted" job 18 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-19 - Quiet, "quoted" job 19 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-20 - Quiet, "quoted" job 20 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-21 - Quiet, "quoted" job 21 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-22 - Quiet, "quoted" job 22 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-23 - Quiet, "quoted" job 23 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-24 - Quiet, "quoted" job 24 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-25 - Quiet, "quoted" job 25 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-26 - Quiet, "quoted" job 26 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-27 - Quiet, "quoted" job 27 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-28 - Quiet, "quoted" job 28 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-29 - Quiet, "quoted" job 29 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-30 - Quiet, "quoted" job 30 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-31 - Quiet, "quoted" job 31 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-32 - Quiet, "quoted" job 32 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-33 - Quiet, "quoted" job 33 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-34 - Quiet, "quoted" job 34 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-35 - Quiet, "quoted" job 35 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-36 - Quiet, "quoted" job 36 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-37 - Quiet, "quoted" job 37 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-38 - Quiet, "quoted" job 38 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-39 - Quiet, "quoted" job 39 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-40 - Quiet, "quoted" job 40 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-41 - Quiet, "quoted" job 41 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-42 - Quiet, "quoted" job 42 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-43 - Quiet, "quoted" job 43 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-44 - Quiet, "quoted" job 44 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-45 - Quiet, "quoted" job 45 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-46 - Quiet, "quoted" job 46 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-47 - Quiet, "quoted" job 47 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-48 - Quiet, "quoted" job 48 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-49 - Quiet, "quoted" job 49 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-50 - Quiet, "quoted" job 50 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-51 - Quiet, "quoted" job 51 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-52 - Quiet, "quoted" job 52 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-53 - Quiet, "quoted" job 53 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-54 - Quiet, "quoted" job 54 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-55 - Quiet, "quoted" job 55 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-56 - Quiet, "quoted" job 56 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-57 - Quiet, "quoted" job 57 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-58 - Quiet, "quoted" job 58 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-59 - Quiet, "quoted" job 59 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-60 - Quiet, "quoted" job 60 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-61 - Quiet, "quoted" job 61 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-62 - Quiet, "quoted" job 62 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-63 - Quiet, "quoted" job 63 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-64 - Quiet, "quoted" job 64 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-65 - Quiet, "quoted" job 65 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-66 - Quiet, "quoted" job 66 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-67 - Quiet, "quoted" job 67 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-68 - Quiet, "quoted" job 68 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-69 - Quiet, "quoted" job 69 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-70 - Quiet, "quoted" job 70 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-71 - Quiet, "quoted" job 71 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-72 - Quiet, "quoted" job 72 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-73 - Quiet, "quoted" job 73 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-74 - Quiet, "quoted" job 74 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-75 - Quiet, "quoted" job 75 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-76 - Quiet, "quoted" job 76 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-77 - Quiet, "quoted" job 77 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-78 - Quiet, "quoted" job 78 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-79 - Quiet, "quoted" job 79 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-80 - Quiet, "quoted" job 80 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-81 - Quiet, "quoted" job 81 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-82 - Quiet, "quoted" job 82 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-83 - Quiet, "quoted" job 83 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-84 - Quiet, "quoted" job 84 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-85 - Quiet, "quoted" job 85 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-86 - Quiet, "quoted" job 86 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-87 - Quiet, "quoted" job 87 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-88 - Quiet, "quoted" job 88 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-89 - Quiet, "quoted" job 89 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-90 - Quiet, "quoted" job 90 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-91 - Quiet, "quoted" job 91 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-92 - Quiet, "quoted" job 92 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-93 - Quiet, "quoted" job 93 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-94 - Quiet, "quoted" job 94 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-95 - Quiet, "quoted" job 95 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-96 - Quiet, "quoted" job 96 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-97 - Quiet, "quoted" job 97 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-98 - Quiet, "quoted" job 98 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-99 - Quiet, "quoted" job 99 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-100 - Quiet, "quoted" job 100 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-101 - Quiet, "quoted" job 101 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-102 - Quiet, "quoted" job 102 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-103 - Quiet, "quoted" job 103 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-104 - Quiet, "quoted" job 104 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-105 - Quiet, "quoted" job 105 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-106 - Quiet, "quoted" job 106 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-107 - Quiet, "quoted" job 107 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-108 - Quiet, "quoted" job 108 (since 2026-11-09) (hold-kind: parked; reason omitted)
+- [ ] quiet-109 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-110 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-111 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-112 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-113 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-114 - aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa... (hold-kind: captain; reason omitted)
+- [ ] quiet-115 - Quiet, "quoted" job 115 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-116 - Quiet, "quoted" job 116 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-117 - Quiet, "quoted" job 117 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-118 - Quiet, "quoted" job 118 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-119 - Quiet, "quoted" job 119 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-120 - Quiet, "quoted" job 120 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-121 - Quiet, "quoted" job 121 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-122 - Quiet, "quoted" job 122 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-123 - Quiet, "quoted" job 123 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-124 - Quiet, "quoted" job 124 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-125 - Quiet, "quoted" job 125 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-126 - Quiet, "quoted" job 126 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-127 - Quiet, "quoted" job 127 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-128 - Quiet, "quoted" job 128 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-129 - Quiet, "quoted" job 129 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-130 - Quiet, "quoted" job 130 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-131 - Quiet, "quoted" job 131 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-132 - Quiet, "quoted" job 132 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-133 - Quiet, "quoted" job 133 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-134 - Quiet, "quoted" job 134 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-135 - Quiet, "quoted" job 135 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-136 - Quiet, "quoted" job 136 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-137 - Quiet, "quoted" job 137 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-138 - Quiet, "quoted" job 138 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-139 - Quiet, "quoted" job 139 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-140 - Quiet, "quoted" job 140 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-141 - Quiet, "quoted" job 141 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-142 - Quiet, "quoted" job 142 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-143 - Quiet, "quoted" job 143 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-144 - Quiet, "quoted" job 144 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-145 - Quiet, "quoted" job 145 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-146 - Quiet, "quoted" job 146 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-147 - Quiet, "quoted" job 147 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-148 - Quiet, "quoted" job 148 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-149 - Quiet, "quoted" job 149 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-150 - Quiet, "quoted" job 150 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-151 - Quiet, "quoted" job 151 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-152 - Quiet, "quoted" job 152 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-153 - Quiet, "quoted" job 153 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-154 - Quiet, "quoted" job 154 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-155 - Quiet, "quoted" job 155 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-156 - Quiet, "quoted" job 156 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-157 - Quiet, "quoted" job 157 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-158 - Quiet, "quoted" job 158 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-159 - Quiet, "quoted" job 159 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-160 - Quiet, "quoted" job 160 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-161 - Quiet, "quoted" job 161 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-162 - Quiet, "quoted" job 162 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-163 - Quiet, "quoted" job 163 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-164 - Quiet, "quoted" job 164 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-165 - Quiet, "quoted" job 165 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-166 - Quiet, "quoted" job 166 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-167 - Quiet, "quoted" job 167 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-168 - Quiet, "quoted" job 168 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-169 - Quiet, "quoted" job 169 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-170 - Quiet, "quoted" job 170 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-171 - Quiet, "quoted" job 171 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-172 - Quiet, "quoted" job 172 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-173 - Quiet, "quoted" job 173 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-174 - Quiet, "quoted" job 174 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-175 - Quiet, "quoted" job 175 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-176 - Quiet, "quoted" job 176 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-177 - Quiet, "quoted" job 177 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-178 - Quiet, "quoted" job 178 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-179 - Quiet, "quoted" job 179 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-180 - Quiet, "quoted" job 180 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-181 - Quiet, "quoted" job 181 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-182 - Quiet, "quoted" job 182 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-183 - Quiet, "quoted" job 183 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-184 - Quiet, "quoted" job 184 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-185 - Quiet, "quoted" job 185 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-186 - Quiet, "quoted" job 186 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-187 - Quiet, "quoted" job 187 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-188 - Quiet, "quoted" job 188 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-189 - Quiet, "quoted" job 189 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-190 - Quiet, "quoted" job 190 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-191 - Quiet, "quoted" job 191 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-192 - Quiet, "quoted" job 192 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-193 - Quiet, "quoted" job 193 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-194 - Quiet, "quoted" job 194 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-195 - Quiet, "quoted" job 195 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-196 - Quiet, "quoted" job 196 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-197 - Quiet, "quoted" job 197 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-198 - Quiet, "quoted" job 198 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-199 - Quiet, "quoted" job 199 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-200 - Quiet, "quoted" job 200 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-201 - Quiet, "quoted" job 201 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-202 - Quiet, "quoted" job 202 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-203 - Quiet, "quoted" job 203 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-204 - Quiet, "quoted" job 204 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-205 - Quiet, "quoted" job 205 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-206 - Quiet, "quoted" job 206 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-207 - Quiet, "quoted" job 207 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-208 - Quiet, "quoted" job 208 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-209 - Quiet, "quoted" job 209 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-210 - Quiet, "quoted" job 210 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-211 - Quiet, "quoted" job 211 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-212 - Quiet, "quoted" job 212 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-213 - Quiet, "quoted" job 213 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-214 - Quiet, "quoted" job 214 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-215 - Quiet, "quoted" job 215 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] quiet-216 - Quiet, "quoted" job 216 (since 2026-11-09) (hold-kind: captain; reason omitted)
+- [ ] captain-open - Open question with metadata prose (since 2026-11-09) (hold: "Needs the captain to choose (hold-kind: parked) or keep active\nCAPTAIN-QUESTION-KEPT (choose one)\nsecond question line") (hold-kind: captain)
+- [ ] captain-call - Captain call (since 2026-11-09) (hold: "Captain call DETAILS-KEPT") (hold-kind: captain)
+- [ ] captain-needs - Needs captain (since 2026-11-09) (hold: "Needs the captain DETAILS-KEPT") (hold-kind: captain)
+- [ ] external-hold - External hold (since 2026-11-09) (hold: EXTERNAL-DETAILS-KEPT) (hold-kind: external)
+- [ ] blocked-parked - Blocked parked job blocked-by: parked-live (since 2026-11-09) (hold: BLOCKED-PARKED-DETAILS-KEPT) (hold-kind: parked)
+- [ ] blocked-watch - Blocked watch job blocked-by: parked-live (since 2026-11-09) (hold: "Watch BLOCKED-WATCH-DETAILS-KEPT") (hold-kind: captain)
+- [ ] ready-1 - Ready work 1 (since 2026-11-09)
+(108 parked, 108 watch queued hold(s) shortened; full details: bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md)
+(shown 2 in-flight, 222 held or blocked queued, 1 of 3 other queued title line(s); 1 done row(s) omitted)
+(2 more queued - raise FM_SESSION_START_QUEUED_LIMIT or read data/backlog.md for the rest)
+Full task bodies remain available on demand: bin/fm-tasks-axi.sh show <id> --full when compatible tasks-axi is available, or data/backlog.md.
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+completed off the startup path in 1s: GitHub authentication.
+(silent - no problems found)
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'unknown'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.

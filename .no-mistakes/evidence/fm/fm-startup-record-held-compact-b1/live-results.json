@@ -1,19 +1,61 @@
 {
-  "tasks-axi": {
-    "stored_backlog_bytes": 174722,
-    "rendered_backlog_bytes": 22149,
-    "exact_counts": "108 parked, 108 watch",
-    "protected_rows": "all original decoded reasons retained",
-    "backlog_unchanged": true,
-    "valid_utf8": true
-  },
-  "manual": {
-    "stored_backlog_bytes": 174722,
-    "rendered_backlog_bytes": 29313,
-    "exact_counts": "108 parked, 108 watch",
-    "protected_rows": "all original decoded reasons retained",
-    "backlog_unchanged": true,
-    "valid_utf8": true
-  },
-  "detail_retrieval": "full encoded multiline Watch reason remains available through fm-tasks-axi.sh show quiet-109 --full"
+  "results": [
+    {
+      "backend": "tasks-axi",
+      "scenario": "216 unblocked queued parked/Watch/Wait holds become bounded single lines with exact 108/108 counts",
+      "result": "pass",
+      "input_bytes": 455838
+    },
+    {
+      "backend": "tasks-axi",
+      "scenario": "In-flight, blocked, ordinary captain, and external holds retain full listing details; blocked overlap is not counted",
+      "result": "pass"
+    },
+    {
+      "backend": "tasks-axi",
+      "scenario": "Metadata-like prose inside an encoded captain question stays whole and cannot increment parked counts",
+      "result": "pass"
+    },
+    {
+      "backend": "tasks-axi",
+      "scenario": "Queued limit bounds ready work only, omits done rows, retains all held identities and leaves durable data unchanged",
+      "result": "pass"
+    },
+    {
+      "backend": "tasks-axi",
+      "scenario": "Long 2-, 3-, and 4-byte UTF-8 titles cut at each partial-character boundary stay valid and bounded",
+      "result": "pass"
+    },
+    {
+      "backend": "manual",
+      "scenario": "216 unblocked queued parked/Watch/Wait holds become bounded single lines with exact 108/108 counts",
+      "result": "pass",
+      "input_bytes": 455838
+    },
+    {
+      "backend": "manual",
+      "scenario": "In-flight, blocked, ordinary captain, and external holds retain full listing details; blocked overlap is not counted",
+      "result": "pass"
+    },
+    {
+      "backend": "manual",
+      "scenario": "Metadata-like prose inside an encoded captain question stays whole and cannot increment parked counts",
+      "result": "pass"
+    },
+    {
+      "backend": "manual",
+      "scenario": "Queued limit bounds ready work only, omits done rows, retains all held identities and leaves durable data unchanged",
+      "result": "pass"
+    },
+    {
+      "backend": "manual",
+      "scenario": "Long 2-, 3-, and 4-byte UTF-8 titles cut at each partial-character boundary stay valid and bounded",
+      "result": "pass"
+    },
+    {
+      "scenario": "Use the printed full-details command to retrieve a complete encoded watch reason after startup",
+      "result": "pass"
+    }
+  ],
+  "backlog_sha256_before_and_after": "96345d622c77d570a6dc26173bc4e69afe5c795ddd85c2f9e548b0b5e2b1abf7"
 }

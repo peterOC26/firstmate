@@ -1,0 +1,107 @@
+$ tasks-axi add blocked-parked blocked-parked --file <lab>/data/backlog.md
+ok: added blocked-parked -> Queued
+task:
+  id: blocked-parked
+  title: blocked-parked
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blocked-parked --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block blocked-parked --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to record a dependency
+
+$ tasks-axi hold blocked-parked --reason BLOCKED-PARKED-FULL --kind parked --file <lab>/data/backlog.md
+ok: hold blocked-parked -> held (parked)
+task:
+  id: blocked-parked
+  title: blocked-parked
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: BLOCKED-PARKED-FULL
+  hold_kind: parked
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold blocked-parked --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to resume dispatch
+  - Run `tasks-axi ready --include-held --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to review paused work
+
+$ tasks-axi block blocked-parked --by live-parked --file <lab>/data/backlog.md
+ok: block blocked-parked -> blocked-by live-parked
+help[2]:
+  - Run `tasks-axi unblock blocked-parked --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to clear it
+  - Run `tasks-axi ready --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to see what is still dispatchable
+
+$ tasks-axi add blocked-watch blocked-watch --file <lab>/data/backlog.md
+ok: added blocked-watch -> Queued
+task:
+  id: blocked-watch
+  title: blocked-watch
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start blocked-watch --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block blocked-watch --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to record a dependency
+
+$ tasks-axi hold blocked-watch --reason Watch BLOCKED-WATCH-FULL --kind captain --file <lab>/data/backlog.md
+ok: hold blocked-watch -> held (captain)
+task:
+  id: blocked-watch
+  title: blocked-watch
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: Watch BLOCKED-WATCH-FULL
+  hold_kind: captain
+  hold_until: "-"
+  kind: task
+  repo: "-"
+  priority: "-"
+  created: 2026-11-09
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi unhold blocked-watch --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to resume dispatch
+  - Run `tasks-axi ready --include-held --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to review paused work
+
+$ tasks-axi block blocked-watch --by live-parked --file <lab>/data/backlog.md
+ok: block blocked-watch -> blocked-by live-parked
+help[2]:
+  - Run `tasks-axi unblock blocked-watch --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to clear it
+  - Run `tasks-axi ready --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZHHAZ0MNQPFEA26P70W0WH/.startup-live-sbi3x_dj/data/backlog.md` to see what is still dispatchable

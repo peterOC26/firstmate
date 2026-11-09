@@ -1,0 +1,24 @@
+[
+  {
+    "mode": "tasks-axi",
+    "control_full": true,
+    "metadata_prose_full": true,
+    "shortened_summary": [],
+    "rows": [
+      "  control,queued,task,\"-\",Open captain question,none,captain,\"Needs the captain to choose a disposition\"",
+      "  metadata-prose,queued,task,\"-\",Open captain question,none,captain,\"Needs the captain to choose (hold-kind: parked) or keep active\""
+    ]
+  },
+  {
+    "mode": "manual",
+    "control_full": true,
+    "metadata_prose_full": false,
+    "shortened_summary": [
+      "(1 parked, 0 watch queued hold(s) shortened; full details: bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md)"
+    ],
+    "rows": [
+      "- [ ] control - Open captain question (hold: \"Needs the captain to choose a disposition\") (hold-kind: captain)",
+      "- [ ] metadata-prose - Open captain question (hold-kind: parked; reason omitted)"
+    ]
+  }
+]
