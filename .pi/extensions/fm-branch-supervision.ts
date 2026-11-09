@@ -114,6 +114,7 @@ import {
 import {
   activateEligibleRowsOwner,
   afkPostureRecordPresent,
+  pendingCaptainInboxIds,
   awayPostureTailFor,
   branchWakePrompt,
   deactivateEligibleRowsOwner,
@@ -1549,6 +1550,9 @@ ${context.command}
         // mid-operation; every relocated action revalidates at its own gate;
         // rows are store-first and the durable queue keeps them.
         const afk = afkPostureRecordPresent(state);
+        if (afk && pendingCaptainInboxIds(state).length > 0) {
+          throw new Error("the captain sent an inbox note; hand this wake back to main for the away return");
+        }
         const scope = scopeForUnreadWake(state, heartbeat, afk);
         // A newly-arrived main-owned (check-kind) row never bounces this
         // whole recheck back to main - scopeForUnreadWake excludes it from

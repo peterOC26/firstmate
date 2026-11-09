@@ -2551,6 +2551,54 @@ EOF
   pass "an accepted away-only wake rejects after archive, while a drained task-local wake stays a quiet no-op"
 }
 
+test_captain_note_arriving_after_offer_returns_to_main() {
+  local repo home out status
+  repo="$TMP_ROOT/inbox-recheck-root"
+  home="$TMP_ROOT/inbox-recheck-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+await eval(`(async () => { ${process.env.DRIVER_PRELUDE}; globalThis.__t = { fire, home, realRoot, bus, makeOffer, approvedProject }; })()`);
+const { fire, home, realRoot, bus, makeOffer, approvedProject } = globalThis.__t;
+import { spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const run = (script, args) => {
+  const result = spawnSync("bash", [`${realRoot}/bin/${script}`, ...args], {
+    encoding: "utf8", env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state` },
+  });
+  if (result.status !== 0) throw new Error(`${script} failed: ${result.stderr}`);
+  return result.stdout;
+};
+await fire("session_start", {});
+run("fm-afk-contract.sh", ["enter"]);
+writeFileSync(`${home}/state/.wake-queue`, "1\t1\tsignal\tbranch-driver.status\tsignal: branch-driver.status\n");
+const offer = makeOffer("signal: branch-driver.status", [approvedProject], false, true);
+bus.emit("fm-branch-supervision:dispatch", offer);
+if (!offer.accepted) throw new Error("fixture offer was not accepted");
+// Arrives after synchronous accept, before the serialized execution recheck.
+const { id } = JSON.parse(run("fm-inbox.sh", ["note", "--json", "Jobs reply: I am back"]));
+const failure = await offer.settlement.then(() => null, (error) => error);
+if (!(failure instanceof Error) || !failure.message.includes("captain sent an inbox note")) {
+  throw new Error(`late note did not reject the branch delivery: ${failure}`);
+}
+if ((globalThis.__fmPrompts ?? []).length !== 0) throw new Error("branch was prompted with the captain note");
+if (existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("late note acquired a branch grant");
+const lib = await import(pathToFileURL(`${process.env.PLUGIN.replace(/fm-branch-supervision.ts$/, "lib/fm-branch-dispatch.ts")}`).href);
+const scope = lib.scopeForUnreadWake(`${home}/state`, false, true);
+if (scope.eligibleSeqs.length !== 1 || scope.checkSeqs.length !== 0) throw new Error(`captain note entered eligible rows: ${JSON.stringify(scope)}`);
+if (lib.branchOfferForWake(`${home}/state`, "heartbeat", true).eligible) throw new Error("co-present note did not veto a new offer");
+if (!run("fm-wake-drain.sh", []).includes(`inbox:${id}`)) throw new Error("main's drain lost the note");
+if (!readFileSync(`${home}/state/.afk-contract`, "utf8")) throw new Error("branch archived main's record");
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a late captain note must return the accepted wake to main: $out"
+  pass "a captain note arriving after accept prevents the branch prompt and stays main-owned"
+}
+
 test_away_claimed_heartbeat_on_a_task_wake_lifts_task_scoping() {
   local repo home out status
   repo="$TMP_ROOT/away-heartbeat-scope-root"
@@ -6314,6 +6362,7 @@ test_branch_dispatch_resolves_terminal_keyed_orca_stale_row
 test_branch_dispatch_keeps_project_with_canonical_owner
 test_branch_dispatch_routes_secondmate_signal_by_new_span
 test_branch_cache_key_is_per_home_stable
+test_captain_note_arriving_after_offer_returns_to_main
 test_branch_default_on_heartbeat_afk_and_fallback
 test_away_record_parks_main_and_presents_after_archive
 test_away_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event

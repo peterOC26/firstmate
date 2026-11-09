@@ -45,6 +45,7 @@ import { Type } from "typebox";
 import { registerFirstmateTool } from "./lib/fm-native-contract.ts";
 import {
   afkPostureRecordPresent,
+  pendingCaptainInboxIds,
   branchOfferForWake,
   createBranchDispatchOffer,
   FM_BRANCH_DISPATCH_EVENT,
@@ -669,9 +670,13 @@ export default function (pi: ExtensionAPI) {
     pending?: PendingActionableClose,
   ): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
+    const inboxIds = afkPostureRecordPresent(state) ? pendingCaptainInboxIds(state) : [];
+    const inboxReturn = inboxIds.length > 0
+      ? `\n\nPi watcher: the captain sent a note and away mode should end (captain inbox note ${inboxIds.join(" ")} queued). Run bin/fm-afk-return.sh, then answer the note.`
+      : "";
     const content = encodeFirstmateOperationalInput(
       "watcher",
-      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.${inboxReturn}`,
     );
     if (pending) owner.unconsumedWakes.set(pending.token, { content, pending });
     try {

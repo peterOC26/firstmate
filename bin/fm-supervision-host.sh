@@ -70,8 +70,8 @@
 #     the captain sent a note and away mode should end. A park-bound exit,
 #     and every other hand-back to main, emits that same line beside its own
 #     when a note is still unsurfaced. Main treats that wake as the return.
-#     Quiet mode never takes this path. The away daemon and the Pi branch do
-#     not apply this hand-back yet.
+#     Quiet mode never takes this path. The daemon and Pi own their matching
+#     hand-backs in fm-supervise-daemon.sh and the Pi watcher extension.
 # Every turn that starts attended meets that rule again at its start, so a
 # close accepted away whose turn starts attended (the captain returned in
 # between) or an attended close whose task turned main-only while the

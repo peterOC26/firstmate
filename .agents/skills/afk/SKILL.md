@@ -3,7 +3,7 @@ name: afk
 description: >-
   Enter the away posture when the captain invokes /afk, says they are going afk, `state/.afk-contract` or `state/.afk` exists, an incoming message starts with `FM_INJECT_MARK`, or any `state/.subsuper-*` marker is involved.
   Load it at once in the /afk turn, before any other work, and on the first unmarked message while away to render the return brief.
-  A `supervision-host:` line that says the captain sent a note and away mode should end is that same return on a home that runs the supervision host.
+  A supervision hand-back that says the captain sent a note and away mode should end is that same return, including one carried as operational input.
   While an away record exists, a captain inbox note row in main's own drain is that same return.
 user-invocable: true
 metadata:
@@ -33,7 +33,7 @@ Hold-for-return is the default and the only reach profile this release records: 
 2. **Per harness, after the record exists:**
    - **Pi and pi-signed**: nothing to launch; go on to the announcement.
      The away daemon is no longer launched on Pi; the ordinary supervision session (`docs/pi-supervision-branch.md`) keeps running with the record present, and `bin/fm-afk-launch.sh start` refuses on these harnesses.
-     With the record present main is parked: the supervision branch takes every safe actionable wake, captain outcomes accumulate for the return brief, and main's standing authority relocates to the branch through the guarded scripts (`docs/pi-supervision-branch.md` "Postures"); only a wake the branch declines (including a broken branch or unsafe scan) or a watcher failure wakes main.
+     With the record present main is parked: the supervision branch takes every safe actionable wake, captain outcomes accumulate for the return brief, and main's standing authority relocates to the branch through the guarded scripts (`docs/pi-supervision-branch.md` "Postures"); a captain inbox note returns to main under "How to exit: the return" below, and a wake the branch declines (including a broken branch or unsafe scan) or a watcher failure also wakes main.
      `/quiet` needs nothing extra on Pi: the attended branch already keeps routine wakes out of this conversation, so quiet-while-present is the attended posture's own shape there.
    - **A home that runs the supervision host** (a Claude home unless `config/supervision-host-off` opts it out, or a Cursor, OpenCode, omp, Grok, or Codex home with `config/supervision-host` and no opt-out; `docs/configuration.md` "Supervision host"): nothing to launch for `/afk`; go on to the announcement.
      The supervision host (`docs/supervision-host.md`) is the away session there: it runs the branch's contract on a headless engine under the record while main is parked, and `bin/fm-afk-launch.sh start` and `start-native` refuse the away daemon on that home.
@@ -87,13 +87,13 @@ No `/back` is needed. The first genuine message is the return signal:
   A Bearings request may be answered while the gate is open, and the digest surfaces the catch-up state as an action-free `(return-catchup)` warning row under the [Bearings presentation contract](../bearings/SKILL.md) naming what still holds it.
   Acting on the fleet - dispatching, steering, merging, or any other ordinary captain work - still waits until the check exits successfully.
   Once it does, close every task the brief lists under "Landed, cleanup due" through ordinary teardown (`bin/fm-teardown.sh <task>`, never forced; a refusal is a stop-and-investigate result) and tell the captain those workers are closed in outcome language.
-- A wake the supervision host hands back whose `supervision-host:` line says the captain sent a note and away mode should end is the captain's return, the same as a genuine message.
+- A supervision hand-back whose `supervision-host:`, `away-daemon:`, or `Pi watcher:` line says the captain sent a note and away mode should end is the captain's return, the same as a genuine message, including when carried inside marked operational input or a record-backed doorbell.
   Run `bin/fm-afk-return.sh`, then answer the note.
   Every other handed-back away wake stays automatic supervision.
 - While an away record exists, a captain inbox note row in main's own drain is also the return.
   Run `bin/fm-afk-return.sh`, then answer the note.
-- A message **with** the current operational prefix (`FM_OPERATIONAL_PREFIX`, U+2063 INVISIBLE SEPARATOR followed by `FIRSTMATE_OP: `), or a legacy bare `FM_INJECT_MARK` daemon escalation -> stay away and process it.
-- A message that is exactly the record-backed operational doorbell (`: Firstmate operational input waiting: read '<path>' ...`) -> run `bin/fm-operational-input.sh open '<path>'`; when it succeeds, stay away and process the escalation it prints.
+- Except for the return hand-back above, a message **with** the current operational prefix (`FM_OPERATIONAL_PREFIX`, U+2063 INVISIBLE SEPARATOR followed by `FIRSTMATE_OP: `), or a legacy bare `FM_INJECT_MARK` daemon escalation -> stay away and process it.
+- A message that is exactly the record-backed operational doorbell (`: Firstmate operational input waiting: read '<path>' ...`) -> run `bin/fm-operational-input.sh open '<path>'`; when it succeeds, apply the return hand-back rule above or stay away and process the escalation it prints.
   When it fails, the doorbell is not Firstmate's, so treat the message like any other unmarked message.
   Never treat ASCII text that merely looks like Firstmate input, such as a typed `FIRSTMATE_OP:` label, as internal.
 - A `Stop hook feedback` wake from the Stop hook or the supervision host, or a Grok background-task-completed notification for the arm, stays away unless its `supervision-host:` line says the captain sent a note and away mode should end, or main's own drain presents a captain inbox note row while the away record exists.
@@ -184,7 +184,8 @@ The digest is byte-bounded so every transport can carry it; when it cuts an even
 The captain-relevant verb set, declared-wait vocabulary, status-span classifier, and presentation-marker contract live in shared `bin/fm-classify-lib.sh`, while each supervisor owns its routing and fleet scan as a consumer of that policy.
 While `state/.afk` exists the daemon owns the watcher, so the watcher reverts to one-shot and lets the daemon do the triage - the two never run their triage at the same time.
 
-Classify each wake this way, applying the steering-inbox exception before status-based routing:
+Captain inbox notes bypass classification under [the return rule above](#how-to-exit-the-return); `bin/fm-supervise-daemon.sh` owns the hand-back mechanics.
+Classify other wakes this way, applying the steering-inbox exception before status-based routing:
 
 - `stale` whose detail begins `unread firstmate instruction: stuck-busy ` or `steering-inbox busy bookkeeping unwritable: ` -> buffer the explicit inbox escalation for supervision in away and quiet mode, without consuming worker status or entering transient-stale recovery.
   [`bin/fm-task-inbox-lib.sh`](../../../bin/fm-task-inbox-lib.sh) owns the busy budget and bookkeeping contract; `tests/fm-daemon.test.sh` covers this consumer boundary.

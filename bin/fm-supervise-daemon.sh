@@ -19,6 +19,10 @@
 # the /afk skill sets that flag and starts this daemon; any real (unmarked)
 # user message clears it and firstmate resumes full responsiveness.
 # When afk is off, normal fm-watch.sh always-on triage is the active mechanism.
+# A queued captain inbox note hands supervision back to main for the return.
+# It bypasses classification and acknowledgement, and retries the existing
+# guarded injection on housekeeping ticks until submission is confirmed.
+# Only confirmed delivery marks the inbox key surfaced; main keeps its row.
 # Any buffered daemon escalations that remain while afk is off survive in
 # state/.subsuper-escalations and are flushed on the next "while you were out"
 # catch-up or when afk is re-entered.
@@ -1353,6 +1357,7 @@ _oldest_line_age() {  # <buf> -> seconds since the oldest buffered item first ar
 #     the block below and escalate what it finds; that block owns its file set.
 housekeeping() {  # <state>
   local state=$1 now due f key task win marker age last max_defer oldest pause_secs marker_epoch until bounded_until pause_reason dialog_name persisted
+  hand_back_captain_inbox "$state" && return 0
   now=$(_now)
   migrate_watcher_pause_markers "$state"
 
@@ -1907,15 +1912,66 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
+# Return 0 while a captain inbox note belongs to main, including when delivery
+# must retry. Leave every row untouched so a main drain owns the return and
+# catch-up. The queue, not the surfaced marker, decides whether to stand aside.
+hand_back_captain_inbox() (  # <state>
+  local state=$1 key keys='' pending='' ids='' msg age max_defer
+  afk_active "$state" || return 1
+  [ -s "$state/.wake-queue" ] || return 1
+  awk -F '\t' '$3 == "check" && $4 ~ /^inbox:/ { found=1 } END { exit !found }' "$state/.wake-queue" || return 1
+  [ "$(fm_afk_contract_mode "$state")" != quiet ] || return 1
+  # Local bindings also keep sourceable callers on this exact task state.
+  local STATE=$state FM_WAKE_QUEUE="$state/.wake-queue" FM_WAKE_QUEUE_LOCK="$state/.wake-queue.lock"
+  # shellcheck source=bin/fm-wake-lib.sh
+  . "$FM_DAEMON_DIR/fm-wake-lib.sh"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  keys=$(fm_wake_queued_keys_locked check)
+  for key in $keys; do
+    case "$key" in inbox:*) pending=1 ;; esac
+  done
+  keys=$(fm_wake_inbox_unsurfaced_keys_locked)
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ -n "$pending" ] || return 1
+  [ -n "$keys" ] || return 0
+  for key in $keys; do ids="$ids ${key#inbox:}"; done
+  # Use the existing bounded digest, frozen-submit retry and native request-id
+  # owner, including when other escalations were already waiting for delivery.
+  msg="away-daemon: the captain sent a note and away mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the note."
+  if ! grep -Fxq -- "$msg" "$state/.subsuper-escalations" 2>/dev/null; then
+    escalate_add "$state" "$msg" || { log "captain inbox return could not be buffered; wake rows retained"; return 0; }
+  fi
+  if escalate_flush "$state"; then
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    for key in $keys; do fm_wake_surfaced_mark_locked "$key" || true; done
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    log "captain inbox note${ids} handed back to main; wake rows retained"
+  else
+    log "captain inbox hand-back deferred: ${INJECT_LAST_FAILURE:-submit unconfirmed}; wake rows retained"
+    max_defer=${FM_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}
+    age=$(_oldest_line_age "$state/.subsuper-escalations")
+    if [ "$max_defer" -gt 0 ] && [ "$age" -ge "$max_defer" ]; then
+      inject_wedge_alarm "$state" "$age"
+    fi
+  fi
+  return 0
+)
+
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
   local handled=0 failed=0 ack_through ack_generation
+  hand_back_captain_inbox "$state" && return 0
   out=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || return 1
   err=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || { rm -f "$out"; return 1; }
   if ! "$FM_DAEMON_DIR/fm-wake-drain.sh" > "$out" 2> "$err"; then
     cat "$err" >&2
     rm -f "$out" "$err"
     return 1
+  fi
+  # A note may have arrived between the pre-drain scan and presentation.
+  if hand_back_captain_inbox "$state"; then
+    rm -f "$out" "$err"
+    return 0
   fi
 
   tab=$(printf '\t')

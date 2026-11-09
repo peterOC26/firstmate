@@ -488,6 +488,51 @@ test_catchall_buffer_failure_preserves_position() {
   pass "catch-all markers advance only after escalation buffering succeeds"
 }
 
+# A real inbox publication, the real guarded submit, and main's real drain:
+# no daemon ack may consume this return, even beside another wake.
+test_captain_note_hands_back_before_daemon_consumption() {
+  local dir state sent pane id queued drained calls
+  dir=$(make_supercase captain-note-return); state="$dir/state"
+  sent="$dir/sent"; pane="$dir/pane"
+  mkdir -p "$dir/config" "$dir/data"
+  FM_HOME="$dir" bash "$ROOT/bin/fm-afk-contract.sh" enter --words 'watch the fleet' >/dev/null \
+    || fail "captain note: away record failed"
+  afk_enter "$state"
+  append_wake "$state" heartbeat heartbeat heartbeat
+  id=$(FM_HOME="$dir" bash "$ROOT/bin/fm-inbox.sh" note --json 'Jobs reply: I am back' \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+  [ -n "$id" ] || fail "captain note: publication failed"
+  queued=$(cat "$state/.wake-queue")
+  printf '❯ occupied composer\n' > "$pane"
+  local -x PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_SENT="$sent" FM_FAKE_TMUX_CAPTURE="$pane"
+  local -x FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=sess:supervisor
+  handle_durable_wakes 'check: rearm-resurface' "$state" || fail "captain note: daemon hand-back failed"
+  [ ! -s "$sent" ] || fail "captain note: bypassed the composer guard"
+  [ "$(cat "$state/.wake-queue")" = "$queued" ] || fail "captain note: deferred return consumed rows"
+  printf '❯ \n' > "$pane"
+  # Retry comes from housekeeping, without needing another watcher close.
+  housekeeping "$state"
+  [ "$(cat "$state/.wake-queue")" = "$queued" ] || fail "captain note: successful return consumed rows"
+  assert_contains "$(delivered_digest "$sent")" 'the captain sent a note and away mode should end' "captain note: missing return signal"
+  assert_contains "$(delivered_digest "$sent")" "captain inbox note queued" "captain note: missing note hand-back"
+  assert_contains "$(delivered_digest "$sent")" 'bin/fm-afk-return.sh' "captain note: missing return action"
+  calls=$(wc -l < "$sent")
+  housekeeping "$state"
+  handle_durable_wakes heartbeat "$state"
+  [ "$(wc -l < "$sent")" = "$calls" ] || fail "captain note: confirmed delivery repeated"
+  [ -f "$state/.afk-contract" ] || fail "captain note: daemon archived main's away record"
+  drained=$(FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-wake-drain.sh" 2>"$dir/drain.err")
+  assert_contains "$drained" "check: captain inbox note $id" "captain note: main lost the note"
+  assert_contains "$drained" 'heartbeat' "captain note: main lost the co-present wake"
+  assert_contains "$(FM_HOME="$dir" bash "$ROOT/bin/fm-inbox.sh" drain)" 'Jobs reply: I am back' "captain note: note body lost"
+  bash "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "captain note: away archive failed"
+  FM_AFK_MODE=quiet bash "$ROOT/bin/fm-afk-contract.sh" enter --words 'stay quiet while I am here' >/dev/null \
+    || fail "captain note: quiet record failed"
+  if hand_back_captain_inbox "$state"; then fail "captain note: quiet mode triggered an away return"; fi
+  [ "$(wc -l < "$sent")" = "$calls" ] || fail "captain note: quiet mode injected a return"
+  pass "captain notes bypass daemon consumption, retry guarded delivery, and remain queued for main"
+}
+
 test_durable_wake_failure_retains_entire_batch() {
   local dir state fakebin attempts
   dir=$(make_supercase durable-failure); state="$dir/state"; fakebin="$dir/daemon-bin"; attempts="$dir/attempts"
@@ -3592,6 +3637,7 @@ test_busy_inbox_escalation_reaches_supervision reset away
 test_busy_inbox_escalation_reaches_supervision reset quiet
 test_busy_inbox_dispatch_preserves_other_stale_reasons
 test_catchall_buffer_failure_preserves_position
+test_captain_note_hands_back_before_daemon_consumption
 test_durable_wake_failure_retains_entire_batch
 test_missing_status_stale_is_acknowledged_without_diagnostic
 test_transient_unreadable_signal_recovers_without_advancing

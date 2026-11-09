@@ -21,9 +21,10 @@ import { runCommandAsync } from "./fm-async-exec.ts";
 // Postures (docs/pi-supervision-branch.md "Postures"). The away-posture record
 // state/.afk-contract (owner: bin/fm-afk-contract.sh) is the posture; it is
 // read as a file at every routing decision, never inferred from chat. While
-// it exists the branch takes EVERY actionable row - check rows, decision-owned
-// rows, and heartbeat rows included - and main is offered nothing the branch
-// can take. The two vetoes that describe a broken queue stay vetoes in both
+// it exists the branch takes actionable rows other than captain inbox notes,
+// which return to main under the away return policy. Other check rows,
+// decision-owned rows, and heartbeat rows remain branch-owned. The two vetoes
+// that describe a broken queue stay vetoes in both
 // postures, and such a wake, like every watcher-failure alarm, still falls
 // back to main exactly as attended, because only main can repair supervision
 // itself; parking main is a cost measure, continuity is the safety property.
@@ -31,15 +32,32 @@ import { runCommandAsync } from "./fm-async-exec.ts";
 export const FM_BRANCH_DISPATCH_EVENT = "fm-branch-supervision:dispatch";
 
 // The away-posture record's state-relative filename, exactly as
-// bin/fm-afk-contract.sh writes it. Presence is the only fact read here; the
-// guarded scripts validate the record themselves (bin/fm-lease-lib.sh).
+// bin/fm-afk-contract.sh writes it. A quiet record is a present user; the
+// guarded scripts validate the complete record themselves (bin/fm-lease-lib.sh).
 export const AFK_CONTRACT_FILE = ".afk-contract";
 
 export function afkPostureRecordPresent(state: string): boolean {
   try {
-    return statSync(join(state, AFK_CONTRACT_FILE)).isFile();
+    const record = join(state, AFK_CONTRACT_FILE);
+    return statSync(record).isFile() && !/^mode: quiet\r?$/m.test(readFileSync(record, "utf8"));
   } catch {
     return false;
+  }
+}
+
+// Captain inbox rows belong to main in both postures. Inspect the durable key,
+// not the note's user-controlled prose, including on an unrelated wake close.
+export function pendingCaptainInboxIds(state: string): string[] {
+  try {
+    return readFileSync(join(state, ".wake-queue"), "utf8")
+      .split(/\r?\n/)
+      .flatMap((line) => {
+        const fields = line.split("\t");
+        return fields.length >= 5 && /^[0-9]+$/.test(fields[1]) && fields[2] === "check" && fields[3].startsWith("inbox:")
+          ? [fields[3].slice("inbox:".length)] : [];
+      });
+  } catch {
+    return [];
   }
 }
 
@@ -50,7 +68,7 @@ export function afkPostureRecordPresent(state: string): boolean {
 // never prefix; bin/fm-branch-prompt.sh's fixed "Postures" section is what it
 // refers back to.
 export const AWAY_POSTURE_TAIL =
-  "POSTURE: AWAY. The away-posture record state/.afk-contract exists, so the captain is not present and MAIN is parked: you take every row, including check rows and decision rows, and no outcome reaches the captain until the return brief. " +
+  "POSTURE: AWAY. The away-posture record state/.afk-contract exists, so the captain is not present and MAIN is parked: you take the granted rows, including ordinary check rows and decision rows, and no outcome reaches the captain until the return brief. " +
   "The record below is the captain's away words, verbatim, and the whole mandate: act on them by your own judgment where this event is the moment they name, only through the guarded scripts under MAIN's standing authority - never more - which enforce it: bin/fm-pr-merge.sh merges any pull request that is green at its live head, synchronously, and refuses a red one or --allow-red; bin/fm-spawn.sh dispatches queued work (already queued, or filed by you from the words) within the spend cap; bin/fm-send.sh --resolve-key answers a decision the words pre-answer, or one the ask-user-authority policy in your prompt lets firstmate decide; bin/fm-merge-local.sh still refuses you. " +
   "Never by analogy, and hold on doubt: a sentence you cannot act on with confidence is reported with verdict captain, naming it, and left for the return. " +
   "Credential entry, legal or financial acceptance, an attended prompt, any discard the captain did not name, and any destructive, irreversible, or security-sensitive action are refused for every actor in every posture, whatever the words say. " +
@@ -445,8 +463,8 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
       // Main-owned while attended: excluded from what the branch may claim,
       // never a reason to reject the rest of the queue and never a reason to
       // send an otherwise-eligible heartbeat review to main. Away, the branch
-      // is the only actor, so the row is claimed unscoped.
-      if (afk) {
+      // handles other checks, so those rows are claimed unscoped.
+      if (afk && !key.startsWith("inbox:")) {
         eligibleSeqs.push(seq);
         checkSeqs.push(seq);
       }
@@ -606,7 +624,7 @@ export interface BranchOfferVerdict {
 // task stays on main. Other tasks and heartbeat handling remain independent.
 //
 // The away posture collapses that partition: every actionable row is
-// branch-eligible and the trigger class no longer forces anything to main
+// branch-eligible except captain inbox notes, which return the close to main
 // (scopeForUnreadWake owns the per-row rule).
 export function branchOfferForWake(state: string, message: string, afk: boolean, attendedHost = false): BranchOfferVerdict {
   const heartbeat = /^heartbeat($|:)/.test(message);
@@ -628,7 +646,7 @@ export function branchOfferForWake(state: string, message: string, afk: boolean,
   const attendedEligible = !isCheckTrigger && !isNeedsDecisionTrigger && (
     afk ? scopeForUnreadWake(state, heartbeat, false).eligible : scope.eligible
   );
-  const eligible = afk ? scope.eligible : attendedEligible;
+  const eligible = afk ? scope.eligible && pendingCaptainInboxIds(state).length === 0 : attendedEligible;
   return { scope, heartbeat, eligible, awayOnly: Boolean(eligible && !attendedEligible) };
 }
 
