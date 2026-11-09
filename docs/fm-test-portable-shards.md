@@ -106,7 +106,7 @@ Its header and `--help` own the modeled-budget check and output fields; read the
 The watch-triage suite is three serial members so no one file occupies a whole CI shard: `tests/fm-watch-triage.test.sh` (classifier, signal/turn-end absorb, wedge ladder, gone endpoints, TERM, busy-pane age, timer repair, procevent, heartbeat/afk hand-off, exit picker; hint 1085417 ms), `tests/fm-watch-triage-pause.test.sh` (declared waits, captain-call holds, pause transitions, away/quiet holds, paused-until and background-job waits; hint 487363 ms), and `tests/fm-watch-triage-wedge-defer.test.sh` (wedge-threshold deferrals; 13 tests, hint 614407 ms).
 Those hints are the slower successful script durations from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961), replacing the per-file sums from run [40280579086](https://github.com/kunchenguid/firstmate/actions/runs/40280579086) after `tests/fm-watch-triage.test.sh` again passed 16 minutes on its own.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
-Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
+Even so, maxima from two runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
 
@@ -147,7 +147,7 @@ Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.s
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
 
-The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the three watch-triage members still sum to about 26 minutes of CI test time.
+The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the three watch-triage members still sum to about 36.5 minutes of CI test time.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
 The layout uses sixteen portable serial shards, three portable parallel shards, the Herdr lane, the herdr-core lane, and three lint partitions, plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
