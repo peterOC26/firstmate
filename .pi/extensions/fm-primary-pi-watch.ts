@@ -44,6 +44,7 @@ import { Box, Container, Text, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { registerFirstmateTool } from "./lib/fm-native-contract.ts";
 import {
+  AFK_CONTRACT_FILE,
   afkPostureRecordPresent,
   pendingCaptainInboxIds,
   branchOfferForWake,
@@ -670,7 +671,12 @@ export default function (pi: ExtensionAPI) {
     pending?: PendingActionableClose,
   ): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
-    const inboxIds = afkPostureRecordPresent(state) ? pendingCaptainInboxIds(state) : [];
+    let inboxIds: string[] = [];
+    try {
+      if (afkPostureRecordPresent(state) && !/^mode: quiet\r?$/m.test(readFileSync(resolve(state, AFK_CONTRACT_FILE), "utf8"))) {
+        inboxIds = pendingCaptainInboxIds(state);
+      }
+    } catch {}
     const inboxReturn = inboxIds.length > 0
       ? `\n\nPi watcher: the captain sent a note and away mode should end (captain inbox note ${inboxIds.join(" ")} queued). Run bin/fm-afk-return.sh, then answer the note.`
       : "";

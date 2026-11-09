@@ -32,14 +32,13 @@ import { runCommandAsync } from "./fm-async-exec.ts";
 export const FM_BRANCH_DISPATCH_EVENT = "fm-branch-supervision:dispatch";
 
 // The away-posture record's state-relative filename, exactly as
-// bin/fm-afk-contract.sh writes it. A quiet record is a present user; the
-// guarded scripts validate the complete record themselves (bin/fm-lease-lib.sh).
+// bin/fm-afk-contract.sh writes it. Presence is the only fact read here; the
+// guarded scripts validate the record themselves (bin/fm-lease-lib.sh).
 export const AFK_CONTRACT_FILE = ".afk-contract";
 
 export function afkPostureRecordPresent(state: string): boolean {
   try {
-    const record = join(state, AFK_CONTRACT_FILE);
-    return statSync(record).isFile() && !/^mode: quiet\r?$/m.test(readFileSync(record, "utf8"));
+    return statSync(join(state, AFK_CONTRACT_FILE)).isFile();
   } catch {
     return false;
   }

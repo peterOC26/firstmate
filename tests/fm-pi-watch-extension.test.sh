@@ -1602,6 +1602,7 @@ captain-note|main|check: rearm-resurface|1\t1\tcheck\tinbox:jobs-answer\tcheck: 
 captain-note-mixed|main|signal: task-a.status|1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n2\t2\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n
 late-note|reject|signal: task-a.status|1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n
 note-prose-only|branch|check: captain inbox note fake|1\t1\tcheck\tmain-only\tcheck: captain inbox note fake\n
+quiet-check|branch|check: routine|1\t1\tcheck\tmain-only\tcheck: routine\n|quiet
 quiet-note|main|check: rearm-resurface|1\t1\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n|quiet
 corrupt|main|signal: task-a.status|not a queue row\n
 CASES

@@ -1915,7 +1915,7 @@ handle_wake() {  # <reason> <state>
 # Return 0 while a captain inbox note belongs to main, including when delivery
 # must retry. Leave every row untouched so a main drain owns the return and
 # catch-up. The queue, not the surfaced marker, decides whether to stand aside.
-hand_back_captain_inbox() (  # <state>
+hand_back_captain_inbox() {  # <state>
   local state=$1 key keys='' pending='' ids='' msg age max_defer
   afk_active "$state" || return 1
   [ -s "$state/.wake-queue" ] || return 1
@@ -1955,7 +1955,7 @@ hand_back_captain_inbox() (  # <state>
     fi
   fi
   return 0
-)
+}
 
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
