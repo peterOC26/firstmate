@@ -871,6 +871,14 @@ escalate_digest_body() {  # <buf>
   local LC_ALL=C buf=$1 item='' sep cut remaining=$ESCALATE_DIGEST_BYTES room cap shown=0 total=0
   ESCALATE_BODY=
   ESCALATE_BOUNDED=0
+  # A large paste can remain unsubmitted in a pane composer. Keep the return
+  # itself short; the existing full-text record carries accompanying events.
+  if grep -Fxq -- "$CAPTAIN_INBOX_RETURN" "$buf"; then
+    ESCALATE_BODY=$CAPTAIN_INBOX_RETURN
+    ESCALATE_EVENTS=$(( $(wc -l < "$buf") ))
+    [ "$ESCALATE_EVENTS" -le 1 ] || ESCALATE_BOUNDED=1
+    return 0
+  fi
   while IFS= read -r item || [ -n "$item" ]; do
     total=$((total + 1))
     sep=
@@ -887,10 +895,7 @@ escalate_digest_body() {  # <buf>
     ESCALATE_BODY+="$sep$item"
     remaining=$((remaining - ${#sep} - ${#item}))
     shown=$((shown + 1))
-  done < <(
-    grep -Fx -- "$CAPTAIN_INBOX_RETURN" "$buf" || true
-    grep -Fxv -- "$CAPTAIN_INBOX_RETURN" "$buf" || true
-  )
+  done < "$buf"
   ESCALATE_EVENTS=$total
   [ "$shown" -ge "$total" ] || ESCALATE_BODY+=" | +$((total - shown)) more event(s)"
 }

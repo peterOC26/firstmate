@@ -493,7 +493,7 @@ test_catchall_buffer_failure_preserves_position() {
 # A real inbox publication, the real guarded submit, and main's real drain:
 # no daemon ack may consume this return, even beside another wake.
 test_captain_note_hands_back_before_daemon_consumption() {
-  local dir state sent pane id queued drained calls item i
+  local dir state sent pane id queued drained calls item i digest full
   dir=$(make_supercase captain-note-return); state="$dir/state"
   sent="$dir/sent"; pane="$dir/pane"
   mkdir -p "$dir/config" "$dir/data"
@@ -510,9 +510,11 @@ test_captain_note_hands_back_before_daemon_consumption() {
   printf '❯ occupied composer\n' > "$pane"
   local -x PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_SENT="$sent" FM_FAKE_TMUX_CAPTURE="$pane"
   local -x FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=sess:supervisor
+  local -x FM_DAEMON_PRIMARY_HARNESS=codex
   handle_durable_wakes 'check: rearm-resurface' "$state" || fail "captain note: daemon hand-back failed"
   [ ! -s "$sent" ] || fail "captain note: bypassed the composer guard"
   [ "$(cat "$state/.wake-queue")" = "$queued" ] || fail "captain note: deferred return consumed rows"
+  cp "$state/.subsuper-escalations" "$dir/buffer.orig"
   printf '❯ \n' > "$pane"
   # Retry comes from housekeeping, without needing another watcher close.
   housekeeping "$state"
@@ -520,6 +522,12 @@ test_captain_note_hands_back_before_daemon_consumption() {
   assert_contains "$(delivered_digest "$sent")" 'the captain sent a note and away mode should end' "captain note: missing return signal"
   assert_contains "$(delivered_digest "$sent")" "captain inbox note queued" "captain note: missing note hand-back"
   assert_contains "$(delivered_digest "$sent")" 'bin/fm-afk-return.sh' "captain note: missing return action"
+  digest=$(head -n 1 "$sent")
+  [ "$(printf '%s' "$digest" | LC_ALL=C wc -c)" -lt 1024 ] \
+    || fail "captain note: return still carries a large pasted digest"
+  full=$(printf '%s' "$digest" | sed -n 's/.*full text of every event: \([^ )]*\).*/\1/p')
+  [ -n "$full" ] && cmp -s "$full" "$dir/buffer.orig" \
+    || fail "captain note: short return lost buffered events"
   calls=$(wc -l < "$sent")
   housekeeping "$state"
   handle_durable_wakes heartbeat "$state"
