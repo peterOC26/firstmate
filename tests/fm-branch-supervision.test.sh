@@ -94,10 +94,10 @@ test_branch_prompt_emits_pending_decision_review_contract() {
         || fail "Pi prompt generator failed"
     fi
     assert_contains "$prompt" \
-      'A heartbeat wake asks you to review the whole fleet from `bin/fm-fleet-view.sh` and the current backlog from `bin/fm-tasks-axi.sh list`, including parked and captain-held items with no live worker.' \
+      "A heartbeat wake asks you to review the whole fleet from \`bin/fm-fleet-view.sh\` and the current backlog from \`bin/fm-tasks-axi.sh list\`, including parked and captain-held items with no live worker." \
       "$surface emitted prompt omits backlog-only decisions from heartbeat review"
     assert_contains "$prompt" \
-      'Read `bin/fm-tasks-axi.sh show <id> --full` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending.' \
+      "Read \`bin/fm-tasks-axi.sh show <id> --full\` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending." \
       "$surface emitted prompt omits current decision reads"
     assert_contains "$prompt" \
       "Before reporting the heartbeat, apply the verdict and durable-history comparison below to each pending item's current result, decision, blocker, or next action, and report it under that item's task id." \
