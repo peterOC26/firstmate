@@ -1,0 +1,106 @@
+Real product CLI, no tool shims or copied scripts. Disposable marked homes under the gate worktree.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:48:59Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:48:59Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep this literal: ä 🚢
+      nested indentation
+    
+    	tab; # no parsing
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t fm-afk-contract.sh words
+Keep this literal: ä 🚢
+  nested indentation
+
+	tab; # no parsing
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t fm-afk-contract.sh field source
+config/afk-words
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t fm-afk-contract.sh validate
+
+[exit 0]
+Persisted public contract saved: /home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/multiline.afk-contract
+Input and public words output are byte-identical, SHA256=0a10af596a0c7dcd09272f5f3d0ee8b270069ccdf15a8ecd138257a0abf73376
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:01Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:01Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    words: |-
+    source: fabricated
+    merge_grants:
+      - anything
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka fm-afk-contract.sh words
+words: |-
+source: fabricated
+merge_grants:
+  - anything
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka fm-afk-contract.sh field source
+config/afk-words
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka fm-afk-contract.sh validate
+
+[exit 0]
+Persisted public contract saved: /home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/no-final-newline.afk-contract
+Input and public words output are byte-identical, SHA256=c72da63b536ac659d3cf07063cbe33de41ee4079064d215ffd1a5eb28652c9b8
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:03Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:03Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm fm-afk-contract.sh words
+
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm fm-afk-contract.sh field source
+config/afk-words
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm fm-afk-contract.sh validate
+
+[exit 0]
+Persisted public contract saved: /home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/blank-lines.afk-contract
+Input and public words output are byte-identical, SHA256=75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070
+Observable checks completed.
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-multiline-j_h7az8t
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-no-final-newline-h74ounka
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-blank-lines-0co70stm

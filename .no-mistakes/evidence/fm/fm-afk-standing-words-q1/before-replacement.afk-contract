@@ -1,0 +1,14 @@
+version: 2
+entered: 2026-11-09T07:49:46Z
+entered_epoch: 1794210586
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 4
+confirmed: 2026-11-09T07:49:46Z
+confirmed_epoch: 1794210586
+source: config/afk-words
+words: |
+  Original standing away words
+    preserve indentation
+  

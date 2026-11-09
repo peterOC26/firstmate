@@ -1,0 +1,132 @@
+Real product CLI, no tool shims or copied scripts. Disposable marked homes under the gate worktree.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc {'FM_AFK_MODE': 'quiet'} fm-afk-launch.sh enter
+Quiet mode recorded at 2026-11-09T07:50:15Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-09T07:50:15Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words: (none)
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-contract.sh words
+
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-contract.sh field source
+
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-contract.sh mode
+quiet
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc {'FM_AFK_MODE': 'quiet'} fm-afk-launch.sh enter
+Quiet mode recorded at 2026-11-09T07:50:15Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-09T07:50:15Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words: (none)
+[stderr]
+fm-afk-contract: quiet mode already recorded at 2026-11-09T07:50:15Z; a refresh leaves it untouched
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:50:16Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:50:16Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Now use these words in away mode
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: quiet mode became the away posture; the quiet record is archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc/state/afk-contracts/1794210615-superseded-1794210616.afk-contract
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-contract.sh words
+Now use these words in away mode
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc fm-afk-contract.sh field source
+config/afk-words
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh fm-afk-launch.sh enter --words Explicit argument beats standing file
+Away posture recorded at 2026-11-09T07:50:18Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:50:18Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Explicit argument beats standing file
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh fm-afk-contract.sh words
+Explicit argument beats standing file
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh fm-afk-contract.sh field source
+
+[exit 0]
+Entry completed without opening the FIFO standing path; an attempted read would block until the command timeout.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea fm-afk-launch.sh enter --words-file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea/explicit.txt
+Away posture recorded at 2026-11-09T07:50:19Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:50:19Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Explicit file bytes
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea fm-afk-contract.sh words
+Explicit file bytes
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea fm-afk-contract.sh field source
+
+[exit 0]
+Entry completed without opening the FIFO standing path; an attempted read would block until the command timeout.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc fm-afk-launch.sh enter --words 
+Away posture recorded at 2026-11-09T07:50:20Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:50:20Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc fm-afk-contract.sh words
+
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc fm-afk-contract.sh field source
+
+[exit 0]
+Entry completed without opening the FIFO standing path; an attempted read would block until the command timeout.
+Observable checks completed.
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-quiet-ng7pe_gc
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-cp98wmxh
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-words-file-l_41ckea
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-explicit-empty-fdv5jybc

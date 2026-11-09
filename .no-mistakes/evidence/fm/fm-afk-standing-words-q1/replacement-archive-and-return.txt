@@ -1,0 +1,95 @@
+Real product CLI, no tool shims or copied scripts. Disposable marked homes under the gate worktree.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:46Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:46Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Original standing away words
+      preserve indentation
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh field entered_epoch
+1794210586
+[exit 0]
+Persisted public contract saved: /home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/before-replacement.afk-contract
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-launch.sh enter --words New instructions for this away session only
+Away posture recorded at 2026-11-09T07:49:49Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:46Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    New instructions for this away session only
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: replaced the earlier away posture; its record is archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5/state/afk-contracts/1794210586-superseded-1794210589.afk-contract
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh words
+New instructions for this away session only
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh field source
+
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh field entered_epoch
+1794210586
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh words --path /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5/state/afk-contracts/1794210586-superseded-1794210589.afk-contract
+Original standing away words
+  preserve indentation
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-contract.sh field source --path /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5/state/afk-contracts/1794210586-superseded-1794210589.afk-contract
+config/afk-words
+[exit 0]
+Persisted public contract saved: /home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/after-replacement.afk-contract
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-return.sh begin
+=== Return brief (away 2026-11-09T07:49:46Z -> 2026-11-09T07:50:02Z, 16s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words superseded at unknown (from config/afk-words):
+    Original standing away words
+      preserve indentation
+    
+  your words at entry:
+    New instructions for this away session only
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+[stderr]
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5/state/afk-contracts/1794210586.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5 fm-afk-return.sh guard
+
+[exit 0]
+Return archived the current record, displayed current and superseded mandates with source, and cleared the catch-up gate.
+Observable checks completed.
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-replace-return-o9og2mg5

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "verbatim-standing-entry",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/verbatim-standing-entry.txt",
+    "reason": ""
+  },
+  {
+    "name": "absent-empty-and-unusable-files",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/absent-empty-and-unusable-files.txt",
+    "reason": ""
+  },
+  {
+    "name": "wordless-refresh-preserves-record",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/wordless-refresh-preserves-record.txt",
+    "reason": ""
+  },
+  {
+    "name": "replacement-archive-and-return",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/replacement-archive-and-return.txt",
+    "reason": ""
+  },
+  {
+    "name": "return-brief-names-active-source",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/return-brief-names-active-source.txt",
+    "reason": ""
+  },
+  {
+    "name": "quiet-and-explicit-words-ignore-file",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/quiet-and-explicit-words-ignore-file.txt",
+    "reason": ""
+  },
+  {
+    "name": "literal-text-and-authority-boundary",
+    "result": "pass",
+    "live": true,
+    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/literal-text-and-authority-boundary.txt",
+    "reason": ""
+  }
+]

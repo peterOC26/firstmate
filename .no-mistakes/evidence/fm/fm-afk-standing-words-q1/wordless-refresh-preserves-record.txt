@@ -1,0 +1,164 @@
+Real product CLI, no tool shims or copied scripts. Disposable marked homes under the gate worktree.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1 fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1 fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:24Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:24Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Original standing words
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1 fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:24Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:24Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Original standing words
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:24Z; a refresh leaves it untouched
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1 fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:24Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:24Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Original standing words
+    
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:24Z; a refresh leaves it untouched
+[exit 0]
+The complete persisted contract stayed byte-identical after changing the file and after making it unusable.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:30Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:30Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:30Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:30Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:30Z; a refresh leaves it untouched
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:30Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:30Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:30Z; a refresh leaves it untouched
+[exit 0]
+The complete persisted contract stayed byte-identical after changing the file and after making it unusable.
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o fm-afk-launch.sh enter --words Explicit mandate
+Away posture recorded at 2026-11-09T07:49:37Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:37Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Explicit mandate
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:37Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:37Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Explicit mandate
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:37Z; a refresh leaves it untouched
+[exit 0]
+$ FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o fm-afk-launch.sh enter
+Away posture recorded at 2026-11-09T07:49:37Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:49:37Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Explicit mandate
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[stderr]
+fm-afk-contract: away posture already recorded at 2026-11-09T07:49:37Z; a refresh leaves it untouched
+[exit 0]
+The complete persisted contract stayed byte-identical after changing the file and after making it unusable.
+Observable checks completed.
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-standing-7kbxg1d1
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-absent-39ql32_e
+Removed disposable lab: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZKR0PF12YHC0N3D91J3D2R/.test-tmp/fm-lab-refresh-explicit-wbupcm4o
