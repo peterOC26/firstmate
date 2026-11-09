@@ -593,7 +593,7 @@ EOF
 # nothing is new or unprocessed.
 #   - Captain outcomes come first and never wait behind routine ones. Every
 #     unprocessed captain row is presented on every drain until main
-#     acknowledges it, collapsed to one line per task: the task's newest
+#     acknowledges it, with continuation rows kept separately and other rows collapsed per task: the task's newest
 #     presented summary, naming how many unprocessed captain outcomes it
 #     carries, with tasks in order of their oldest unprocessed row. The byte
 #     cap presents only the oldest contiguous run of captain rows and counts
@@ -624,7 +624,7 @@ EOF
 # (bin/fm-afk-return.sh) keeps its catch-up gated instead of clearing over
 # outcomes a later drain would present again.
 print_branch_outcomes_section() {
-  local config rows through captain routine line seq task task_line target i
+  local config rows through captain routine line seq task continuation task_line target i lookup
   local text='' used=0 shown=0 held=0 bytes item_bytes=600 captain_bytes=4000 routine_bytes=2000
   local routine_lines='' routine_count=0 routine_shown=0
   local -a captain_tasks=() captain_lines=() captain_line_bytes=()
@@ -646,8 +646,9 @@ print_branch_outcomes_section() {
     || ! captain=$(printf '%s\n' "$rows" | jq -rs '
       map(select(.verdict == "captain")) | sort_by(.seq)
       | reduce .[] as $r ({count: {}, lines: []};
-          .count[$r.task] += 1
-          | .lines += ["\($r.seq)\t\($r.task)\t[seq \($r.seq)\(if .count[$r.task] > 1 then ", newest of \(.count[$r.task]) for this task" else "" end), recorded \($r.recordedAgo) ago] \($r.task): \($r.summary | gsub("[\t\n\r]"; " "))\(if $r.continuation then "; MAIN continuation handoff: \($r.continuation | gsub("[\t\n\r]"; " "))" else "" end)"])
+          ([$r.task, (if $r.continuation then $r.seq else null end)] | tojson) as $key
+          | .count[$key] += 1
+          | .lines += ["\($r.seq)\t\($key)\t\($r.continuation != null)\t[seq \($r.seq)\(if .count[$key] > 1 then ", newest of \(.count[$key]) for this task" else "" end), recorded \($r.recordedAgo) ago] \($r.task): \($r.summary | gsub("[\t\n\r]"; " "))\(if $r.continuation then "; MAIN continuation handoff: \($r.continuation | gsub("[\t\n\r]"; " "))" else "" end)"])
       | .lines[]' 2>/dev/null) \
     || ! routine=$(printf '%s\n' "$rows" | jq -rs 'map(select(.unread and .verdict == "routine" and .silent != true)) | sort_by(.seq) | reverse | .[]
       | "[seq \(.seq)] \(.task): \(.summary | gsub("[\t\n\r]"; " "))"' 2>/dev/null) \
@@ -657,13 +658,19 @@ print_branch_outcomes_section() {
   fi
 
   target=0
-  while IFS=$(printf '\t') read -r seq task task_line; do
+  while IFS=$(printf '\t') read -r seq task continuation task_line; do
     case "$seq" in ''|*[!0-9]*) continue ;; esac
     if [ "$held" -gt 0 ]; then
       held=$((held + 1))
       continue
     fi
     cap_outcome_line "$task_line" $((item_bytes - 1))
+    if [ "$continuation" = true ] && [ "$OUTCOME_LINE" != "$task_line" ]; then
+      lookup="; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs $seq"
+      cap_outcome_line "$task_line" $((item_bytes - 1 - ${#lookup}))
+      OUTCOME_LINE=$OUTCOME_LINE$lookup
+      OUTCOME_LINE_BYTES=$((OUTCOME_LINE_BYTES + ${#lookup}))
+    fi
     i=0
     while [ "$i" -lt "$shown" ] && [ "${captain_tasks[$i]}" != "$task" ]; do i=$((i + 1)); done
     bytes=$(( used + OUTCOME_LINE_BYTES + 1 ))
@@ -682,7 +689,7 @@ print_branch_outcomes_section() {
 $captain
 ROWS
   if [ "$shown" -gt 0 ]; then
-    text="BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, one line per task, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement):
+    text="BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
 "
     for line in "${captain_lines[@]}"; do
       text="$text$line

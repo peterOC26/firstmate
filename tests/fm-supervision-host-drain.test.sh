@@ -470,7 +470,7 @@ test_branch_outcomes_date_a_legacy_backlog_without_adopting_it() {
     "a days-old captain outcome must say when it was recorded"
   assert_contains "$drained" "[seq 3, recorded 3d ago] beta: beta PR" "every captain outcome must say when it was recorded"
   assert_contains "$drained" "check the task's current state first" "the section must ask main to check the current state before acting"
-  assert_contains "$drained" "your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement" \
+  assert_contains "$drained" "your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement" \
     "the section must keep settled outcomes out of the reply to the captain"
   assert_contains "$drained" "mark-processed --through 3;" "the backlog must still carry its acknowledgement"
   [ -n "$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" unprocessed)" ] \
@@ -572,6 +572,87 @@ test_branch_outcomes_present_continuations_off_pi() {
 }
 
 
+test_branch_outcomes_preserve_older_and_newer_handoffs() {
+  local home drained n
+  home="$TMP_ROOT/drain-continuation-collapse"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  for n in 1 2; do
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "stage $n complete" --continuation "Start authorized step $n." >/dev/null || fail "fixture: handoff"
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "CI note $n" >/dev/null || fail "fixture: plain row"
+  done
+  for n in 1 2; do
+    drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+    assert_contains "$drained" 'MAIN continuation handoff: Start authorized step 1.' "an older handoff must survive newer plain and continuation rows"
+    assert_contains "$drained" 'MAIN continuation handoff: Start authorized step 2.' "a newer handoff must remain independently visible"
+    assert_contains "$drained" 'gamma: CI note 2' "plain rows must still collapse to the newest"
+    assert_not_contains "$drained" 'gamma: CI note 1' "older plain rows must still collapse"
+    assert_contains "$drained" 'mark-processed --through 4;' "the acknowledgement must cover all presented rows"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 4 >/dev/null || fail "acknowledgement refused"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "acknowledged handoffs must stop repeating"
+  pass "drain: every handoff survives per-task collapse until acknowledgement"
+}
+
+test_branch_outcomes_abbreviated_handoffs_lookup_and_boundaries() {
+  local home drained pad n line lookup full bytes summary
+  home="$TMP_ROOT/drain-continuation-cap"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  pad=$(awk 'BEGIN { for (i = 0; i < 700; i++) printf "界" }')
+  for n in 1 2 3 4 5 6 7 8; do
+    summary=$pad
+    [ $((n % 2)) -eq 0 ] || summary="stage complete"
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "$summary" --continuation "$pad Start authorized step $n." >/dev/null || fail "fixture: long handoff"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'later CI note' >/dev/null || fail "fixture: later plain row"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  bytes=$(printf '%s\n' "$drained" | sed -n '/^\[seq /p' | wc -c)
+  [ "$bytes" -le 4000 ] || fail "captain rows exceeded byte budget"
+  for n in 1 2 3 4 5 6; do
+    line=$(printf '%s\n' "$drained" | sed -n "/^\[seq $n,/p")
+    bytes=$(printf '%s\n' "$line" | wc -c)
+    [ "$bytes" -le 600 ] || fail "handoff exceeded line budget"
+    assert_contains "$line" '[truncated]' "long handoff must be abbreviated"
+    lookup=${line##*full MAIN continuation handoff: }
+    [ "$lookup" = "bin/fm-branch-outcome.sh lookup --seqs $n" ] || fail "missing actionable lookup: $line"
+    full=$(cd "$ROOT" && FM_HOME="$home" bash -c "$lookup") || fail "emitted lookup failed"
+    [ "$(printf '%s\n' "$full" | jq -r '.continuation')" = "$pad Start authorized step $n." ] || fail "lookup lost full handoff"
+  done
+  assert_contains "$drained" '3 newer captain outcome(s) are held back' "overflow must retain a contiguous acknowledgement boundary"
+  assert_contains "$drained" 'mark-processed --through 6;' "acknowledgement must stop before withheld handoffs"
+  assert_not_contains "$drained" 'later CI note' "a newer plain row must not bypass a withheld handoff"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 6 >/dev/null || fail "acknowledgement refused"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_contains "$drained" 'lookup --seqs 7' "withheld handoff must follow after acknowledgement"
+  assert_contains "$drained" 'lookup --seqs 8' "every withheld handoff must follow"
+  assert_contains "$drained" 'later CI note' "withheld plain row must follow"
+  assert_contains "$drained" 'mark-processed --through 9;' "next acknowledgement must cover the remainder"
+  pass "drain: abbreviated handoffs retain executable full lookups and contiguous byte bounds"
+}
+
+test_branch_outcomes_emit_continuation_processing_duty() {
+  local home drained
+  home="$TMP_ROOT/drain-continuation-duty"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'stage complete' --continuation 'Start authorized validation.' >/dev/null || fail "fixture: handoff"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_contains "$drained" 'reconcile current task/stage state and existing authority' "emitted processing instruction must reconcile authority"
+  assert_contains "$drained" 'start the authorized spawn, steer, or handoff before acknowledging' "emitted processing instruction must require action"
+  assert_contains "$drained" 'if already started, do not duplicate it' "emitted processing instruction must prevent duplicate work"
+  assert_contains "$drained" 'Record the actual blocker, decision, or evidence that no further action is needed' "emitted processing instruction must require evidence when unable to advance"
+  assert_contains "$drained" 'read the full outcome using its lookup --seqs command before acting or acknowledging' "emitted processing instruction must require reading abbreviated handoffs"
+  pass "drain: delivered processing instructions require continuation handling before acknowledgement"
+}
+
+
 # The state a legacy backlog shares with a freshly opted-in home: no read
 # cursor, no processed marker, and a captain outcome nothing has shown yet. Any
 # cutover skip keyed on those markers would drop this first outcome; it must be
@@ -646,6 +727,9 @@ fm_test_run \
   test_branch_ack_keeps_older_keyed_decision_open \
   test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi \
   test_branch_outcomes_present_continuations_off_pi \
+  test_branch_outcomes_preserve_older_and_newer_handoffs \
+  test_branch_outcomes_abbreviated_handoffs_lookup_and_boundaries \
+  test_branch_outcomes_emit_continuation_processing_duty \
   test_branch_outcomes_keep_an_unshown_outcome_until_acknowledged \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_a_switch_to_pi \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_an_index_repair
