@@ -1,0 +1,17 @@
+{
+  "base": {
+    "exit": 0,
+    "stdout": "FM_TEST_COVERAGE ok total=334 parallel=26 parallel_max_ms=814249 parallel_imbalance_ms=552 parallel_unhinted=0 serial=292 serial_shards=12 serial_unhinted=43 serial_max_ms=1105445 serial_budget_ms=1200000 herdr=16\n",
+    "stderr": ""
+  },
+  "relocated_pi_lane2_listing": {
+    "exit": 0,
+    "stdout": "tests/fm-pi-primary-types.test.sh\ntests/fm-pr-merge.test.sh\ntests/fm-backend-t3code.test.sh\ntests/fm-x-mode.test.sh\ntests/fm-herdr-lab.test.sh\ntests/fm-review-diff.test.sh\ntests/fm-grok-harness.test.sh\ntests/fm-send-settle.test.sh\ntests/fm-supervision-instructions.test.sh\ntests/fm-ensure-agents-md.test.sh\n",
+    "stderr": ""
+  },
+  "relocated_pi_guard": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "fm-test-run: coverage guard: tests/fm-pi-primary-types.test.sh must stay in portable-parallel-1\n"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "experiment": "Current measured timings with former twelve-shard packing",
+  "exit": 1,
+  "stdout": "",
+  "stderr": "fm-test-run: coverage guard: largest portable serial shard packs 1474182ms above the 1200000ms target\nfm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md\n"
+}
