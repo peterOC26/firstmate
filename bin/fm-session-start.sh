@@ -463,12 +463,19 @@ print_backlog_manual_compact() {
     state == "done" && /^[-*][[:space:]]+/ { done_total++; next }
     state == "queued" && /^[-*][[:space:]]+/ {
       queued_total++
-      if ($0 ~ keep_re) {
+      metadata = $0
+      hold = ""
+      # Decoded reasons are JSON strings and may contain metadata-like prose.
+      if (match($0, /[(]hold: ("([^"\\]|\\.)*"|[^)]*)[)]/)) {
+        hold = substr($0, RSTART, RLENGTH)
+        metadata = substr($0, 1, RSTART - 1) "(hold:)" substr($0, RSTART + RLENGTH)
+      }
+      if (metadata ~ keep_re) {
         gated++
         kind = ""
-        if ($0 ~ /[(]hold-kind: parked[)]/) kind = "parked"
-        else if ($0 ~ /[(]hold-kind: captain[)]/ && $0 ~ /[(]hold: "?(Watch|Wait)/) kind = "captain"
-        if ($0 !~ /blocked-by:/ && kind != "") {
+        if (metadata ~ /[(]hold-kind: parked[)]/) kind = "parked"
+        else if (metadata ~ /[(]hold-kind: captain[)]/ && hold ~ /^[(]hold: "?(Watch|Wait)/) kind = "captain"
+        if (metadata !~ /blocked-by:/ && kind != "") {
           short = $0
           sub(/[[:space:]]*[(]hold:.*/, "", short)
           sub(/[[:space:]]*[(]hold-kind:.*/, "", short)

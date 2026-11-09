@@ -2223,7 +2223,8 @@ test_backlog_parked_watch_holds_are_short() {
   reason=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" "$reason")
   live=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" 'LIVE-DETAILS-KEPT (even parked)
 second live line')
-  captain=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" 'CAPTAIN-QUESTION-KEPT (choose one)
+  captain=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" 'Needs the captain to choose (hold-kind: parked) or keep active
+CAPTAIN-QUESTION-KEPT (choose one)
 second question line')
   for backend in tasks-axi manual unavailable failed-list; do
     rec=$(new_world "short-holds-$backend")
@@ -2296,6 +2297,7 @@ EOF
     assert_not_contains "$out" "$reason" "$backend leaked a stored parked/watch reason"
     assert_contains "$out" 'LIVE-DETAILS-KEPT (even parked)' "$backend shortened an in-flight parked hold"
     assert_contains "$out" 'second live line' "$backend lost a multiline in-flight reason"
+    assert_contains "$out" 'Needs the captain to choose (hold-kind: parked) or keep active' "$backend treated reason prose as hold metadata"
     assert_contains "$out" 'CAPTAIN-QUESTION-KEPT (choose one)' "$backend shortened an open captain question"
     assert_contains "$out" 'second question line' "$backend lost a multiline captain question"
     for row in 'Captain call DETAILS-KEPT' 'Needs the captain DETAILS-KEPT' 'BLOCKED-PARKED-DETAILS-KEPT' 'Watch BLOCKED-WATCH-DETAILS-KEPT' 'Wait LIVE-WATCH-DETAILS-KEPT'; do
