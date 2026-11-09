@@ -1,0 +1,998 @@
+[
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lo4adnbwn"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lo4adnbwn\n"
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lo4adnbwn/tmux/tmux-1000/fm-lab,1968142,0\n"
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "state": "empty recovery retired while watcher remains live",
+    "files": {
+      ".watcher-down": "acked:downtime:1969473.1794232371.Ra5QHj\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": ""
+    }
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "result": "pass"
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "bin/fm-watch-arm.sh",
+      "--stop"
+    ],
+    "exit": 0,
+    "output": "watcher: stopped pid=1969569\n"
+  },
+  {
+    "scenario": "settled-empty-no-wake",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l2nodiqp_"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l2nodiqp_\n"
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l2nodiqp_/tmux/tmux-1000/fm-lab,1972087,0\n"
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "state": "no-cursor retained recovery and emitted main wake",
+    "files": {
+      ".watcher-down": "announced:downtime:1972102.1794232375.jpyktd\n",
+      ".wake-queue": ""
+    }
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "result": "pass"
+  },
+  {
+    "scenario": "uncertain-recovery--no-cursor",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l5mqj4_4r"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l5mqj4_4r\n"
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l5mqj4_4r/tmux/tmux-1000/fm-lab,1973397,0\n"
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "state": "unread-status retained recovery and emitted main wake",
+    "files": {
+      ".watcher-down": "announced:downtime:1973406.1794232376.xzh7jS\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": ""
+    }
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "result": "pass"
+  },
+  {
+    "scenario": "uncertain-recovery--unread-status",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ljtr5ak14"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ljtr5ak14\n"
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ljtr5ak14/tmux/tmux-1000/fm-lab,1974530,0\n"
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ndemo [key=capacity] blocked: no capacity\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\nOPEN DECISIONS: <key> is the [key=...] printed before the verb; a token inside a note is prose, not a key.\n"
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "state": "open-decision retained recovery and emitted main wake",
+    "files": {
+      ".watcher-down": "announced:downtime:1975514.1794232379.6Deuho\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647277:2026-11-09 14:52:57.110940527 +0100\t0\t0\n"
+    }
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "result": "pass"
+  },
+  {
+    "scenario": "uncertain-recovery--open-decision",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l8irs6liv"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l8irs6liv\n"
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l8irs6liv/tmux/tmux-1000/fm-lab,1976521,0\n"
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "bin/fm-branch-outcome.sh",
+      "append",
+      "--task",
+      "demo",
+      "--verdict",
+      "captain",
+      "--summary",
+      "choose deployment window"
+    ],
+    "exit": 0,
+    "output": "1\n"
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "bin/fm-branch-outcome.sh",
+      "mark-read",
+      "--through",
+      "1"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "state": "unprocessed-outcome retained recovery and emitted main wake",
+    "files": {
+      ".watcher-down": "announced:downtime:1976893.1794232380.nJ6IfQ\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": ""
+    }
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "result": "pass"
+  },
+  {
+    "scenario": "uncertain-recovery--unprocessed-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lx3ng74hz"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lx3ng74hz\n"
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lx3ng74hz/tmux/tmux-1000/fm-lab,1977844,0\n"
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "state": "corrupt-outcome retained recovery and emitted main wake",
+    "files": {
+      ".watcher-down": "announced:downtime:1977866.1794232381.OCMgwY\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": ""
+    }
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "result": "pass"
+  },
+  {
+    "scenario": "uncertain-recovery--corrupt-outcome",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ldhc_5zw1"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ldhc_5zw1\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ldhc_5zw1/tmux/tmux-1000/fm-lab,1978646,0\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "1794232383\t2\tsignal\tdemo.status\tsignal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ldhc_5zw1/state/demo.status\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 1978692.1794232383.UKTpkI\nwake annotation: latest wake-EVENT observed at drain, not current state: demo.status: note: deployment failed and stopped\nUNREAD STATUS (new since last drain, not re-printed after this presentation):\ndemo note: deployment failed and stopped\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-wake-drain.sh",
+      "--ack-through",
+      "2",
+      "--recovery-generation",
+      "1978692.1794232383.UKTpkI"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 1980759.1794232386.Rbj2H1\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "node",
+      "bin/fm-branch-dispatch.mjs",
+      "recovery-settled"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "state": "before watcher close",
+    "files": {
+      ".watcher-down": "announced:handling:1980759.1794232386.Rbj2H1\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647276:2026-11-09 14:53:02.559286631 +0100\t36\t0\n"
+    }
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-watch-arm.sh",
+      "--stop"
+    ],
+    "exit": 0,
+    "output": "watcher: stopped pid=1982171\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "state": "after watcher close",
+    "files": {
+      ".watcher-down": "pending:interrupted:1980759.1794232386.Rbj2H1\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647276:2026-11-09 14:53:02.559286631 +0100\t36\t0\n"
+    }
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "state": "presentation alone cannot settle interrupted handling",
+    "files": {
+      ".watcher-down": "announced:interrupted:1980759.1794232386.Rbj2H1\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647276:2026-11-09 14:53:02.559286631 +0100\t36\t0\n"
+    }
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 1980759.1794232386.Rbj2H1\n"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "bin/fm-wake-drain.sh",
+      "--ack-through",
+      "0",
+      "--recovery-generation",
+      "1980759.1794232386.Rbj2H1"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "state": "only generation-bound post-handling acknowledgement retires recovery",
+    "files": {
+      ".watcher-down": "acked:handling:1980759.1794232386.Rbj2H1\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647276:2026-11-09 14:53:02.559286631 +0100\t36\t0\n"
+    }
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "result": "pass"
+  },
+  {
+    "scenario": "interrupted-handling-needs-ack",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l86yy2lau"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l86yy2lau\n"
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.l86yy2lau/tmux/tmux-1000/fm-lab,1986229,0\n"
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "UNREAD STATUS (new since last drain, not re-printed after this presentation):\ndemo note: deployment probe complete\n"
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "state": "remote parent channel excluded while local status is presented",
+    "files": {
+      ".watcher-down": "acked:downtime:1987084.1794232396.PxUc5T\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647279:2026-11-09 14:53:14.288031689 +0100\t32\t0\n"
+    }
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "bin/fm-watch-arm.sh",
+      "--stop"
+    ],
+    "exit": 0,
+    "output": "watcher: stopped pid=1987147\n"
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_recovery_marker_publish \"$STATE/.watcher-down\" downtime"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "state": "new local failure remains recoverable",
+    "files": {
+      ".watcher-down": "announced:downtime:1987147.1794232397.PEgEt5\n",
+      ".wake-queue": "",
+      ".status-presentation-cursor": "demo\tstrong:65028:18647279:2026-11-09 14:53:14.288031689 +0100\t32\t0\n"
+    }
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "result": "pass"
+  },
+  {
+    "scenario": "remote-parent-channel-exclusion",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lnbg1on92"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lnbg1on92\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "new-session",
+      "-d",
+      "-s",
+      "watcher-lab",
+      "-x",
+      "120",
+      "-y",
+      "36",
+      "-c",
+      "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA",
+      "bash"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "display-message",
+      "-p",
+      "#{socket_path},#{pid},0"
+    ],
+    "exit": 0,
+    "output": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lnbg1on92/tmux/tmux-1000/fm-lab,1988683,0\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_wake_append signal demo.status \"signal: $STATE/demo.status\"; fm_wake_append check merge \"check: merge landed: manual check\""
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "node",
+      "bin/fm-branch-dispatch.mjs",
+      "offer"
+    ],
+    "exit": 0,
+    "output": "eligible=1\nstatus=safe\ncorrupted=0\nrows=1\ntasks=demo\nunscoped=0\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "node",
+      "bin/fm-branch-dispatch.mjs",
+      "offer"
+    ],
+    "exit": 0,
+    "output": "eligible=0\nstatus=safe\ncorrupted=0\nrows=1\ntasks=demo\nunscoped=0\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "node",
+      "--input-type=module",
+      "-e",
+      "import {branchOfferForWake} from \"./.pi/extensions/lib/fm-branch-dispatch.ts\"; for(const afk of [false,true]) console.log(JSON.stringify({afk,...branchOfferForWake(process.env.FM_HOME+\"/state\",\"check: rearm-resurface\",afk)}));"
+    ],
+    "exit": 0,
+    "output": "{\"afk\":false,\"scope\":{\"status\":\"safe\",\"eligible\":true,\"projects\":[\"demo\"],\"eligibleSeqs\":[\"1\"],\"eligibleTasks\":[\"demo\"],\"corrupted\":false,\"needsDecisionKeys\":[],\"checkSeqs\":[],\"heartbeatSeqs\":[],\"taskByWakeKey\":{\"demo\":\"demo\",\"demo.status\":\"demo\",\"demo.turn-ended\":\"demo\",\"fm-demo\":\"demo\"}},\"heartbeat\":false,\"eligible\":false,\"awayOnly\":false}\n{\"afk\":true,\"scope\":{\"status\":\"safe\",\"eligible\":true,\"projects\":[\"demo\"],\"eligibleSeqs\":[\"1\",\"2\"],\"eligibleTasks\":[\"demo\"],\"corrupted\":false,\"needsDecisionKeys\":[],\"checkSeqs\":[\"2\"],\"heartbeatSeqs\":[],\"taskByWakeKey\":{\"demo\":\"demo\",\"demo.status\":\"demo\",\"demo.turn-ended\":\"demo\",\"fm-demo\":\"demo\"}},\"heartbeat\":false,\"eligible\":true,\"awayOnly\":true}\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-wake-grant.sh",
+      "activate",
+      "1968111",
+      "live-scope"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-wake-grant.sh",
+      "publish",
+      "live-scope",
+      "1"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-wake-drain.sh"
+    ],
+    "exit": 0,
+    "output": "1794232398\t1\tsignal\tdemo.status\tsignal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.lnbg1on92/state/demo.status\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 1988687.1794232398.5Y2k0u\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-wake-drain.sh",
+      "--ack-through",
+      "2",
+      "--recovery-generation",
+      "1988687.1794232398.5Y2k0u"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "state": "branch ack preserves original main-owned row 2",
+    "files": {
+      ".watcher-down": "pending:handling:1988687.1794232398.5Y2k0u\n",
+      ".wake-queue": "1794232398\t2\tcheck\tmerge\tcheck: merge landed: manual check\n"
+    }
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bin/fm-wake-grant.sh",
+      "deactivate",
+      "1968111",
+      "live-scope"
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "bash",
+      "-c",
+      ". bin/fm-wake-lib.sh; fm_wake_append signal demo.status \"signal: $STATE/demo.status\""
+    ],
+    "exit": 0,
+    "output": ""
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "node",
+      "bin/fm-branch-dispatch.mjs",
+      "offer"
+    ],
+    "exit": 0,
+    "output": "eligible=0\nstatus=unsafe\ncorrupted=0\nrows=\ntasks=\nunscoped=0\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "node",
+      "bin/fm-branch-dispatch.mjs",
+      "offer",
+      "--afk"
+    ],
+    "exit": 0,
+    "output": "eligible=0\nstatus=unsafe\ncorrupted=1\nrows=\ntasks=\nunscoped=0\n"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "result": "pass"
+  },
+  {
+    "scenario": "host-only-scope-and-actor-grants",
+    "command": [
+      "tmux",
+      "-L",
+      "fm-lab",
+      "kill-server"
+    ],
+    "exit": 0,
+    "output": ""
+  }
+]

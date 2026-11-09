@@ -1,0 +1,2 @@
+watcher: started pid=1978692 (beacon fresh)
+signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M707ZYJDNYM24B7YH8M5C8GA/.ldhc_5zw1/state/demo.status
