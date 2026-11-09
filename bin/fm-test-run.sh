@@ -605,6 +605,7 @@ portable_parallel_lane_weight() {
 
 # Portable parallel shard 1: LPT balance of the proven-isolated set over the
 # hints above. Stored order agrees with this lane's --list-scheduled output.
+# tests/fm-pi-primary-types.test.sh runs the production-consumer typecheck here.
 list_portable_parallel_1() {
   cat <<'EOF'
 tests/fm-captain-hold-lifecycle.test.sh
@@ -1176,6 +1177,12 @@ run_coverage_guard() {
     cat "$tmp/p$parallel_i" >>"$tmp/parallel_raw"
     parallel_i=$((parallel_i + 1))
   done
+
+  if ! grep -Fxq 'tests/fm-pi-primary-types.test.sh' "$tmp/p1"; then
+    log "coverage guard: tests/fm-pi-primary-types.test.sh must stay in portable-parallel-1"
+    rm -rf "$tmp"
+    return 1
+  fi
 
   LC_ALL=C sort "$tmp/parallel_raw" | uniq -d >"$tmp/shard_dups"
   if [ -s "$tmp/shard_dups" ]; then
