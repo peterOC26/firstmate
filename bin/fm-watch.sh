@@ -3770,6 +3770,9 @@ if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
 elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
 fi
+# The arm check exposes the exact token only for a valid pending generation.
+WATCHER_RECOVERY_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+
 # Side-band ledger publication, detached from the poll loop.
 #
 # The poll loop owns the liveness beacon below, and fm-guard.sh reads that
@@ -3885,6 +3888,13 @@ resurface_after_downtime() {
       exit 1
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
+    WATCHER_RECOVERY_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+  fi
+  if fm_recovery_marker_settle_empty "$WATCHER_DOWNTIME_MARKER" "$WATCHER_RECOVERY_TOKEN" \
+    node "$SCRIPT_DIR/fm-branch-dispatch.mjs" recovery-settled; then
+    WATCHER_RECOVERY_PENDING=0
+    WATCHER_RECOVERY_TOKEN=
+    return 0
   fi
   wake "check: rearm-resurface"
 }

@@ -96,8 +96,9 @@ A successful row grant transfers ownership of exactly the currently branch-eligi
 
 What is never offered, or falls back to main:
 
-- While attended, a check-kind triggering close is never offered, even when other rows are eligible.
-  Check-kind closes are merge-confirmation polls, Relay mentions, credential/auth failures, and every other legitimately main-only class.
+- While attended, a check-kind triggering close stays on main, except `check: rearm-resurface`, which offers only its original eligible task rows with their existing sequence ids and task scope.
+  Merge-confirmation polls, Relay mentions, credential/auth failures and decision-owned rows remain main-owned.
+  An empty recovery grants nothing; deterministic settlement is owned by [watcher continuity](watcher-continuity.md#empty-settlement).
 - When a triggering close has no acceptor (extension absent, branch broken), it keeps today's wake-to-main path.
 - Watcher-failure alarms always go to main, because only main can repair the watcher cycle.
 

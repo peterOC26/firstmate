@@ -370,6 +370,33 @@ function spanIsDecisionOwned(
   return false;
 }
 
+// Read-only evidence for the watcher's generation-bound empty recovery
+// settlement. A missing presentation cursor is uncertainty, never proof that
+// an interrupted turn finished. Outcome-store validation stays with its owner.
+export function recoveryStatusSettled(state: string): boolean {
+  try {
+    const cursor = readPresentationCursor(state);
+    if (!cursor) return false;
+    const resolveVerb = process.env.FM_CLASSIFY_RESOLVE_VERB || "resolved";
+    const heldVerb = process.env.FM_CLASSIFY_CAPTAIN_HELD_VERB || "captain-held";
+    const reserved = (process.env.FM_CLASSIFY_RESERVED_KEY_PREFIXES || "pending-reply-").split(/\s+/).filter(Boolean);
+    for (const name of readdirSync(state)) {
+      if (name.startsWith(".") || !name.endsWith(".status")) continue;
+      const file = join(state, name);
+      if (!lstatSync(file).isFile()) return false;
+      const version = statusFileVersion(file);
+      const contents = readFileSync(file);
+      const presented = cursor.get(name.slice(0, -7));
+      if (!presented || presented.ident !== statusFileIdentity(file) || presented.offset !== contents.length) return false;
+      if (openDecisions(nonBlankLines(contents.toString("utf8")), resolveVerb, heldVerb, reserved).size > 0) return false;
+      if (version !== statusFileVersion(file)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = false, attendedHost = false): UnreadWakeScope {
   let queue = "";
   try {
@@ -589,6 +616,9 @@ export interface BranchOfferVerdict {
 // host off Pi (bin/fm-branch-dispatch.mjs offer) both route through this one
 // owner, so a close reaches main off Pi exactly when it would on Pi.
 //
+// A recovery close offers the original eligible rows, with their exact task
+// scope and sequence ids; it never grants the synthetic check or main-owned
+// rows. An empty recovery is not a branch turn.
 // A check-kind close (merge-confirmation polls, Relay mentions,
 // credential/auth failures, and every other legitimately main-only class -
 // docs/pi-supervision-branch.md) is never routed to the branch while attended,
@@ -610,8 +640,9 @@ export interface BranchOfferVerdict {
 // (scopeForUnreadWake owns the per-row rule).
 export function branchOfferForWake(state: string, message: string, afk: boolean, attendedHost = false): BranchOfferVerdict {
   const heartbeat = /^heartbeat($|:)/.test(message);
-  const isCheckTrigger = /^check:/.test(message);
-  const scope = scopeForUnreadWake(state, heartbeat, afk, attendedHost && !afk);
+  const isRecoveryTrigger = message === "check: rearm-resurface";
+  const isCheckTrigger = /^check:/.test(message) && !isRecoveryTrigger;
+  const scope = scopeForUnreadWake(state, heartbeat, afk, (attendedHost || isRecoveryTrigger) && !afk);
   const triggerKeys = /^signal:/.test(message)
     ? message
       .slice("signal:".length)
@@ -626,7 +657,7 @@ export function branchOfferForWake(state: string, message: string, afk: boolean,
   const needsDecisionTasks = new Set(scope.needsDecisionKeys.map(taskIdentity));
   const isNeedsDecisionTrigger = triggerKeys.some((key) => needsDecisionTasks.has(taskIdentity(key)));
   const attendedEligible = !isCheckTrigger && !isNeedsDecisionTrigger && (
-    afk ? scopeForUnreadWake(state, heartbeat, false).eligible : scope.eligible
+    afk ? scopeForUnreadWake(state, heartbeat, false, isRecoveryTrigger).eligible : scope.eligible
   );
   const eligible = afk ? scope.eligible : attendedEligible;
   return { scope, heartbeat, eligible, awayOnly: Boolean(eligible && !attendedEligible) };

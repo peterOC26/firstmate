@@ -585,7 +585,94 @@ test_branch_outcomes_keep_a_drain_presented_outcome_across_an_index_repair() {
   pass "drain: an outcome the host drain presented but main never acknowledged survives an outcome index repair"
 }
 
+test_recovery_offer_preserves_original_task_scope() {
+  local home state out
+  home="$TMP_ROOT/recovery-offer"; state="$home/state"
+  mkdir -p "$state"
+  printf 'project=demo\nwindow=fm-demo\n' > "$state/demo.meta"
+  append_wake "$state" signal demo.status "signal: $state/demo.status"
+  append_wake "$state" check merge "check: merge landed: fixture"
+  out=$(printf 'check: rearm-resurface\n' | FM_HOME="$home" node "$DISPATCH" offer)
+  assert_contains "$out" 'eligible=1' "recovery must offer original eligible rows"
+  assert_contains "$out" 'rows=1' "recovery must preserve sequence ids"
+  assert_contains "$out" 'tasks=demo' "recovery must preserve exact task scope"
+  assert_contains "$out" 'unscoped=0' "recovery must not grant arbitrary checks"
+  printf 'needs-decision [key=choice]: choose\n' > "$state/demo.status"
+  out=$(printf 'check: rearm-resurface\n' | FM_HOME="$home" node "$DISPATCH" offer)
+  assert_contains "$out" 'eligible=0' "an open decision must remain main-owned during recovery"
+  out=$(FM_HOME="$home" node --input-type=module - "$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" "$state" <<'JS'
+import { pathToFileURL } from "node:url";
+const dispatch = await import(pathToFileURL(process.argv[2]).href);
+const verdict = dispatch.branchOfferForWake(process.argv[3], "check: rearm-resurface", false);
+if (verdict.eligible) throw new Error("Pi recovery offered an open decision");
+const away = dispatch.branchOfferForWake(process.argv[3], "check: rearm-resurface", true);
+if (!away.eligible || !away.awayOnly) throw new Error("away recovery lost its authority partition");
+console.log("pi-recovery-scope=ok");
+JS
+  ) || fail "Pi recovery did not preserve the decision partition"
+  assert_contains "$out" 'pi-recovery-scope=ok' "Pi must apply the same recovery scope"
+  printf 'corrupt\n' >> "$state/.wake-queue"
+  out=$(printf 'check: rearm-resurface\n' | FM_HOME="$home" node "$DISPATCH" offer --afk)
+  assert_contains "$out" 'eligible=0' "corrupt recovery must reach main in both postures"
+  pass "recovery offers original task rows without broadening authority"
+}
+
+# Exercise the real generation transition and read-only checker together.
+test_empty_recovery_settlement_requires_positive_evidence() {
+  local home state
+  home="$TMP_ROOT/recovery-empty"; state="$home/state"
+  mkdir -p "$state"
+  FM_HOME="$home" bash -s "$ROOT" <<'SH' || fail "empty recovery settlement failed"
+set -eu
+root=$1
+. "$root/bin/fm-wake-lib.sh"
+. "$root/bin/fm-classify-lib.sh"
+: > "$FM_WAKE_QUEUE"
+fm_recovery_marker_publish "$STATE/.watcher-down" downtime
+fm_recovery_marker_arm_check "$STATE/.watcher-down"
+token=$FM_RECOVERY_MARKER_TOKEN
+checker="$root/bin/fm-branch-dispatch.mjs"
+settle() { fm_recovery_marker_settle_empty "$STATE/.watcher-down" "$token" node "$checker" recovery-settled; }
+! settle # No presentation cursor is not proof of completed handling.
+: > "$STATE/.status-presentation-cursor"
+printf 'blocked [key=old]: capacity unavailable\nworking: newer prose\n' > "$STATE/demo.status"
+! settle
+snapshot=$(status_presentation_snapshot "$STATE")
+status_commit_presentation_snapshot "$STATE" "$snapshot"
+! settle # Even a presented, buried open blocker remains unresolved.
+printf 'resolved [key=old]: available\n' >> "$STATE/demo.status"
+! settle # The resolution has not been presented yet.
+snapshot=$(status_presentation_snapshot "$STATE")
+status_commit_presentation_snapshot "$STATE" "$snapshot"
+FM_HOME="$FM_HOME" bash "$root/bin/fm-branch-outcome.sh" append --task demo --verdict captain --summary 'decision pending' >/dev/null
+! settle
+FM_HOME="$FM_HOME" bash "$root/bin/fm-branch-outcome.sh" mark-read --through 1
+! settle # Read is not processed.
+FM_HOME="$FM_HOME" bash "$root/bin/fm-branch-outcome.sh" mark-processed --through 1 >/dev/null
+settle
+[ "$(cat "$STATE/.watcher-down")" = "acked:${token#*:}" ]
+! settle # A consumed token cannot be acknowledged again.
+fm_recovery_marker_publish "$STATE/.watcher-down" downtime
+fm_recovery_marker_arm_check "$STATE/.watcher-down"
+next=$FM_RECOVERY_MARKER_TOKEN
+! settle # A stale token cannot retire the newer, otherwise-settled generation.
+[ "$(cat "$STATE/.watcher-down")" = "$next" ]
+token=$next
+store=$(cat "$STATE/branch-outcomes.jsonl")
+printf 'broken\n' >> "$STATE/branch-outcomes.jsonl"
+! settle # Corrupt outcome evidence is never an empty result.
+printf '%s\n' "$store" > "$STATE/branch-outcomes.jsonl"
+fm_wake_append check new 'check: a new failure'
+[ -s "$FM_WAKE_QUEUE" ]
+[ "${FM_RECOVERY_MARKER_WRITTEN_TOKEN##*:}" != "${token##*:}" ]
+! settle # A later queued failure is never consumed by empty settlement.
+SH
+  pass "empty recovery requires presented status, closed decisions, processed outcomes and the exact generation"
+}
+
 fm_test_run \
+  test_recovery_offer_preserves_original_task_scope \
+  test_empty_recovery_settlement_requires_positive_evidence \
   test_report_surface_enforces_actor_turn_and_scope \
   test_report_after_the_return_is_queued_for_main \
   test_dispatch_entry_scopes_rows_and_renders_the_away_tail \

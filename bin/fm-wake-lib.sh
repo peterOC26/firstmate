@@ -1049,6 +1049,30 @@ _fm_recovery_marker_begin_handling() {
   fm_lock_release "$lock"
 }
 
+# Retire only the exact announced downtime generation a watcher just found,
+# with no queued row and positive read-only evidence from the supplied checker.
+# Queue and marker locks fence appends; a later append opens a fresh episode.
+# A failed checker or superseded token leaves recovery entirely untouched.
+fm_recovery_marker_settle_empty() {  # <marker> <announced-token> <checker> [args...]
+  local marker=$1 expected=$2 lock rc=1
+  shift 2
+  case "$expected" in announced:downtime:*) ;; *) return 1 ;; esac
+  lock="${marker}.lock"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  if ! fm_lock_acquire_wait "$lock"; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    return 1
+  fi
+  if [ -f "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ] && [ -r "$FM_WAKE_QUEUE" ] \
+    && [ ! -s "$FM_WAKE_QUEUE" ] && fm_recovery_marker_read "$marker" \
+    && [ "$FM_RECOVERY_MARKER_TOKEN" = "$expected" ] && "$@"; then
+    _fm_recovery_marker_write_locked "$marker" downtime "${expected##*:}" acked && rc=0
+  fi
+  fm_lock_release "$lock"
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$rc"
+}
+
 fm_recovery_marker_snapshot() {
   local marker=$1 lock
   FM_RECOVERY_MARKER_TOKEN=

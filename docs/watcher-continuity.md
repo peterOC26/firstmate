@@ -226,7 +226,7 @@ In its `--claude` mode it cooperates with the auto-arm.
 ## Recovery episode acknowledgement
 
 A recovery episode is one generation of the `state/.watcher-down` marker.
-It is retired only by the generation-bound acknowledgement the drain prints as `WAKE_ACK_REQUIRED`.
+It is retired by the generation-bound acknowledgement the drain prints as `WAKE_ACK_REQUIRED`, or by the deterministic empty settlement below.
 The away return brief treats a still-open handling episode as a wake in progress, not watcher downtime; an open downtime episode remains a gap.
 
 ### Announcement
@@ -238,6 +238,13 @@ If an announced-but-unacknowledged episode has an empty queue, the arm leaves th
 If a durable row arrived after the announcement, the arm opens a fresh pending downtime generation so buried work still resurfaces once.
 A Codex foreground checkpoint skips the announced-episode reopen transition, so an already-announced generation stays announced while the checkpoint continues its bounded supervision.
 Its ordinary arm check still announces a never-announced generation, including one made pending by a durable queue append during the checkpoint.
+
+### Empty settlement
+
+Before emitting a recovery close, the watcher may retire that exact announced downtime token under the queue and marker locks when the durable queue is a readable empty regular file.
+The shared dispatcher must also prove that every status byte matches its presentation cursor, no status decision remains open, and the outcome store has no unread or unprocessed record.
+Missing, changed, malformed or unreadable evidence preserves the recovery wake; settlement consumes no queue rows or outcomes and a later append opens a fresh generation.
+`tests/fm-supervision-host-drain.test.sh` exercises the generation guard and evidence refusals; `tests/fm-supervision-host.test.sh` proves that settled recovery uses no engine turn and leaves supervision live.
 
 ### Generation reuse
 
@@ -264,7 +271,8 @@ It is a non-fatal result that names its own remedy: re-drain, then acknowledge t
 
 The acknowledgement retires the marker only when no rows remain after sequence-bound consumption.
 A concurrently appended wake has a higher sequence, remains queued, and keeps the episode pending for presentation.
-Consequently, a watcher close during handling republishes the same generation as pending and forces one recovery turn even when no queue row remains, while the outstanding generation-bound acknowledgement stays valid.
+Consequently, a watcher close during handling republishes the same generation as pending, while the outstanding generation-bound acknowledgement stays valid.
+An empty episode still requires recovery unless it passes the empty-settlement proof above.
 An acknowledged episode does not freeze the generation, because the next downtime after it opens an episode of its own.
 
 ## Per-actor acknowledgement
