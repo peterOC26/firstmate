@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # fm-supervise-daemon.sh — presence-gated sub-supervisor (closes #27's P2).
 #
-# Wraps bin/fm-watch.sh: runs it as a child, presents and classifies every
-# durable wake after an actionable close, acknowledges only after routing, and
+# Wraps bin/fm-watch.sh: runs it as a child, presents and classifies ordinary
+# durable wakes after an actionable close, acknowledges only after routing, and
 # either SELF-HANDLES the routine majority in bash (no firstmate turn) or
 # ESCALATES a batched, distilled digest to the supervisor endpoint on
 # captain-relevant events plus bounded declared-wait rechecks. This is the
@@ -19,10 +19,15 @@
 # the /afk skill sets that flag and starts this daemon; any real (unmarked)
 # user message clears it and firstmate resumes full responsiveness.
 # When afk is off, normal fm-watch.sh always-on triage is the active mechanism.
-# In away mode, a queued captain inbox note hands supervision back to main for the return.
-# It bypasses classification and acknowledgement, and retries the existing
-# guarded injection on housekeeping ticks until submission is confirmed.
+# In away mode, a queued captain inbox note hands supervision back to main for
+# the return; quiet mode keeps ordinary routing. The entire batch bypasses
+# classification and acknowledgement. Watcher restarts and other housekeeping
+# stand aside while the note stays queued, even after delivery is confirmed;
+# housekeeping ticks retry the guarded injection until confirmation.
 # Only confirmed delivery marks the inbox key surfaced; main keeps its row.
+# The return digest carries the short return signal and a full-text pointer
+# for accompanying events, so the byte bound cannot omit the return signal.
+# An already-frozen submission is retried unchanged before that return digest.
 # Any buffered daemon escalations that remain while afk is off survive in
 # state/.subsuper-escalations and are flushed on the next "while you were out"
 # catch-up or when afk is re-entered.

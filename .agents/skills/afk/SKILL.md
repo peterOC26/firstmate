@@ -69,7 +69,7 @@ Hold-for-return is the default and the only reach profile this release records: 
 - On Pi, [Postures](../../../docs/pi-supervision-branch.md#postures) owns wake routing and [Authority relocation](../../../docs/pi-supervision-branch.md#authority-relocation) owns the merge, fresh-spawn, relaunch, spend-cap, and decision-answer gates.
 - On a non-Pi home that runs the supervision host, the host's engine is that branch under the same rules.
   A wake it hands back reaches main through that harness's own wake path (`Stop hook feedback` on Claude, a `watcher` follow-up on Cursor, OpenCode, and omp, the arm's background-task-completed notification on Grok, the checkpoint's output on Codex) with a `supervision-host:` line.
-  Handle that wake under the away posture, because it is automatic supervision and not the captain's return, unless the line says the captain sent a note and away mode should end, or main's own drain presents a captain inbox note row while the away record exists ("How to exit: the return" below; the [supervision protocol](../../../docs/supervision-protocols/supervision-host.md) is what main reads on the wake).
+  Apply [the return policy below](#how-to-exit-the-return) to that wake; the [supervision protocol](../../../docs/supervision-protocols/supervision-host.md) is what main reads on delivery.
 - The session-start digest reports the posture under its AFK subsection, so a restart re-enters the posture from the record, not from memory.
 
 ## How to exit: the return
@@ -176,7 +176,7 @@ The daemon still clears its buffer only on the backend's `empty` success verdict
 
 ### Classification policy
 
-Captain inbox notes bypass classification under [the return rule above](#how-to-exit-the-return); `bin/fm-supervise-daemon.sh` owns the hand-back mechanics.
+In away mode, captain inbox notes bypass classification under [the return rule above](#how-to-exit-the-return); `bin/fm-supervise-daemon.sh` owns the hand-back mechanics.
 For other wakes, the daemon wraps `fm-watch.sh`, runs the watcher as a child, presents durable wakes after each actionable watcher close, classifies each presented record in bash, and acknowledges the presented generation only after routing completes.
 It self-handles the routine majority without consuming a firstmate turn.
 Events selected by the routing below escalate to firstmate's context as one pre-read, single-line, batched digest.
