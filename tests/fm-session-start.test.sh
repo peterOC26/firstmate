@@ -186,16 +186,24 @@ case "${1:-}" in
       *'--state held'*)
         if [ "${FM_FAKE_SHORT_HOLDS:-}" = fail ]; then exit 9; fi
         if [ "${FM_FAKE_SHORT_HOLDS:-}" = yes ]; then
-          task_header 220
+          task_header 225
           i=1
           while [ "$i" -le 216 ]; do
             kind=parked
-            [ "$i" -gt 108 ] && kind=watch
-            printf '  quiet-%s,queued,ship,firstmate,%s,none,%s,%s\n' "$i" '"Quiet, \"quoted\" job"' "$kind" "$FM_FAKE_SHORT_REASON"
+            [ "$i" -gt 108 ] && kind=captain
+            hold_reason=$FM_FAKE_SHORT_REASON
+            [ "$i" -gt 108 ] && hold_reason=$FM_FAKE_WATCH_REASON
+            [ "$i" -gt 162 ] && hold_reason="Wait $FM_FAKE_SHORT_REASON"
+            printf '  quiet-%s,queued,ship,firstmate,%s,none,%s,%s\n' "$i" '"Quiet, \"quoted\" job"' "$kind" "$hold_reason"
             i=$((i + 1))
           done
           printf '  parked-live,in_flight,ship,firstmate,Live parked job,none,parked,%s\n' "$FM_FAKE_LIVE_REASON"
           printf '  captain-open,queued,ship,firstmate,Open captain question,none,captain,%s\n' "$FM_FAKE_CAPTAIN_REASON"
+          printf '%s\n' '  captain-call,queued,ship,firstmate,Captain call,none,captain,Captain call DETAILS-KEPT'
+          printf '%s\n' '  captain-needs,queued,ship,firstmate,Needs captain,none,captain,Needs the captain DETAILS-KEPT'
+          printf '%s\n' '  blocked-parked,queued,ship,firstmate,Blocked parked job,compact-startup,parked,BLOCKED-PARKED-DETAILS-KEPT'
+          printf '%s\n' '  blocked-watch,queued,ship,firstmate,Blocked watch job,compact-startup,captain,Watch BLOCKED-WATCH-DETAILS-KEPT'
+          printf '%s\n' '  watch-live,in_flight,ship,firstmate,Live watch job,none,captain,Wait LIVE-WATCH-DETAILS-KEPT'
           printf '%s\n' '  external-hold,queued,ship,firstmate,External wait,none,external,EXTERNAL-DETAILS-KEPT'
           printf '%s\n' '  unknown-hold,queued,ship,firstmate,Unknown wait,none,new-kind,UNKNOWN-DETAILS-KEPT'
           list_help
@@ -206,8 +214,9 @@ case "${1:-}" in
         ;;
       *'--state queued'*'--blocked'*)
         if [ "${FM_FAKE_SHORT_HOLDS:-}" = yes ]; then
-          task_header 1
-          printf '  blocked-parked,queued,ship,firstmate,Blocked parked job,compact-startup,parked,%s\n' "$FM_FAKE_SHORT_REASON"
+          task_header 2
+          printf '%s\n' '  blocked-parked,queued,ship,firstmate,Blocked parked job,compact-startup,parked,BLOCKED-PARKED-DETAILS-KEPT'
+          printf '%s\n' '  blocked-watch,queued,ship,firstmate,Blocked watch job,compact-startup,captain,Watch BLOCKED-WATCH-DETAILS-KEPT'
           list_help
           exit 0
         fi
@@ -2067,7 +2076,7 @@ EOF
   out=$(FM_FAKE_TASKS_AXI_LOG="$log" FM_FAKE_TASKS_AXI_READY=3 \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
-  assert_contains "$out" "compact backlog listing (tasks-axi; done rows omitted; in-flight and captain holds kept whole; parked/watch holds shortened; ready queued bounded to 20; task bodies omitted)" \
+  assert_contains "$out" "compact backlog listing (tasks-axi; done rows omitted; in-flight, blocked and other captain holds kept whole; parked/watch holds shortened; ready queued bounded to 20; task bodies omitted)" \
     "compatible tasks-axi backend did not render the compact backlog listing"
   assert_contains "$out" "tasks[1]{id,state,kind,repo,title,blocked_by,hold_kind,hold_reason}:" \
     "tasks-axi compact listing omitted the expected structured field header"
@@ -2155,7 +2164,7 @@ EOF
 
   out=$(FM_SESSION_START_QUEUED_LIMIT=4 run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
-  assert_contains "$out" "compact backlog listing (manual backend; done rows omitted; in-flight and captain holds kept whole; parked/watch holds shortened; other queued bounded to 4; indented task bodies omitted)" \
+  assert_contains "$out" "compact backlog listing (manual backend; done rows omitted; in-flight, blocked and other captain holds kept whole; parked/watch holds shortened; other queued bounded to 4; indented task bodies omitted)" \
     "manual backend did not use compact title-line rendering"
   assert_contains "$out" "## In flight" "manual compact rendering omitted the in-flight section heading"
   assert_contains "$out" "- [ ] compact-startup - Compact startup digest" \
@@ -2205,12 +2214,10 @@ EOF
   pass "unavailable or incompatible tasks-axi falls back to compact manual backlog rendering"
 }
 
-# Large encoded reasons must disappear only from queued parked/watch rows,
-# including the overlapping blocked listing. Exercise the executable with both
-# tasks-axi and each fallback, leaving all task storage unchanged.
 test_backlog_parked_watch_holds_are_short() {
-  local backend rec root task_home fakebin out reason live captain before after row i kind mode
+  local backend rec root task_home fakebin out reason watch hold_reason live captain before after row i kind mode
   reason=$(printf 'QUIET-REASON-OMITTED%.0s' {1..80})
+  watch=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" "Watch $reason")
   reason=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" "$reason")
   live=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" 'LIVE-DETAILS-KEPT (even parked)
 second live line')
@@ -2231,13 +2238,21 @@ EOF
     {
       printf '# Backlog\n\n## In flight\n'
       printf -- '- [ ] parked-live - Live parked job (hold: %s) (hold-kind: parked)\n' "$live"
+      printf '%s\n' '- [ ] watch-live - Live watch job (hold: Wait LIVE-WATCH-DETAILS-KEPT) (hold-kind: captain)'
       printf '\n## Queued\n'
       for ((i=1; i<=216; i++)); do
         kind=parked
-        [ "$i" -gt 108 ] && kind=watch
-        printf -- '- [ ] quiet-%s - Quiet, "quoted" job %s (hold: %s) (hold-kind: %s)\n' "$i" "$i" "$reason" "$kind"
+        [ "$i" -gt 108 ] && kind=captain
+        hold_reason=$reason
+        [ "$i" -gt 108 ] && hold_reason=$watch
+        [ "$i" -gt 162 ] && hold_reason="Wait $reason"
+        printf -- '- [ ] quiet-%s - Quiet, "quoted" job %s (hold: %s) (hold-kind: %s)\n' "$i" "$i" "$hold_reason" "$kind"
       done
       printf -- '- [ ] captain-open - Open captain question (hold: %s) (hold-kind: captain)\n' "$captain"
+      printf '%s\n' '- [ ] captain-call - Captain call (hold: Captain call DETAILS-KEPT) (hold-kind: captain)'
+      printf '%s\n' '- [ ] captain-needs - Needs captain (hold: Needs the captain DETAILS-KEPT) (hold-kind: captain)'
+      printf '%s\n' '- [ ] blocked-parked - Blocked parked job (hold: BLOCKED-PARKED-DETAILS-KEPT) (hold-kind: parked) (blocked-by: compact-startup)'
+      printf '%s\n' '- [ ] blocked-watch - Blocked watch job (hold: Watch BLOCKED-WATCH-DETAILS-KEPT) (hold-kind: captain) (blocked-by: compact-startup)'
       printf -- '- [ ] external-hold - External wait (hold: EXTERNAL-DETAILS-KEPT) (hold-kind: external)\n'
       printf -- '- [ ] unknown-hold - Unknown wait (hold: UNKNOWN-DETAILS-KEPT) (hold-kind: new-kind)\n'
       printf '\n## Done\n'
@@ -2245,7 +2260,7 @@ EOF
     before=$(cat "$task_home/data/backlog.md")
     mode=yes
     [ "$backend" = failed-list ] && mode=fail
-    out=$(FM_FAKE_SHORT_HOLDS="$mode" FM_FAKE_SHORT_REASON="$reason" \
+    out=$(FM_FAKE_SHORT_HOLDS="$mode" FM_FAKE_SHORT_REASON="$reason" FM_FAKE_WATCH_REASON="$watch" \
       FM_FAKE_LIVE_REASON="$live" FM_FAKE_CAPTAIN_REASON="$captain" FM_SESSION_START_QUEUED_LIMIT=1 \
       run_session_start "$task_home" "$root" "$fakebin:$BASE_PATH")
     assert_contains "$out" '108 parked, 108 watch queued hold(s) shortened' "$backend lost the exact held counts"
@@ -2257,6 +2272,10 @@ EOF
     assert_contains "$out" 'second live line' "$backend lost a multiline in-flight reason"
     assert_contains "$out" 'CAPTAIN-QUESTION-KEPT (choose one)' "$backend shortened an open captain question"
     assert_contains "$out" 'second question line' "$backend lost a multiline captain question"
+    for row in 'Captain call DETAILS-KEPT' 'Needs the captain DETAILS-KEPT' 'BLOCKED-PARKED-DETAILS-KEPT' 'Watch BLOCKED-WATCH-DETAILS-KEPT' 'Wait LIVE-WATCH-DETAILS-KEPT'; do
+      assert_contains "$out" "$row" "$backend shortened a protected hold"
+    done
+    assert_equals 1 "$(printf '%s\n' "$out" | grep -c 'queued hold(s) shortened')" "$backend double-counted shortened holds"
     assert_contains "$out" 'EXTERNAL-DETAILS-KEPT' "$backend shortened an external hold"
     assert_contains "$out" 'UNKNOWN-DETAILS-KEPT' "$backend shortened an unknown hold kind"
     assert_contains "$out" 'bin/fm-tasks-axi.sh show <id> --full' "$backend lost the detail pointer"
@@ -2266,7 +2285,7 @@ EOF
     after=$(cat "$task_home/data/backlog.md")
     assert_equals "$before" "$after" "$backend changed stored hold details"
     if [ "$backend" = tasks-axi ]; then
-      assert_contains "$out" '1 parked, 0 watch queued hold(s) shortened' 'blocked group leaked or lost its parked hold'
+      assert_equals 2 "$(printf '%s\n' "$out" | grep -c 'BLOCKED-PARKED-DETAILS-KEPT')" 'blocked hold overlap did not retain both full rows'
       assert_contains "$out" 'Quiet, \"quoted\" job' 'quoted TOON title was parsed incorrectly'
     fi
   done
