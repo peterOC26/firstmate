@@ -214,7 +214,15 @@ test_canonical_partitions_preserve_full_lint() {
       || fail "partition $part did not stream an end record per root"
   done
   [ "$(LC_ALL=C sort "$tmp/union")" = "$all" ] || fail "lint partitions lose or duplicate canonical roots"
-  for option in 0of2 3of2 1of3; do
+  : > "$tmp/union3"
+  for part in 1of3 2of3 3of3; do
+    selected=$(CI=true "$LINT" --partition "$part" --list-files) \
+      || fail "partition $part must list canonical roots"
+    [ -n "$selected" ] || fail "empty lint partition $part"
+    printf '%s\n' "$selected" >> "$tmp/union3"
+  done
+  [ "$(LC_ALL=C sort "$tmp/union3")" = "$all" ] || fail "three lint partitions lose or duplicate canonical roots"
+  for option in 0of2 3of2 4of3 1of1; do
     rc=0
     "$LINT" --partition "$option" --list-files > "$tmp/refused" 2>&1 || rc=$?
     [ "$rc" = 2 ] || fail "invalid partition $option was not refused"
@@ -225,7 +233,7 @@ test_canonical_partitions_preserve_full_lint() {
   rc=0
   "$LINT" --partition 1of2 bin/fm-lint.sh > "$tmp/refused" 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "partition accepted an explicit subset"
-  pass "two canonical lint partitions preserve complete source-aware coverage and reject weakened modes"
+  pass "canonical lint partitions preserve complete source-aware coverage and reject weakened modes"
 }
 
 # fm_lint_stub_git <fakebin-dir>: install a git stub for the changed-file mode

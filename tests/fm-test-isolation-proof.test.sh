@@ -258,10 +258,9 @@ test_parallel_shards_consume_the_proven_set() {
   local proven shards
   proven=$("$PROOF" --list | LC_ALL=C sort -u)
   shards=$(
-    {
-      "$RUNNER" --list --lane portable-parallel-1
-      "$RUNNER" --list --lane portable-parallel-2
-    } | LC_ALL=C sort -u
+    "$RUNNER" --list-lanes | grep '^portable-parallel-' | while IFS= read -r lane; do
+      "$RUNNER" --list --lane "$lane"
+    done | LC_ALL=C sort -u
   )
   [ "$proven" = "$shards" ] \
     || fail "portable parallel shards must equal isolation-proof --list exactly"
