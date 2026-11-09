@@ -664,6 +664,113 @@ test_entry_without_spend_records_the_live_worker_count_never_below_the_floor() {
   pass "entry without --spend records the live worker count, never below the default floor, and an explicit --spend still wins"
 }
 
+# config/afk-words is the mandate only when an away enter is given no words.
+# An absent file records none, a present file is stored byte for byte, quiet
+# mode never reads it, a wordless refresh leaves the live record alone, and
+# new words replace and archive that mandate.
+test_standing_words_file_is_the_mandate_only_for_a_wordless_away_entry() {
+  local home out file first archived rc
+  home=$(make_home standing-absent)
+  mkdir -p "$home/config"
+  out=$(contract "$home" enter 2>&1) || fail "plain entry with no standing file failed: $out"
+  assert_contains "$out" 'No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return.' 'an absent standing file still announces no mandate'
+  assert_not_contains "$out" 'standing away words were used' 'an absent standing file must not announce standing words'
+  [ -z "$(contract "$home" words)" ] || fail "an absent standing file recorded a mandate"
+  [ -z "$(contract "$home" field source)" ] || fail "an absent standing file set a source"
+
+  home=$(make_home standing-present)
+  mkdir -p "$home/config"
+  file="$home/config/afk-words"
+  printf 'merge when green,\n  keep this indentation\n\nstop: never\n' > "$file"
+  out=$(contract "$home" enter 2>&1) || fail "standing-file entry failed: $out"
+  [ "$(contract "$home" words; printf x)" = "$(cat "$file"; printf x)" ] \
+    || fail "the record did not keep the standing file byte for byte"
+  [ "$(contract "$home" field source)" = config/afk-words ] || fail "the record did not mark the standing file"
+  assert_contains "$out" 'Your standing away words were used; send /afk with new words to replace them.' 'the announcement did not name the standing file'
+  assert_contains "$out" 'The away session will carry them out where it can' 'the standing announcement dropped the carry-out line'
+  assert_contains "$out" '    merge when green,' 'the read-back dropped the standing words'
+  contract "$home" validate || fail "a standing-file record does not validate"
+  # A wordless refresh keeps today's record even after the file changes.
+  printf 'different words\n' > "$file"
+  first=$(cat "$home/state/.afk-contract")
+  sleep 1
+  out=$(contract "$home" enter 2>&1) || fail "refresh over a standing mandate failed: $out"
+  assert_contains "$out" 'already recorded at' 'a wordless refresh did not name the standing record'
+  [ "$(cat "$home/state/.afk-contract")" = "$first" ] || fail "a wordless refresh rewrote the standing mandate from the file"
+  # Explicit words ignore the file and do not mark the standing source.
+  home=$(make_home standing-explicit)
+  mkdir -p "$home/config"
+  printf 'from the file\n' > "$home/config/afk-words"
+  contract "$home" enter --words 'typed words' >/dev/null 2>&1 || fail "explicit words over a standing file failed"
+  [ "$(contract "$home" words)" = 'typed words' ] || fail "explicit words lost to the standing file"
+  [ -z "$(contract "$home" field source)" ] || fail "explicit words were marked as the standing file"
+  # New words replace the standing mandate and archive it with its source.
+  home=$(make_home standing-replace)
+  mkdir -p "$home/config"
+  file="$home/config/afk-words"
+  printf 'file words\n' > "$file"
+  contract "$home" enter >/dev/null 2>&1 || fail "standing entry before replacement failed"
+  first=$(contract "$home" field entered_epoch)
+  sleep 1
+  out=$(contract "$home" enter --words 'replacement words' 2>&1) || fail "replacement of standing words failed: $out"
+  assert_contains "$out" 'replaced the earlier away posture' 'replacement did not archive the standing mandate'
+  archived=$(find "$home/state/afk-contracts" -name "$first-superseded-*.afk-contract" -print -quit)
+  [ -f "$archived" ] || fail "the standing mandate was not archived"
+  [ "$(contract "$home" words --path "$archived"; printf x)" = "$(printf 'file words\n'; printf x)" ] \
+    || fail "the archive lost the standing words"
+  [ "$(contract "$home" field source --path "$archived")" = config/afk-words ] \
+    || fail "the archive lost the standing source"
+  [ "$(contract "$home" words)" = 'replacement words' ] || fail "the live record does not carry the new words"
+  [ -z "$(contract "$home" field source)" ] || fail "the replacement was marked as the standing file"
+  [ "$(contract "$home" field entered_epoch)" = "$first" ] || fail "replacement changed the away session start"
+  # A directory where the file should be refuses rather than recording no mandate.
+  home=$(make_home standing-not-a-file)
+  mkdir -p "$home/config/afk-words"
+  set +e
+  out=$(contract "$home" enter 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "a standing path that is a directory was accepted: $out"
+  assert_contains "$out" 'standing away words are not a readable file' 'the refusal did not name the standing file'
+  [ ! -e "$home/state/.afk-contract" ] || fail "a refused standing file still wrote a record"
+  pass "a standing words file is the wordless away mandate, verbatim, and new words replace it"
+}
+
+test_standing_words_leave_quiet_mode_unchanged() {
+  local home out file quiet_entered first
+  home=$(make_home standing-quiet)
+  mkdir -p "$home/config"
+  file="$home/config/afk-words"
+  printf 'QUIET-MUST-NOT-SEE-THIS\n' > "$file"
+  out=$(FM_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet entry beside a standing file failed: $out"
+  assert_contains "$out" 'Quiet mode recorded at ' 'quiet entry beside a standing file did not announce quiet mode'
+  assert_not_contains "$out" 'standing away words were used' 'quiet mode announced the standing file'
+  assert_not_contains "$out" 'QUIET-MUST-NOT-SEE-THIS' 'quiet mode recorded the standing file'
+  assert_not_contains "$out" 'hold-for-return' 'quiet mode beside a standing file read as away'
+  [ "$(contract "$home" mode)" = quiet ] || fail "quiet mode changed beside a standing file"
+  [ -z "$(contract "$home" words)" ] || fail "quiet mode recorded a mandate from the standing file"
+  [ -z "$(contract "$home" field source)" ] || fail "quiet mode marked the standing source"
+  first=$(cat "$home/state/.afk-contract")
+  out=$(FM_AFK_MODE=quiet contract "$home" enter 2>&1) || fail "quiet refresh beside a standing file failed: $out"
+  assert_contains "$out" 'quiet mode already recorded at ' 'quiet refresh beside a standing file did not stay a refresh'
+  [ "$(cat "$home/state/.afk-contract")" = "$first" ] || fail "quiet refresh beside a standing file rewrote the record"
+
+  home=$(make_home standing-quiet-to-away)
+  mkdir -p "$home/config"
+  printf 'away words from the file\n' > "$home/config/afk-words"
+  FM_AFK_MODE=quiet contract "$home" enter >/dev/null 2>&1 || fail "quiet entry before an away conversion failed"
+  quiet_entered=$(contract "$home" field entered_epoch)
+  out=$(contract "$home" enter 2>&1) || fail "away entry over quiet beside a standing file failed: $out"
+  assert_contains "$out" 'quiet mode became the away posture' 'away entry over quiet did not convert'
+  assert_contains "$out" 'Your standing away words were used; send /afk with new words to replace them.' 'the converted away entry did not use the standing file'
+  [ "$(contract "$home" mode)" = away ] || fail "away entry over quiet left the record quiet"
+  [ "$(contract "$home" words)" = 'away words from the file' ] || fail "away entry over quiet did not record the standing file"
+  [ "$(contract "$home" field source)" = config/afk-words ] || fail "the converted away record did not mark the standing file"
+  ls "$home/state/afk-contracts/$quiet_entered-superseded-"*.afk-contract >/dev/null 2>&1 \
+    || fail "the quiet record was not archived when standing words became the away mandate"
+  pass "quiet mode ignores the standing file, and a later away entry can use it"
+}
+
 test_readback_renders_words_verbatim_with_the_record_scalars
 test_words_preserve_final_newline_shape
 test_enter_writes_a_v2_record_in_one_step_and_announces_hold_for_return
@@ -685,3 +792,5 @@ test_version_1_record_is_replaced_by_a_version_2_record
 test_record_changes_refuse_while_a_reader_holds_the_lock
 test_quiet_record_reads_as_a_present_captain_holding_nothing
 test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away
+test_standing_words_file_is_the_mandate_only_for_a_wordless_away_entry
+test_standing_words_leave_quiet_mode_unchanged

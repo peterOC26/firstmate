@@ -28,7 +28,8 @@ Hold-for-return is the default and the only reach profile this release records: 
    For an away record it then prints the read-only entry inventory; a quiet entry does not.
    The words are the whole mandate: `bin/fm-afk-contract.sh` records them exactly as given, with no clause fields, verbs, ids, or merge-grant list, and by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
    Read `bin/fm-afk-contract.sh --help` for the flags rather than memorizing them.
-   Plain `/afk` with no words is a valid entry with no mandate; the announcement says no instructions were recorded.
+   When an away `/afk` brings no words, a readable local `config/afk-words` file is recorded verbatim as the mandate, the record marks `source: config/afk-words`, and the announcement says those standing away words were used and that `/afk` with new words replaces them; quiet mode does not read that file.
+   With neither words nor that file, plain `/afk` still records no mandate and the announcement says no instructions were recorded.
    Re-invoking `/afk` while already away with no new words is a refresh and leaves the standing record untouched; new words replace the mandate at once, preserve the original session entry, and archive the superseded words for the return brief.
 2. **Per harness, after the record exists:**
    - **Pi and pi-signed**: nothing to launch; go on to the announcement.

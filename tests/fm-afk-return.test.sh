@@ -24,11 +24,13 @@ install_runner() {  # <case-dir>
   mkdir -p "$dir/bin" "$dir/home/state" "$dir/home/data" "$dir/home/config"
   cp "$ROOT/bin/fm-afk-return.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/"
-  cp "$ROOT/bin/fm-treehouse-slot-lib.sh" "$dir/bin/"
-  cp "$ROOT/bin/fm-wake-surface-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-lock-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/"
+  # wake-lib sources the slot and surface libraries at load, and classify-lib
+  # sources the close library. Without them the dwell scan drops its closing-epoch helpers.
+  cp "$ROOT/bin/fm-treehouse-slot-lib.sh" "$dir/bin/"
+  cp "$ROOT/bin/fm-wake-surface-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-classify-close-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/bin/"
   cp "$ROOT/bin/fm-backend.sh" "$dir/bin/"
@@ -657,6 +659,28 @@ test_return_brief_lists_landed_work_awaiting_cleanup() {
   assert_not_contains "$out" 'example/child/pull/7' "a secondmate's recorded PR surfaced in the brief"
   assert_contains "$out" 'catch-up clear' "landed work must not hold the gate"
   pass "the return brief lists landed work whose worker is still up, from the durable merge marker only, without gating on it and never offering a secondmate for teardown"
+}
+
+test_return_brief_names_standing_words_source() {
+  local dir out words
+  dir="$TMP_ROOT/brief-standing-words"
+  install_runner "$dir"
+  words=$'keep the lane moving\n\n'
+  printf '%s' "$words" > "$dir/home/config/afk-words"
+  contract_in "$dir" enter >/dev/null 2>&1 || fail "standing-words entry failed"
+  [ "$(contract_in "$dir" field source)" = config/afk-words ] || fail "entry did not mark the standing file"
+  [ "$(contract_in "$dir" words; printf x)" = "$(printf '%s' "$words"; printf x)" ] \
+    || fail "entry did not keep the standing file verbatim"
+  contract_in "$dir" enter --words $'replacement mandate\n' >/dev/null 2>&1 || fail "replacement of standing words failed"
+  touch "$dir/home/state/.last-watcher-beat"
+  : > "$dir/home/state/.fake-drain"
+  out=$(run_return "$dir" begin) || fail "standing-words return did not clear: $out"
+  assert_contains "$out" '  your words superseded at ' "the standing mandate was not archived into the brief"
+  assert_contains "$out" '(from config/afk-words):' "the brief did not name the standing-file source"
+  assert_contains "$out" '    keep the lane moving' "the standing words were not rendered verbatim"
+  assert_contains "$out" $'  your words at entry:\n    replacement mandate' "the replacement mandate lost its entry line"
+  assert_not_contains "$out" $'  your words at entry (from config/afk-words):' "the replacement mandate was marked as the standing file"
+  pass "the return brief names config/afk-words on the mandate that came from the standing file"
 }
 
 test_return_brief_keeps_refresh_history() {
@@ -1727,6 +1751,7 @@ test_return_brief_lists_landed_work_awaiting_cleanup
 test_return_brief_points_at_the_drain_on_a_host_home_only
 test_return_brief_all_silent_window_does_not_point_at_drain
 test_return_keeps_catchup_gated_when_the_drain_cannot_record_outcomes
+test_return_brief_names_standing_words_source
 test_return_brief_keeps_refresh_history
 test_malformed_posture_record_keeps_catchup_gated
 test_missing_epoch_record_stays_required_after_disappearing
