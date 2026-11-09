@@ -1,0 +1,266 @@
+
+--- primary ready ---
+ I'll start the session once, then arm the Pi watcher and wait. Checking the home environment first.
+
+
+ $ echo "FM_HOME=${FM_HOME:-}"; echo "PWD=$(pwd)"; ls -la "${FM_HOME:-.}" 2>/dev/null | head -50; echo "---"; ls -la state 2>/dev/null | head -30; echo
+ "---afk---"; ls -la state/.afk state/.afk-contract state/.subsuper-* 2>/dev/null; echo "---env---"; env | grep -E '^FM_|^PI_' | sort (timeout 15000s)
+
+ ... (19 earlier lines, ctrl+o to expand)
+ PI_PROVIDER=xai
+ PI_REASONING_LEVEL=medium
+ PI_SESSION_FILE=/tmp/fm-lab.dsfe61aj/sessions/2026-11-09T06-52-37-696Z_01a1bf14-8dbf-71d0-8478-1534dc3de4d3.jsonl
+ PI_SESSION_ID=01a1bf14-8dbf-71d0-8478-1534dc3de4d3
+ PI_SKIP_VERSION_CHECK=1
+
+ Took 0.0s
+
+
+ No away record. Running session start from this worktree.
+
+
+ $ ls -la bin/fm-session-start.sh && bin/fm-session-start.sh (timeout 30000s)
+
+ ... (191 earlier lines, ctrl+o to expand)
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+ Took 10.6s
+
+
+ Session started. Fleet is empty. AFK is absent.
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only after a later notification says the cycle is
+ missing, failed, or unhealthy
+
+
+ The watcher is armed. Waiting now.
+
+ Session start is done for this isolated home. Fleet is empty, away mode is off, and the
+
+── ⠼ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑14k ↓932 R22k CH79.0% $0.044 (sub) 2.9%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+
+--- away entry ---
+
+
+ The watcher is armed. Waiting now.
+
+ Session start is done for this isolated home. Fleet is empty, away mode is off, and the Pi watcher is armed (child 1). Ordinary re-arms are automatic.
+ Waiting.
+
+
+ I am going afk. Watch the empty fleet; do not launch any workers.
+
+
+ Entering away posture now. No workers will be launched.
+
+ Entering away mode now: writing the AFK record first, then announcing and reading it back.
+
+
+ $ bin/fm-afk-launch.sh enter --help; echo "===="; bin/fm-afk-contract.sh --help (timeout 15000s)
+
+ ... (24 earlier lines, ctrl+o to expand)
+     Print the ordinary worker count this home holds right now (SPEND CAP
+     below). Reads no record, so it answers before an entry as well as during
+     one.
+   fm-afk-contract.sh archive              move the record aside; print its path
+   fm-afk-contract.sh archived <entered_epoch>   print that archived record's path
+
+ Took 0.1s
+
+
+ The first command may have incorrectly passed the help flag to fm-afk-launch.sh.
+
+
+ $ bin/fm-afk-launch.sh enter --words "Watch the empty fleet; do not launch any workers." (timeout 15000s)
+
+ ... (11 earlier lines, ctrl+o to expand)
+ Read-back checklist:
+   Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+   A named merge still waits while a slower advisory suite has not reported.
+   Name any sentence dropped when /afk is sent again with only a stop clause.
+   Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+ Took 0.6s
+
+
+── ⠙ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑29k ↓1.4k R51k CH95.2% $0.092 (sub) 3.2%/500k (auto)                                                                                    (xai) grok-4.6 • medium
+
+--- away posture before note ---
+
+ Took 0.1s
+
+
+ The first command may have incorrectly passed the help flag to fm-afk-launch.sh.
+
+
+ $ bin/fm-afk-launch.sh enter --words "Watch the empty fleet; do not launch any workers." (timeout 15000s)
+
+ ... (11 earlier lines, ctrl+o to expand)
+ Read-back checklist:
+   Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+   A named merge still waits while a slower advisory suite has not reported.
+   Name any sentence dropped when /afk is sent again with only a stop clause.
+   Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+ Took 0.6s
+
+
+ The enter command should have printed the read-only entry inventory for the away record.
+
+ The entry inventory may have been omitted or truncated. I will run the entry brief script to verify.
+
+ I will review the entry brief script and launch script. I need to restate AGENTS.md section 9 in plain sentences. I must note any unacted items that wait for
+ return.
+
+ The read-back checklist is purely informational. The record stands without a go signal. I will check four items: green pull requests and their merge
+ sentences, pending advisory suites, dropped sentences on a stop-only /afk, and jobs with three consecutive failed checks to park.
+
+
+ $ bin/fm-afk-entry-brief.sh --help 2>&1 | head -80; echo "===="; ls -la "${FM_HOME}/state/.afk-contract" "${FM_HOME}/state/.afk" 2>&1; echo "====";
+ bin/fm-afk-contract.sh live-workers (timeout 15000s)
+
+ ... (17 earlier lines, ctrl+o to expand)
+ ====
+ ls: cannot access '/tmp/fm-lab.dsfe61aj/state/.afk': No such file or directory
+ -rw------- 1 zabi zabi 357 Nov  9 07:53 /tmp/fm-lab.dsfe61aj/state/.afk-contract
+ ====
+ 0
+
+ Took 0.1s
+
+
+── ⠋ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑30k ↓2.0k R67k CH96.6% $0.104 (sub) 3.3%/500k (auto)                                                                                    (xai) grok-4.6 • medium
+
+INBOX PUBLICATION
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1794207206-E0FUo7","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/tmp/fm-lab.dsfe61aj/state/inbox/1794207206-E0FUo7.note"}
+
+--- away record archived ---
+ security-sensitive actions stay blocked no matter what the words say.
+
+ I read your instructions as: keep watching this empty fleet, and do not spawn anyone. Expected return was not given. Spend cap is 4 concurrent workers. Reach
+ is hold-for-return only.
+
+ Nothing in those sentences is a merge, discard, or other never-set action, so there is nothing I would have to leave for your return on that account. “No
+ merges” is a valid reading: there are no green pull requests, and the words do not name one. A named merge would still wait on a slower advisory suite; none
+ is named. This is a first entry, so no prior sentence was dropped by a stop-only /afk. The inventory has no job with three or more consecutive failed checks
+ on the same findings, so nothing to park.
+
+ The away session will watch the empty fleet under those words. I will not launch workers.
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+ Pi watcher: the captain sent a note and away mode should end (captain inbox note 1794207206-E0FUo7 queued). Run bin/fm-afk-return.sh, then answer the note.
+
+
+ The user sent an operational message.
+
+ The captain's note is a return signal. Run bin/fm-afk-return.sh first. Then answer the note. The queued wake must be handled before this.
+
+ The operational message orders bin/fm-wake-drain.sh first, but the AFK skill says bin/fm-afk-return.sh must run before acting on the captain's return. I am
+ weighing these conflicting instructions.
+
+ The AFK skill explicitly requires bin/fm-afk-return.sh before acting on a captain's return. The operational message ordering is overridden.
+
+ The wake-drain instruction is irrelevant here. The skill treats the originating wake as already handled, so MAIN must not re-drain or re-run it. This
+ exception applies to supervision branch outcomes, not this return signal.
+
+ This is the return hand-back. Running the away-return script first, then I'll answer the captain's note.
+
+
+ $ bin/fm-afk-return.sh (timeout 30000s)
+
+ fm-afk-launch: away-posture record archived at /tmp/fm-lab.dsfe61aj/state/afk-contracts/1794207196.afk-contract
+ fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+
+ Elapsed 1.1s
+
+
+── ⠧ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑48k ↓4.0k R99k CH2.9% $0.170 (sub) 3.8%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+
+--- main answered note ---
+ MARIGOLD.
+ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 2477205.1794207206.UOgS2l
+ fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+ Took 4.6s
+
+
+ Return completed. Catch-up is clear.
+
+ Relay the return brief in section 9 language. Answer the note with MARIGOLD. Then run bin/fm-wake-drain.sh with the specified ack and recovery parameters. No
+ cleanup tasks are listed.
+
+ No need to re-drain the wake. The note content is already captured in the brief. I will answer with MARIGOLD, relay the brief, then run the ack-through
+ command.
+
+ Relaying the return brief, then acknowledging the wake after I answer the note.
+
+
+ $ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 2477205.1794207206.UOgS2l (timeout 15000s)
+
+ (no output)
+
+ Took 0.2s
+
+
+ You are back. Away mode is stopped (39s, 2026-11-09T06:53:16Z to 2026-11-09T06:53:55Z). No daemon was running.
+
+ Supervisor health: supervision ran through the away window with no detected gap (watcher beat 2s old at return). A wake was being handled at return; that is
+ not a gap.
+
+ Your instructions were to watch the empty fleet and not launch any workers. The away session took no action under them.
+
+ Waiting on you: nothing.
+ Tried and failed, or could not be fixed: nothing.
+ Landed, cleanup due: nothing.
+ Handled while away: nothing recorded.
+ Not started: nothing.
+ Cost: no supervision outcomes; no live tasks at return.
+
+ Catch-up is clear, so ordinary work may proceed.
+
+ MARIGOLD
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑50k ↓4.7k R136k CH97.5% $0.196 (sub) 4.0%/500k (auto)                                                                                   (xai) grok-4.6 • medium
+
+MAIN INBOX AFTER RETURN
+1794207206-E0FUo7
+    Jobs note: I am back. Please reply with the word MARIGOLD.
+
+Ack with: fm-inbox.sh drain --ack <id>...
+
+EXPORT
+Exported to: /home/zabi/.no-mistakes/evidence/01M6ZGFZ4MA04RTKC9RGZFD8DV/pi-live-session.html
+
+STATE .wake-queue
+
+CLEANUP: private fm-lab tmux stopped; lab removed.

@@ -1,0 +1,116 @@
+
+real watcher armed
+
+ ▀▀█  v1.0.3
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-primary-pi-watch.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ $ bin/fm-session-start.sh
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ data/learnings.md
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ ================================================================================
+ NEXT STEP
+ ================================================================================
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+
+ ... 140 more lines (ctrl+o to expand)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only after a later notification says the cycle is
+ missing, failed, or unhealthy
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+$0.000 (sub) 0.7%/500k (auto)                                                                                                            (xai) grok-4.6 • medium
+
+Quiet mode recorded at 2026-11-09T07:04:35Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-09T07:04:35Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    remain quiet while present
+
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1794207876-VZG5gn","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/tmp/fm-lab.relml3yu/state/inbox/1794207876-VZG5gn.note"}
+
+ACTUAL GENERATED USER PROMPT
+⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: rearm-resurface
+
+Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+quiet note delivered to main
+
+ ▀▀█  v1.0.3
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  fm-primary-pi-watch.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ $ bin/fm-session-start.sh
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ data/learnings.md
+ --------------------------------------------------------------------------------
+ ABSENT
+
+ ================================================================================
+ NEXT STEP
+ ================================================================================
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+
+ ... 140 more lines (ctrl+o to expand)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only after a later notification says the cycle is
+ missing, failed, or unhealthy
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+$0.000 (sub) 0.7%/500k (auto)                                                                                                            (xai) grok-4.6 • medium
+
+CLEANUP: private tmux server stopped and disposable home removed.

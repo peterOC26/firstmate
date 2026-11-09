@@ -1,0 +1,60 @@
+$ bash bin/fm-lab-home.sh create /tmp/fm-lab.4i0pqji3
+/tmp/fm-lab.4i0pqji3
+
+$ bash bin/fm-afk-contract.sh enter --words watch the fleet
+Away posture recorded at 2026-11-09T07:00:02Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T07:00:02Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    watch the fleet
+
+$ bash -c . bin/fm-wake-lib.sh; fm_wake_append check ordinary-check "check: captain inbox note fake"
+
+$ node bin/fm-branch-dispatch.mjs offer --afk
+eligible=1
+status=safe
+corrupted=0
+rows=1
+tasks=
+unscoped=1
+
+$ node bin/fm-branch-dispatch.mjs scope --afk
+status=safe
+corrupted=0
+rows=1
+tasks=
+unscoped=1
+
+$ bash bin/fm-inbox.sh note --json I am back; handle this inbox note.
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1794207606-n6NatU","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/tmp/fm-lab.4i0pqji3/state/inbox/1794207606-n6NatU.note"}
+
+$ node bin/fm-branch-dispatch.mjs offer --afk
+eligible=0
+status=safe
+corrupted=0
+rows=1
+tasks=
+unscoped=1
+
+$ node bin/fm-branch-dispatch.mjs scope --afk
+status=safe
+corrupted=0
+rows=1
+tasks=
+unscoped=1
+
+Persisted queue unchanged by dispatch:
+1794207604	1	check	ordinary-check	check: captain inbox note fake
+1794207606	2	check	inbox:1794207606-n6NatU	check: captain inbox note 1794207606-n6NatU - I am back; handle this inbox note.
+
+$ bash bin/fm-wake-drain.sh
+1794207604	1	check	ordinary-check	check: captain inbox note fake
+1794207606	2	check	inbox:1794207606-n6NatU	check: captain inbox note 1794207606-n6NatU - I am back; handle this inbox note.
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 3227708.1794207604.bjS3aH
+
+RESULT: ordinary check remains branch-eligible despite inbox-like prose; real inbox key vetoes an unrelated heartbeat; inbox row excluded from branch claim and still drainable by main.
+
+CLEANUP: disposable home removed.

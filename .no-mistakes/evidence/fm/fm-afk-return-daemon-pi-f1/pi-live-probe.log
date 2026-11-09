@@ -1,0 +1,254 @@
+Real Pi CLI 1.0.3, private tmux session, 160x48, marked disposable home.
+
+--- 5s ---
+
+ ▀▀█  v1.0.3
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  .agents/skills/afk/SKILL.md
+
+[Extensions]
+  fm-branch-supervision.ts, fm-primary-pi-watch.ts, fm-primary-turnend-guard.ts
+
+
+ This is an isolated live validation home with no fleet. Run bin/fm-session-start.sh exactly once, use fm_watch_arm_pi to arm supervision, then wait. Do not
+ change code, install anything, launch workers, or access any other home. All operational data belongs under FM_HOME.
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+ I will run the isolated live validation procedure exactly as requested.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+── ⠋ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+$0.000 (sub) 2.1%/500k (auto)                                                                                                            (xai) grok-4.6 • medium
+
+--- 10s ---
+
+ ▀▀█  v1.0.3
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  .agents/skills/afk/SKILL.md
+
+[Extensions]
+  fm-branch-supervision.ts, fm-primary-pi-watch.ts, fm-primary-turnend-guard.ts
+
+
+ This is an isolated live validation home with no fleet. Run bin/fm-session-start.sh exactly once, use fm_watch_arm_pi to arm supervision, then wait. Do not
+ change code, install anything, launch workers, or access any other home. All operational data belongs under FM_HOME.
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+ I will run the isolated live validation procedure exactly as requested.
+
+ I will run bin/fm-session-start.sh once, arm supervision with fm_watch_arm_pi, and wait. I will not change code, install anything, launch workers, or access
+ other homes. All operational data stays under FM_HOME. I am checking whether AFK conditions apply.
+
+ No AFK skill is needed. This is not an /afk turn.
+
+ I'll start the session once, then arm supervision and wait as instructed.
+
+
+ $ bin/fm-session-start.sh
+
+ Elapsed 0.0s
+
+
+
+
+
+
+
+
+
+── ⠹ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑9.7k ↓523 R512 CH5.0% $0.023 (sub) 2.2%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+
+--- 15s ---
+
+ ▀▀█  v1.0.3
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  .agents/skills/afk/SKILL.md
+
+[Extensions]
+  fm-branch-supervision.ts, fm-primary-pi-watch.ts, fm-primary-turnend-guard.ts
+
+
+ This is an isolated live validation home with no fleet. Run bin/fm-session-start.sh exactly once, use fm_watch_arm_pi to arm supervision, then wait. Do not
+ change code, install anything, launch workers, or access any other home. All operational data belongs under FM_HOME.
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+ I will run the isolated live validation procedure exactly as requested.
+
+ I will run bin/fm-session-start.sh once, arm supervision with fm_watch_arm_pi, and wait. I will not change code, install anything, launch workers, or access
+ other homes. All operational data stays under FM_HOME. I am checking whether AFK conditions apply.
+
+ No AFK skill is needed. This is not an /afk turn.
+
+ I'll start the session once, then arm supervision and wait as instructed.
+
+
+ $ bin/fm-session-start.sh
+
+ ... (14 earlier lines, ctrl+o to expand)
+ BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent
+ handing back a board before its reply is accepted
+
+ WAKE QUEUE
+ --------------------------------------------------------------------------------
+
+ Elapsed 5.1s
+
+
+── ⠼ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑9.7k ↓523 R512 CH5.0% $0.023 (sub) 2.2%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+
+--- 20s ---
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  .agents/skills/afk/SKILL.md
+
+[Extensions]
+  fm-branch-supervision.ts, fm-primary-pi-watch.ts, fm-primary-turnend-guard.ts
+
+
+ This is an isolated live validation home with no fleet. Run bin/fm-session-start.sh exactly once, use fm_watch_arm_pi to arm supervision, then wait. Do not
+ change code, install anything, launch workers, or access any other home. All operational data belongs under FM_HOME.
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+ I will run the isolated live validation procedure exactly as requested.
+
+ I will run bin/fm-session-start.sh once, arm supervision with fm_watch_arm_pi, and wait. I will not change code, install anything, launch workers, or access
+ other homes. All operational data stays under FM_HOME. I am checking whether AFK conditions apply.
+
+ No AFK skill is needed. This is not an /afk turn.
+
+ I'll start the session once, then arm supervision and wait as instructed.
+
+
+ $ bin/fm-session-start.sh
+
+ ... (189 earlier lines, ctrl+o to expand)
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+ Took 8.3s
+
+
+ Session start completed. Away mode is inactive.
+
+── ⠦ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑9.7k ↓523 R512 CH5.0% $0.023 (sub) 2.8%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+
+--- 25s ---
+
+ This is an isolated live validation home with no fleet. Run bin/fm-session-start.sh exactly once, use fm_watch_arm_pi to arm supervision, then wait. Do not
+ change code, install anything, launch workers, or access any other home. All operational data belongs under FM_HOME.
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+ I will run the isolated live validation procedure exactly as requested.
+
+ I will run bin/fm-session-start.sh once, arm supervision with fm_watch_arm_pi, and wait. I will not change code, install anything, launch workers, or access
+ other homes. All operational data stays under FM_HOME. I am checking whether AFK conditions apply.
+
+ No AFK skill is needed. This is not an /afk turn.
+
+ I'll start the session once, then arm supervision and wait as instructed.
+
+
+ $ bin/fm-session-start.sh
+
+ ... (189 earlier lines, ctrl+o to expand)
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+ Took 8.3s
+
+
+ Session start completed. Away mode is inactive.
+
+ Session is up with an empty fleet. Arming the one required Pi watcher cycle next.
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only after a later notification says the cycle is
+ missing, failed, or unhealthy
+
+
+ The watcher is armed. Waiting as requested.
+
+ Session started in this isolated home. Fleet is empty, away mode is off, and the Pi watcher cycle is armed. Waiting.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZGFZ4MA04RTKC9RGZFD8DV (detached)
+↑13k ↓715 R24k CH97.9% $0.043 (sub) 2.8%/500k (auto)                                                                                     (xai) grok-4.6 • medium
+Watcher lock appeared.
+
+Private tmux server stopped; disposable lab removed.

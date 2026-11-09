@@ -1,0 +1,7 @@
+1..5
+ok - host: an away inbox note is handed back so main can end away mode, and the engine does not take it
+ok - host: an away wake with no inbox note stays on the engine
+ok - host: a quiet-mode inbox note stays an attended hand-back
+ok - host: an unsurfaced inbox note beside an away close is handed back before another engine turn
+ok - host: an inbox note queued after the first poll is the return at the park bound
+FM_TEST_COMPLETE
