@@ -238,8 +238,8 @@ test_branch_outcomes_put_captain_first_and_collapse_routine_overflow() {
 }
 
 
-# Repeated captain outcomes for one task collapse to its newest, one line per
-# task; when the byte cap holds rows back, the section shows only the oldest
+# Repeated plain captain outcomes for one task collapse to its newest plain
+# row; when the byte cap holds rows back, the section shows only the oldest
 # contiguous run its acknowledgement covers - a shown task's newer row that
 # follows a held-back one waits too, so no presented situation repeats - and
 # the next drain shows the rest.
@@ -291,8 +291,8 @@ test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
 
 # The reference experience after a long away window: the drain is the only
 # presenter, so the first drain once the away record is gone shows the window
-# once - each task's captain outcomes collapsed to one line, routine ones past
-# the section's limit as a count - and once main acknowledges them, a second
+# once - each task's plain captain outcomes collapsed to one line, routine
+# ones past the section's limit as a count - and once main acknowledges them, a second
 # drain shows nothing from the window.
 test_branch_outcomes_present_a_long_away_window_once() {
   local home drained pad n target
@@ -470,7 +470,7 @@ test_branch_outcomes_date_a_legacy_backlog_without_adopting_it() {
     "a days-old captain outcome must say when it was recorded"
   assert_contains "$drained" "[seq 3, recorded 3d ago] beta: beta PR" "every captain outcome must say when it was recorded"
   assert_contains "$drained" "check the task's current state first" "the section must ask main to check the current state before acting"
-  assert_contains "$drained" "your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement" \
+  assert_contains "$drained" "your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement" \
     "the section must keep settled outcomes out of the reply to the captain"
   assert_contains "$drained" "mark-processed --through 3;" "the backlog must still carry its acknowledgement"
   [ -n "$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" unprocessed)" ] \
@@ -524,6 +524,131 @@ test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi() {
   [ -n "$(FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" unprocessed)" ] \
     || fail "the switch adopted an unacknowledged captain outcome as processed"
   pass "drain: an outcome carried across a switch off Pi comes back with its age, never adopted"
+}
+
+
+# A Pi-recorded continuation must survive a switch to the host drain, including
+# repeated presentation before acknowledgement.
+test_branch_outcomes_present_continuations_off_pi() {
+  local home drained continuation fakecodex primary
+  home="$TMP_ROOT/drain-continuation-off-pi"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  continuation=$(printf 'Stage complete.\nStart\tthe authorized validation;\rthen report its result.')
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'implementation complete' --continuation "$continuation" >/dev/null \
+    || fail "fixture: could not record the continuation"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task delta --verdict captain \
+    --summary 'report complete' --continuation 'Hand the report to the assigned worker.' >/dev/null \
+    || fail "fixture: could not record another continuation"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task legacy --verdict captain \
+    --summary 'needs a decision' >/dev/null || fail "fixture: could not record a legacy outcome"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task routine --verdict routine \
+    --summary 'still working' >/dev/null || fail "fixture: could not record a routine outcome"
+
+  drained=$(FM_HOME="$home" FM_TEST_HARNESS=pi "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "Pi must leave the continuation to its extension"
+  assert_absent "$home/state/.branch-outcomes-cursor" "Pi must not mark an unpresented continuation read"
+  fakecodex="$TMP_ROOT/drain-continuation-codex"
+  ln -s /bin/bash "$fakecodex"
+  for primary in "$FAKE_CLAUDE" "$fakecodex"; do
+    drained=$(FM_HOME="$home" "$primary" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+    assert_contains "$drained" \
+      '[seq 1, recorded 0m ago] gamma: implementation complete; MAIN continuation handoff: Stage complete. Start the authorized validation; then report its result.' \
+      "the continuation must be flattened onto the captain row, even after it was marked read"
+    assert_contains "$drained" \
+      '[seq 2, recorded 0m ago] delta: report complete; MAIN continuation handoff: Hand the report to the assigned worker.' \
+      "every captain row must carry its own continuation"
+    assert_re '^\[seq 3, recorded 0m ago\] legacy: needs a decision$' <(printf '%s\n' "$drained") \
+      "a captain row without a continuation must stay unchanged"
+    assert_contains "$drained" 'mark-processed --through 3;' "the continuation must carry its acknowledgement target"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 3 >/dev/null \
+    || fail "the presented continuations could not be acknowledged"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "acknowledged continuations must stop repeating"
+  pass "drain: Pi continuations appear on each captain line off Pi until acknowledged"
+}
+
+
+test_branch_outcomes_preserve_older_and_newer_handoffs() {
+  local home drained n
+  home="$TMP_ROOT/drain-continuation-collapse"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  for n in 1 2; do
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "stage $n complete" --continuation "Start authorized step $n." >/dev/null || fail "fixture: handoff"
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "CI note $n" >/dev/null || fail "fixture: plain row"
+  done
+  for n in 1 2; do
+    drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+    assert_contains "$drained" 'MAIN continuation handoff: Start authorized step 1.' "an older handoff must survive newer plain and continuation rows"
+    assert_contains "$drained" 'MAIN continuation handoff: Start authorized step 2.' "a newer handoff must remain independently visible"
+    assert_contains "$drained" 'gamma: CI note 2' "plain rows must still collapse to the newest"
+    assert_not_contains "$drained" 'gamma: CI note 1' "older plain rows must still collapse"
+    assert_contains "$drained" 'mark-processed --through 4;' "the acknowledgement must cover all presented rows"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 4 >/dev/null || fail "acknowledgement refused"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "acknowledged handoffs must stop repeating"
+  pass "drain: every handoff survives per-task collapse until acknowledgement"
+}
+
+test_branch_outcomes_abbreviated_handoffs_lookup_and_boundaries() {
+  local home drained pad n line lookup full bytes summary
+  home="$TMP_ROOT/drain-continuation-cap"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  pad=$(awk 'BEGIN { for (i = 0; i < 700; i++) printf "界" }')
+  for n in 1 2 3 4 5 6 7 8; do
+    summary=$pad
+    [ $((n % 2)) -eq 0 ] || summary="stage complete"
+    FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+      --summary "$summary" --continuation "$pad Start authorized step $n." >/dev/null || fail "fixture: long handoff"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'later CI note' >/dev/null || fail "fixture: later plain row"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  bytes=$(printf '%s\n' "$drained" | sed -n '/^\[seq /p' | wc -c)
+  [ "$bytes" -le 4000 ] || fail "captain rows exceeded byte budget"
+  for n in 1 2 3 4 5 6; do
+    line=$(printf '%s\n' "$drained" | sed -n "/^\[seq $n,/p")
+    bytes=$(printf '%s\n' "$line" | wc -c)
+    [ "$bytes" -le 600 ] || fail "handoff exceeded line budget"
+    assert_contains "$line" '[truncated]' "long handoff must be abbreviated"
+    lookup=${line##*full MAIN continuation handoff: }
+    [ "$lookup" = "bin/fm-branch-outcome.sh lookup --seqs $n" ] || fail "missing actionable lookup: $line"
+    full=$(cd "$ROOT" && FM_HOME="$home" bash -c "$lookup") || fail "emitted lookup failed"
+    [ "$(printf '%s\n' "$full" | jq -r '.continuation')" = "$pad Start authorized step $n." ] || fail "lookup lost full handoff"
+  done
+  assert_contains "$drained" '3 newer captain outcome(s) are held back' "overflow must retain a contiguous acknowledgement boundary"
+  assert_contains "$drained" 'mark-processed --through 6;' "acknowledgement must stop before withheld handoffs"
+  assert_not_contains "$drained" 'later CI note' "a newer plain row must not bypass a withheld handoff"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 6 >/dev/null || fail "acknowledgement refused"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_contains "$drained" 'lookup --seqs 7' "withheld handoff must follow after acknowledgement"
+  assert_contains "$drained" 'lookup --seqs 8' "every withheld handoff must follow"
+  assert_contains "$drained" 'later CI note' "withheld plain row must follow"
+  assert_contains "$drained" 'mark-processed --through 9;' "next acknowledgement must cover the remainder"
+  pass "drain: abbreviated handoffs retain executable full lookups and contiguous byte bounds"
+}
+
+test_branch_outcomes_emit_continuation_processing_duty() {
+  local home drained
+  home="$TMP_ROOT/drain-continuation-duty"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'stage complete' --continuation 'Start authorized validation.' >/dev/null || fail "fixture: handoff"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_contains "$drained" 'reconcile current task/stage state and existing authority' "emitted processing instruction must reconcile authority"
+  assert_contains "$drained" 'start the authorized spawn, steer, or handoff before acknowledging' "emitted processing instruction must require action"
+  assert_contains "$drained" 'if already started, do not duplicate it' "emitted processing instruction must prevent duplicate work"
+  assert_contains "$drained" 'Record the actual blocker, decision, or evidence that no further action is needed' "emitted processing instruction must require evidence when unable to advance"
+  assert_contains "$drained" 'read the full outcome using its lookup --seqs command before acting or acknowledging' "emitted processing instruction must require reading abbreviated handoffs"
+  pass "drain: delivered processing instructions require continuation handling before acknowledgement"
 }
 
 
@@ -600,6 +725,10 @@ fm_test_run \
   test_branch_outcomes_date_a_legacy_backlog_without_adopting_it \
   test_branch_ack_keeps_older_keyed_decision_open \
   test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi \
+  test_branch_outcomes_present_continuations_off_pi \
+  test_branch_outcomes_preserve_older_and_newer_handoffs \
+  test_branch_outcomes_abbreviated_handoffs_lookup_and_boundaries \
+  test_branch_outcomes_emit_continuation_processing_duty \
   test_branch_outcomes_keep_an_unshown_outcome_until_acknowledged \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_a_switch_to_pi \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_an_index_repair
