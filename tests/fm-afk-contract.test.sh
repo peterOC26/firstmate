@@ -669,7 +669,7 @@ test_entry_without_spend_records_the_live_worker_count_never_below_the_floor() {
 # mode never reads it, a wordless refresh leaves the live record alone, and
 # new words replace and archive that mandate.
 test_standing_words_file_is_the_mandate_only_for_a_wordless_away_entry() {
-  local home out file first archived rc
+  local home out file first archived
   home=$(make_home standing-absent)
   mkdir -p "$home/config"
   out=$(contract "$home" enter 2>&1) || fail "plain entry with no standing file failed: $out"
@@ -723,16 +723,15 @@ test_standing_words_file_is_the_mandate_only_for_a_wordless_away_entry() {
   [ "$(contract "$home" words)" = 'replacement words' ] || fail "the live record does not carry the new words"
   [ -z "$(contract "$home" field source)" ] || fail "the replacement was marked as the standing file"
   [ "$(contract "$home" field entered_epoch)" = "$first" ] || fail "replacement changed the away session start"
-  # A directory where the file should be refuses rather than recording no mandate.
   home=$(make_home standing-not-a-file)
   mkdir -p "$home/config/afk-words"
-  set +e
-  out=$(contract "$home" enter 2>&1)
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "a standing path that is a directory was accepted: $out"
-  assert_contains "$out" 'standing away words are not a readable file' 'the refusal did not name the standing file'
-  [ ! -e "$home/state/.afk-contract" ] || fail "a refused standing file still wrote a record"
+  out=$(contract "$home" enter 2>&1) || fail "a standing path that is a directory blocked entry: $out"
+  assert_contains "$out" "warning: standing away words were not used: $home/config/afk-words is not a readable regular file" 'the warning did not name the unused standing file'
+  [ "$(printf '%s\n' "$out" | grep -c 'warning: standing away words were not used:')" -eq 1 ] || fail "entry did not emit exactly one standing words warning"
+  [ -f "$home/state/.afk-contract" ] || fail "an unusable standing file prevented recording the away posture"
+  [ -z "$(contract "$home" words)" ] || fail "an unusable standing file recorded a mandate"
+  [ -z "$(contract "$home" field source)" ] || fail "an unusable standing file set a source"
+  contract "$home" validate || fail "the entry beside an unusable standing file does not validate"
   pass "a standing words file is the wordless away mandate, verbatim, and new words replace it"
 }
 

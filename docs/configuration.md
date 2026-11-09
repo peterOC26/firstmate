@@ -736,7 +736,7 @@ The optional local, gitignored `config/afk-words` file holds the captain's stand
 When `bin/fm-afk-contract.sh enter`, which `bin/fm-afk-launch.sh enter` calls, is given neither `--words` nor `--words-file` and will write an away record, a readable file is stored verbatim as the mandate.
 The record marks `source: config/afk-words`, the entry announcement says the standing away words were used and that `/afk` with new words replaces them, and the return brief's instructions section names that source.
 An absent file records no mandate.
-A path that exists but is not a readable regular file refuses the entry.
+A path that exists but is not a readable regular file records no mandate and allows entry, with one warning naming the path and saying the standing away words were not used.
 Quiet mode never reads the file.
 A refresh that brings no new words leaves the current record untouched, including when the file changes afterward.
 Supplying `--words` or `--words-file` records those words instead, archives the previous mandate, and does not mark `source: config/afk-words`.

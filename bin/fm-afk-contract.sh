@@ -75,9 +75,9 @@
 # (FM_CONFIG_OVERRIDE, otherwise $FM_HOME/config) is the mandate: its bytes are
 # stored verbatim and the record marks source: config/afk-words. An absent file
 # records no mandate. A path that exists but is not a readable regular file
-# refuses the entry. Quiet mode never reads the file. A refresh that brings no
-# new words leaves the standing record untouched, so a later edit of the file
-# does not replace a live mandate. No parser reads the file.
+# records no mandate and warns at entry. Quiet mode never reads the file. A
+# refresh that brings no new words leaves the standing record untouched, so a
+# later edit of the file does not replace a live mandate. No parser reads the file.
 # The words block runs to the end of a version 2 record; in a version 1 record
 # only its legacy clauses:, refused:, and merge_grants: sections end it. Any
 # other line after the header that is not a stored line is damage, not a
@@ -514,9 +514,9 @@ fm_afk_contract_standing_words_path() {
 }
 
 # Read the standing file into WORDS and mark provenance. Absent means no
-# mandate. A path that exists and is not a readable regular file refuses, so a
-# broken file cannot look like a plain entry with no words. The sentinel keeps
-# trailing newlines, the same way --words-file does. Nothing in the file is parsed.
+# mandate. An unreadable or non-regular path warns and records no mandate. The
+# sentinel keeps trailing newlines, the same way --words-file does. Nothing in
+# the file is parsed.
 fm_afk_contract_load_standing_words() {
   local path
   path=$(fm_afk_contract_standing_words_path)
@@ -524,8 +524,8 @@ fm_afk_contract_load_standing_words() {
     return 0
   fi
   if [ ! -f "$path" ] || [ ! -r "$path" ]; then
-    fm_afk_contract_log "standing away words are not a readable file: $path"
-    return 1
+    fm_afk_contract_log "warning: standing away words were not used: $path is not a readable regular file"
+    return 0
   fi
   WORDS=$(cat "$path"; rc=$?; printf x; exit "$rc") || return 1
   WORDS=${WORDS%x}
