@@ -203,7 +203,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 PORTABLE_SERIAL_SHARDS=16
 
 # How many separate-runner shards the proven-isolated set splits into.
-# One owner, same refusal rule as the serial count: CI lane names carry it.
+# CI must wire every configured shard; lane names carry only the shard index.
 PORTABLE_PARALLEL_SHARDS=3
 
 # Conservative balance hint for a portable-serial script with no measurement.
