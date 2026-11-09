@@ -1985,10 +1985,10 @@ spawn_abort_cleanup() {
     if [ "$SPAWN_ENDPOINT_CLOSED" = 1 ] && fm_backend_herdr_endpoint_confirmed_gone "${T:-}" &&
       herdr_slot_status=$(git -C "$WT" status --porcelain --untracked-files=all 2>/dev/null) &&
       [ -z "$herdr_slot_status" ] &&
-      spawn_return_treehouse_slot >/dev/null 2>&1; then
+      (cd "$PROJ_ABS" && treehouse return --force "$WT") >/dev/null 2>&1; then
       :
     else
-      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, follow the journal recovery steps below" >&2
+      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, run 'treehouse return --force $WT' from $PROJ_ABS" >&2
     fi
   fi
   # Durable acquisitions survive aborts. The journal is written before get,
