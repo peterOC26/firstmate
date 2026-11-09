@@ -1,0 +1,11 @@
+1
+2
+3
+4
+5
+
+Newest captain row for pending-choice using the emitted bounded query:
+{"seq":4,"epoch":1794231665,"task":"pending-choice","wake":"","verdict":"captain","summary":"New blocker: choose a replacement queue.","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+
+Bounded query for a task with no captain history:
+(no matching row)
