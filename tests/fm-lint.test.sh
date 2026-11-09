@@ -1534,8 +1534,6 @@ test_root_memory_limit_reports_a_named_death() {
 
 test_memory_failure_retries_without_external_sources() {
   local tmp fakebin fixture out rc log rss_kib require_bounds=0 mode
-  local FM_LINT_MEMORY_FALLBACK=1
-  export FM_LINT_MEMORY_FALLBACK
   local -a modes=(0)
   if fm_lint_bounds_supported; then
     require_bounds=1
@@ -1570,20 +1568,6 @@ fi
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
-
-  rc=0
-  out=$(
-    unset FM_LINT_MEMORY_FALLBACK
-    PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 \
-      FM_TEST_FALLBACK_LOG="$log" "$LINT" --telemetry "$tmp/default.tsv" "$fixture" 2>&1
-  ) || rc=$?
-  [ "$rc" -eq 251 ] || fail "the default must preserve a source-aware memory failure (exit $rc)"$'\n'"$out"
-  [ "$(cat "$log")" = "$(printf 'yes\tnone')" ] \
-    || fail "default lint retried without external sources"$'\n'"$(cat "$log")"
-  assert_contains "$out" "Heap exhausted" "default lint lost the original diagnostics"
-  awk -F '\t' '$1 == "end" && $9 == 251 && $10 == "memory" && $12 == 1 { found=1 } END { exit !found }' \
-    "$tmp/default.roots.tsv" || fail "default lint lost its source-aware memory failure record"
-  pass "memory fallback stays off by default and preserves source-aware failure diagnostics"
 
   for mode in "${modes[@]}"; do
     : > "$log"
@@ -1650,8 +1634,6 @@ SH
 }
 
 test_memory_fallback_spends_only_the_remaining_root_deadline() {
-  local FM_LINT_MEMORY_FALLBACK=1
-  export FM_LINT_MEMORY_FALLBACK
   if ! fm_lint_bounds_supported; then
     pass "SKIP (host cannot enforce the bounded envelope): fallback deadline check"
     return
