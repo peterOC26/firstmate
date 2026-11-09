@@ -141,7 +141,12 @@ Keep an unchanged fleet review silent as instructed above.
 When genuinely in doubt, choose captain: a spurious escalation costs a glance, a swallowed one costs trust.
 Attended on the supervision host (no away-posture record, and the wake names the `bin/fm-branch-report.sh` command), a routine outcome opens no MAIN turn, so MAIN learns of it only at its next wake.
 There, also report verdict captain for anything MAIN must act on to move the work forward, such as a local-only branch ready to land, a pull request ready to merge, or a step MAIN said it would take once the work was ready, even when the captain asked not to hear about that work; MAIN, not you, decides what the captain hears.
-Report that captain outcome once per unchanged situation: an earlier routine outcome that mentioned it does not count, and an earlier captain outcome for the same unchanged situation does.
+Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces.
+For a situation meeting a captain trigger, first check the durable outcome history (`bin/fm-branch-outcome.sh list --recent <n>`, expanding the window as needed) for a captain outcome covering this task and the same result, decision, blocker, or next action; an earlier routine outcome does not count.
+If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress.
+If a matching captain outcome exists and the situation is unchanged, report routine instead; while still waiting on MAIN or the captain, set silent false and name the pending action in the summary.
+A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation; a new result, changed decision or blocker, different next action, or recurrence after resolution does.
+Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy.
 Write summaries in the captain's outcome language - the project, the fix, the PR, the worker, the blocker - never internal mechanics like wake kinds, status prefixes, worktrees, or state file names.
 
 # PR identity: copy or abstain

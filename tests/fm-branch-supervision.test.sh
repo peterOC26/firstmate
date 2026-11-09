@@ -44,7 +44,6 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
   [ "$host_a" = "$host_b" ] || fail "host prompt lost prefix stability"
   assert_not_contains "$host_a" "continuation" "host must not request unsupported handoffs"
   assert_contains "$host_a" "also report verdict captain for anything MAIN must act on to move the work forward" "host must retain upstream routing"
-  assert_contains "$host_a" "Report that captain outcome once per unchanged situation" "host must retain upstream deduplication"
 
   # Below the provider's 1024-token caching minimum a branch prompt gets no
   # cache reuse at all (measured in the feasibility evidence), so hold a
@@ -80,6 +79,40 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the second-mate relay, signal-span, or stale-liveness rule" ;;
   esac
   pass "branch prompt is byte-stable across homes, cwd, timezone, and time, above the cache floor"
+}
+
+test_branch_prompt_reports_unchanged_holds_without_repeated_escalation() {
+  local surface prompt
+  # Exercise the emitted contract on both public report surfaces. These
+  # assertions verify instructions reach the model, not model adherence.
+  for surface in pi host; do
+    if [ "$surface" = host ]; then
+      prompt=$(FM_HOME="$TMP_ROOT/prompt-holds" bash "$ROOT/bin/fm-branch-prompt.sh" --supervision-host) \
+        || fail "host prompt generator failed"
+    else
+      prompt=$(FM_HOME="$TMP_ROOT/prompt-holds" bash "$ROOT/bin/fm-branch-prompt.sh") \
+        || fail "Pi prompt generator failed"
+    fi
+    assert_contains "$prompt" \
+      "Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces." \
+      "$surface prompt does not apply deduplication to every escalation"
+    assert_contains "$prompt" \
+      "For a situation meeting a captain trigger, first check the durable outcome history (\`bin/fm-branch-outcome.sh list --recent <n>\`, expanding the window as needed) for a captain outcome covering this task and the same result, decision, blocker, or next action; an earlier routine outcome does not count." \
+      "$surface prompt does not require evidence of a matching captain outcome"
+    assert_contains "$prompt" \
+      "If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress." \
+      "$surface prompt can swallow a previously unreported hold"
+    assert_contains "$prompt" \
+      "If a matching captain outcome exists and the situation is unchanged, report routine instead; while still waiting on MAIN or the captain, set silent false and name the pending action in the summary." \
+      "$surface prompt can repeat an escalation or hide the pending action"
+    assert_contains "$prompt" \
+      "A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation; a new result, changed decision or blocker, different next action, or recurrence after resolution does." \
+      "$surface prompt does not distinguish duplicate wakes from material changes"
+    assert_contains "$prompt" \
+      "Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy." \
+      "$surface prompt permits task or heartbeat silence over a pending hold"
+  done
+  pass "both emitted prompts distinguish unreported holds, visible unchanged holds, and changed situations"
 }
 
 # A home adds its own rules through config/branch-prompt-include.md: absent or
@@ -1689,6 +1722,7 @@ WRAPPER
 }
 
 test_branch_prompt_is_byte_stable_and_above_cache_floor
+test_branch_prompt_reports_unchanged_holds_without_repeated_escalation
 test_branch_prompt_home_include_is_appended_last
 test_branch_prompt_routes_completed_scouts_through_guarded_cleanup
 test_outcome_store_is_append_only_with_cursor_reads
