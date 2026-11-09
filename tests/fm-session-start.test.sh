@@ -2217,6 +2217,7 @@ EOF
 
 test_backlog_parked_watch_holds_are_short() {
   local backend rec root task_home fakebin out reason watch hold_reason live captain before after row i kind mode
+  local prefix title glyph padding boundary case_index
   reason=$(printf 'QUIET-REASON-OMITTED%.0s' {1..80})
   watch=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" "Watch $reason")
   reason=$(bash -c '. "$1/bin/fm-hold-reason-lib.sh"; fm_hold_reason_encode "$2"' bash "$ROOT" "$reason")
@@ -2247,7 +2248,22 @@ EOF
         hold_reason=$reason
         [ "$i" -gt 108 ] && hold_reason=$watch
         [ "$i" -gt 162 ] && hold_reason="Wait $reason"
-        printf -- '- [ ] quiet-%s - Quiet, "quoted" job %s (hold: %s) (hold-kind: %s)\n' "$i" "$i" "$hold_reason" "$kind"
+        prefix="- [ ] quiet-$i - "
+        title="Quiet, \"quoted\" job $i"
+        case_index=$(( (i - 1) % 108 + 1 ))
+        if [ "$case_index" -le 6 ]; then
+          case "$case_index" in
+            1) glyph=é; boundary=116 ;;
+            2) glyph=€; boundary=116 ;;
+            3) glyph=€; boundary=115 ;;
+            4) glyph=🚢; boundary=116 ;;
+            5) glyph=🚢; boundary=115 ;;
+            6) glyph=🚢; boundary=114 ;;
+          esac
+          printf -v padding '%*s' "$((boundary - ${#prefix}))" ''
+          title="${padding// /a}$glyph$glyph$glyph$glyph$glyph"
+        fi
+        printf '%s%s (hold: %s) (hold-kind: %s)\n' "$prefix" "$title" "$hold_reason" "$kind"
       done
       printf -- '- [ ] captain-open - Open captain question (hold: %s) (hold-kind: captain)\n' "$captain"
       printf '%s\n' '- [ ] captain-call - Captain call (hold: Captain call DETAILS-KEPT) (hold-kind: captain)'
@@ -2264,6 +2280,15 @@ EOF
     out=$(FM_FAKE_SHORT_HOLDS="$mode" FM_FAKE_SHORT_REASON="$reason" FM_FAKE_WATCH_REASON="$watch" \
       FM_FAKE_LIVE_REASON="$live" FM_FAKE_CAPTAIN_REASON="$captain" FM_SESSION_START_QUEUED_LIMIT=1 \
       run_session_start "$task_home" "$root" "$fakebin:$BASE_PATH")
+    printf '%s' "$out" | perl -MEncode=decode,FB_CROAK -0777 -ne 'decode("UTF-8", $_, FB_CROAK)' \
+      || fail "$backend emitted invalid UTF-8"
+    if [ "$backend" != tasks-axi ]; then
+      for i in 1 2 3 4 5 6 109 110 111 112 113 114; do
+        row=$(printf '%s\n' "$out" | awk -v id="$i" '$0 ~ "^- \\[ \\] quiet-" id " - " { print }')
+        assert_contains "$row" '... (hold-kind:' "$backend did not bound the multibyte title for quiet-$i"
+        [ "${#row}" -le 160 ] || fail "$backend multibyte row exceeded its bound"
+      done
+    fi
     assert_contains "$out" '108 parked, 108 watch queued hold(s) shortened' "$backend lost the exact held counts"
     assert_contains "$out" 'quiet-216' "$backend dropped a watch row beyond the queued bound"
     assert_contains "$out" 'quiet-1' "$backend dropped a parked identity"

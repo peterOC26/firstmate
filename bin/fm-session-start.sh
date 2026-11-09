@@ -443,7 +443,7 @@ print_backlog_manual_compact() {
   local path=$1 reason=$2
   printf 'compact backlog listing (%s; done rows omitted; in-flight, blocked and other captain holds kept whole; parked/watch holds shortened; other queued bounded to %s; indented task bodies omitted)\n' \
     "$reason" "$QUEUED_LIMIT"
-  fm_hold_reason_decode_stream markdown < "$path" | awk -v max="$QUEUED_LIMIT" -v keep_re="$MANUAL_KEEP_RE" '
+  fm_hold_reason_decode_stream markdown < "$path" | LC_ALL=C awk -v max="$QUEUED_LIMIT" -v keep_re="$MANUAL_KEEP_RE" '
     function state_for_heading(line, heading) {
       heading = line
       sub(/^##[[:space:]]+/, "", heading)
@@ -472,7 +472,11 @@ print_backlog_manual_compact() {
           short = $0
           sub(/[[:space:]]*[(]hold:.*/, "", short)
           sub(/[[:space:]]*[(]hold-kind:.*/, "", short)
-          if (length(short) > 120) short = substr(short, 1, 117) "..."
+          if (length(short) > 120) {
+            cut = 117
+            while (substr(short, cut + 1, 1) ~ /[\200-\277]/) cut--
+            short = substr(short, 1, cut) "..."
+          }
           printf "%s (hold-kind: %s; reason omitted)\n", short, kind
           if (kind == "parked") parked++; else watch++
         } else print $0
