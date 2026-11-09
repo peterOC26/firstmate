@@ -507,9 +507,9 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
     // Projectless records may establish ambiguity, never routing authority.
     if (!project || !task) return UNSAFE_SCOPE;
     // A second mate's signal is judged by its new span on both paths. For a
-    // single-task log, an attended host can have accepted a routine signal
-    // before its task gained a main-owned decision, so it checks the whole
-    // log; Pi retains its existing per-row scan.
+    // single-task log, an attended host or recovery close may revisit a signal
+    // after its task gained a main-owned decision, so it checks the whole log;
+    // other Pi wakes retain their existing per-row scan.
     const spanRule = kind === "signal" && secondmates.has(task);
     if (task && (kind === "stale" || (kind === "signal" && (attendedHost || spanRule)))) {
       const statusPath = `${state}/${task}.status`;
@@ -620,7 +620,7 @@ export interface BranchOfferVerdict {
 // A recovery close offers the original eligible rows, with their exact task
 // scope and sequence ids; it never grants the synthetic check or main-owned
 // rows. An empty recovery is not a branch turn.
-// A check-kind close (merge-confirmation polls, Relay mentions,
+// Any other check-kind close (merge-confirmation polls, Relay mentions,
 // credential/auth failures, and every other legitimately main-only class -
 // docs/pi-supervision-branch.md) is never routed to the branch while attended,
 // even when other currently-unread rows are individually eligible: this

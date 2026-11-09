@@ -3872,7 +3872,7 @@ resurface_after_downtime() {
   # Re-announcing from this cycle is what turned a lost handshake into an
   # unbounded recovery loop. A handled host turn explicitly settles its
   # handoff after consuming the predecessor's rows, making any row left for
-  # main a recoverable downtime episode.
+  # main recoverable under docs/watcher-continuity.md "Generation reuse".
   if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
     if ! fm_recovery_marker_arm_check "$WATCHER_DOWNTIME_MARKER"; then
       echo "watcher: recovery state could not be consumed safely" >&2

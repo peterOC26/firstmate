@@ -146,7 +146,8 @@ Main follows the [`/afk` return contract](../.agents/skills/afk/SKILL.md#how-to-
 An explicit captain autonomy grant in the current task's own note is standing authority for that job only.
 `bin/fm-branch-prompt.sh` "Postures" owns how the away session reads and judges it.
 Captain outcomes of a close the engine takes remain in the store until the return drain presents them (see [Captain outcomes](#captain-outcomes)).
-Every turn that starts attended meets the attended rule again at its start, and the offer's scan is the scope the turn claims: a close accepted away whose turn starts attended, because the captain returned in between, or an attended close whose task turned main-only (a decision appeared) while the successor started, reaches main unchanged and leaves that successor cycle running, with the handoff that turn had confirmed handed back as already announced interrupted recovery, so that successor does not announce the same close again.
+Every turn that starts attended meets the attended rule again at its start, and the offer's scan is the scope the turn claims: a close accepted away whose turn starts attended, because the captain returned in between, or an attended close whose task turned main-only (a decision appeared) while the successor started, reaches main unchanged and leaves that successor cycle running.
+The handoff follows the [recovery generation reuse contract](watcher-continuity.md#generation-reuse).
 A captain who leaves while an attended turn runs turns its captain outcomes into away outcomes: they wait for the return too.
 
 ### Quiet mode
@@ -276,7 +277,7 @@ All other primaries and the host-off Stop path retain their existing behavior.
 
 With acknowledged hand-back disabled, every path that cannot finish a wake the engine took hands that wake to main, with one `supervision-host: <why>` line after the close.
 An away hand-back may also carry the [inbox-note return signal](#away).
-Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
+Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes recovery under the [generation reuse contract](watcher-continuity.md#generation-reuse).
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
 On Claude, a Stop hook whose rewake is refused while the recovery marker is still `pending:handling` or `announced:handling` and no watcher is live preserves the host's actionable output on any resulting rewake.
