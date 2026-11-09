@@ -1,0 +1,21 @@
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.P5fp1X/home/data/abort-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/abort-a
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.P5fp1X/home/data/abort-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: durable Treehouse acquisition did not report a worktree; retain /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.P5fp1X/home/state/abort-a.treehouse-acquire for reconciliation
+warning: herdr presentation cleanup could not verify the exact pane; refusing focus-unsafe pane close
+warning: retaining Treehouse lease recovery journal /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.P5fp1X/home/state/abort-a.treehouse-acquire; reconcile this acquisition before retrying task abort-a
+Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything.
+journal=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.P5fp1X/home/state/abort-a.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.

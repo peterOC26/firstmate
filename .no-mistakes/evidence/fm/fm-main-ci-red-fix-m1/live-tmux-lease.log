@@ -1,0 +1,133 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh
+
+$ fm-spawn.sh lease-live PROJECT "sh -c ..." --scout --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project' to release it.
+spawned lease-live harness=sh kind=scout window=primary:fm-lease-live worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project
+
+$ task metadata and acquisition identity
+window=primary:fm-lease-live
+endpoint_task_id=lease-live
+worktree=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project
+treehouse_lease_id=4c68527b073dc32d5f17acdbd85e5bc6
+treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/lease-live/a1794215532.3929826.16561
+project=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/project
+harness=sh
+kind=scout
+tasktmp=/tmp/fm-lease-live
+model=default
+effort=default
+spawn_gen=s1794215534.3929826.30197
+project=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/project
+treehouse_lease_holder=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/lease-live/a1794215532.3929826.16561
+treehouse_lease_id=4c68527b073dc32d5f17acdbd85e5bc6
+
+$ tmux capture-pane (real shell endpoint)
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/project$
+ cd -- '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project'
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project$ cd -- '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/
+.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project'
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project$ export GOTMPDIR=/tmp/fm-lease-live/gotmp
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project$ export COMPACT_ADVISER_DISABLE=1
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project$ export FM_TASK_ID=lease-live
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehous
+e/.treehouse/project-80a342/1/project$ . '/tmp/fm-lease-live+deb87146dd0acae1f556dd161be49d77167095309dc432870b01d179aed
+ca47e/launch.s1794215534.3929826.30197.sh'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ kill exact worker window, then treehouse status --json
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+[{"name":"1","path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project","status":"leased","flavor":"git","lease_id":"4c68527b073dc32d5f17acdbd85e5bc6","lease_holder":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/lease-live/a1794215532.3929826.16561","leased_at":"2026-11-09T10:12:12.977051653+01:00","processes":[]}]
+{
+  "name": "1",
+  "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project",
+  "status": "leased",
+  "flavor": "git",
+  "lease_id": "4c68527b073dc32d5f17acdbd85e5bc6",
+  "lease_holder": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/lease-live/a1794215532.3929826.16561",
+  "leased_at": "2026-11-09T10:12:12.977051653+01:00",
+  "processes": []
+}
+
+$ repeat same-id spawn (must refuse)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh
+REFUSED: task lease-live has a retained Treehouse acquisition journal; reconcile /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/state/lease-live.treehouse-acquire before retrying
+Manual recovery: pause allocations and cleanup for this project; inspect the journal, retained task records, pool treehouse-state.json, and slot claim before releasing anything.
+journal=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/state/lease-live.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treehouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired case from pool treehouse-state.json, then remove only this journal by hand and stop:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any local home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is confirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+same-id retry exit=1
+complete: lease-live captain-call inventory reviewed
+
+$ fm-teardown.sh lease-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: reaping leaked worktree process group for lease-live: 3929804
+teardown: force-killing leaked worktree process group for lease-live: 3929804
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown lease-live complete (window primary:fm-lease-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project)
+Backlog: lease-live just finished (config/backlog-backend selects manual editing). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/data/backlog.md - move lease-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+$ treehouse status --json after guarded cleanup
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+[{"name":"1","path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-lab.0yjhjh/treehouse/.treehouse/project-80a342/1/project","status":"available","flavor":"git","lease_id":"","lease_holder":"","leased_at":null,"processes":[]}]
+
+Verified real tmux cwd, durable lease after endpoint exit, duplicate refusal, and guarded lease release.

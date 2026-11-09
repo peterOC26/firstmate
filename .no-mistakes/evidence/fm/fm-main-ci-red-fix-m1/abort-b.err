@@ -1,0 +1,3 @@
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.hK9WwV/home/data/abort-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/abort-b
+warning: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZRFE3PJJN8KQDW6A33PF0Z/.test-phase-tmp/fm-herdr-presentation.hK9WwV/home/data/abort-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted
