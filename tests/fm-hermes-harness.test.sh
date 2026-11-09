@@ -201,7 +201,7 @@ chmod +x "$fakebin/tmux"
 
 home="$case_dir/home"
 proj="$case_dir/project"
-wt="$case_dir/wt"
+wt="$case_dir/slot-worker/repo"
 fm_test_spawn_home "$home" hermes
 fm_git_worktree "$proj" "$wt" hermes-test
 fm_test_spawn_brief "$home" hermes-worker
@@ -216,6 +216,8 @@ if out=$(fm_test_run_spawn "$home" "$wt" "$fakebin" sm "$proj" --secondmate --ha
 assert_contains "$out" 'crewmate/scout adapter only' 'secondmate diagnostic'
 pass 'scout spawn carries native profile, interactive brief, hook overlay and metadata'
 
+wt="$case_dir/slot-stalled/repo"
+git -C "$proj" worktree add --quiet -b hermes-stalled "$wt"
 fm_test_spawn_brief "$home" hermes-stalled
 if out=$(FM_FAKE_HERMES_STALL_META="$home/state/hermes-stalled.meta" FM_FAKE_HERMES_KILL_LOG="$case_dir/kill" \
   FM_HERMES_READY_POLLS=2 FM_HERMES_POLL_INTERVAL=0 \
@@ -227,6 +229,8 @@ assert_contains "$(cat "$case_dir/kill" 2>/dev/null)" 'kill-window record=presen
 [ ! -e "$home/state/hermes-stalled.meta" ] || fail 'stalled fresh spawn kept its task record'
 pass 'stalled Hermes launch stops its pane before the task record is removed'
 
+wt="$case_dir/slot-unclosed/repo"
+git -C "$proj" worktree add --quiet -b hermes-unclosed "$wt"
 fm_test_spawn_brief "$home" hermes-unclosed
 if out=$(FM_FAKE_HERMES_STALL_META="$home/state/hermes-unclosed.meta" FM_FAKE_HERMES_KILL_LOG="$case_dir/kill-unclosed" \
   FM_FAKE_HERMES_KILL_FAIL=1 FM_HERMES_READY_POLLS=2 FM_HERMES_POLL_INTERVAL=0 \
