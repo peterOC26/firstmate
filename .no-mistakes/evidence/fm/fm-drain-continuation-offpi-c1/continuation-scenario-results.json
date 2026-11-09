@@ -1,0 +1,10 @@
+{
+  "harness": "codex",
+  "live_cli_scenarios": [
+    "older and newer continuations survive plain-row collapse and repeat until acknowledged",
+    "emitted processing contract requires reconciliation, authorized action, duplicate prevention and blocker/no-action evidence",
+    "legacy rows and visible/silent routine presentation remain compatible",
+    "UTF-8 handoffs keep executable full-outcome lookups and contiguous bounded acknowledgement",
+    "host opt-out leaves the handoff unread for later presentation"
+  ]
+}

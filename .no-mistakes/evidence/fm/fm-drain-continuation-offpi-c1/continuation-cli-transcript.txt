@@ -1,0 +1,210 @@
+
+$ FM_HOME=<disposable lab> bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/mixed
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/mixed
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-harness.sh
+codex
+[exit 0]
+Actual current harness detected without test seams: codex
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary implementation complete --continuation Implementation complete.
+Start	the authorized validation;then report its result.
+1
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh mark-read --through 1
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary older CI note
+2
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary second stage complete --continuation Start authorized stage two.
+3
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary newest CI note
+4
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task legacy --verdict captain --summary needs a decision
+5
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task routine --verdict routine --summary still working
+6
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task silent --verdict routine --summary unchanged --silent true
+7
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: implementation complete; MAIN continuation handoff: Implementation complete. Start the authorized validation; then report its result.
+[seq 4, newest of 2 for this task, recorded 0m ago] gamma: newest CI note
+[seq 3, recorded 0m ago] gamma: second stage complete; MAIN continuation handoff: Start authorized stage two.
+[seq 5, recorded 0m ago] legacy: needs a decision
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 5; until then every drain presents them again
+BRANCH OUTCOMES, ROUTINE (handled by the supervision session since your last drain; for your awareness, nothing to acknowledge):
+[seq 6] routine: still working
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: implementation complete; MAIN continuation handoff: Implementation complete. Start the authorized validation; then report its result.
+[seq 4, newest of 2 for this task, recorded 0m ago] gamma: newest CI note
+[seq 3, recorded 0m ago] gamma: second stage complete; MAIN continuation handoff: Start authorized stage two.
+[seq 5, recorded 0m ago] legacy: needs a decision
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 5; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh mark-processed --through 5
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+[exit 0]
+Persisted state: processed=5; immutable outcome-log digest preserved; next drain has no outcomes.
+
+$ FM_HOME=<disposable lab> bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/bounded
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/bounded
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary stage complete --continuation <2125 UTF-8 bytes>
+1
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary <2100 UTF-8 bytes> --continuation <2125 UTF-8 bytes>
+2
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary stage complete --continuation <2125 UTF-8 bytes>
+3
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary <2100 UTF-8 bytes> --continuation <2125 UTF-8 bytes>
+4
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary stage complete --continuation <2125 UTF-8 bytes>
+5
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary <2100 UTF-8 bytes> --continuation <2125 UTF-8 bytes>
+6
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary stage complete --continuation <2125 UTF-8 bytes>
+7
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary <2100 UTF-8 bytes> --continuation <2125 UTF-8 bytes>
+8
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary later CI note
+9
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 1
+[seq 2, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 2
+[seq 3, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 3
+[seq 4, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 4
+[seq 5, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 5
+[seq 6, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 6
+BRANCH OUTCOMES: 3 newer captain outcome(s) are held back (byte cap); they follow on the next drain once these are acknowledged
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 6; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 1
+{"seq":1,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"stage complete","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 1."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 2
+{"seq":2,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 2."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 3
+{"seq":3,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"stage complete","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 3."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 4
+{"seq":4,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 4."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 5
+{"seq":5,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"stage complete","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 5."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 6
+{"seq":6,"epoch":1794240519,"task":"gamma","wake":"","verdict":"captain","summary":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 6."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 1
+[seq 2, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 2
+[seq 3, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 3
+[seq 4, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 4
+[seq 5, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 5
+[seq 6, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 6
+BRANCH OUTCOMES: 3 newer captain outcome(s) are held back (byte cap); they follow on the next drain once these are acknowledged
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 6; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh mark-processed --through 6
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh unprocessed
+{"seq":7,"epoch":1794240520,"task":"gamma","wake":"","verdict":"captain","summary":"stage complete","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 7.","recordedAgo":"0m"}
+{"seq":8,"epoch":1794240520,"task":"gamma","wake":"","verdict":"captain","summary":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 8.","recordedAgo":"0m"}
+{"seq":9,"epoch":1794240520,"task":"gamma","wake":"","verdict":"captain","summary":"later CI note","silent":false,"statusEndpoint":0,"statusIdent":"-","recordedAgo":"0m"}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 7, recorded 0m ago] gamma: stage complete; MAIN continuation handoff: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 7
+[seq 8, recorded 0m ago] gamma: 界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 [truncated]; full MAIN continuation handoff: bin/fm-branch-outcome.sh lookup --seqs 8
+[seq 9, recorded 0m ago] gamma: later CI note
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 9; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 7
+{"seq":7,"epoch":1794240520,"task":"gamma","wake":"","verdict":"captain","summary":"stage complete","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 7."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh lookup --seqs 8
+{"seq":8,"epoch":1794240520,"task":"gamma","wake":"","verdict":"captain","summary":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界","silent":false,"statusEndpoint":0,"statusIdent":"-","continuation":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界 Start authorized step 8."}
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh mark-processed --through 9
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+[exit 0]
+Observed UTF-8 row byte lengths including newline: [600, 599, 600, 599, 600, 599]; total=3597; after first acknowledgement unprocessed seqs=[7, 8, 9]; final processed=9.
+
+$ FM_HOME=<disposable lab> bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/opt-out
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70GTNYFBFR3KQHVN2KVHAEZ/fm-lab.jscr3kks/opt-out
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary pending handoff --continuation Start authorized validation.
+1
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: pending handoff; MAIN continuation handoff: Start authorized validation.
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 1; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable lab> bash bin/fm-branch-outcome.sh mark-processed --through 1
+[exit 0]
+
+All disposable lab directories removed on exit.
