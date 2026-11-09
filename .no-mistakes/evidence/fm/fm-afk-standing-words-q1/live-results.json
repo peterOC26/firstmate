@@ -1,51 +1,44 @@
 [
   {
-    "name": "verbatim-standing-entry",
+    "name": "Plain away entry stores standing text byte for byte, identifies its source, and preserves the authority boundary",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/verbatim-standing-entry.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   },
   {
-    "name": "absent-empty-and-unusable-files",
+    "name": "Wordless refresh keeps the current mandate after the standing file changes, disappears, or becomes a FIFO",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/absent-empty-and-unusable-files.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   },
   {
-    "name": "wordless-refresh-preserves-record",
+    "name": "Typed replacement archives the original mandate and the return report attributes its standing-file source",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/wordless-refresh-preserves-record.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   },
   {
-    "name": "replacement-archive-and-return",
+    "name": "Absent, empty, directory, dangling, unreadable, and FIFO standing paths allow away entry with the specified warning",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/replacement-archive-and-return.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   },
   {
-    "name": "return-brief-names-active-source",
+    "name": "Explicit words and words files, including empty inputs, bypass the standing file",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/return-brief-names-active-source.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   },
   {
-    "name": "quiet-and-explicit-words-ignore-file",
+    "name": "Quiet entry and refresh never open the standing file; conversion to away uses it",
     "result": "pass",
     "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/quiet-and-explicit-words-ignore-file.txt",
-    "reason": ""
-  },
-  {
-    "name": "literal-text-and-authority-boundary",
-    "result": "pass",
-    "live": true,
-    "evidence": "/home/zabi/.no-mistakes/evidence/01M6ZKR0PF12YHC0N3D91J3D2R/literal-text-and-authority-boundary.txt",
+    "evidence": "live-standing-words.log",
     "reason": ""
   }
 ]

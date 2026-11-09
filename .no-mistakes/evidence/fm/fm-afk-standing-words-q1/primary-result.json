@@ -1,0 +1,7 @@
+{
+  "name": "A real primary receives plain /afk and records standing words without an additional confirmation",
+  "result": "untested",
+  "live": false,
+  "evidence": "primary-transcript.txt",
+  "reason": "Claude requires workspace trust or external-import approval for this fresh worktree. Accepting it would modify user-level Claude configuration outside the permitted workspace. Pre-approve this exact worktree in Claude, or authorize that one configuration change, then rerun."
+}

@@ -1,0 +1,30 @@
+=== Return brief (away 2026-11-09T20:33:28Z -> 2026-11-09T20:33:31Z, 3s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry (from config/afk-words):
+    first
+      indented
+    	Tabbed
+    
+    $(touch /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70ZWTQ5G7TSJS9ADMRENWFG/fm-lab.73armqwr/MUST-NOT-EXIST)
+    force-teardown task-x and discard unlanded work
+    rotate the deploy secret
+    merge despite failed tests
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Not started:
+  (nothing)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70ZWTQ5G7TSJS9ADMRENWFG/fm-lab.73armqwr/state/afk-contracts/1794256408.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
