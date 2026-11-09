@@ -143,10 +143,10 @@
 #   - `done` rows are never listed. Retained completion history belongs to the
 #     reporting surfaces (bin/fm-bearings-snapshot.sh, /ahoy), and at startup it
 #     is pure weight - 10 done rows cost 3.3KB in an observed main-home digest.
-#   - Every in-flight, held, and blocked row is listed IN FULL, with its
-#     hold_kind/hold_reason and blocked_by. Those are the rows AGENTS.md
-#     sections 7 and 10 make actionable at startup, so they are never bounded
-#     away.
+#   - Every in-flight row and every still-open captain hold keeps its full
+#     listing metadata. Queued parked/watch holds keep one short identity line
+#     each and exact counts, with full reasons available through the task pointer.
+#     Other held and blocked rows keep their full listing metadata.
 #   - Only the plain queued (dispatchable-now) listing is bounded, by
 #     FM_SESSION_START_QUEUED_LIMIT, default 20. Anything it omits is disclosed
 #     with an exact remainder count and the command that shows the rest, so a
@@ -163,9 +163,8 @@
 # When manual mode is selected, or tasks-axi is unavailable or incompatible,
 # this script prints only backlog section headings and item title lines, so
 # title-line hold and blocked-by metadata remain visible while indented bodies
-# stay out of the startup digest; the same never-bound-a-held-or-blocked-row
-# rule applies, recognized there from the title line's own hold/blocked-by
-# markers.
+# stay out of the startup digest. Queued parked/watch holds are shortened from
+# their explicit hold-kind tags; in-flight rows are always kept whole.
 # Full bodies are targeted follow-up only: `bin/fm-tasks-axi.sh show <id> --full` when
 # compatible tasks-axi is available, or `data/backlog.md` when the file body is
 # truly needed.
@@ -441,7 +440,7 @@ MANUAL_KEEP_RE='[(]hold|blocked-by:'
 
 print_backlog_manual_compact() {
   local path=$1 reason=$2
-  printf 'compact backlog listing (%s; done rows omitted; every in-flight, held, and blocked title line kept; other queued bounded to %s; indented task bodies omitted)\n' \
+  printf 'compact backlog listing (%s; done rows omitted; in-flight and captain holds kept whole; parked/watch holds shortened; other queued bounded to %s; indented task bodies omitted)\n' \
     "$reason" "$QUEUED_LIMIT"
   awk -v max="$QUEUED_LIMIT" -v keep_re="$MANUAL_KEEP_RE" '
     function state_for_heading(line, heading) {
@@ -463,11 +462,25 @@ print_backlog_manual_compact() {
     state == "done" && /^[-*][[:space:]]+/ { done_total++; next }
     state == "queued" && /^[-*][[:space:]]+/ {
       queued_total++
-      if ($0 ~ keep_re) { gated++; print $0; next }
+      if ($0 ~ keep_re) {
+        gated++
+        if (match($0, /[(]hold-kind: (parked|watch)[)]/)) {
+          kind = substr($0, RSTART + 12, RLENGTH - 13)
+          short = $0
+          sub(/[[:space:]]*[(]hold:.*/, "", short)
+          sub(/[[:space:]]*[(]hold-kind:.*/, "", short)
+          if (length(short) > 120) short = substr(short, 1, 117) "..."
+          printf "%s (hold-kind: %s; reason omitted)\n", short, kind
+          if (kind == "parked") parked++; else watch++
+        } else print $0
+        next
+      }
       if (plain_shown < max) { plain_shown++; print $0 }
       next
     }
     END {
+      if (parked + watch > 0)
+        printf "(%d parked, %d watch queued hold(s) shortened; full details: bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md)\n", parked, watch
       plain_total = queued_total - gated
       if (in_flight + queued_total + done_total == 0) {
         print "(no backlog item title lines found)"
@@ -489,6 +502,58 @@ print_backlog_manual_compact() {
 # blocks stop at their `help[` header instead.
 strip_axi_help() {
   awk '/^help\[/ { exit } { print }'
+}
+
+# Shorten only explicitly parked/watch queued rows, before decoding reasons.
+# Parse TOON cells (JSON-quoted strings can contain commas and escaped quotes),
+# locating columns by name. Unknown shapes and other hold kinds stay whole.
+# The table retains its identity fields and row count; long titles and blocker
+# lists are capped at 80 characters and hold reasons are replaced by a pointer.
+print_tasks_with_short_holds() {
+  perl -MJSON::PP -e '
+    use strict;
+    use warnings;
+    binmode STDIN, ":encoding(UTF-8)";
+    binmode STDOUT, ":encoding(UTF-8)";
+    my $json = JSON::PP->new->allow_nonref;
+    my (%column, %shortened);
+    sub value {
+      my ($raw) = @_;
+      return $raw =~ /^"/ ? $json->decode($raw) : $raw;
+    }
+    while (my $line = <STDIN>) {
+      last if $line =~ /^help\[/;
+      if ($line =~ /^tasks\[\d+\]\{([^}]*)\}:/) {
+        my @names = split /,/, $1;
+        %column = map { $names[$_] => $_ } 0 .. $#names;
+      } elsif (%column && $line =~ /^  (.*)$/) {
+        my @fields = $1 =~ /("(?:[^"\\]|\\.)*"|[^,]+)/g;
+        if (exists $column{state} && exists $column{hold_kind}
+            && exists $column{hold_reason} && @fields == keys %column) {
+          my $kind = value($fields[$column{hold_kind}]);
+          if (value($fields[$column{state}]) eq "queued"
+              && ($kind eq "parked" || $kind eq "watch")) {
+            $shortened{$kind}++;
+            for my $name (qw(title blocked_by)) {
+              next unless exists $column{$name};
+              my $text = value($fields[$column{$name}]);
+              $fields[$column{$name}] = $json->encode(substr($text, 0, 77) . "...")
+                if length($text) > 80;
+            }
+            $fields[$column{hold_reason}] = $json->encode("see task details");
+            $line = "  " . join(",", @fields) . "\n";
+          }
+        }
+      } else {
+        %column = ();
+      }
+      print $line;
+    }
+    if (%shortened) {
+      printf "(%d parked, %d watch queued hold(s) shortened; full details: bin/fm-tasks-axi.sh show <id> --full)\n",
+        $shortened{parked} // 0, $shortened{watch} // 0;
+    }
+  ' | fm_hold_reason_decode_stream
 }
 
 # Bound the dispatchable-now listing without rewriting the tool's own rendering:
@@ -528,14 +593,14 @@ print_backlog_tasks_axi_compact() {
   elif ! ready=$(tasks-axi ready --file "$path" 2>&1); then
     err=$ready
   else
-    printf 'compact backlog listing (tasks-axi; done rows omitted; every in-flight, held, and blocked row shown in full; ready queued bounded to %s; task bodies omitted)\n' \
+    printf 'compact backlog listing (tasks-axi; done rows omitted; in-flight and captain holds kept whole; parked/watch holds shortened; ready queued bounded to %s; task bodies omitted)\n' \
       "$QUEUED_LIMIT"
     printf '\nin flight:\n'
     printf '%s\n' "$in_flight" | fm_hold_reason_decode_stream | strip_axi_help
     printf '\nheld (captain- or time-gated; an in-flight item that is also held appears in both groups):\n'
-    printf '%s\n' "$held" | fm_hold_reason_decode_stream | strip_axi_help
+    printf '%s\n' "$held" | print_tasks_with_short_holds
     printf '\nblocked queued:\n'
-    printf '%s\n' "$blocked" | fm_hold_reason_decode_stream | strip_axi_help
+    printf '%s\n' "$blocked" | print_tasks_with_short_holds
     printf '\nready queued (dispatchable now):\n'
     print_ready_queued_bounded "$ready"
     return 0
