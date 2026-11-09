@@ -15,9 +15,10 @@
 #     watcher ownership
 #   - status-tail bounding, default and FM_SESSION_START_STATUS_TAIL override
 #   - the per-line status-tail cap and its truncation marker
-#   - startup backlog composition: done rows dropped, in-flight and captain
-#     holds kept whole, parked/watch holds shortened with exact counts, and
-#     the dispatchable queued listing bounded with an exact disclosed remainder
+#   - startup backlog composition: done rows dropped, unblocked queued
+#     parked/watch holds shortened with exact counts, other holds and all
+#     in-flight/blocked rows kept whole, and the dispatchable queued listing
+#     bounded with an exact disclosed remainder
 #   - orphan status logs whose task meta has already disappeared
 #   - per-task endpoint-liveness lines for a live and a dead recorded target,
 #     tmux and herdr both
@@ -2113,7 +2114,7 @@ EOF
   assert_grep "ready --file $home/data/backlog.md" "$log" \
     "session start did not ask tasks-axi for the dispatchable queued set"
 
-  pass "compatible tasks-axi backlog rendering drops done rows and keeps every in-flight, held, and blocked row"
+  pass "compatible tasks-axi backlog rendering drops done rows and preserves in-flight, non-watch captain-held, and blocked metadata"
 }
 
 # The bound may only ever cut the dispatchable-now listing, and whatever it cuts
@@ -2189,7 +2190,7 @@ EOF
     "manual compact rendering did not disclose an exact queued remainder"
   assert_contains "$out" "or data/backlog.md" "manual compact digest omitted the data/backlog.md full-body pointer"
 
-  pass "manual backlog rendering drops done rows, keeps every held or blocked title line, and bounds the rest"
+  pass "manual backlog rendering drops done rows, preserves non-watch captain-held and blocked metadata, and bounds plain queued rows"
 }
 
 test_backlog_compact_tasks_axi_unavailable_uses_manual_fallback() {

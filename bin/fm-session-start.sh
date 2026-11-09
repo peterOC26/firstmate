@@ -143,10 +143,12 @@
 #   - `done` rows are never listed. Retained completion history belongs to the
 #     reporting surfaces (bin/fm-bearings-snapshot.sh, /ahoy), and at startup it
 #     is pure weight - 10 done rows cost 3.3KB in an observed main-home digest.
-#   - Every in-flight row and every still-open captain hold keeps its full
-#     listing metadata. Unblocked queued parked/watch holds keep one short identity line
-#     each and exact counts, with full reasons available through the task pointer.
-#     Other held and blocked rows keep their full listing metadata.
+#   - Only unblocked queued holds are eligible for shortening: parked-kind
+#     holds and watch jobs (captain-kind holds whose decoded reasons start
+#     with Watch or Wait) keep one short identity line each with exact counts
+#     and a full-details pointer.
+#     Every other hold, every in-flight row, and every blocked row keeps its
+#     full listing metadata.
 #   - Only the plain queued (dispatchable-now) listing is bounded, by
 #     FM_SESSION_START_QUEUED_LIMIT, default 20. Anything it omits is disclosed
 #     with an exact remainder count and the command that shows the rest, so a
@@ -161,9 +163,9 @@
 # `tasks-axi ready`), so this script never reimplements task state; the groups
 # can overlap, because an in-flight item that is also held appears under both.
 # When manual mode is selected, or tasks-axi is unavailable or incompatible,
-# this script prints only backlog section headings and item title lines, so
-# title-line hold and blocked-by metadata remain visible while indented bodies
-# stay out of the startup digest.
+# this script prints only backlog section headings and item title lines,
+# applying the same shortening rule above and keeping other title-line metadata
+# whole; indented bodies stay out of the startup digest.
 # Full bodies are targeted follow-up only: `bin/fm-tasks-axi.sh show <id> --full` when
 # compatible tasks-axi is available, or `data/backlog.md` when the file body is
 # truly needed.
