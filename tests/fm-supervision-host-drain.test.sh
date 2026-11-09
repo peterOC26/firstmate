@@ -528,8 +528,7 @@ test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi() {
 
 
 # A Pi-recorded continuation must survive a switch to the host drain, including
-# repeated presentation before acknowledgement. Keep each handoff on its task's
-# single line while leaving rows without a continuation unchanged.
+# repeated presentation before acknowledgement.
 test_branch_outcomes_present_continuations_off_pi() {
   local home drained continuation fakecodex primary
   home="$TMP_ROOT/drain-continuation-off-pi"
