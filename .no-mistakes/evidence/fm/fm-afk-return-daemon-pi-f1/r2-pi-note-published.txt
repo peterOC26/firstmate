@@ -1,0 +1,40 @@
+
+
+ $ bin/fm-session-start.sh (timeout 60000s)
+
+ ... (207 earlier lines, ctrl+o to expand)
+ Follow the supervision operating instructions block above for harness 'pi'.
+ This script never starts supervision itself.
+
+ The digest above is complete for this session start. The READ-ONCE CONTRACT
+ section near the top of it governs what may still be read from disk.
+
+ Took 5.4s
+
+
+ Session start completed. Reviewing the supervision instructions.
+
+ The user's instruction to initialize once and reply READY conflicts with the supervision requirement to make the
+ required fm_watch_arm_pi call during the initial process cycle. The isolated live test primary status adds further
+ ambiguity.
+
+ The required fm_watch_arm_pi call will be made as part of session initialization. The captain's explicit instruction
+ to reply READY will follow.
+
+ No bootstrap-diagnostics skill load is needed. The inherited FM_HOME path is correct.
+
+ Session start is in; making the one required Pi watcher arm for this initial cycle.
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only
+ after a later notification says the cycle is missing, failed, or unhealthy
+
+
+ Captain, READY.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑38k ↓950 R21k CH96.4% $0.093 (sub) 4.3%/500k (auto)                                             (xai) grok-4.6 • medium

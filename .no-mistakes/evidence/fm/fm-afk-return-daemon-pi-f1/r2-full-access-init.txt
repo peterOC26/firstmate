@@ -1,0 +1,40 @@
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+  permissions: YOLO mode
+
+  Tip: Use /fork to branch the current chat into a new thread.
+
+⚠ Heads up, you have less than 10% of your weekly limit left. Run /status for a breakdown.
+
+
+› This is an isolated live test primary. Use only inherited FM_HOME and private TMUX for state and lifecycle. Do not
+  dispatch, publish, install, change global configuration or run pipelines. Initialize once with bin/fm-session-
+  start.sh, then reply READY. The driver prepares away state and owns cleanup. Follow the repository away-return policy
+  on operational inbox wakes and publish actual replies with bin/fm-inbox.sh reply.
+
+
+• Captain, I’ll initialize this isolated test once using the inherited environment.
+
+• Ran bin/fm-session-start.sh
+  └
+    ================================================================================
+    SESSION START - /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX/.l.D7KDLf
+    +128 lines (^t to view transcript)
+
+• READY, captain.
+
+  Worked for 11s • 15:51
+
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · I…  ⚠ 2 warnings · f2 to view
+
+
+
+
+
+
+
+

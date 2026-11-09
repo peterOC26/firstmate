@@ -1,0 +1,40 @@
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+⚠ Heads up, you have less than 10% of your weekly limit left. Run /status for a breakdown.
+
+
+› This is an isolated test primary. Do not dispatch, publish, install packages, change global configuration, or run
+  pipelines. Initialize this lab with bin/fm-session-start.sh once, using the inherited FM_HOME and TMUX. All mutations
+  must stay in this lab or this repository. Then reply READY. The driver prepares the away record and owns cleanup.
+
+
+• Captain, I’ll initialize the lab once with the inherited environment, then reply READY.
+
+• Ran bin/fm-session-start.sh
+  └
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+    + 129 lines (^t to expand)
+
+• READY
+
+  Worked for 12s • 15:35
+
+
+
+
+
+
+
+
+
+
+
+                                                                                      ⚠ weekly limit: 8% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Initialize isolated test lab …
+  ← for agents · ? for shortcuts                                                              ⚠ 3 warnings · f2 to view

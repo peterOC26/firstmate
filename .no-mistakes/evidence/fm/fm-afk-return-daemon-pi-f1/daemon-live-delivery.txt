@@ -1,0 +1,40 @@
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+⚠ Heads up, you have less than 10% of your weekly limit left. Run /status for a breakdown.
+
+
+› This is an isolated live test primary. Use only the inherited FM_HOME for home state. Do not dispatch, publish,
+  install packages, or run validation pipelines. Reply READY only.
+
+
+• READY
+
+  Worked for 3s • 15:24
+
+
+› FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away
+  mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the
+  note. (pre-read; re-arm not needed — watcher daemon-managed)
+
+
+• Captain, I’ll read the away-mode instructions, drain the queued note, and end away mode.
+
+• Ran cat .agents/skills/afk/SKILL.md .agents/skills/away-quiet-supervision/SKILL.md .agents/skills/operational-home-la…
+  └   .subsuper-* .supervise-daemon.*   sub-supervisor internals; never touch
+    .no-mistakes/        local validation state and evidence; gitignored
+    ```
+    + 466 lines (^t to expand)
+
+
+
+
+• Working (5s • esc to interrupt)
+
+                                                                                      ⚠ weekly limit: 9% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Reply READY · Context 6% used
+  ← for agents · ? for shortcuts                                                              ⚠ 2 warnings · f2 to view

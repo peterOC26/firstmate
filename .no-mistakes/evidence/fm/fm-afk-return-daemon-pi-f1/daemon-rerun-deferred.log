@@ -1,0 +1,12 @@
+[2026-11-09T15:29:02+0100] daemon starting (pid 3336779); target=primary:0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-11-09T15:29:06+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:29:06+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:29:08+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:29:08+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:29:08+0100] wake: check: rearm-resurface
+[2026-11-09T15:29:08+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:29:08+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:29:10+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:29:10+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:29:12+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:29:12+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained

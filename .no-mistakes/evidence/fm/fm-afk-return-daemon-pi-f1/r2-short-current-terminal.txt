@@ -1,0 +1,86 @@
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+
+› Ask Codex to do anything
+
+
+
+  Hooks need review
+  5 hooks are new or changed.
+  Hooks can run outside the sandbox after you trust them.
+
+
+› 1. Review hooks
+  2. Trust all and continue
+  3. Continue without trusting (hooks won't run)
+
+  enter confirm · esc skip
+
+
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+  Tip: When goals are enabled, use /goal to set or inspect the objective for a long-running task.
+
+
+› This is an isolated live test primary. Use only inherited FM_HOME and TMUX for home state and terminals. Do not
+  dispatch, publish, install packages, modify global configuration, run pipelines, or write outside the lab/worktree.
+  Initialize once with bin/fm-session-start.sh, then reply READY. The driver prepares away state and owns cleanup.
+
+
+• Captain, I’ll initialize this isolated test once using the inherited environment.
+
+• Ran bin/fm-session-start.sh
+  └
+    ================================================================================
+    SESSION START - /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+    +129 lines (^t to view transcript)
+
+• READY
+
+  Worked for 8s • 15:46
+
+
+› ⁣FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away
+  mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the
+  note. (pre-read; re-arm not needed — watcher daemon-managed)
+
+
+• Captain, I’m loading the away-return instructions, then I’ll drain the queued note and end away mode.
+
+• Ran cat .agents/skills/afk/SKILL.md .agents/skills/away-quiet-supervision/SKILL.md
+  └ ---
+    name: afk
+    description: >-
+    +296 lines (^t to view transcript)
+
+• Ran bin/fm-wake-drain.sh
+  └ (no output)
+
+• Ran bin/fm-afk-return.sh
+  └ === Return brief ===
+    Supervisor health:
+      - GAP: the watcher beat was 999999s old at return (grace 300s)
+    +18 lines (^t to view transcript)
+
+• Captain, the wake drain returned no note. The return command exited 3; catch-up remains gated.
+
+  • Health: watcher heartbeat missing or stale.
+  • Instructions: no away contract found; legacy flag only.
+  • Waiting: backlog unreadable.
+  • Failed work or cleanup due: none listed.
+  • Handled: zero outcomes.
+  • Not started: entry inventory unavailable.
+  • Cost: zero recorded outcomes; zero live tasks.
+
+  I’ve left cleanup to the driver.
+
+  Worked for 21s • 15:46
+
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · I…  ⚠ 2 warnings · f2 to view

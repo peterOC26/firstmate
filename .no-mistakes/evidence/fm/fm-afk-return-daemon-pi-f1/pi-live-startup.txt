@@ -1,0 +1,40 @@
+ - Codemode persists images: tools.read() on an image file now gives back an image block that image() can show. See
+   Call tools (https://github.com/earendil-works/pi/blob/v1.0.4/packages/coding-agent/docs/codemode.md#call-tools).
+
+ ### Added
+
+ - Added * patterns to --tools and --exclude-tools, for example --tools read,codemode,'mcp__radius__*'
+ - Added --no-mcp to disable the built-in MCP support for one run
+
+ ### Fixed
+
+ - Fixed syntax highlighting losing colors after the first line of multiline strings and comments in fenced code blocks
+   (#10143 (https://github.com/earendil-works/pi/issues/10143))
+ - Fixed codemode scripts not receiving images from read: tools.read() now resolves to an image block for image files,
+   which image() shows (#10251 (https://github.com/earendil-works/pi/issues/10251))
+ - Fixed MCP OAuth sign-in failing with invalid_redirect_uri on servers with OpenID Connect client registration, such
+   as mcp.modem.dev: pi now registers as a native client (#10493 (https://github.com/earendil-works/pi/issues/10493))
+ - Fixed --tools removing MCP tools, which left pi --tools codemode without any MCP servers. --tools now keeps MCP
+   tools unless an entry starts with mcp__
+ - Fixed MCP session shutdown returning while a server was still connecting, leaving its transport open until the
+   server answered or timed out (#10249 (https://github.com/earendil-works/pi/issues/10249))
+ - Fixed system prompt rules and the skills hint naming tools hidden by prepareLoadout. Hidden tools are left out of
+   the rules, the skills hint names no tool when the file reader is hidden, and codemode shows each tool's prompt
+   guidelines with its declaration; ToolLoadout gains getPromptGuidelines() (#10343
+   (https://github.com/earendil-works/pi/issues/10343))
+ - Fixed Bedrock requests that fail with The pending stream has been canceled after a stalled HTTP/2 connection not
+   being retried automatically (#10379 (https://github.com/earendil-works/pi/issues/10379))
+ - Fixed codemode scripts that patch built-ins (for example Array.prototype.toJSON = ...) crashing pi and leaving the
+   tool call unsettled. Built-ins are now frozen before the script runs, so such patches have no effect (#10444
+   (https://github.com/earendil-works/pi/issues/10444))
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+$0.000 (sub) 0.0%/500k (auto)                                                                    (xai) grok-4.6 • medium

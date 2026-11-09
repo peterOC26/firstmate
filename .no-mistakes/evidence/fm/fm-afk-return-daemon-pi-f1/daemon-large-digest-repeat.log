@@ -1,0 +1,15 @@
+[2026-11-09T15:35:51+0100] daemon starting (pid 3604942); target=primary:0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-11-09T15:35:56+0100] captain inbox note 1794234953-7pipOP handed back to main; wake rows retained
+[2026-11-09T15:35:56+0100] wake: check: rearm-resurface
+[2026-11-09T15:36:10+0100] wake: check: rearm-resurface
+[2026-11-09T15:36:12+0100] escalate: check: captain inbox note 1794234953-7pipOP - I am back. Run bin/fm-afk-return.sh, publish DAEMON_NOTE_RECEIVED using bin/fm-inbox.sh reply, and a -> check: captain inbox note 1794234953-7pipOP - I am back. Run bin/fm-afk-return.sh, publish DAEMON_NOTE_RECEIVED using bin/fm-inbox.sh reply, and a
+[2026-11-09T15:36:50+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:36:50+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:36:50+0100] wake: check: rearm-resurface
+[2026-11-09T15:36:51+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:36:51+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:36:52+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:36:52+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:36:54+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:36:54+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:36:58+0100] captain inbox note 1794235009-xxCnlb handed back to main; wake rows retained

@@ -1,0 +1,12 @@
+{
+  ".afk": null,
+  ".afk-contract": "version: 2\nentered: 2026-11-09T14:46:41Z\nentered_epoch: 1794235601\nexpected_return: -\nreach_channels: none\nreach_announced: No phone channel is configured; anything that needs you waits for your return.\nspend_max_concurrent_workers: 4\nconfirmed: 2026-11-09T14:46:41Z\nconfirmed_epoch: 1794235601\nwords: |-\n  Observe only this isolated lab. Do not dispatch or publish.\n",
+  ".wake-queue": "1794235601\t1\tcheck\tinbox:1794235601-RCzAoz\tcheck: captain inbox note 1794235601-RCzAoz - Jobs inbox probe: return from away mode and answer PI-LIVE-RETURN using bin/fm-inbox.sh reply.\n",
+  ".wake-queue.ack": null,
+  ".wake-queue.surfaced": null,
+  ".supervise-daemon.log": null,
+  ".subsuper-escalations": null,
+  ".subsuper-escalations.since": null,
+  "archived_contracts": [],
+  "digest_records": {}
+}

@@ -1,0 +1,68 @@
+{
+  "daemon_large_backlog": {
+    "buffer_bytes_while_deferred": 10515,
+    "deferred_attempts": 3,
+    "watcher_closes_while_deferred": 1,
+    "draft_preserved": true,
+    "note_retained_until_main": true,
+    "entire_backlog_preserved_in_one_full_text_record": true,
+    "away_record_archived": true,
+    "queue_acknowledged_by_main": true,
+    "published_reply": {
+      "id": "1794235913-b6kLij",
+      "at": "2026-11-09T14:53:00Z",
+      "body": "LAB-LARGE-RETURN",
+      "cursor": "000000000001"
+    }
+  },
+  "pi_away": {
+    "away_record_archived": true,
+    "queue_acknowledged": true,
+    "published_reply": {
+      "id": "1794235601-RCzAoz",
+      "at": "2026-11-09T14:47:23Z",
+      "body": "PI-LIVE-RETURN",
+      "cursor": "000000000001"
+    }
+  },
+  "pi_quiet": {
+    "record_mode_retained": "quiet",
+    "published_reply": {
+      "id": "1794235746-aF5e4j",
+      "at": "2026-11-09T14:49:35Z",
+      "body": "PI-QUIET-NOTE",
+      "cursor": "000000000002"
+    }
+  },
+  "setup_corrections": [
+    "Initial Codex shell environment omitted FM_HOME; relaunched with shell_environment_policy.inherit=all.",
+    "Workspace sandbox denied private tmux socket with Operation not permitted; relaunched disposable lab CLI with --sandbox danger-full-access --ask-for-approval never. Global configuration was unchanged."
+  ],
+  "focused_fixture_checks": {
+    "daemon": [
+      "captain hand-back with large backlog and composer deferral",
+      "retry digest/alarm globals",
+      "unchanged frozen generation",
+      "watcher parks until main drains"
+    ],
+    "pi": [
+      "away routing matrix including quiet-note",
+      "note arrives after accept before branch prompt"
+    ]
+  },
+  "daemon_fresh_return": {
+    "away_record_archived": true,
+    "queue_acknowledged": true,
+    "published_reply": {
+      "id": "1794236013-UzPvfm",
+      "at": "2026-11-09T14:53:53Z",
+      "body": "LAB-FRESH-RETURN",
+      "cursor": "000000000002"
+    }
+  },
+  "daemon_quiet": {
+    "mode_retained": "quiet",
+    "ordinary_escalation_buffer": "check: captain inbox note 1794236061-JcRqv7 - Daemon quiet guard probe: keep quiet mode active.\n",
+    "away_return_signal_sent": false
+  }
+}

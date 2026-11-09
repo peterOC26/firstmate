@@ -1,0 +1,6 @@
+{
+  "queue": "1794234544\t1\tcheck\tinbox:1794234544-J2q4X4\tcheck: captain inbox note 1794234544-J2q4X4 - I am back. End away mode with bin/fm-afk-return.sh, then reply DAEMON_NOTE_RECEIVED using bin/fm-inb\n",
+  "watcher_closes": 1,
+  "escalation_bytes": 10620,
+  "away_record_present": true
+}

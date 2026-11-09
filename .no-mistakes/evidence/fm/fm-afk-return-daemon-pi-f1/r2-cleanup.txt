@@ -1,0 +1,7 @@
+fm-afk-launch: terminal close command failed, but exact absence was confirmed
+fm-afk-launch: away-posture record archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX/.l.D7KDLf/state/afk-contracts/1794236059.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+
+Removed disposable worktree labs, generated setup state, and temporary test wrappers:
+[".l.D7KDLf", ".p.FjiZmU", "tests/.live-fm-daemon.test.sh", "tests/.live-fm-pi-watch-extension.test.sh", "tests/.live-fm-pi-branch-extension.test.sh", "state", "config", ".live-test"]
+Private primary and daemon processes stopped; no lab watcher PID records remain.

@@ -1,0 +1,40 @@
+
+
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+  Tip: When goals are enabled, use /goal to set or inspect the objective for a long-running task.
+
+
+› This is an isolated live test primary. Use only inherited FM_HOME and TMUX for home state and terminals. Do not
+  dispatch, publish, install packages, modify global configuration, run pipelines, or write outside the lab/worktree.
+  Initialize once with bin/fm-session-start.sh, then reply READY. The driver prepares away state and owns cleanup.
+
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · C…  ⚠ 2 warnings · f2 to view
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

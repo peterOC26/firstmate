@@ -1,0 +1,40 @@
+⚠ Heads up, you have less than 10% of your weekly limit left. Run /status for a breakdown.
+
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+
+› 3
+
+
+• Captain, I’ll load the session context to see what “3” refers to.
+
+• Ran bin/fm-session-start.sh
+  └
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+    + 141 lines (^t to expand)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+◦ Working (8s • esc to interrupt)
+
+                                                                                      ⚠ weekly limit: 8% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Review item 3 · Context 6% us…
+  ← for agents · ? for shortcuts                                                              ⚠ 3 warnings · f2 to view

@@ -1,0 +1,4 @@
+ok - captain notes bypass daemon consumption, retry guarded delivery, and remain queued for main
+ok - captain inbox retries retain digest and alarm state
+ok - captain return survives bounds after an unchanged frozen generation
+ok - daemon parks watcher during deferred and confirmed returns, then resumes

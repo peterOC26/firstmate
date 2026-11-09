@@ -1,0 +1,16 @@
+Away posture recorded at 2026-11-09T14:23:58Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-09T14:23:58Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Observe the isolated lab only
+{"schema":"fm-inbox-note.v1","outcome":"created","id":"1794234238-NlMuaU","request_id":null,"saved":true,"announced":true,"acknowledged":false,"path":"/home/zabi/.no-mistakes/evidence/01M70A5P9C0RX9NZ5XGE0572MX/q.7i5sep/state/inbox/1794234238-NlMuaU.note"}
+eligible=0
+status=unsafe
+corrupted=0
+rows=
+tasks=
+unscoped=1
+1794234239	1	check	inbox:1794234238-NlMuaU	check: captain inbox note 1794234238-NlMuaU - Jobs note: return and answer this note

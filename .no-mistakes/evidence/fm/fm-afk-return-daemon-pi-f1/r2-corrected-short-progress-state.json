@@ -1,0 +1,12 @@
+{
+  ".afk": "away\n1794235771\n",
+  ".afk-contract": "version: 2\nentered: 2026-11-09T14:49:29Z\nentered_epoch: 1794235769\nexpected_return: -\nreach_channels: none\nreach_announced: No phone channel is configured; anything that needs you waits for your return.\nspend_max_concurrent_workers: 4\nconfirmed: 2026-11-09T14:49:29Z\nconfirmed_epoch: 1794235769\nwords: |-\n  Observe this isolated lab only. Do not dispatch or publish.\n",
+  ".wake-queue": "1794235771\t1\tcheck\tinbox:1794235771-7X9isH\tcheck: captain inbox note 1794235771-7X9isH - Short-note return probe: reply LAB-SHORT-RETURN using bin/fm-inbox.sh reply.\n",
+  ".wake-queue.ack": null,
+  ".wake-queue.surfaced": null,
+  ".supervise-daemon.log": "[2026-11-09T15:49:31+0100] daemon starting (pid 4051978); target=primary:0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s\n[2026-11-09T15:49:33+0100] captain inbox note 1794235771-7X9isH handed back to main; wake rows retained\n[2026-11-09T15:49:33+0100] wake: check: rearm-resurface\n",
+  ".subsuper-escalations": "",
+  ".subsuper-escalations.since": null,
+  "archived_contracts": [],
+  "digest_records": {}
+}

@@ -1,0 +1,40 @@
+ This is a quiet guard probe, not an away return. I will load the quiet skill and reply to the inbox with
+ PI-QUIET-NOTE.
+
+ Quiet-guard inbox note is queued. Loading the quiet playbook, then I'll answer the note without leaving quiet mode.
+
+
+ [skill] quiet (ctrl+o to expand)
+
+
+ The note is to keep quiet mode active, not to turn it off.
+
+ I will reply to the inbox note via fm-inbox.sh. I will not run fm-afk-return.sh. I will acknowledge the inbox and
+ handle the wake. On Pi, quiet mode enters nothing. The probe requires the inbox reply and quiet mode to stay active. I
+ will not tell the captain to enter anything that would confuse the probe.
+
+ AGENTS.md section 9 requires a durable captain-facing answer for inbox notes. The captain sent this note directly.
+ Quiet mode normally surfaces only decisions, failures, credentials, or review-ready work. This note is a
+ captain-requested completion. A captain-facing outcome is appropriate.
+
+ I will answer the note in chat as well as the inbox. The captain is present in quiet mode.
+
+
+ $ bin/fm-inbox.sh reply 1794235746-aF5e4j PI-QUIET-NOTE && bin/fm-inbox.sh drain --ack 1794235746-aF5e4j &&
+ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 4027295.1794235746.J3xBgi (timeout 30000s)
+
+ replied 1794235746-aF5e4j
+ acked 1794235746-aF5e4j
+
+ Took 0.3s
+
+
+ Captain, quiet mode stays on. Answered the note: PI-QUIET-NOTE.
+
+ Session exported to: /home/zabi/.no-mistakes/evidence/01M70A5P9C0RX9NZ5XGE0572MX/r2-pi-session-with-quiet.html
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑75k ↓4.6k R244k CH98.1% $0.300 (sub) 7.4%/500k (auto)                                           (xai) grok-4.6 • medium

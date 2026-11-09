@@ -1,0 +1,47 @@
+[2026-11-09T15:25:13+0100] daemon starting (pid 3215313); target=primary:0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-11-09T15:25:17+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:17+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:17+0100] wake: check: rearm-resurface
+[2026-11-09T15:25:17+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:17+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:18+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:18+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:20+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:20+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:22+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:22+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:25+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:25+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:26+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:26+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:28+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:28+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:30+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:30+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:32+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:32+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:35+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:35+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:36+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:36+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:38+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:38+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:40+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:40+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:42+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:42+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:45+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:45+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:46+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:46+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:48+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:48+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:50+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:50+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:53+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:53+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:54+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:54+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:25:56+0100] inject deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer)
+[2026-11-09T15:25:56+0100] captain inbox hand-back deferred: deferred: supervisor composer not confirmed-empty (state=pending: unsubmitted text in the composer); wake rows retained
+[2026-11-09T15:26:00+0100] captain inbox note 1794234316-3VqCw3 handed back to main; wake rows retained

@@ -1,0 +1,38 @@
+{
+  "away_record_present": false,
+  "catchup_gate_present": false,
+  "wake_queue": "",
+  "receipts": {
+    "schema": "fm-inbox-receipts.v1",
+    "home": "01M70A5P9C0RX9NZ5XGE0572MX/p.6CKWb6",
+    "generated": "2026-11-09T14:25:41Z",
+    "pending": [],
+    "handled": [
+      {
+        "id": "1794234253-LIfSqf",
+        "at": "2026-11-09T14:24:13Z",
+        "source": "text",
+        "request_id": null,
+        "body": "I am back. End away mode and reply LAB_NOTE_RECEIVED to this note. Stay within this empty isolated lab; do not dispatch anything.",
+        "acknowledged": true,
+        "announced": true,
+        "reply": {
+          "id": "1794234253-LIfSqf",
+          "at": "2026-11-09T14:25:01Z",
+          "body": "LAB_NOTE_RECEIVED",
+          "cursor": "000000000001"
+        }
+      }
+    ],
+    "replies": [
+      {
+        "id": "1794234253-LIfSqf",
+        "at": "2026-11-09T14:25:01Z",
+        "body": "LAB_NOTE_RECEIVED",
+        "cursor": "000000000001"
+      }
+    ],
+    "reply_cursor": "000000000001",
+    "omitted": []
+  }
+}

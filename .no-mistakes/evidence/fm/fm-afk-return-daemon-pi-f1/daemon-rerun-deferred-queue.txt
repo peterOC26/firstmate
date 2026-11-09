@@ -1,0 +1,1 @@
+1794234544	1	check	inbox:1794234544-J2q4X4	check: captain inbox note 1794234544-J2q4X4 - I am back. End away mode with bin/fm-afk-return.sh, then reply DAEMON_NOTE_RECEIVED using bin/fm-inb

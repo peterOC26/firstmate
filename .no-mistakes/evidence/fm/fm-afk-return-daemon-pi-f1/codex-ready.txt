@@ -1,0 +1,40 @@
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX
+
+⚠ Heads up, you have less than 10% of your weekly limit left. Run /status for a breakdown.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                                                      ⚠ weekly limit: 9% left · /status
+
+› This is an isolated live test primary. Use only the inherited FM_HOME for home state. Do not dispatch, publish,
+  install packages, or run validation pipelines. Reply READY only.
+
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Context 0% used
+                                                                                              ⚠ 2 warnings · f2 to view

@@ -1,0 +1,40 @@
+› This is an isolated test primary. Do not dispatch, publish, install packages, change global configuration, or run pi…
+    + 129 lines (^t to expand)
+
+• READY
+
+  Worked for 12s • 15:35
+
+
+› FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away
+  mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the
+  note. (pre-read; re-arm not needed — watcher daemon-managed)
+
+
+• Captain, I’m loading the away-mode instructions, then I’ll drain the note and end away mode.
+
+• Ran cat .agents/skills/afk/SKILL.md .agents/skills/away-quiet-supervision/SKILL.md
+  └ - Any other unmarked message means the captain returned in away mode (load `/afk`, run the return owner, and do not…
+    - Away and quiet mode never expand approval authority for merges, ask-user findings, destructive actions, irreversi…
+    - Bias ambiguous input toward exit because a present captain takes precedence.
+    + 298 lines (^t to expand)
+
+• Ran bin/fm-wake-drain.sh
+  └ 1794234953    1    check    inbox:1794234953-7pipOP    check: captain inbox note 1794234953-7pipOP - I am back. Run…
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3605815.…
+    + 2 lines (^t to expand)
+
+• Ran bin/fm-afk-return.sh
+  └ catch-up wake: 1794234953 1 check inbox:1794234953-7pipOP check: captain inbox note 1794234953-7pipOP - I am back. …
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3605815.…
+    fm-afk-return: catch-up clear; ordinary captain work may proceed
+    + 26 lines (^t to expand)
+
+◦ Working (17s • esc to interrupt)
+
+                                                                                      ⚠ weekly limit: 8% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Initialize isolated test lab …
+  ← for agents · ? for shortcuts                                                              ⚠ 3 warnings · f2 to view

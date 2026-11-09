@@ -1,0 +1,40 @@
+
+ The wake drain acknowledgment may have been silent.
+
+ The chained command produced both reply and drain ack outputs. The wake-drain ack-through likely succeeded silently.
+
+ The captain-facing message must relay the full return brief in order, answer the note, address the captain, and stand
+ alone. The return brief covers a 32-second away period and supervisor health.
+
+ Supervisor health shows no gap. The watcher beat was 16 seconds old at return. A wake was handled at return. The away
+ session observed only the isolated lab. It dispatched nothing. It published nothing. No outcomes were handled.
+
+ The captain-facing message will translate the return brief into plain language. It will state the away duration and
+ confirm monitoring ran without gaps. It will note that a notification was already being handled at return. It will
+ mention the instructions to observe only and not dispatch or publish. It will note that nothing was done under those
+ instructions. It will also note that nothing was waiting on the captain.
+
+ Captain, you are back. Away window was 32 seconds (14:46:41Z to 14:47:13Z).
+
+ Monitoring ran through with no gap. A notification was already being handled at return — this inbox note — not a gap.
+
+ Your away words: observe only this isolated lab; do not dispatch or publish. Nothing was done under them.
+
+ Waiting on you: nothing.
+ Tried and failed: nothing.
+ Cleanup due: nothing.
+ Handled while away: nothing.
+ Not started: nothing.
+ Cost: no outcomes recorded; no live work at return.
+
+ Catch-up is clear.
+
+ Answered the inbox note: PI-LIVE-RETURN.
+
+ Session exported to: /home/zabi/.no-mistakes/evidence/01M70A5P9C0RX9NZ5XGE0572MX/r2-pi-session.html
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑71k ↓3.4k R106k CH97.8% $0.216 (sub) 6.9%/500k (auto)                                           (xai) grok-4.6 • medium

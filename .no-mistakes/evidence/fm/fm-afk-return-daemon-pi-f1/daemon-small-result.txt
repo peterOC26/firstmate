@@ -1,0 +1,40 @@
+› 3
+• Explored
+  └ Read SKILL.md (session-start-recovery skill)
+    + Show details
+
+• Captain, what does “3” refer to? I don’t have the numbered options in this session.
+
+  Startup also reported error: cannot write session lock; operate read-only until resolved, so fleet changes are
+  blocked.
+
+  Worked for 14s • 15:33
+
+
+› FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away
+  mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the
+  note. (pre-read; re-arm not needed — watcher daemon-managed)
+
+
+• Captain, I’m loading the away-mode return instructions. The session lock remains unverified, so I can’t drain the
+  inbox or change away state.
+
+• Ran cat .agents/skills/afk/SKILL.md .agents/skills/away-quiet-supervision/SKILL.md
+  └ - Any other unmarked message means the captain returned in away mode (load `/afk`, run the return owner, and do not…
+    - Away and quiet mode never expand approval authority for merges, ask-user findings, destructive actions, irreversi…
+    - Bias ambiguous input toward exit because a present captain takes precedence.
+    + 298 lines (^t to expand)
+
+• Captain, I couldn’t retrieve the queued note or end away mode: startup reported error: cannot write session lock;
+  operate read-only until resolved.
+
+  AGENTS.md §3 prohibits draining or changing fleet state without verified lock ownership. The lock-owning session must
+  handle this return.
+
+  Worked for 8s • 15:33
+                                                                                      ⚠ weekly limit: 8% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Review item 3 · Context 10% u…
+  ← for agents · ? for shortcuts                                                              ⚠ 3 warnings · f2 to view

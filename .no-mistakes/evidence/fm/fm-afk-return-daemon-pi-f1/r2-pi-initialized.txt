@@ -1,0 +1,40 @@
+
+[Extensions]
+  fm-branch-supervision.ts, fm-calm.ts, fm-primary-pi-watch.ts, fm-primary-read-repetition.ts,
+fm-primary-turnend-guard.ts, orca-prefill.ts, orca-titlebar-spinner.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+
+ This is an isolated live test primary. Use only inherited FM_HOME for home state. Do not dispatch, publish, install
+ packages, modify global configuration or run pipelines. Initialize once with bin/fm-session-start.sh, then reply
+ READY. The driver prepares away state and owns cleanup.
+
+
+ I will initialize as an isolated live test primary.
+
+ I will run bin/fm-session-start.sh exactly once. I will not dispatch, publish, install packages, modify global
+ configuration, or run pipelines. I will not assume away state exists. I will reply READY.
+
+ Initializing once with the session-start script, then I'll reply READY.
+
+
+ $ bin/fm-session-start.sh (timeout 60000s)
+
+ ... (6 earlier lines, ctrl+o to expand)
+ lock acquired: harness pid 3916946
+
+ HOME ROLE
+ --------------------------------------------------------------------------------
+ fm-role: user (default)
+
+ Elapsed 2.0s
+
+
+── ⠴ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑17k ↓308 R512 CH2.9% $0.036 (sub) 3.6%/500k (auto)                                              (xai) grok-4.6 • medium

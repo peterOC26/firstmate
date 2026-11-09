@@ -1,0 +1,40 @@
+› ⁣FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away mo…
+• Ran bin/fm-inbox.sh --help
+  └ bin/fm_voice_records.py owns the scope-controlled machine view the voice agent
+    reads, because the voice agent must be able to answer without record free text
+    ever reaching a model.
+    + 100 lines (^t to expand)
+
+• Ran bin/fm-inbox.sh drain
+  └     I am back. Run bin/fm-afk-return.sh, publish DAEMON_NOTE_RECEIVED using bin/fm-inbox.sh reply, and acknowledge …
+
+    Ack with: fm-inbox.sh drain --ack <id>...
+    + 2 lines (^t to expand)
+
+• Ran bin/fm-inbox.sh reply 1794234953-7pipOP DAEMON_NOTE_RECEIVED
+  └ replied 1794234953-7pipOP
+
+• Ran bin/fm-inbox.sh drain --ack 1794234953-7pipOP
+  └ acked 1794234953-7pipOP
+
+• Ran bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3605815.1794234953.lEg5go
+  └ wake drain: acknowledged wakes through 1 (0 row(s) consumed), but a newer recovery episode is pending; re-run bin/f…
+    + 1 line (^t to expand)
+
+• Ran bin/fm-wake-drain.sh
+  └ (no output)
+
+• Captain, away mode ended and catch-up cleared. Published DAEMON_NOTE_RECEIVED and acknowledged the note and wake. The
+  lab remains isolated.
+
+  Return brief: no daemon was running; the wake was being handled. No actions were taken under your observe-only
+  instructions. Nothing awaits you, failed, needs cleanup, was handled, or remains unstarted. Recorded cost: zero
+  outcomes and zero live tasks.
+
+  Worked for 40s • 15:36
+                                                                                      ⚠ weekly limit: 8% left · /status
+
+› [Pasted Content 6141 chars]
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Initialize isolated test lab …
+                                                                                              ⚠ 3 warnings · f2 to view

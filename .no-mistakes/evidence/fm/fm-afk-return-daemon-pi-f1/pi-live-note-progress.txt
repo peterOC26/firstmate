@@ -1,0 +1,40 @@
+ fm-afk-return.sh owns the ordered shutdown and wake drain. It should run first.
+
+ I should check if fm-afk-return.sh already drains wakes to avoid double-handling. The afk skill is already loaded.
+
+ AGENTS.md section 8 mandates draining the durable wake queue before peeking or steering. The inbox note may be
+ presented during that drain. The return script header will be checked to confirm whether it already handles wake
+ presentation.
+
+ This is a return hand-back. I’ll load the return owner, drain the queue, then exit away mode and answer the note.
+
+
+ [skill] afk:1-50 (ctrl+o to expand)
+
+
+
+ $ bin/fm-afk-return.sh --help 2>&1 | head -80 (timeout 20s)
+
+ ... (5 earlier lines, ctrl+o to expand)
+   fm-afk-return.sh begin    Same as the default command.
+   fm-afk-return.sh check    Re-render the brief and close the gate only after blockers resolve.
+   fm-afk-return.sh guard    Read-only consult: exit 3 while away mode is still
+                            active, exit 4 while return catch-up is pending.
+   fm-afk-return.sh catchup-summary  Read-only catch-up projection for a reporting surface.
+
+ Took 0.0s
+
+
+ The skill requires running fm-afk-return.sh before acting.
+
+
+ read ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX/bin/fm-afk-return.sh:1-80
+
+
+ The return script owns durable wake presentation.
+
+── ⠧ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑66k ↓5.4k R176k CH92.6% $0.253 (sub) 7.9%/500k (auto)                                           (xai) grok-4.6 • medium

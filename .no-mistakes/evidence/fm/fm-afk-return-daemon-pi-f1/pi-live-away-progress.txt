@@ -1,0 +1,40 @@
+ reading.
+   A named merge still waits while a slower advisory suite has not reported.
+   Name any sentence dropped when /afk is sent again with only a stop clause.
+   Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+ Took 0.8s
+
+
+ The system printed an announcement and read back a checklist.
+
+ The inventory may be empty for this isolated lab. I will verify the session state, review the entry brief, complete
+ the checklist, and arm the Pi watcher.
+
+ I will read bin/fm-afk-entry-brief.sh to complete the checklist. I must not launch the Pi daemon. I will register a
+ future date only if the captain asks.
+
+ Away record is in place. Next I’ll initialize the lab if this session has no digest, then finish the entry read-back.
+
+
+ $ bin/fm-session-start.sh (timeout 60s)
+
+ ... (14 earlier lines, ctrl+o to expand)
+ BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy
+ reply path, but upgrade to prevent handing back a board before its reply is accepted
+
+ WAKE QUEUE
+ --------------------------------------------------------------------------------
+
+ Elapsed 4.0s
+
+
+
+ read ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX/bin/fm-afk-entry-brief.sh:1-120
+
+
+── ⠙ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑28k ↓2.5k R72k CH97.5% $0.108 (sub) 5.9%/500k (auto)                                            (xai) grok-4.6 • medium

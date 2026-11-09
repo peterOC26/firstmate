@@ -1,0 +1,40 @@
+› ⁣FIRSTMATE_OP: v1 away-supervisor: Supervisor escalate (1 event(s)): away-daemon: the captain sent a note and away mo…
+    + 466 lines (^t to expand)
+
+• Explored
+  └ Read SKILL.md (away-quiet-supervision skill)
+    + Show details
+
+• Ran bin/fm-wake-drain.sh
+  └ (no output)
+
+• Exited (status 3) bin/fm-afk-return.sh
+  └ catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+    catch-up lifecycle: held set unreadable: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX/…
+    fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification r…
+    + 20 lines (^t to expand)
+
+• Exited (status 1) printenv FM_HOME
+  └ (no output)
+
+• Ran bin/fm-inbox.sh --help
+  └ bin/fm_voice_records.py owns the scope-controlled machine view the voice agent
+    reads, because the voice agent must be able to answer without record free text
+    ever reaching a model.
+    + 100 lines (^t to expand)
+
+• Exited (status 1) printenv FM_HOME
+  └ (no output)
+
+• Captain, FM_HOME is missing from the inherited environment. The drain returned no note; the return script fell back to
+  this checkout and failed its catch-up gate because the backlog was unreadable.
+
+  I should have checked FM_HOME first. Please restore it so I can access the intended note and finish the return.
+
+  Worked for 27s • 15:26
+                                                                                      ⚠ weekly limit: 9% left · /status
+
+› Ask Codex to do anything
+
+  GPT-6-Astra medium · ~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX · Reply READY · Context 11% used
+  ← for agents · ? for shortcuts                                                              ⚠ 2 warnings · f2 to view

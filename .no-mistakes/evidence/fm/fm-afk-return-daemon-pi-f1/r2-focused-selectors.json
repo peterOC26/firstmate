@@ -1,0 +1,16 @@
+{
+  "method": "Executed temporary copies containing original function bodies; only standalone top-level test invocations were suppressed. All copies removed after testing.",
+  "tests/fm-daemon.test.sh": [
+    "test_captain_note_hands_back_before_daemon_consumption",
+    "test_captain_note_retains_retry_state",
+    "test_captain_note_preserves_frozen_generation",
+    "test_captain_note_parks_watcher_until_main_drains"
+  ],
+  "tests/fm-pi-watch-extension.test.sh": [
+    "test_pi_away_record_collapses_eligibility_and_keeps_vetoes_on_main"
+  ],
+  "tests/fm-pi-branch-extension.test.sh": [
+    "test_captain_note_arriving_after_offer_returns_to_main"
+  ],
+  "baseline": "The unrelated synthetic broken-branch fallback was not selected or modified. Its prior main failure is recorded in supplied branch decisions."
+}

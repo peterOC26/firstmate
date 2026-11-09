@@ -1,0 +1,23 @@
+{
+  "reproduced_after_successful_short_note_return": true,
+  "away_record_remained": true,
+  "escalation_buffer_empty": true,
+  "queue": "1794235009\t2\tcheck\tinbox:1794235009-xxCnlb\tcheck: captain inbox note 1794235009-xxCnlb - I am back. End away mode and reply REPEAT_NOTE_RECEIVED. Keep this empty lab isolated.\n",
+  "pending_note": {
+    "id": "1794235009-xxCnlb",
+    "at": "2026-11-09T14:36:49Z",
+    "source": "text",
+    "request_id": null,
+    "body": "I am back. End away mode and reply REPEAT_NOTE_RECEIVED. Keep this empty lab isolated.",
+    "acknowledged": false,
+    "announced": true,
+    "reply": null
+  },
+  "daemon_delivery_claims": [
+    "[2026-11-09T15:35:56+0100] captain inbox note 1794234953-7pipOP handed back to main; wake rows retained",
+    "[2026-11-09T15:36:58+0100] captain inbox note 1794235009-xxCnlb handed back to main; wake rows retained"
+  ],
+  "terminal_evidence": "daemon-large-digest-repeat-final.txt",
+  "fully_initialized_session_evidence": "daemon-final-init.txt",
+  "successful_short_return_evidence": "daemon-final-verified-state.json"
+}

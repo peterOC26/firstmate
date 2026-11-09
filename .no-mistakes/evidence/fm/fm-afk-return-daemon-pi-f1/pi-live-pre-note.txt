@@ -1,0 +1,40 @@
+ request.
+
+ The bootstrap diagnostic will be kept internal per section 9. No engine was printed at entry. The Pi has no daemon to
+ launch. The inventory and watcher arm will run in parallel. The announcement will use hold-for-return only, with no
+ phone channel.
+
+ The announcement will use plain-sentence restatements of the section 9 language. It will note the expected return,
+ spend cap, and reach announcement. Destructive, irreversible, or security-sensitive actions are never
+ pre-authorizable. The lab session is started and away mode is entered. Ordinary Pi monitoring remains active.
+
+
+ $ bin/fm-afk-entry-brief.sh (timeout 30s)
+
+ ... (1 earlier lines, ctrl+o to expand)
+   Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid
+ reading.
+   A named merge still waits while a slower advisory suite has not reported.
+   Name any sentence dropped when /afk is sent again with only a stop clause.
+   Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+
+ Took 0.1s
+
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only
+ after a later notification says the cycle is missing, failed, or unhealthy
+
+
+ The entry brief printed only the checklist. The inventory was empty. Nonempty sections listed live jobs.
+
+ The watcher is running. I will now announce the AFK entry to the captain. I will follow the skill rules: no
+ confirmation request, no internal mechanics, and a plain-sentence restatement with expected return, spend cap, and
+ reach.
+
+── ⠴ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑61k ↓3.5k R72k CH1.5% $0.180 (sub) 6.9%/500k (auto)                                             (xai) grok-4.6 • medium

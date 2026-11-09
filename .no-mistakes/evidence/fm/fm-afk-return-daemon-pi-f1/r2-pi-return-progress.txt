@@ -1,0 +1,40 @@
+ Took 0.0s
+
+
+ Return brief and catch-up are clear.
+
+ I will answer the captain's inbox note with PI-LIVE-RETURN included. I will acknowledge the wake drain. No branch
+ processing is needed.
+
+ I will run both drain acknowledgment commands. The captain message will relay the return brief in section 9 language,
+ using outcomes rather than mechanics. The sections are supervisor health, your instructions, waiting on you, tried and
+ failed, landed with cleanup due, handled while away, not started, cost, catch-up health, and catch-up wake.
+
+ Away posture is archived and catch-up is clear. Publishing the durable inbox answer, then acknowledging the note and
+ the notification.
+
+
+ $ bin/fm-inbox.sh reply 1794235601-RCzAoz PI-LIVE-RETURN && bin/fm-inbox.sh drain --ack 1794235601-RCzAoz &&
+ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3962466.1794235602.9NUgMr (timeout 30000s)
+
+ replied 1794235601-RCzAoz
+ acked 1794235601-RCzAoz
+
+ Took 0.5s
+
+
+ The wake drain acknowledgment may have been silent.
+
+ The chained command produced both reply and drain ack outputs. The wake-drain ack-through likely succeeded silently.
+
+ The captain-facing message must relay the full return brief in order, answer the note, address the captain, and stand
+ alone. The return brief covers a 32-second away period and supervisor health.
+
+ Supervisor health shows no gap. The watcher beat was 16 seconds old at return. A wake was handled at return. The away
+ session observed only the isolated lab. It dispatched nothing. It published nothing. No outcomes were handled.
+
+── ⠦ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑71k ↓2.6k R73k CH92.4% $0.194 (sub) 6.7%/500k (auto)                                            (xai) grok-4.6 • medium

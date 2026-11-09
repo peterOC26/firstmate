@@ -1,0 +1,36 @@
+{
+  "scenario": "Captain inbox note queued behind five roughly 2 KB pending daemon events on real Codex 0.167.0 in private tmux (120x40).",
+  "setup": "Created marked lab with fm-lab-home.sh; launched actual codex with shell_environment_policy.inherit=\"all\"; opted out of supervision host; started real fm-afk-start.sh; seeded pending event buffer through production escalate_add; published via fm-inbox.sh note.",
+  "expected": "Return message starts a primary turn; fm-afk-return.sh ends away mode and primary answers the note. Only confirmed submission retires retries.",
+  "observed": {
+    "daemon_report": "[2026-11-09T15:29:16+0100] captain inbox note 1794234544-J2q4X4 handed back to main; wake rows retained",
+    "away_record_remained": true,
+    "queue": "1794234544\t1\tcheck\tinbox:1794234544-J2q4X4\tcheck: captain inbox note 1794234544-J2q4X4 - I am back. End away mode with bin/fm-afk-return.sh, then reply DAEMON_NOTE_RECEIVED using bin/fm-inb\n",
+    "escalation_buffer": "",
+    "receipts": {
+      "schema": "fm-inbox-receipts.v1",
+      "home": "01M70A5P9C0RX9NZ5XGE0572MX/r.eal8xm",
+      "generated": "2026-11-09T14:31:08Z",
+      "pending": [
+        {
+          "id": "1794234544-J2q4X4",
+          "at": "2026-11-09T14:29:04Z",
+          "source": "text",
+          "request_id": null,
+          "body": "I am back. End away mode with bin/fm-afk-return.sh, then reply DAEMON_NOTE_RECEIVED using bin/fm-inbox.sh reply and acknowledge this note. Stay within this empty lab; no dispatch.",
+          "acknowledged": false,
+          "announced": true,
+          "reply": null
+        }
+      ],
+      "handled": [],
+      "replies": [],
+      "reply_cursor": "",
+      "omitted": []
+    },
+    "terminal": "Composer contains unsubmitted large message; no primary turn starts. See daemon-large-digest-final-stall.txt.",
+    "later_manual_enter": "One later Enter did not recover the message. See daemon-large-digest-manual-enter.txt.",
+    "later_composer_probe": "unknown"
+  },
+  "causality": "The shared tmux submit/composer implementation is unchanged in this diff. This is an observed failure of the new inbox-handback path relying on that transport, not a claim that this patch introduced the transport defect."
+}

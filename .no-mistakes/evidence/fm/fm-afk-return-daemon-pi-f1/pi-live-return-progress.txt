@@ -1,0 +1,40 @@
+
+ The note asks to end away mode and reply LAB_NOTE_RECEIVED. I will run fm-afk-return.sh, then answer the note. I can
+ also acknowledge it with bin/fm-inbox.sh drain --ack <id>.
+
+ I will read the full note with bin/fm-inbox.sh show <id> before replying. The reply uses bin/fm-inbox.sh reply <id>. I
+ must stay within the empty isolated lab constraints and avoid dispatching.
+
+
+ $ bin/fm-afk-return.sh (timeout 30s)
+
+ ... (28 earlier lines, ctrl+o to expand)
+ catch-up wake: 1794234253 1 check inbox:1794234253-LIfSqf check: captain inbox note 1794234253-LIfSqf - I am back. End
+ away mode and reply LAB_NOTE_RECEIVED to this note. Stay within this empty isolated l
+ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation
+ 3191574.1794234253.vVh5kv
+ fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+ Took 3.0s
+
+
+ The return brief is complete. Catch-up is clear.
+
+
+ $ bin/fm-inbox.sh --help 2>&1 | head -60 (timeout 20s)
+
+ ... (55 earlier lines, ctrl+o to expand)
+ enqueue again.
+ `receipts` is the bounded JSON view of pending and handled notes, their
+ acknowledgement, announcement, and any recorded reply. Default bounds omit
+ rather than implying the first page is everything; omitted[] names the
+ surface and how to reveal it, the same convention as fm-bearings-snapshot.sh.
+
+ Took 0.0s
+
+
+── ⠸ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑69k ↓6.2k R293k CH97.3% $0.322 (sub) 8.4%/500k (auto)                                           (xai) grok-4.6 • medium

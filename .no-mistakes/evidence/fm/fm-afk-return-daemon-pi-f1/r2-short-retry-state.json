@@ -1,0 +1,12 @@
+{
+  ".afk": "away\n1794235587\n",
+  ".afk-contract": "version: 2\nentered: 2026-11-09T14:46:25Z\nentered_epoch: 1794235585\nexpected_return: -\nreach_channels: none\nreach_announced: No phone channel is configured; anything that needs you waits for your return.\nspend_max_concurrent_workers: 4\nconfirmed: 2026-11-09T14:46:25Z\nconfirmed_epoch: 1794235585\nwords: |-\n  Observe only this isolated lab. Do not dispatch or publish.\n",
+  ".wake-queue": "1794235587\t1\tcheck\tinbox:1794235587-0s590d\tcheck: captain inbox note 1794235587-0s590d - Return probe: please answer with LAB-SHORT-RETURN and record the answer using bin/fm-inbox.sh reply.\n1794235687\t2\tcheck\tinbox:1794235687-zoZDu5\tcheck: captain inbox note 1794235687-zoZDu5 - Return probe after lab setup: answer LAB-SHORT-READY and publish the answer with bin/fm-inbox.sh rep\n",
+  ".wake-queue.ack": null,
+  ".wake-queue.surfaced": null,
+  ".supervise-daemon.log": "[2026-11-09T15:46:27+0100] daemon starting (pid 3949385); target=primary:0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s\n[2026-11-09T15:46:30+0100] captain inbox note 1794235587-0s590d handed back to main; wake rows retained\n[2026-11-09T15:46:30+0100] wake: check: rearm-resurface\n",
+  ".subsuper-escalations": "",
+  ".subsuper-escalations.since": null,
+  "archived_contracts": [],
+  "digest_records": {}
+}

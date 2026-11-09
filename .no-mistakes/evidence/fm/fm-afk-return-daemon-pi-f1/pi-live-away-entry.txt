@@ -1,0 +1,40 @@
+
+
+ Entering away mode.
+
+ I'll load the away-mode skills first, then initialize the lab and enter AFK as instructed.
+
+
+ [skill] afk (ctrl+o to expand)
+
+
+
+ [skill] away-quiet-supervision (ctrl+o to expand)
+
+
+ The skill requires writing the record first in this same turn.
+
+ Run bin/fm-afk-launch.sh enter with the words file or inline text. The Pi requires no launch step. Proceed to announce
+ and read back after entry. Normal Pi supervision arms automatically. The lab remains isolated and uses only the
+ inherited FM_HOME.
+
+ The skill's explicit rule to write the AFK record first takes precedence over initializing the lab with
+ bin/fm-session-start.sh.
+
+ AGENTS.md section 3 mandates running bin/fm-session-start.sh exactly once at session start. The user's words
+ explicitly request this initialization before entering away mode. I am weighing whether to perform session-start if
+ the digest is absent, while still prioritizing the AFK record as the skill requires.
+
+ The skill treats /afk as the immediate go signal. The first required cycle must be armed with fm_watch_arm_pi.
+
+ The Pi watcher cycle must be started or repaired only after a notification flags a missing, failed, or unhealthy
+ cycle. No session digest is present in this conversation, so session-start may be needed to satisfy the words.
+
+ I will check the session-start script and FM_HOME state before writing the words file and running the AFK enter
+ command.
+
+── ⠸ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑17k ↓272 R512 CH2.9% $0.036 (sub) 5.4%/500k (auto)                                              (xai) grok-4.6 • medium

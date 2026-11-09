@@ -1,0 +1,40 @@
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+
+ $ bin/fm-wake-drain.sh (timeout 30000s)
+
+ 1794235746   2   check   inbox:1794235746-aF5e4j   check: captain inbox note 1794235746-aF5e4j - Quiet guard probe:
+ answer PI-QUIET-NOTE using bin/fm-inbox.sh reply. Keep quiet mode active.
+ WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation
+ 4027295.1794235746.J3xBgi
+
+ Took 1.2s
+
+
+ A captain inbox note mentions quiet mode.
+
+ This is a quiet guard probe, not an away return. I will load the quiet skill and reply to the inbox with
+ PI-QUIET-NOTE.
+
+ Quiet-guard inbox note is queued. Loading the quiet playbook, then I'll answer the note without leaving quiet mode.
+
+
+ [skill] quiet (ctrl+o to expand)
+
+
+ The note is to keep quiet mode active, not to turn it off.
+
+ I will reply to the inbox note via fm-inbox.sh. I will not run fm-afk-return.sh. I will acknowledge the inbox and
+ handle the wake. On Pi, quiet mode enters nothing. The probe requires the inbox reply and quiet mode to stay active. I
+ will not tell the captain to enter anything that would confuse the probe.
+
+ AGENTS.md section 9 requires a durable captain-facing answer for inbox notes. The captain sent this note directly.
+ Quiet mode normally surfaces only decisions, failures, credentials, or review-ready work. This note is a
+ captain-requested completion. A captain-facing outcome is appropriate.
+
+── ⠸ Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M70A5P9C0RX9NZ5XGE0572MX (detached)
+↑73k ↓3.8k R174k CH99.3% $0.255 (sub) 7.3%/500k (auto)                                           (xai) grok-4.6 • medium
