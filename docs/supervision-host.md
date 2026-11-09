@@ -110,7 +110,7 @@ Only an away record is away: no record, or the record daemon-backed quiet mode w
 
 The host asks the Pi branch's offer rule (`branchOfferForWake`, through `bin/fm-branch-dispatch.mjs offer`) whether the branch may take the close.
 Under that rule, main-owned check triggers, decision-owned signal or stale triggers, and scans that are unsafe or hold nothing for the branch stay main's, as on Pi.
-Recovery closes follow the same [wake offer rule](pi-supervision-branch.md#wake-dispatch), without granting the synthetic check.
+For recovery closes, see the host exception in the [wake offer rule](pi-supervision-branch.md#wake-dispatch).
 A captain inbox note queued during an attended engine turn waits for that turn to finish without interrupting it; the existing `FM_SUPERVISION_HOST_TURN_TIMEOUT` [engine-turn bound](configuration.md#environment-variables) still applies.
 The host then passes the next close to main before starting another engine turn, even if the successor already closed for an unrelated wake before the note arrived.
 On that main-only pass-through the host starts the successor watcher cycle and leaves it running, then prints the close unchanged.

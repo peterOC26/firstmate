@@ -199,7 +199,7 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce the predecessor-delivered wake while its handling handoff remains open.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-An external durable append still republishes that episode as pending interrupted recovery, so the successor surfaces it whether the prior handling turn is still running or has acknowledged its rows.
+An external durable append still reopens recovery under the [generation reuse contract](#generation-reuse), so the successor surfaces it whether the prior handling turn is still running or has acknowledged its rows.
 The append numbers past every queued row, so a lost or malformed sequence counter cannot let an outstanding acknowledgement consume it.
 Once those rows are acknowledged, a later append that repeats one byte for byte still opens a new recovery generation, which the successor recovers.
 Notification never consumes rows; sequence-bound, per-actor acknowledgement remains the owner of consumption.
