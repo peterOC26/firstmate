@@ -13,8 +13,8 @@
 # only: no phone channel exists; a quiet entry's says nothing is held) and the
 # read-back, which is informational and never waits for a go
 # (bin/fm-afk-contract.sh owns the record schema; the words are the whole
-# mandate and no script parses them). When that enter is given no words, the
-# same script records a readable config/afk-words file as the mandate.
+# mandate and no script parses them). That script's STANDING WORDS contract
+# also owns mandate selection when both word-input flags are omitted.
 # The record is the posture in every harness.
 # On Pi and pi-signed the entry launches no daemon: the away daemon is no longer
 # launched on Pi, the ordinary supervision session keeps running in both
@@ -78,10 +78,7 @@
 #                              announcement and the read-back. An away record
 #                              then prints the entry inventory; a quiet entry
 #                              does not. With no words while away it is a
-#                              refresh; new words replace the mandate. With no
-#                              words on a fresh away entry, a readable
-#                              config/afk-words file is that mandate
-#                              (bin/fm-afk-contract.sh). On Pi
+#                              refresh; new words replace the mandate. On Pi
 #                              no daemon is launched.
 #   fm-afk-launch.sh start     Capture the captain pane, then (unless the daemon
 #                              is already running) launch the daemon in a fresh

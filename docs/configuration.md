@@ -733,15 +733,16 @@ Selecting or discovering any other supervisor backend, including `hc`, `zellij`,
 
 The optional local, gitignored `config/afk-words` file holds the captain's standing away words for a plain `/afk`.
 `config/` is gitignored, so the file stays on this machine, and it is local to each home rather than part of secondmate inherited configuration.
-When `bin/fm-afk-contract.sh enter`, which `bin/fm-afk-launch.sh enter` calls, is given neither `--words` nor `--words-file` and will write an away record, a readable file is stored verbatim as the mandate.
-The record marks `source: config/afk-words`, the entry announcement says the standing away words were used and that `/afk` with new words replaces them, and the return brief's instructions section names that source.
-An absent file records no mandate.
+On an away entry with no supplied words, when a new record will be written, a readable regular file supplies the mandate verbatim.
+For nonempty standing words, the record identifies `config/afk-words` as the source, the entry announcement says the standing away words were used and that `/afk` with new words replaces them, and the return brief's instructions section names that source.
+An absent or empty file records no mandate.
 A path that exists but is not a readable regular file records no mandate and allows entry, with one warning naming the path and saying the standing away words were not used.
 Quiet mode never reads the file.
 A refresh that brings no new words leaves the current record untouched, including when the file changes afterward.
-Supplying `--words` or `--words-file` records those words instead, archives the previous mandate, and does not mark `source: config/afk-words`.
+Sending `/afk` with new words uses them for that session and archives any previous mandate without changing the standing file.
 Nothing in the file is parsed.
-`bin/fm-afk-contract.sh` owns the read, the `source` field, and the announcement, and `bin/fm-afk-return.sh` owns the instructions-section line.
+The fallback does not change standing authority or pre-authorize destructive, irreversible, or security-sensitive actions.
+`bin/fm-afk-contract.sh` owns the input flags, file resolution, record schema, and entry announcement; `bin/fm-afk-return.sh` owns the return brief's instructions-section rendering.
 
 ## Away-mode wedge alarm channels (config/wedge-alarm)
 

@@ -61,19 +61,19 @@
 #   confirmed_epoch: <seconds>        is the go, so no later human step stamps it
 #   mode: quiet                    only on a quiet entry (FM_AFK_MODE=quiet); absent
 #                                  means away
-#   source: config/afk-words       only when these words were read from the
+#   source: config/afk-words       only when nonempty words were read from the
 #                                  standing file because an away enter was given
 #                                  no --words and no --words-file; absent
-#                                  otherwise, including quiet mode, a refresh,
-#                                  and an explicit mandate
+#                                  otherwise, including quiet mode and an
+#                                  explicit mandate; a refresh preserves it
 #   words: | or |-                 the captain's words, verbatim, never edited,
 #     <line>                       one record line per input line (or `words: -`
-#     ...                          when /afk carried no words); `|` retains a
+#     ...                          when no mandate was recorded); `|` retains a
 #                                  final newline and `|-` records its absence
 # STANDING WORDS. When an away enter is given no --words and no --words-file and
 # this call will write a record, a readable config/afk-words file
 # (FM_CONFIG_OVERRIDE, otherwise $FM_HOME/config) is the mandate: its bytes are
-# stored verbatim and the record marks source: config/afk-words. An absent file
+# stored verbatim with provenance as above. An absent or empty file
 # records no mandate. A path that exists but is not a readable regular file
 # records no mandate and warns at entry. Quiet mode never reads the file. A
 # refresh that brings no new words leaves the standing record untouched, so a
@@ -101,11 +101,9 @@
 #     Write the record now, with no separate confirmation step, then print the
 #     entry announcement and the read-back. Exit 0 on success and 2 on a usage
 #     error. --words-file keeps the file's bytes verbatim, trailing newlines
-#     included. With no --words and no --words-file, a readable config/afk-words
-#     is recorded the same way on an away write and the record marks
-#     source: config/afk-words; an absent file records no mandate, and quiet
-#     mode never reads that file (STANDING WORDS above). With no words while a
-#     record stands, this is a refresh that leaves the standing record
+#     included. STANDING WORDS above owns the fallback when both word-input
+#     flags are omitted. With no words while a record stands, this is a
+#     refresh that leaves the standing record
 #     untouched; new words replace the mandate, carry the original session
 #     entry forward, and archive the superseded record. A replacement is staged
 #     before the prior record is archived and replaced. `propose` and `confirm`
