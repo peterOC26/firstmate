@@ -647,7 +647,7 @@ print_branch_outcomes_section() {
       map(select(.verdict == "captain")) | sort_by(.seq)
       | reduce .[] as $r ({count: {}, lines: []};
           .count[$r.task] += 1
-          | .lines += ["\($r.seq)\t\($r.task)\t[seq \($r.seq)\(if .count[$r.task] > 1 then ", newest of \(.count[$r.task]) for this task" else "" end), recorded \($r.recordedAgo) ago] \($r.task): \($r.summary | gsub("[\t\n\r]"; " "))"])
+          | .lines += ["\($r.seq)\t\($r.task)\t[seq \($r.seq)\(if .count[$r.task] > 1 then ", newest of \(.count[$r.task]) for this task" else "" end), recorded \($r.recordedAgo) ago] \($r.task): \($r.summary | gsub("[\t\n\r]"; " "))\(if $r.continuation then "; MAIN continuation handoff: \($r.continuation | gsub("[\t\n\r]"; " "))" else "" end)"])
       | .lines[]' 2>/dev/null) \
     || ! routine=$(printf '%s\n' "$rows" | jq -rs 'map(select(.unread and .verdict == "routine" and .silent != true)) | sort_by(.seq) | reverse | .[]
       | "[seq \(.seq)] \(.task): \(.summary | gsub("[\t\n\r]"; " "))"' 2>/dev/null) \

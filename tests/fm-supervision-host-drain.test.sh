@@ -527,6 +527,51 @@ test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi() {
 }
 
 
+# A Pi-recorded continuation must survive a switch to the host drain, including
+# repeated presentation before acknowledgement. Keep each handoff on its task's
+# single line while leaving rows without a continuation unchanged.
+test_branch_outcomes_present_continuations_off_pi() {
+  local home drained continuation fakecodex primary
+  home="$TMP_ROOT/drain-continuation-off-pi"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  continuation=$(printf 'Stage complete.\nStart\tthe authorized validation;\rthen report its result.')
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task gamma --verdict captain \
+    --summary 'implementation complete' --continuation "$continuation" >/dev/null \
+    || fail "fixture: could not record the continuation"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task delta --verdict captain \
+    --summary 'report complete' --continuation 'Hand the report to the assigned worker.' >/dev/null \
+    || fail "fixture: could not record another continuation"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task legacy --verdict captain \
+    --summary 'needs a decision' >/dev/null || fail "fixture: could not record a legacy outcome"
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append --task routine --verdict routine \
+    --summary 'still working' >/dev/null || fail "fixture: could not record a routine outcome"
+
+  drained=$(FM_HOME="$home" FM_TEST_HARNESS=pi "$ROOT/bin/fm-wake-drain.sh" 2>&1)
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "Pi must leave the continuation to its extension"
+  assert_absent "$home/state/.branch-outcomes-cursor" "Pi must not mark an unpresented continuation read"
+  fakecodex="$TMP_ROOT/drain-continuation-codex"
+  ln -s /bin/bash "$fakecodex"
+  for primary in "$FAKE_CLAUDE" "$fakecodex"; do
+    drained=$(FM_HOME="$home" "$primary" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+    assert_contains "$drained" \
+      '[seq 1, recorded 0m ago] gamma: implementation complete; MAIN continuation handoff: Stage complete. Start the authorized validation; then report its result.' \
+      "the continuation must be flattened onto the captain row, even after it was marked read"
+    assert_contains "$drained" \
+      '[seq 2, recorded 0m ago] delta: report complete; MAIN continuation handoff: Hand the report to the assigned worker.' \
+      "every captain row must carry its own continuation"
+    assert_re '^\[seq 3, recorded 0m ago\] legacy: needs a decision$' <(printf '%s\n' "$drained") \
+      "a captain row without a continuation must stay unchanged"
+    assert_contains "$drained" 'mark-processed --through 3;' "the continuation must carry its acknowledgement target"
+  done
+  FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" mark-processed --through 3 >/dev/null \
+    || fail "the presented continuations could not be acknowledged"
+  drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
+  assert_not_contains "$drained" 'BRANCH OUTCOMES' "acknowledged continuations must stop repeating"
+  pass "drain: Pi continuations appear on each captain line off Pi until acknowledged"
+}
+
+
 # The state a legacy backlog shares with a freshly opted-in home: no read
 # cursor, no processed marker, and a captain outcome nothing has shown yet. Any
 # cutover skip keyed on those markers would drop this first outcome; it must be
@@ -600,6 +645,7 @@ fm_test_run \
   test_branch_outcomes_date_a_legacy_backlog_without_adopting_it \
   test_branch_ack_keeps_older_keyed_decision_open \
   test_branch_outcomes_date_an_outcome_carried_across_a_switch_off_pi \
+  test_branch_outcomes_present_continuations_off_pi \
   test_branch_outcomes_keep_an_unshown_outcome_until_acknowledged \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_a_switch_to_pi \
   test_branch_outcomes_keep_a_drain_presented_outcome_across_an_index_repair
