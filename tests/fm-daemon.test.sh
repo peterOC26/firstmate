@@ -23,6 +23,8 @@ if [ -z "${FM_TEST_DAEMON_SOURCED:-}" ]; then
 fi
 
 TMP_ROOT=$(fm_test_tmproot fm-daemon-tests)
+# shellcheck source=bin/fm-wake-lib.sh
+FM_STATE_OVERRIDE="$TMP_ROOT/state" . "$ROOT/bin/fm-wake-lib.sh"
 FM_DAEMON_PRIMARY_HARNESS=claude
 export FM_DAEMON_PRIMARY_HARNESS
 
@@ -491,7 +493,7 @@ test_catchall_buffer_failure_preserves_position() {
 # A real inbox publication, the real guarded submit, and main's real drain:
 # no daemon ack may consume this return, even beside another wake.
 test_captain_note_hands_back_before_daemon_consumption() {
-  local dir state sent pane id queued drained calls
+  local dir state sent pane id queued drained calls item i
   dir=$(make_supercase captain-note-return); state="$dir/state"
   sent="$dir/sent"; pane="$dir/pane"
   mkdir -p "$dir/config" "$dir/data"
@@ -503,6 +505,8 @@ test_captain_note_hands_back_before_daemon_consumption() {
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
   [ -n "$id" ] || fail "captain note: publication failed"
   queued=$(cat "$state/.wake-queue")
+  printf -v item '%02048d' 0
+  for i in 1 2 3 4 5; do escalate_add "$state" "$i$item"; done
   printf '❯ occupied composer\n' > "$pane"
   local -x PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_SENT="$sent" FM_FAKE_TMUX_CAPTURE="$pane"
   local -x FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=sess:supervisor
@@ -551,7 +555,9 @@ test_captain_note_retains_retry_state() {
     printf '%s\n' "$(( $(_now) - 120 ))" > "$state/.subsuper-escalations.since"
     ESCALATE_KEPT_FULL=
     WEDGE_ALARM_LAST_EPOCH=0
+    FM_RECOVERY_MARKER_TOKEN=retry-generation
     hand_back_captain_inbox "$state" || fail "retry: hand-back declined"
+    [ "$FM_RECOVERY_MARKER_TOKEN" = retry-generation ] || fail "retry: reset recovery generation"
     full=$ESCALATE_KEPT_FULL
     [ -n "$full" ] && [ -f "$full" ] || fail "retry: lost retained digest"
     [ "$WEDGE_ALARM_LAST_EPOCH" -gt 0 ] || fail "retry: lost alarm state"
@@ -561,6 +567,91 @@ test_captain_note_retains_retry_state() {
     [ "$(ls -A "$state/.subsuper-digests")" = "$(basename "$full")" ] || fail "retry: orphaned digest"
     [ "$(wc -l < "$dir/alarms")" -eq 1 ] || fail "retry: repeated alarm"
     pass "captain inbox retries retain digest and alarm state"
+  )
+}
+
+test_captain_note_preserves_frozen_generation() {
+  local dir state item i original original_id attempt=0
+  dir=$(make_supercase captain-note-frozen); state="$dir/state"
+  (
+    afk_enter "$state"
+    inject_msg() {
+      attempt=$((attempt + 1))
+      case "$attempt" in
+        1)
+          original=$1; original_id=$4
+          INJECT_SUBMIT_ATTEMPTED=1 INJECT_LAST_VERDICT=unconfirmed INJECT_SENT_MSG=$1
+          return 1 ;;
+        2)
+          [ "$1" = "$original" ] && [ "$4" = "$original_id" ] || fail "return changed frozen submission"
+          return 0 ;;
+        3)
+          assert_contains "$1" 'the captain sent a note and away mode should end' "return missing after frozen delivery"
+          return 0 ;;
+        *) fail "unexpected extra submission" ;;
+      esac
+    }
+    FM_SUPERVISOR_BACKEND=t3code
+    escalate_add "$state" 'blocked: original generation'
+    escalate_flush "$state" && fail "initial submission should be unconfirmed"
+    printf -v item '%02048d' 0
+    for i in 1 2 3 4 5; do escalate_add "$state" "$i$item"; done
+    append_wake "$state" check inbox:frozen 'check: captain inbox note frozen'
+    hand_back_captain_inbox "$state" || fail "frozen return declined"
+    [ "$attempt" -eq 3 ] || fail "return did not follow frozen generation"
+    [ ! -s "$state/.subsuper-escalations" ] || fail "return buffer not cleared"
+    pass "captain return survives bounds after an unchanged frozen generation"
+  )
+}
+
+test_captain_note_parks_watcher_until_main_drains() {
+  local dir state ticks=0
+  dir=$(make_supercase captain-note-watcher); state="$dir/state"
+  local -x FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_HOUSEKEEPING_TICK=0
+  mkdir -p "$dir/daemon-bin"
+  printf '. "%s/bin/fm-wake-lib.sh"\n' "$ROOT" > "$dir/daemon-bin/fm-wake-lib.sh"
+  cat > "$dir/daemon-bin/fm-watch.sh" <<'WATCH'
+#!/usr/bin/env bash
+printf 'start\n' >> "$FM_HOME/starts"
+if [ ! -e "$FM_HOME/first-close" ]; then
+  touch "$FM_HOME/first-close"
+  printf '1\t1\tcheck\tinbox:loop\tcheck: captain inbox note loop\n' > "$FM_STATE_OVERRIDE/.wake-queue"
+fi
+printf 'check: rearm-resurface\n'
+WATCH
+  chmod +x "$dir/daemon-bin/fm-watch.sh"
+  (
+    afk_enter "$state"
+    FM_DAEMON_DIR="$dir/daemon-bin"
+    FM_SUPERVISOR_BACKEND=tmux FM_SUPERVISOR_TARGET=fixture
+    discover_supervisor_backend() { printf tmux; }
+    discover_supervisor_target() { printf fixture; }
+    fm_backend_target_exists() { return 0; }
+    inject_msg() {
+      printf 'attempt\n' >> "$dir/attempts"
+      INJECT_SUBMIT_ATTEMPTED=0 INJECT_LAST_VERDICT=busy INJECT_LAST_FAILURE=busy
+      [ "$ticks" -ge 3 ]
+    }
+    sleep() {
+      command sleep 0.1
+      ticks=$((ticks + 1))
+      case "$ticks" in
+        3|4)
+          [ "$(wc -l < "$dir/starts")" -eq 1 ] || fail "pending return restarted watcher"
+          ;;
+      esac
+      if [ "$ticks" -eq 4 ]; then
+        [ "$(wc -l < "$dir/attempts")" -ge 2 ] || fail "parked watcher prevented retry"
+        [ ! -s "$state/.subsuper-escalations" ] || fail "retry did not deliver"
+        : > "$state/.wake-queue"
+      fi
+      if [ "$ticks" -eq 5 ]; then
+        [ "$(wc -l < "$dir/starts")" -eq 2 ] || fail "watcher did not resume after main drain"
+        pass "daemon parks watcher during deferred and confirmed returns, then resumes"
+        cleanup
+      fi
+    }
+    fm_super_main
   )
 }
 
@@ -3670,6 +3761,8 @@ test_busy_inbox_dispatch_preserves_other_stale_reasons
 test_catchall_buffer_failure_preserves_position
 test_captain_note_hands_back_before_daemon_consumption
 test_captain_note_retains_retry_state
+test_captain_note_preserves_frozen_generation
+test_captain_note_parks_watcher_until_main_drains
 test_durable_wake_failure_retains_entire_batch
 test_missing_status_stale_is_acknowledged_without_diagnostic
 test_transient_unreadable_signal_recovers_without_advancing

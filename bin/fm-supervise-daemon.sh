@@ -862,6 +862,7 @@ ESCALATE_DIGEST_BYTES=8192
 ESCALATE_ITEM_BYTES=2048
 ESCALATE_ITEM_MIN_BYTES=128
 ESCALATE_FULL_DIR=.subsuper-digests
+CAPTAIN_INBOX_RETURN="away-daemon: the captain sent a note and away mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the note."
 
 # escalate_digest_body: join <buf>'s items with " | " inside the byte budget.
 # Sets ESCALATE_BODY, ESCALATE_EVENTS (every buffered item), and
@@ -886,7 +887,10 @@ escalate_digest_body() {  # <buf>
     ESCALATE_BODY+="$sep$item"
     remaining=$((remaining - ${#sep} - ${#item}))
     shown=$((shown + 1))
-  done < "$buf"
+  done < <(
+    grep -Fx -- "$CAPTAIN_INBOX_RETURN" "$buf" || true
+    grep -Fxv -- "$CAPTAIN_INBOX_RETURN" "$buf" || true
+  )
   ESCALATE_EVENTS=$total
   [ "$shown" -ge "$total" ] || ESCALATE_BODY+=" | +$((total - shown)) more event(s)"
 }
@@ -1913,16 +1917,18 @@ handle_wake() {  # <reason> <state>
 # Return 0 while a captain inbox note belongs to main, including when delivery
 # must retry. Leave every row untouched so a main drain owns the return and
 # catch-up. The queue, not the surfaced marker, decides whether to stand aside.
-hand_back_captain_inbox() {  # <state>
-  local state=$1 key keys='' pending='' ids='' msg age max_defer
+captain_inbox_pending() {  # <state>
+  local state=$1
   afk_active "$state" || return 1
   [ -s "$state/.wake-queue" ] || return 1
-  awk -F '\t' '$3 == "check" && $4 ~ /^inbox:/ { found=1 } END { exit !found }' "$state/.wake-queue" || return 1
   [ "$(fm_afk_contract_mode "$state")" != quiet ] || return 1
-  # Local bindings also keep sourceable callers on this exact task state.
+  awk -F '\t' '$3 == "check" && $4 ~ /^inbox:/ { found=1 } END { exit !found }' "$state/.wake-queue"
+}
+
+hand_back_captain_inbox() {  # <state>
+  local state=$1 key keys='' pending='' ids='' msg age max_defer
+  captain_inbox_pending "$state" || return 1
   local STATE=$state FM_WAKE_QUEUE="$state/.wake-queue" FM_WAKE_QUEUE_LOCK="$state/.wake-queue.lock"
-  # shellcheck source=bin/fm-wake-lib.sh
-  . "$FM_DAEMON_DIR/fm-wake-lib.sh"
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
   keys=$(fm_wake_queued_keys_locked check)
   for key in $keys; do
@@ -1935,7 +1941,7 @@ hand_back_captain_inbox() {  # <state>
   for key in $keys; do ids="$ids ${key#inbox:}"; done
   # Use the existing bounded digest, frozen-submit retry and native request-id
   # owner, including when other escalations were already waiting for delivery.
-  msg="away-daemon: the captain sent a note and away mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the note."
+  msg=$CAPTAIN_INBOX_RETURN
   if ! grep -Fxq -- "$msg" "$state/.subsuper-escalations" 2>/dev/null; then
     escalate_add "$state" "$msg" || { log "captain inbox return could not be buffered; wake rows retained"; return 0; }
   fi
@@ -2215,6 +2221,7 @@ fm_super_main() {
       if [ -n "${WATCHER_PID:-}" ]; then
         # child exited: reap + classify its wake reason
         if wait "${WATCHER_PID}"; then rc=0; else rc=$?; fi
+        WATCHER_PID=""
         reason=""
         if [ -n "${CUR_TMP:-}" ] && [ -e "${CUR_TMP:-}" ]; then
           reason=$(<"${CUR_TMP}")
@@ -2226,7 +2233,6 @@ fm_super_main() {
         if [ "$rc" -ne 0 ] || [ -z "$reason" ]; then
           record_crash
           log "watcher exited rc=$rc reason='$reason'; restarting after ${backoff_secs}s"
-          WATCHER_PID=""
           sleep "$backoff_secs"
           continue
         fi
@@ -2236,7 +2242,6 @@ fm_super_main() {
         # skipped (rc=0, this is normal idle, not a crash).
         if ! is_wake_reason "$reason"; then
           log "watcher non-wake stdout, idling: $reason"
-          WATCHER_PID=""
           sleep "${HOUSEKEEPING_TICK:-$HOUSEKEEPING_TICK_DEFAULT}"
           continue
         fi
@@ -2246,7 +2251,9 @@ fm_super_main() {
         fi
         trim_log
       fi
-      start_watcher || continue
+      if ! captain_inbox_pending "$STATE"; then
+        start_watcher || continue
+      fi
     fi
 
     # --- one housekeeping tick (gated to HOUSEKEEPING_TICK), then poll -------
