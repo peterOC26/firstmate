@@ -72,9 +72,7 @@
 # cannot apply the address-space limit at all) each root still runs in its
 # own ShellCheck process with identical diagnostics, just unbounded.
 #
-# Only with FM_LINT_MEMORY_FALLBACK=1, a source-following root that exits
-# with a memory failure is retried once; the default preserves that failure.
-# The opt-in retry runs
+# If a source-following root exits with a memory failure, it is retried once
 # without --external-sources under the same memory limit and only the time
 # left in that root's original deadline; with under a second left, the
 # memory failure stands without a retry. A clean retry passes
@@ -300,8 +298,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   # fresh one, so both attempts together still fit the budget CI sized its job
   # timeout around.
   fallback_secs=$(( (start_ms + FM_LINT_INTERNAL_ROOT_SECS * 1000 - $(fm_lint_now_ms)) / 1000 ))
-  if [ "${FM_LINT_MEMORY_FALLBACK:-0}" = 1 ] \
-    && [ "$reason" = memory ] \
+  if [ "$reason" = memory ] \
     && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ] \
     && [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] \
     && [ "$fallback_secs" -lt 1 ]; then
@@ -309,8 +306,7 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
       "$path" "$initial_reason" "$initial_rc" "$FM_LINT_INTERNAL_ROOT_SECS" >> "$output_dir/shard.$shard_index.out"
     rss_kib=$(fm_lint_root_rss "$rss_file")
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
-  elif [ "${FM_LINT_MEMORY_FALLBACK:-0}" = 1 ] \
-    && [ "$reason" = memory ] \
+  elif [ "$reason" = memory ] \
     && [ "${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}" -eq 1 ]; then
     fallback_args=()
     for arg in "${FM_LINT_WORKER_ARGS[@]}"; do

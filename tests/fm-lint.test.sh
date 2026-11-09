@@ -170,8 +170,9 @@ test_list_files_reports_the_shell_inventory() {
   # CI=true forces the full canonical set regardless of the ambient branch or
   # working-tree diff a local test run happens to have, so this stays a pure
   # inventory check independent of fm-lint.sh's own changed-file mode below.
+  # Hidden scripts are outside the documented shell-glob inventory.
   listed=$(CI=true "$LINT" --list-files)
-  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
+  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' ! -name '.*' -print | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "fm-lint.sh --list-files did not return the complete shell inventory"
   pass "fm-lint.sh --list-files reports the complete shell inventory"
@@ -528,7 +529,7 @@ test_ci_forces_full_lint_even_with_empty_diff() {
   # No git stub: CI=true must short-circuit fm-lint.sh's mode selection before
   # it ever consults git, so this proves CI wins regardless of local diff state.
   listed=$(CI=true "$LINT" --list-files)
-  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
+  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' ! -name '.*' -print | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "CI=true did not force the full canonical file set"
   pass "fm-lint.sh forces a full lint in CI even when the local diff would be empty"
@@ -544,7 +545,7 @@ test_main_branch_forces_full_lint() {
   # not the ambient CI signal a real CI run would otherwise supply.
   listed=$(PATH="$fakebin:$PATH" GITHUB_ACTIONS='' CI='' \
     FM_TEST_GIT_BRANCH=main "$LINT" --list-files)
-  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' -print | LC_ALL=C sort)
+  expected=$(find bin bin/backends tests -maxdepth 1 -type f -name '*.sh' ! -name '.*' -print | LC_ALL=C sort)
   [ "$(printf '%s\n' "$listed" | LC_ALL=C sort)" = "$expected" ] \
     || fail "fm-lint.sh did not force a full lint when HEAD is on main"
   pass "fm-lint.sh forces a full lint when HEAD is on main"
@@ -1533,8 +1534,6 @@ test_root_memory_limit_reports_a_named_death() {
 
 test_memory_failure_retries_without_external_sources() {
   local tmp fakebin fixture out rc log rss_kib require_bounds=0 mode
-  local FM_LINT_MEMORY_FALLBACK=1
-  export FM_LINT_MEMORY_FALLBACK
   local -a modes=(0)
   if fm_lint_bounds_supported; then
     require_bounds=1
@@ -1569,20 +1568,6 @@ fi
 exit 0
 SH
   chmod +x "$fakebin/shellcheck"
-
-  rc=0
-  out=$(
-    unset FM_LINT_MEMORY_FALLBACK
-    PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 \
-      FM_TEST_FALLBACK_LOG="$log" "$LINT" --telemetry "$tmp/default.tsv" "$fixture" 2>&1
-  ) || rc=$?
-  [ "$rc" -eq 251 ] || fail "the default must preserve a source-aware memory failure (exit $rc)"$'\n'"$out"
-  [ "$(cat "$log")" = "$(printf 'yes\tnone')" ] \
-    || fail "default lint retried without external sources"$'\n'"$(cat "$log")"
-  assert_contains "$out" "Heap exhausted" "default lint lost the original diagnostics"
-  awk -F '\t' '$1 == "end" && $9 == 251 && $10 == "memory" && $12 == 1 { found=1 } END { exit !found }' \
-    "$tmp/default.roots.tsv" || fail "default lint lost its source-aware memory failure record"
-  pass "memory fallback stays off by default and preserves source-aware failure diagnostics"
 
   for mode in "${modes[@]}"; do
     : > "$log"
@@ -1649,8 +1634,6 @@ SH
 }
 
 test_memory_fallback_spends_only_the_remaining_root_deadline() {
-  local FM_LINT_MEMORY_FALLBACK=1
-  export FM_LINT_MEMORY_FALLBACK
   if ! fm_lint_bounds_supported; then
     pass "SKIP (host cannot enforce the bounded envelope): fallback deadline check"
     return

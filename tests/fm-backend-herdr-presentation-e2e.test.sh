@@ -143,9 +143,32 @@ if [ "${1:-} ${2:-}" = "pane get" ] && [ -d "$ACTIVE_SEEDED_CONTROL" ] \
   refusal_probe=1
   refusal_before=$(focus_snapshot || printf ambiguous/ambiguous)
 fi
+# An idle abort pane is removed through Herdr's pane-death path, which issues
+# no pane close; its removal is the first exact pane_not_found answer.
+abort_pane_probe=
+if [ "${1:-} ${2:-}" = "pane get" ] && [ -d "$POST_CREATE_ABORT_CONTROL" ]; then
+  for task_dir in "$POST_CREATE_ABORT_CONTROL"/abort-*; do
+    [ -d "$task_dir" ] || continue
+    [ "${3:-}" = "$(cat "$task_dir/task-pane" 2>/dev/null || true)" ] || continue
+    abort_pane_probe=$3
+    break
+  done
+fi
 before=
 [ -z "$mutation" ] || before=$(focus_snapshot || printf ambiguous/ambiguous)
-if out=$(env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@" 2>&1); then
+if [ -n "$abort_pane_probe" ]; then
+  probe_err=$(mktemp "$TMP_ROOT/abort-pane-get.XXXXXX")
+  if out=$(env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@" 2> "$probe_err"); then
+    status=0
+  else
+    status=$?
+  fi
+  if printf '%s\n%s' "$out" "$(cat "$probe_err")" | jq -e 'select(.error.code? == "pane_not_found")' >/dev/null 2>&1; then
+    printf 'pane-gone\t-\t-\t%s\n' "$abort_pane_probe" >> "$FOCUS_AUDIT_LOG"
+  fi
+  cat "$probe_err" >&2
+  rm -f "$probe_err"
+elif out=$(env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"); then
   status=0
 else
   status=$?
@@ -228,6 +251,11 @@ set -u
   done
   printf '\n'
 } >> "$TREEHOUSE_CALL_LOG"
+if [ -d "$POST_CREATE_ABORT_CONTROL" ] && [ "${1:-}" = get ]; then
+  # Fail the lease after the projected pane is created, exercising the
+  # post-create abort cleanup without consuming a real pool slot.
+  exit 0
+fi
 # Treehouse's pool allocator is outside the Herdr concurrency contract under
 # test. Serialize its calls so simultaneous recovery spawns cannot race for
 # one pool slot before reaching the Herdr session lock exercised below.
@@ -320,7 +348,7 @@ EOF
     LAB_READY=0
   fi
   # Spawn leaves each state/<id>.git-hooks strip dir read-only.
-  find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null
+  find "$TMP_ROOT" -type d -exec chmod u+rwx {} + 2>/dev/null || true
   rm -rf "$TMP_ROOT"
 }
 trap cleanup_all EXIT
@@ -459,6 +487,15 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
   fi
 }
 
+finish_concurrent_recovery() {  # <id> <home> <status> <stdout> <stderr>
+  local id=$1 home=$2 status=$3 out=$4 err=$5
+  [ "$status" -ne 0 ] || return 0
+  grep -F "presentation recovery could not acquire its session lock" "$err" >/dev/null 2>&1 \
+    || fail "concurrent recovery $id failed unexpectedly: $(cat "$err")"
+  spawn_task "$id" "$home" "$RECOVERY_PROJECT_DIR" > "$out" 2> "$err" \
+    || fail "concurrent recovery $id retry failed after session-lock contention cleared: $(cat "$err")"
+}
+
 spawn_secondmate_task() {
   local id=$1 home=$2
   FM_GATE_REFUSE_BYPASS=1 FM_SPAWN_NO_GUARD=1 FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
@@ -482,20 +519,19 @@ return_retired_copy() {  # <worktree>
   rm -f "$(dirname "$1")/.fm-slot-owner"
 }
 
-# Model an orphaned presentation after stopping its placeholder worker: only
-# the retained acquisition journal that refuses a same-id spawn is retired.
-# The record stays for the reclaim to read, and the copy stays leased until the
-# suite's own returns: a Treehouse return terminates processes in the copy,
-# which would kill the restored husk shell the reclaim under test must find.
+# Model an orphaned presentation after stopping its placeholder worker.
+# Herdr's treehouse get --lease writes no JSON journal. A journal left by the
+# durable lease path is the only thing retired here, so a later same-id spawn
+# is not refused by it. The record stays for the reclaim to read, and the copy
+# stays leased until the suite's own returns: a Treehouse return terminates
+# processes in the copy, which would kill the restored husk shell the reclaim
+# under test must find.
 retire_stopped_acquisition() {  # <meta>
-  local meta=$1 wt lease_id holder id
+  local meta=$1 wt id
   [ -f "$meta" ] || return 0
   wt=$(sed -n 's/^worktree=//p' "$meta")
-  lease_id=$(sed -n 's/^treehouse_lease_id=//p' "$meta")
-  holder=$(sed -n 's/^treehouse_lease_holder=//p' "$meta")
   id=$(basename "$meta" .meta)
-  [ -n "$wt" ] && [ -n "$lease_id" ] && [ -n "$holder" ] \
-    || fail "orphan presentation fixture has no acquisition identity: $meta"
+  [ -n "$wt" ] || return 0
   RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   rm -rf "$(dirname "$meta")/$id.treehouse-acquire"
 }
@@ -911,17 +947,17 @@ finish_concurrent_expected_abort abort-b "$ABORT_B_STATUS" "$TMP_ROOT/abort-b.ou
 # The forced foreground_cwd is a plain non-git directory, which the discovery
 # poll now screens out on every read rather than adopting, so the armed failure
 # arrives as the poll's own deadline refusal naming that path.
-grep -F "did not enter an isolated worktree" "$TMP_ROOT/abort-a.err" >/dev/null 2>&1 \
+grep -F "treehouse get --lease did not report a worktree" "$TMP_ROOT/abort-a.err" >/dev/null 2>&1 \
   || fail "post-create abort fixture A did not reach the armed validation failure"
-grep -F "did not enter an isolated worktree" "$TMP_ROOT/abort-b.err" >/dev/null 2>&1 \
+grep -F "treehouse get --lease did not report a worktree" "$TMP_ROOT/abort-b.err" >/dev/null 2>&1 \
   || fail "post-create abort fixture B did not reach the armed validation failure"
 ABORT_A_PANE=$(cat "$POST_CREATE_ABORT_CONTROL/abort-a/task-pane")
 ABORT_B_PANE=$(cat "$POST_CREATE_ABORT_CONTROL/abort-b/task-pane")
 ABORT_SEQUENCE=$(sed -n "$((ABORT_FOCUS_START + 1)),\$p" "$FOCUS_AUDIT_LOG" | awk -F '\t' -v a="$ABORT_A_PANE" -v b="$ABORT_B_PANE" '
   $1 == "workspace-create" && $4 ~ /^└ abort-a · p:/ { print "create-a" }
   $1 == "workspace-create" && $4 ~ /^└ abort-b · p:/ { print "create-b" }
-  $1 == "pane-gone" && $4 == a { print "close-a" }
-  $1 == "pane-gone" && $4 == b { print "close-b" }
+  ($1 == "pane-close" || $1 == "pane-gone") && $4 == a && !closed_a++ { print "close-a" }
+  ($1 == "pane-close" || $1 == "pane-gone") && $4 == b && !closed_b++ { print "close-b" }
 ')
 case "$ABORT_SEQUENCE" in
   $'create-a\nclose-a\ncreate-b\nclose-b'|$'create-b\nclose-b\ncreate-a\nclose-a') ;;
@@ -943,15 +979,8 @@ for ABORT_PANE in "$ABORT_A_PANE" "$ABORT_B_PANE"; do
 done
 [ ! -e "$HOME_DIR/state/abort-a.meta" ] && [ ! -e "$HOME_DIR/state/abort-b.meta" ] \
   || fail "post-create abort fixtures published task metadata before launch"
-for ABORT_ID in abort-a abort-b; do
-  ABORT_ALLOCATION="$HOME_DIR/state/$ABORT_ID.treehouse-acquire/allocation.json"
-  ABORT_WT=$(jq -er .path "$ABORT_ALLOCATION") || fail "aborted spawn lost its acquired path"
-  ABORT_LEASE_ID=$(jq -er .lease_id "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease id"
-  ABORT_HOLDER=$(jq -er .lease_holder "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease holder"
-  "$REAL_TREEHOUSE" return --force --if-lease-id "$ABORT_LEASE_ID" --if-lease-holder "$ABORT_HOLDER" "$ABORT_WT" \
-    || fail "could not release the aborted fixture's exact reservation"
-  rm -rf "$HOME_DIR/state/$ABORT_ID.treehouse-acquire"
-done
+# The armed failure is an empty treehouse get --lease. It takes no pool slot
+# and writes no acquisition journal, so there is no reservation to release.
 rm -rf "$POST_CREATE_ABORT_CONTROL"
 rm -f "$HOME_DIR/state/abort-a.herdr-presentation" "$HOME_DIR/state/abort-b.herdr-presentation"
 pass "real Herdr lab: concurrent post-create abort cleanup stays serialized with exact focus restoration"
@@ -1394,8 +1423,12 @@ spawn_task "$PRIMARY_WAVE_ID" "$HOME_DIR" "$RECOVERY_PROJECT_DIR" --herdr-resume
 PRIMARY_WAVE_PID=$!
 spawn_task "$BRAVO_WAVE_ID" "$SECOND_HOME_B" "$RECOVERY_PROJECT_DIR" --herdr-resume-lock-wait > "$TMP_ROOT/bravo-wave-resume.out" 2> "$TMP_ROOT/bravo-wave-resume.err" &
 BRAVO_WAVE_PID=$!
-wait "$PRIMARY_WAVE_PID" || fail "concurrent primary recovery failed: $(cat "$TMP_ROOT/primary-wave-resume.err")"
-wait "$BRAVO_WAVE_PID" || fail "concurrent secondmate recovery failed: $(cat "$TMP_ROOT/bravo-wave-resume.err")"
+if wait "$PRIMARY_WAVE_PID"; then PRIMARY_WAVE_STATUS=0; else PRIMARY_WAVE_STATUS=$?; fi
+if wait "$BRAVO_WAVE_PID"; then BRAVO_WAVE_STATUS=0; else BRAVO_WAVE_STATUS=$?; fi
+finish_concurrent_recovery "$PRIMARY_WAVE_ID" "$HOME_DIR" "$PRIMARY_WAVE_STATUS" \
+  "$TMP_ROOT/primary-wave-resume.out" "$TMP_ROOT/primary-wave-resume.err"
+finish_concurrent_recovery "$BRAVO_WAVE_ID" "$SECOND_HOME_B" "$BRAVO_WAVE_STATUS" \
+  "$TMP_ROOT/bravo-wave-resume.out" "$TMP_ROOT/bravo-wave-resume.err"
 PRIMARY_WAVE_NEW_WT=$(remember_meta_worktree "$PRIMARY_WAVE_META")
 BRAVO_WAVE_NEW_WT=$(remember_meta_worktree "$BRAVO_WAVE_META")
 PRIMARY_WAVE_NEW_PANE=$(grep '^herdr_pane_id=' "$PRIMARY_WAVE_META" | cut -d= -f2-)

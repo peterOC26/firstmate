@@ -64,7 +64,13 @@
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
-# ordering. An exact retry also completes unfinished ordering normalization and
+# ordering. `--release` is attended-only: while the away-posture record exists
+# (state/.afk-contract, or the daemon flag state/.afk, read as away; a quiet
+# record is a present captain) it is refused before anything is written, so an
+# unattended supervisor cannot free held work with its own words and then steer
+# it; the captain releases the hold in an attended session. A closing answer
+# without `--release` is not gated by posture. An exact retry also completes
+# unfinished ordering normalization and
 # is idempotent only when its requested close mode
 # matches the newest record; a changed decision or a mode mismatch is rejected.
 # A re-held task may record a new answer on top. On a task already closed outside this script,
@@ -83,7 +89,9 @@
 # identically no matter which channel the answer arrived on. The key IS the
 # task id - no identity arithmetic. The optional fourth field selects the close:
 # empty or `done` completes the task, `release` lifts the hold so held work
-# resumes; anything else is skipped. A key that names no task, a task that is
+# resumes; anything else is skipped. A `release` line while the away-posture
+# record exists is reported as `refused:` under the same attended-only rule as
+# `answer --release` and feeds nothing. A key that names no task, a task that is
 # not held for the captain, or a task already closed is reported as `skipped:`
 # and feeds nothing. A replayed delivery whose answer digest and requested
 # close mode both match the newest record is reported `closed:` and is a no-op;
@@ -138,7 +146,7 @@
 # `--none` is an explicit semantic attestation that the just-reviewed surface
 # has no unresolved captain call, and is refused while the origin still has an
 # open keyed status decision. With a non-empty inventory, every listed task is
-# verified durable (captain-held, or carrying a recorded resolution),
+# verified durable (docs/captain-hold-lifecycle.md owns the inventory checks),
 # is never the origin itself, and, when `hold --origin` recorded one, was held
 # for this origin; a hold with no recorded origin is accepted on durability
 # alone and named in the output,
@@ -151,9 +159,9 @@
 # erase a source before this gate has succeeded: every recorded inventory
 # entry must still satisfy the same durability and origin checks as `complete`,
 # and no keyed status decision may be open.
-# On the markdown backend, an inventory id absent live is also read from the
-# configured done archive; an archived row requires a recorded resolution,
-# never just a surviving hold annotation. Live rows always take precedence.
+# `complete` and `verify` also read an entry that markdown Done retention moved
+# into the configured Done archive, where it counts only through a recorded
+# resolution; no other subcommand reads the archive.
 # Metadata compatibility: the attestation keeps the historical
 # `decisions_reviewed=1` and `decision_keys=` keys, and an inventory entry that
 # names no existing task resolves through the legacy `<origin>-decision-<entry>`
@@ -240,6 +248,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
+# shellcheck source=bin/fm-afk-contract.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-afk-contract.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -266,6 +277,7 @@ captain_hold_cleanup() {
     fm_lock_release "$CAPTAIN_CONTROL_LOCK" || true
     CAPTAIN_CONTROL_LOCK_HELD=0
   fi
+  fm_afk_contract_lock_release || true
 }
 trap captain_hold_cleanup EXIT
 
@@ -379,10 +391,8 @@ require_tasks_axi() {
 # inside a command substitution can still tell a wedged backend from a
 # genuinely unknown id.
 TASK_SHOW_OUTPUT=
-TASK_SHOW_ARCHIVED=0
 task_show() {  # <id>; sets TASK_SHOW_OUTPUT
   local data status=0 reason
-  TASK_SHOW_ARCHIVED=0
   data=$(fm_backlog_data_absolute "$DATA") || fail "data directory cannot be resolved: $DATA"
   TASK_SHOW_OUTPUT=$(fm_backlog_row_show "$data" "$1" --full 2>/dev/null) || status=$?
   if [ "$status" -eq 124 ]; then
@@ -391,84 +401,6 @@ task_show() {  # <id>; sets TASK_SHOW_OUTPUT
       "${reason:-tasks-axi show $1 exceeded its backlog read bound}" >&2
     exit 124
   fi
-  return "$status"
-}
-
-# Resolve the markdown archive with tasks-axi's project-then-home precedence,
-# relative to its working root, and its default beside the addressed backlog.
-captain_archive_path() {  # <backlog-root> <default-archive>
-  perl -e '
-    use strict; use warnings;
-    my ($root, $default, $home) = @ARGV;
-    my $archive;
-    for my $file ("$home/.tasks-axi/config.toml", "$root/.tasks.toml") {
-      next unless -e $file || -l $file;
-      open my $fh, "<", $file or die "cannot read archive configuration $file: $!\n";
-      my $markdown = 0;
-      while (my $line = <$fh>) {
-        if ($line =~ /^\s*\[([^]]+)\]\s*(?:#.*)?$/) {
-          my $section = $1;
-          $section =~ s/^\s+|\s+$//g;
-          $markdown = $section eq "markdown";
-          next;
-        }
-        next unless $markdown && $line =~ /^\s*archive\s*=/;
-        $line =~ /^\s*archive\s*=\s*(["\x27])(.*?)\1\s*(?:#.*)?$/
-          or die "invalid markdown.archive in $file\n";
-        $archive = $2;
-        $archive =~ /\S/ or die "empty markdown.archive in $file\n";
-      }
-      close $fh or die "cannot finish reading $file: $!\n";
-    }
-    $archive = $default unless defined $archive;
-    print $archive =~ m{^/} ? $archive : "$root/$archive";
-  ' -- "$1" "$2" "${HOME:-}"
-}
-
-# Inventory validation alone may read pruned rows. Keep ordinary answer,
-# reconcile and mutation lookups live-only. Reuse tasks-axi's markdown parser
-# on a private snapshot whose archive batch headings are Done sections; never
-# rewrite the archive or feed its note-archive counterpart into this gate.
-task_show_inventory() {  # <id>; sets TASK_SHOW_OUTPUT and TASK_SHOW_ARCHIVED
-  local id=$1 status=0 data root backend archive snapshot count secs
-  task_show "$id" && return 0
-  status=$?
-  printf '%s\n' "$TASK_SHOW_OUTPUT" | grep -q '^code: NOT_FOUND$' || return "$status"
-  data=$(fm_backlog_data_absolute "$DATA") || return 2
-  root=$(fm_backlog_root "$data") || return 2
-  backend=$(fm_tasks_axi_backend "$root") || return 2
-  [ "$backend" = markdown ] || return "$status"
-  archive=$(captain_archive_path "$root" "$data/done-archive.md") || return 2
-  [ -e "$archive" ] || [ -L "$archive" ] || return "$status"
-  [ -f "$archive" ] && [ -r "$archive" ] || fail "done archive cannot be read at $archive"
-  snapshot=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-archive.XXXXXX") \
-    || fail "cannot stage done archive for $id"
-  if ! sed 's/^## Archived .*/## Done/' "$archive" > "$snapshot"; then
-    rm -f -- "$snapshot"
-    fail "cannot read done archive $archive"
-  fi
-  count=$(awk -v prefix="- [x] $id - " 'index($0, prefix) == 1 { n++ } END { print n+0 }' "$snapshot") || {
-    rm -f -- "$snapshot"
-    return 2
-  }
-  if [ "$count" -gt 1 ]; then
-    rm -f -- "$snapshot"
-    fail "captain-call inventory $id is ambiguous in done archive $archive"
-  fi
-  secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
-  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
-  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
-  status=0
-  # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
-  TASK_SHOW_OUTPUT=$(fm_run_timed "$secs" bash -c \
-    'cd "$1" || exit 1; exec tasks-axi show "$2" --full --backend markdown --file "$3"' \
-    _ "$root" "$id" "$snapshot" 2>&1) || status=$?
-  rm -f -- "$snapshot"
-  if [ "$status" -eq 124 ]; then
-    printf 'fm-captain-hold: tasks-axi show %s exceeded its %ss done archive read bound\n' "$id" "$secs" >&2
-    exit 124
-  fi
-  [ "$status" -ne 0 ] || TASK_SHOW_ARCHIVED=1
   return "$status"
 }
 
@@ -606,17 +538,32 @@ resolution_block() {  # <mode>
 
 # Durable state of one captain call: an active captain hold (annotations
 # surviving even when a date gate has expired) or a recorded captain answer.
-verify_hold_durable() {  # <task-id> [reader]
-  local id=$1 reader=${2:-task_show} show state hold_kind body
-  "$reader" "$id" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
+# Without captain annotations, an open task's leading stamp can signal an
+# incomplete re-hold or unfinished release normalization; the old record alone
+# cannot vouch for that state. Done tasks retain their recorded resolution as
+# evidence, and verify_entry_durable separately checks the stored origin.
+verify_hold_durable() {  # <task-id>
+  local id=$1 show state hold_kind body archived_status
+  task_show "$id" || {
+    [ "$?" -ne 124 ] || fail "the backlog backend exceeded its read bound reading $id"
+    task_show_archived "$id" || {
+      archived_status=$?
+      [ "$archived_status" -ne 124 ] || exit 124
+      fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
+    }
+  }
   show=$TASK_SHOW_OUTPUT
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
-  if body_has_resolution_record "$body"; then
+  if [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
     return 0
   fi
-  if [ "$TASK_SHOW_ARCHIVED" = 0 ] && [ "$state" != "done" ] && [ "$hold_kind" = captain ]; then
+  if body_has_resolution_record "$body"; then
+    if [ "$state" != "done" ] \
+      && [ -n "$(body_hold_set_timestamp "$(decode_shown_value "$body")")" ]; then
+      fail "captain-held task $id carries a recorded answer from an earlier call, but its newer hold never completed; re-run the hold or answer it again"
+    fi
     return 0
   fi
   fail "captain-held task $id is neither held for the captain nor closed with a recorded captain answer"
@@ -641,20 +588,40 @@ CAPTAIN_MIGRATION_SCAN_LOADED=0
 CAPTAIN_MIGRATION_SCAN_JSON=
 NL_SEP=$'\n'
 
-# Section-aware [beads] extraction from a .tasks.toml: only keys inside the
-# [beads] section, comments stripped. Prints "<key> <value>" lines.
-captain_beads_toml_entries() {  # <toml-file>
+# Section-aware extraction from a .tasks.toml: only the named keys inside the
+# named section, comments stripped. A hash inside a quoted value stays, so an
+# archive path may contain one. Prints "<key> <value>" lines.
+captain_toml_section_entries() {  # <toml-file> <section> <key-alternation>
   [ -f "$1" ] || return 0
-  LC_ALL=C awk '
+  LC_ALL=C awk -v section="[$2]" -v keys="^($3)[[:space:]]*=" '
     function trim(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); return v }
-    BEGIN { inbeads = 0 }
+    function strip_comment(s,    i, n, c, q, out) {
+      n = length(s)
+      q = ""
+      out = ""
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1)
+        if (q == "") {
+          if (c == "#") break
+          if (c == "\"" || c == "'\''") q = c
+        } else if (q == "\"" && c == "\\") {
+          out = out c
+          if (i < n) { i++; out = out substr(s, i, 1) }
+          continue
+        } else if (c == q) {
+          q = ""
+        }
+        out = out c
+      }
+      return out
+    }
+    BEGIN { insection = 0 }
     {
-      line = $0
-      sub(/[[:space:]]*#.*/, "", line)
+      line = strip_comment($0)
       line = trim(line)
-      if (line ~ /^\[[^]]+\]$/) { inbeads = (line == "[beads]"); next }
-      if (!inbeads) next
-      if (line ~ /^(prefix|path|binary)[[:space:]]*=/) {
+      if (line ~ /^\[[^]]+\]$/) { insection = (line == section); next }
+      if (!insection) next
+      if (line ~ keys) {
         key = line
         sub(/[[:space:]]*=.*/, "", key)
         sub(/^[^=]*=[[:space:]]*/, "", line)
@@ -663,6 +630,10 @@ captain_beads_toml_entries() {  # <toml-file>
       }
     }
   ' "$1"
+}
+
+captain_beads_toml_entries() {  # <toml-file>
+  captain_toml_section_entries "$1" beads 'prefix|path|binary'
 }
 
 captain_beads_setting() {  # <entries-output> <setting>
@@ -819,15 +790,15 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # beads backend - the migrated row the markdown-to-beads hold migration wrote.
 # Prints "<resolved id> <how>", where <how> is exact, legacy, migrated-note or
 # migrated-prefix, so a caller can record which evidence carried the attestation.
-resolve_entry() {  # <origin-or-empty> <entry> [reader]; prints "<id> <how>" or fails
-  local origin=$1 entry=$2 reader=${3:-task_show} legacy migrated rc
-  if "$reader" "$entry"; then
+resolve_entry() {  # <origin-or-empty> <entry>; prints "<id> <how>" or fails
+  local origin=$1 entry=$2 legacy migrated rc
+  if task_show "$entry"; then
     printf '%s exact' "$entry"
     return 0
   fi
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
     legacy=$(legacy_hold_id "$origin" "$entry")
-    if "$reader" "$legacy"; then
+    if task_show "$legacy"; then
       printf '%s legacy' "$legacy"
       return 0
     fi
@@ -904,7 +875,7 @@ task_identity() {
   printf '%s' "$id"
 }
 
-write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
+write_hold_origin() {  # <task-id> <shown-body> <origin>
   local id=$1 body=$2 origin=$3 stamp rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
@@ -913,10 +884,7 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
     || fail "task $id lost its hold-set stamp before its origin was recorded"
   rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: /' \
     | awk 'NF || started { started = 1; print }')
-  new_body=$stamp
-  if [ -n "$origin" ]; then
-    new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
-  fi
+  new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
   if [ -n "$rest" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
   fi
@@ -928,7 +896,25 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
   fi
   if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
     rm -f -- "$tmp"
-    fail "could not record the hold origin on $id"
+    printf 'fm-captain-hold: could not record the hold origin on %s\n' "$id" >&2
+    return 1
+  fi
+  rm -f -- "$tmp"
+}
+
+# Best-effort restoration removes a refused hold attempt's stamp while
+# preserving the prior body; the new origin has not been published yet.
+# tasks-axi cannot write an empty body, and a task that began empty carries no
+# earlier answer for a stale stamp to mislabel, so that case keeps its body.
+restore_hold_body() {  # <task-id> <shown-original-body>
+  local id=$1 body tmp
+  body=$(decode_shown_value "$2") || return 1
+  [ -n "$body" ] || return 0
+  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-restore.XXXXXX") || return 1
+  if ! printf '%s\n' "$body" > "$tmp" || ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    printf 'fm-captain-hold: could not restore the body of %s after an incomplete hold\n' "$id" >&2
+    return 1
   fi
   rm -f -- "$tmp"
 }
@@ -941,6 +927,121 @@ refuse_self_inventory() {
   fail "origin $origin cannot be its own captain-call inventory entry; hold a separate captain task for the call and list that task"
 }
 
+# --- Done-archive reads on the markdown backend -----------------------------
+#
+# Done retention moves closed markdown rows into the configured archive, which
+# tasks-axi show never reads, so an answered call a scout attested would read as
+# absent once retention ran. Only the completion gate consults the archive: an
+# archived row is closed, so it can satisfy the gate solely through a recorded
+# resolution, and every mutating path keeps seeing it as absent.
+
+# The [markdown] archive key tasks-axi would honour, resolved with tasks-axi's
+# own source precedence: the backlog root's .tasks.toml first, then the
+# user-level $HOME/.tasks-axi/config.toml. Empty when neither sets it; a relative
+# value resolves against the backlog root wherever it was configured, the way
+# tasks-axi resolves it.
+captain_markdown_archive_setting() {  # <backlog-root>
+  local root=$1 archive
+  archive=$(captain_toml_section_entries "$root/.tasks.toml" markdown archive | sed -n 's/^archive //p' | head -1)
+  if [ -z "$archive" ] && [ -n "${HOME:-}" ]; then
+    archive=$(captain_toml_section_entries "$HOME/.tasks-axi/config.toml" markdown archive | sed -n 's/^archive //p' | head -1)
+  fi
+  printf '%s\n' "$archive"
+}
+
+# The archive tasks-axi writes: the [markdown] archive key resolved against the
+# backlog root, else done-archive.md beside the addressed backlog file. Returns
+# 1 when the configured backend keeps no markdown archive.
+captain_markdown_archive_path() {
+  local data root backend archive file
+  data=$(fm_backlog_data_absolute "$DATA") || return 1
+  root=$(fm_backlog_root "$data") || return 1
+  backend=$(fm_tasks_axi_backend "$root" 2>/dev/null) || return 1
+  [ "$backend" = markdown ] || return 1
+  archive=$(captain_markdown_archive_setting "$root")
+  case "$archive" in
+    '')
+      file=$(fm_backlog_file "$data") || return 1
+      archive="${file%/*}/done-archive.md"
+      ;;
+    /*) ;;
+    *) archive="$root/$archive" ;;
+  esac
+  printf '%s\n' "$archive"
+}
+
+# Read an archived row into TASK_SHOW_OUTPUT exactly as tasks-axi shows a live
+# one, by replaying its newest archived block under a scratch Done section. A
+# reused id can be archived more than once, and retention appends, so the last
+# block is the newest. Returns 1 when the row is not archived.
+task_show_archived() {  # <id>; sets TASK_SHOW_OUTPUT
+  local id=$1 archive dir status=0 secs=${FM_BACKLOG_ROW_TIMEOUT_SECS:-10}
+  TASK_SHOW_OUTPUT=
+  case "$secs" in ''|*[!0-9]*) secs=10 ;; esac
+  [ "$secs" -gt 0 ] 2>/dev/null || secs=10
+  archive=$(captain_markdown_archive_path) || return 1
+  [ -f "$archive" ] || return 1
+  dir=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-captain-hold-archive.XXXXXX") \
+    || fail "cannot stage the Done archive read for $id"
+  printf 'backend = "markdown"\n' > "$dir/.tasks.toml"
+  {
+    printf '## Done\n'
+    LC_ALL=C awk -v id="$id" '
+      /^- \[.\] / {
+        rest = substr($0, 7)
+        inrow = (rest == id || index(rest, id " ") == 1)
+        if (inrow) block = $0 "\n"
+        next
+      }
+      inrow && ($0 == "" || $0 ~ /^[[:space:]]/) { block = block $0 "\n"; next }
+      { inrow = 0 }
+      END { printf "%s", block }
+    ' "$archive"
+  } > "$dir/backlog.md" || status=1
+  if [ "$status" -eq 0 ]; then
+    # The replayed archive read gets the same bound as a live backlog read, so a
+    # wedged tasks-axi cannot hang verify, or complete while it holds the origin
+    # metadata lock. A bound hit is not absence, so it stops loudly with 124.
+    # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
+    TASK_SHOW_OUTPUT=$(fm_run_timed "$secs" bash -c \
+      'cd "$1" 2>/dev/null || exit 1; shift; exec tasks-axi show "$@"' \
+      _ "$dir" "$id" --full --file "$dir/backlog.md" 2>/dev/null)
+    status=$?
+    if [ "$status" -eq 124 ]; then
+      printf 'fm-captain-hold: tasks-axi show %s exceeded its %ss Done-archive read bound\n' "$id" "$secs" >&2
+    elif [ "$status" -ne 0 ]; then
+      status=1
+    fi
+  fi
+  rm -f -- "$dir/backlog.md" "$dir/.tasks.toml"
+  rmdir -- "$dir" 2>/dev/null || true
+  return "$status"
+}
+
+# The archived row an entry names, under its exact id or its legacy identity.
+# A read that hit its bound is not absence: it returns 124 so the caller stops
+# loudly instead of reading the row as unarchived.
+archived_entry() {  # <origin-or-empty> <entry>; prints the archived id
+  local origin=$1 entry=$2 legacy status=0
+  task_show_archived "$entry" || status=$?
+  if [ "$status" -eq 0 ]; then
+    printf '%s' "$entry"
+    return 0
+  fi
+  [ "$status" -ne 124 ] || return 124
+  if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
+    legacy=$(legacy_hold_id "$origin" "$entry")
+    status=0
+    task_show_archived "$legacy" || status=$?
+    if [ "$status" -eq 0 ]; then
+      printf '%s' "$legacy"
+      return 0
+    fi
+    [ "$status" -ne 124 ] || return 124
+  fi
+  return 1
+}
+
 # Resolve one entry and verify the row it names is durably captain-held. A
 # resolution failure that is not the read bound keeps resolve_entry's own
 # status - its stderr already named the entry; 124 means the backend never
@@ -948,13 +1049,31 @@ refuse_self_inventory() {
 # as absence. The result carries the attestation evidence and whether an
 # origin was recorded, so completion can disclose the legacy fallback.
 verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origin-state>"
-  local origin=$1 entry=$2 resolved resolve_status=0 id how stored origin_state=unrecorded origin_id stored_id
+  local origin=$1 entry=$2 resolved resolve_status=0 id how stored origin_state=unrecorded origin_id stored_id resolve_err archived archived_status
   # The origin task is never its own captain-call inventory: it is the work the
   # calls were found in, so accepting it would let a refused hold look recorded.
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$entry" = "$origin" ]; then
     refuse_self_inventory "$origin" "$entry"
   fi
-  resolved=$(resolve_entry "$origin" "$entry" task_show_inventory) || resolve_status=$?
+  resolve_err=$(mktemp "${TMPDIR:-/tmp}/fm-captain-hold-resolve.XXXXXX") \
+    || fail "cannot stage the resolution diagnostics for $entry"
+  resolved=$(resolve_entry "$origin" "$entry" 2>"$resolve_err") || resolve_status=$?
+  if [ "$resolve_status" -eq 1 ]; then
+    archived_status=0
+    archived=$(archived_entry "$origin" "$entry") || archived_status=$?
+    if [ "$archived_status" -eq 0 ]; then
+      resolved="$archived archived"
+      resolve_status=0
+    elif [ "$archived_status" -eq 124 ]; then
+      rm -f -- "$resolve_err"
+      exit 124
+    else
+      cat "$resolve_err" >&2
+    fi
+  else
+    cat "$resolve_err" >&2
+  fi
+  rm -f -- "$resolve_err"
   if [ "$resolve_status" -ne 0 ]; then
     [ "$resolve_status" -ne 124 ] \
       || fail "the backlog backend exceeded its read bound resolving $entry"
@@ -962,7 +1081,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   fi
   id=${resolved%% *}
   how=${resolved##* }
-  verify_hold_durable "$id" task_show_inventory
+  verify_hold_durable "$id"
   id=$(show_field_value "$TASK_SHOW_OUTPUT" id)
   validate_slug backend-task-id "$id"
   stored=$(body_hold_origin "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")
@@ -985,7 +1104,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0
+  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason original_body='' hold_status=0
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1058,16 +1177,17 @@ command_hold() {
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly
   # held task without the timestamp that defines this hold lifecycle's age.
+  # Resolve the origin identity before stamping or holding. A lookup failure
+  # leaves an existing task untouched, but a missing row was already created.
+  if [ -n "$origin" ]; then
+    origin=$(task_identity "$origin") || exit $?
+  fi
   task_show_or_fail "$id" "task $id disappeared before recording its hold-set stamp"
+  original_body=$(show_field "$show" body)
   write_hold_set_stamp "$id" "$(show_field "$show" body)" "$hold_set" "$preserve_hold_set"
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id did not retain its hold-set stamp"
-  if [ -n "$origin" ]; then
-    origin=$(task_identity "$origin") || exit $?
-    previous_origin=$(body_hold_origin "$(show_field_value "$show" body)")
-    write_hold_origin "$id" "$(show_field "$show" body)" "$origin" || exit $?
-  fi
   if [ -n "$until" ]; then
     tasks_axi hold "$id" --reason "$stored_reason" --kind captain --until "$until" >/dev/null \
       || hold_status=$?
@@ -1076,21 +1196,22 @@ command_hold() {
       || hold_status=$?
   fi
   if [ "$hold_status" -ne 0 ]; then
-    # A refused re-hold must not associate the previous hold or answer with a
-    # new origin. Restore the old line verbatim, without resolving it again.
-    if [ -n "$origin" ]; then
-      write_hold_origin "$id" "$(show_field "$show" body)" "$previous_origin" || exit $?
-    fi
+    # Restore the body without resolving its old origin again. The new origin
+    # is still unpublished even if this best-effort restoration fails.
+    restore_hold_body "$id" "$original_body" || true
     fail "could not hold task $id for the captain"
   fi
   task_show "$id" || fail "task $id disappeared while holding it"
   show=$TASK_SHOW_OUTPUT
   hold_kind=$(show_field_value "$show" hold_kind)
   [ "$hold_kind" = captain ] || fail "task $id did not retain its captain hold"
-  occurrence=$(( $(resolution_record_count "$(show_field "$show" body)") + 1 ))
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id lost its hold-set stamp while being held"
+  occurrence=$(( $(resolution_record_count "$(show_field "$show" body)") + 1 ))
   publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
+  if [ -n "$origin" ]; then
+    write_hold_origin "$id" "$(show_field "$show" body)" "$origin" || exit $?
+  fi
   printf '%s\n' "$id"
 }
 
@@ -1155,6 +1276,20 @@ apply_pending_retained_artifact() {  # <task-id>
   esac
 }
 
+# A captain hold is released only in an attended session. The away daemon flag
+# (state/.afk, bin/fm-wake-lib.sh fm_afk_mode) and the posture record
+# (state/.afk-contract, bin/fm-afk-contract.sh mode) are both read: either one
+# reading away refuses, a quiet record is a present captain, and no record is
+# attended. The check runs before any write, so a refusal leaves the hold and
+# the body untouched.
+RELEASE_AWAY_REASON='the away-posture record exists, and a captain hold is released only by the captain in an attended session; retry --release after the return archives the record'
+release_attended() {
+  if [ -e "$STATE/.afk" ] && [ "$(fm_afk_mode "$STATE")" = away ]; then
+    return 1
+  fi
+  ! fm_afk_contract_away_present "$STATE"
+}
+
 close_answered() {  # <task-id> <release-0-or-1>
   if [ "$2" = 1 ]; then
     tasks_axi unhold "$1" >/dev/null
@@ -1199,8 +1334,15 @@ command_answer() {
     shift
   done
   validate_slug task-id "$id"
+  if [ "$release" = 1 ] && ! release_attended; then
+    fail "task $id stays held: $RELEASE_AWAY_REASON"
+  fi
   load_decision "$decision_file"
   acquire_task_control_lock "$id"
+  if [ "$release" = 1 ]; then
+    fm_afk_contract_lock_hold "$STATE" || fail "task $id stays held: the away-posture record is locked"
+    release_attended || fail "task $id stays held: $RELEASE_AWAY_REASON"
+  fi
   require_tasks_axi
   task_show "$id" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
   show=$TASK_SHOW_OUTPUT
@@ -1450,6 +1592,11 @@ command_answers() {
         continue
         ;;
     esac
+    if [ "$release_flag" = --release ] && ! release_attended; then
+      printf 'refused: %s (%s)\n' "$key" "$RELEASE_AWAY_REASON"
+      skipped=$((skipped + 1))
+      continue
+    fi
     resolve_rc=0
     id=$(resolve_entry "$origin" "$key" 2>"$err") || resolve_rc=$?
     id=${id%% *}
@@ -1814,7 +1961,7 @@ reconcile_note() {
 
 command_complete() {
   local origin=${1:-} meta previous='' supplied='' keys='' entry key status_file open has_meta=0 transfer_rc transfers=() resolved
-  local resolved_how attested_by_prefix='' origin_state unrecorded_origin=''
+  local resolved_how attested_by_prefix='' origin_state unrecorded_origin='' tmp
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   validate_slug origin-id "$origin"
   shift
@@ -1869,7 +2016,17 @@ EOF
 
   if [ "$has_meta" = 1 ]; then
     if [ "$(meta_value "$meta" decisions_reviewed)" != 1 ] || [ "$previous" != "$keys" ]; then
-      printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$keys" >> "$meta"
+      tmp=$(mktemp "$STATE/.$origin.meta.XXXXXX") \
+        || fail "cannot stage the completion record for $origin"
+      if ! awk -v keys="$keys" '
+          /^(decisions_reviewed|decision_keys)=/ { next }
+          /^pr=/ && !done { print "decisions_reviewed=1"; print "decision_keys=" keys; done = 1 }
+          { print }
+          END { if (!done) { print "decisions_reviewed=1"; print "decision_keys=" keys } }
+        ' "$meta" > "$tmp" || ! mv -f -- "$tmp" "$meta"; then
+        rm -f -- "$tmp"
+        fail "cannot record completion for $origin"
+      fi
     fi
     fm_lock_release "$CAPTAIN_META_LOCK"
     CAPTAIN_META_LOCK_HELD=0
