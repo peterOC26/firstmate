@@ -480,11 +480,12 @@ finish_concurrent_spawn() {  # <id> <status> <stdout> <stderr>
 finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
   local id=$1 status=$2 out=$3 err=$4
   [ "$status" -ne 0 ] || fail "post-create abort fixture $id unexpectedly succeeded"
-  if grep -F "task set is locked" "$err" >/dev/null 2>&1; then
+  if grep -E "task set is locked|another Treehouse slot allocation or return is in progress|unresolved Treehouse acquisition journal" "$err" >/dev/null 2>&1; then
     if spawn_task "$id" "$HOME_DIR" "$PROJECT_DIR" > "$out" 2> "$err"; then
-      fail "post-create abort fixture $id unexpectedly succeeded after task-set publication completed"
+      fail "post-create abort fixture $id unexpectedly succeeded after concurrent allocation completed"
     fi
   fi
+  rm -rf "$HOME_DIR/state/$id.treehouse-acquire"
 }
 
 finish_concurrent_recovery() {  # <id> <home> <status> <stdout> <stderr>
@@ -520,8 +521,7 @@ return_retired_copy() {  # <worktree>
 }
 
 # Model an orphaned presentation after stopping its placeholder worker.
-# Herdr's treehouse get --lease writes no JSON journal. A journal left by the
-# durable lease path is the only thing retired here, so a later same-id spawn
+# The durable acquisition journal is retired here, so a later same-id spawn
 # is not refused by it. The record stays for the reclaim to read, and the copy
 # stays leased until the suite's own returns: a Treehouse return terminates
 # processes in the copy, which would kill the restored husk shell the reclaim
@@ -942,14 +942,14 @@ spawn_task abort-b "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/abort-b.out" 2> "$TMP
 ABORT_B_PID=$!
 if wait "$ABORT_A_PID"; then ABORT_A_STATUS=0; else ABORT_A_STATUS=$?; fi
 if wait "$ABORT_B_PID"; then ABORT_B_STATUS=0; else ABORT_B_STATUS=$?; fi
+# The armed failure is an empty treehouse get --lease. It takes no pool slot
+# but leaves acquisition journals that must be retired before later spawns.
+rm -rf "$HOME_DIR/state/abort-a.treehouse-acquire" "$HOME_DIR/state/abort-b.treehouse-acquire"
 finish_concurrent_expected_abort abort-a "$ABORT_A_STATUS" "$TMP_ROOT/abort-a.out" "$TMP_ROOT/abort-a.err"
 finish_concurrent_expected_abort abort-b "$ABORT_B_STATUS" "$TMP_ROOT/abort-b.out" "$TMP_ROOT/abort-b.err"
-# The forced foreground_cwd is a plain non-git directory, which the discovery
-# poll now screens out on every read rather than adopting, so the armed failure
-# arrives as the poll's own deadline refusal naming that path.
-grep -F "treehouse get --lease did not report a worktree" "$TMP_ROOT/abort-a.err" >/dev/null 2>&1 \
+grep -F "durable Treehouse acquisition did not report a worktree" "$TMP_ROOT/abort-a.err" >/dev/null 2>&1 \
   || fail "post-create abort fixture A did not reach the armed validation failure"
-grep -F "treehouse get --lease did not report a worktree" "$TMP_ROOT/abort-b.err" >/dev/null 2>&1 \
+grep -F "durable Treehouse acquisition did not report a worktree" "$TMP_ROOT/abort-b.err" >/dev/null 2>&1 \
   || fail "post-create abort fixture B did not reach the armed validation failure"
 ABORT_A_PANE=$(cat "$POST_CREATE_ABORT_CONTROL/abort-a/task-pane")
 ABORT_B_PANE=$(cat "$POST_CREATE_ABORT_CONTROL/abort-b/task-pane")
@@ -979,8 +979,6 @@ for ABORT_PANE in "$ABORT_A_PANE" "$ABORT_B_PANE"; do
 done
 [ ! -e "$HOME_DIR/state/abort-a.meta" ] && [ ! -e "$HOME_DIR/state/abort-b.meta" ] \
   || fail "post-create abort fixtures published task metadata before launch"
-# The armed failure is an empty treehouse get --lease. It takes no pool slot
-# and writes no acquisition journal, so there is no reservation to release.
 rm -rf "$POST_CREATE_ABORT_CONTROL"
 rm -f "$HOME_DIR/state/abort-a.herdr-presentation" "$HOME_DIR/state/abort-b.herdr-presentation"
 pass "real Herdr lab: concurrent post-create abort cleanup stays serialized with exact focus restoration"

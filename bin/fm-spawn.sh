@@ -1996,7 +1996,7 @@ spawn_abort_cleanup() {
       spawn_return_treehouse_slot >/dev/null 2>&1; then
       :
     else
-      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, run 'treehouse return --force $WT' from $PROJ_ABS" >&2
+      echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, follow the journal recovery steps below" >&2
     fi
   fi
   spawn_abort_retain_treehouse_journal

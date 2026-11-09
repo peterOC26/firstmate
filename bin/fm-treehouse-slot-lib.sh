@@ -362,7 +362,10 @@ spawn_lease_treehouse_slot() {
     fi
     exit 1
   fi
-  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || {
+    echo "error: durable Treehouse acquisition did not report a worktree; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    exit 1
+  }
   TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
     select(.lease_holder == $holder) | .lease_id |
     select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
