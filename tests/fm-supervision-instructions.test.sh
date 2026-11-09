@@ -223,8 +223,10 @@ test_cross_harness_ordinary_continuation_and_repair_matrix() {
   local ordinary out
 
   out=$("$RENDER" --harness pi)
-  assert_contains "$out" "task-level routine outcome that says the worker is still busy" "Pi instructions omitted task-level silent no-change behavior"
-  assert_contains "$out" "captain outcomes are never silent" "Pi instructions allowed silent captain outcomes"
+  # Check the emitted main instructions; branch-policy coverage lives in
+  # fm-branch-supervision.test.sh now that the branch prompt owns those rules.
+  assert_contains "$out" 'The [branch prompt](../../bin/fm-branch-prompt.sh) owns heartbeat pending-item checks in "Handling a wake" and durable-history comparison, repeat classification, and silence eligibility in "Verdict: routine or captain".' "Pi instructions omitted the branch-policy owner"
+  assert_contains "$out" "Silent routine outcomes are stored without a rendered note; other routine outcomes render with ⛵ then the dim outcome text." "Pi instructions omitted routine-outcome rendering behavior"
   ordinary=$(printf '%s\n' "$out" | grep -F -- '- Ordinary wake:')
   assert_contains "$ordinary" "Pi extension already owns watcher continuity" "pi ordinary-wake line does not leave continuity to the extension"
   assert_not_contains "$ordinary" "fm_watch_arm_pi" "pi ordinary-wake line incorrectly calls the recovery tool"
