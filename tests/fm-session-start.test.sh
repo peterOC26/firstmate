@@ -2141,7 +2141,7 @@ EOF
   assert_contains "$out" "(4 more queued - bin/fm-tasks-axi.sh ready)" \
     "the bounded queued listing did not disclose an exact remainder and how to see it"
 
-  # The bound is for dispatchable work only: captain-held and blocked rows stay whole.
+  # These gated and in-flight fixtures must remain outside the ready-row limit.
   assert_contains "$out" "held-queued,queued,ship,firstmate,Held queued work,none,captain,captain choice pending" \
     "the queued bound swallowed a held row"
   assert_contains "$out" 'blocked-followup,queued,scout,firstmate,Follow compact startup,compact-startup,"-","-"' \
