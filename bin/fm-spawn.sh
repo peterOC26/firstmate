@@ -1717,6 +1717,9 @@ SPAWN_SLOT_CLAIMED=0
 TREEHOUSE_LEASE_ID=
 TREEHOUSE_LEASE_HOLDER=
 TREEHOUSE_ACQUIRE_JOURNAL=
+# Keep the names visibly read here. The lease helpers, which this check does
+# not follow, are what actually use them.
+: "${TREEHOUSE_LEASE_ID}${TREEHOUSE_LEASE_HOLDER}${TREEHOUSE_ACQUIRE_JOURNAL}"
 SPAWN_FRESH_ENDPOINT_OPENED=0
 SPAWN_FRESH_WIRING_PENDING=0
 SPAWN_TASK_TMP_CREATED=0
@@ -5345,7 +5348,9 @@ EOF
       # A durable lease (bin/fm-home-seed.sh's pattern): there is no pane to run
       # the interactive `treehouse get` in, and a slot a live T3 thread points at
       # must never be handed on while that thread could re-create it.
+      # The helper set WT. Repeat it through a command substitution so this check stays small.
       spawn_lease_treehouse_slot
+      WT=$(printf '%s' "$WT")
       T3CODE_LEASED=1
       freshen_spawn_worktree_base "$WT" "$BASE_BRANCH" "$PROJ_ABS" "$MODE" || {
         if [ "$?" -eq 2 ]; then
@@ -6085,6 +6090,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       exit 1
     fi
     SPAWN_SLOT_CLAIMED=1
+    : "$SPAWN_SLOT_CLAIMED"
   fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != t3code ]; then
