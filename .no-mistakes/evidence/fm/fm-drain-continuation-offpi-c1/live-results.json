@@ -1,0 +1,7 @@
+[
+  "retained-handoffs: pass",
+  "delivered-processing-instructions: pass",
+  "legacy-and-routine-compatibility: pass",
+  "bounded-handoffs-and-full-lookups: pass",
+  "host-opt-out-preserves-pending-handoff: pass"
+]

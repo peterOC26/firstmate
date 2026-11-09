@@ -1,0 +1,69 @@
+
+$ FM_HOME=<disposable-lab> bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A73E7BQY1C7RSTDRA7MAN/.fm-lab-qh87yrkp
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M70A73E7BQY1C7RSTDRA7MAN/.fm-lab-qh87yrkp
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-harness.sh
+codex
+[exit 0]
+Real executable interfaces; actual Codex ancestry; no test seams or tool stubs.
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary 'Implementation complete' --continuation 'Stage complete.
+Start	the authorized validation;then report its result.'
+1
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh mark-read --through 1
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary 'CI note 1'
+2
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary 'Validation complete' --continuation 'Hand the validation report to the assigned worker.'
+3
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task gamma --verdict captain --summary 'CI note 2'
+4
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task legacy --verdict captain --summary 'Needs a decision'
+5
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task routine --verdict routine --summary 'Still working'
+6
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh append --task silent --verdict routine --summary 'No change' --silent true
+7
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: Implementation complete; MAIN continuation handoff: Stage complete. Start the authorized validation; then report its result.
+[seq 4, newest of 2 for this task, recorded 0m ago] gamma: CI note 2
+[seq 3, recorded 0m ago] gamma: Validation complete; MAIN continuation handoff: Hand the validation report to the assigned worker.
+[seq 5, recorded 0m ago] legacy: Needs a decision
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 5; until then every drain presents them again
+BRANCH OUTCOMES, ROUTINE (handled by the supervision session since your last drain; for your awareness, nothing to acknowledge):
+[seq 6] routine: Still working
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, plain rows collapsed per task, continuation rows kept separately, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one without a pending continuation needs only the acknowledgement. For each continuation handoff, reconcile current task/stage state and existing authority, then start the authorized spawn, steer, or handoff before acknowledging; if already started, do not duplicate it. Record the actual blocker, decision, or evidence that no further action is needed when you cannot advance. If a handoff is abbreviated, read the full outcome using its lookup --seqs command before acting or acknowledging):
+[seq 1, recorded 0m ago] gamma: Implementation complete; MAIN continuation handoff: Stage complete. Start the authorized validation; then report its result.
+[seq 4, newest of 2 for this task, recorded 0m ago] gamma: CI note 2
+[seq 3, recorded 0m ago] gamma: Validation complete; MAIN continuation handoff: Hand the validation report to the assigned worker.
+[seq 5, recorded 0m ago] legacy: Needs a decision
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 5; until then every drain presents them again
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-branch-outcome.sh mark-processed --through 5
+[exit 0]
+
+$ FM_HOME=<disposable-lab> bin/fm-wake-drain.sh
+[exit 0]
+
+Disposable lab removed. No fleet sessions were launched or accessed.
