@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Codex approval review](#codex-automatic-approval-review), [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Codex permission mode](#codex-permission-mode-configcodex-permission-mode), [persistent managed-policy failover](#persistent-managed-policy-failover), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [several Claude accounts](#several-claude-accounts-configclaude-accounts), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and its [Orca environment source](#orca-environment-source-configlaunch-env-tmux-session) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [record export](#record-export-configrecord-export-root), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [Codex native Stop park](#codex-native-stop-park-configcodex-stop-park), [warm-cache compaction](#warm-cache-compaction-configwarm-compact), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [standing away words](#standing-away-words-configafk-words), [Codex native Stop park](#codex-native-stop-park-configcodex-stop-park), [warm-cache compaction](#warm-cache-compaction-configwarm-compact), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Review bots on owned GitHub pull requests | [Contribution review bots](#contribution-review-bots-configcontribution-review-bots) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
@@ -728,6 +728,21 @@ That keeps a nested tmux or Herdr pane on its own transport, matching the runtim
 Target detection uses `FM_SUPERVISOR_TARGET`, then `$TMUX_PANE`, then `"${HERDR_SESSION:-default}:${HERDR_PANE_ID}"` under herdr, then the prefix-stripped `REX_SESSION` and `REX_BLOCK` under Rex, then `"${HC_SESSION:-default}:${HC_TERMINAL_ID}"` when both hc terminal markers are present, then the thread id from that T3 cwd match, then the legacy `firstmate:0` tmux fallback with a warning.
 
 Selecting or discovering any other supervisor backend, including `hc`, `zellij`, `orca`, `cmux`, or `tern`, refuses at daemon startup instead of trying tmux injection primitives against a non-tmux pane.
+
+## Standing away words (config/afk-words)
+
+The optional local, gitignored `config/afk-words` file holds the captain's standing away words for a plain `/afk`.
+`config/` is gitignored, so the file stays on this machine, and it is local to each home rather than part of secondmate inherited configuration.
+On an away entry with no supplied words, when a new record will be written, a readable regular file supplies the mandate verbatim.
+For nonempty standing words, the record identifies `config/afk-words` as the source, the entry announcement says the standing away words were used and that `/afk` with new words replaces them, and the return brief's instructions section names that source.
+An absent or empty file records no mandate.
+A path that exists but is not a readable regular file records no mandate and allows entry, with one warning naming the path and saying the standing away words were not used.
+Quiet mode never reads the file.
+A refresh that brings no new words leaves the current record untouched, including when the file changes afterward.
+Sending `/afk` with new words uses them for that session and archives any previous mandate without changing the standing file.
+Nothing in the file is parsed.
+The fallback does not change standing authority or pre-authorize destructive, irreversible, or security-sensitive actions.
+`bin/fm-afk-contract.sh` owns the input flags, file resolution, record schema, and entry announcement; `bin/fm-afk-return.sh` owns the return brief's instructions-section rendering.
 
 ## Away-mode wedge alarm channels (config/wedge-alarm)
 

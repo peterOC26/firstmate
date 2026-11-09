@@ -17,7 +17,9 @@
 # worker status logs and steering inboxes.
 # Its order is fixed: supervisor health across the away window
 # first, then the captain's away instructions - their words verbatim, including
-# superseded in-session mandates - followed by the away session's account of
+# superseded in-session mandates, naming config/afk-words when that record's
+# source field says the mandate came from the standing file - followed by the
+# away session's account of
 # every visible action it took under them (each non-silent outcome-store row
 # from the window whose summary opens with the "per your away instructions:"
 # marker the branch prompt in bin/fm-branch-prompt.sh requires), then what is
@@ -589,7 +591,7 @@ MANDATE_COUNT=0
 HELD_READ_FAILED=0
 HELD_READ_PATH=
 render_words_record() {  # <record> [superseded-time]
-  local record=$1 superseded=${2:-} words
+  local record=$1 superseded=${2:-} words words_source note=''
   if ! words=$("$CONTRACT" words --path "$record"; rc=$?; printf x; exit "$rc"); then
     MANDATE_COUNT=$((MANDATE_COUNT + 1))
     printf '  your words are unreadable in %s; catch-up stays gated until the record is restored\n' "$record"
@@ -598,10 +600,14 @@ render_words_record() {  # <record> [superseded-time]
   words=${words%x}
   [ -n "$words" ] || return 0
   MANDATE_COUNT=$((MANDATE_COUNT + 1))
+  words_source=$("$CONTRACT" field source --path "$record" 2>/dev/null || true)
+  if [ "$words_source" = config/afk-words ]; then
+    note=' (from config/afk-words)'
+  fi
   if [ -n "$superseded" ]; then
-    printf '  your words superseded at %s:\n' "$superseded"
+    printf '  your words superseded at %s%s:\n' "$superseded" "$note"
   else
-    printf '  your words at entry:\n'
+    printf '  your words at entry%s:\n' "$note"
   fi
   printf '%s' "$words" | sed 's/^/    /'
   case "$words" in *$'\n') ;; *) printf '\n' ;; esac

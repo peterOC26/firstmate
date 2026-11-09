@@ -61,10 +61,23 @@
 #   confirmed_epoch: <seconds>        is the go, so no later human step stamps it
 #   mode: quiet                    only on a quiet entry (FM_AFK_MODE=quiet); absent
 #                                  means away
+#   source: config/afk-words       only when nonempty words were read from the
+#                                  standing file because an away enter was given
+#                                  no --words and no --words-file; absent
+#                                  otherwise, including quiet mode and an
+#                                  explicit mandate; a refresh preserves it
 #   words: | or |-                 the captain's words, verbatim, never edited,
 #     <line>                       one record line per input line (or `words: -`
-#     ...                          when /afk carried no words); `|` retains a
+#     ...                          when no mandate was recorded); `|` retains a
 #                                  final newline and `|-` records its absence
+# STANDING WORDS. When an away enter is given no --words and no --words-file and
+# this call will write a record, a readable config/afk-words file
+# (FM_CONFIG_OVERRIDE, otherwise $FM_HOME/config) is the mandate: its bytes are
+# stored verbatim with provenance as above. An absent or empty file
+# records no mandate. A path that exists but is not a readable regular file
+# records no mandate and warns at entry. Quiet mode never reads the file. A
+# refresh that brings no new words leaves the standing record untouched, so a
+# later edit of the file does not replace a live mandate. No parser reads the file.
 # The words block runs to the end of a version 2 record; in a version 1 record
 # only its legacy clauses:, refused:, and merge_grants: sections end it. Any
 # other line after the header that is not a stored line is damage, not a
@@ -88,11 +101,13 @@
 #     Write the record now, with no separate confirmation step, then print the
 #     entry announcement and the read-back. Exit 0 on success and 2 on a usage
 #     error. --words-file keeps the file's bytes verbatim, trailing newlines
-#     included. With no words while a record stands, this is a refresh that
-#     leaves the standing record untouched; new words replace the mandate,
-#     carry the original session entry forward, and archive the superseded
-#     record. A replacement is staged before the prior record is archived and
-#     replaced. `propose` and `confirm` were retired with the wait-for-go gate.
+#     included. STANDING WORDS above owns the fallback when both word-input
+#     flags are omitted. With no words while a record stands, this is a
+#     refresh that leaves the standing record
+#     untouched; new words replace the mandate, carry the original session
+#     entry forward, and archive the superseded record. A replacement is staged
+#     before the prior record is archived and replaced. `propose` and `confirm`
+#     were retired with the wait-for-go gate.
 #     Without --spend the recorded cap follows SPEND CAP below.
 #   fm-afk-contract.sh readback
 #     The record's content for the captain and for the away session: the words
@@ -310,6 +325,9 @@ fm_afk_contract_render_record() {  # <entered-iso> <entered-epoch> <confirmed-is
   printf 'confirmed: %s\n' "$confirmed"
   printf 'confirmed_epoch: %s\n' "$confirmed_epoch"
   [ "${FM_AFK_CONTRACT_ENTRY_MODE:-away}" != quiet ] || printf 'mode: quiet\n'
+  if [ -n "${FM_AFK_CONTRACT_WORDS_SOURCE:-}" ]; then
+    printf 'source: %s\n' "$FM_AFK_CONTRACT_WORDS_SOURCE"
+  fi
   if [ -n "$WORDS" ]; then
     local words_body=$WORDS words_indicator='|-'
     case "$words_body" in
@@ -409,6 +427,10 @@ fm_afk_contract_validate() {  # <path>
     ''|quiet) ;;
     *) fm_afk_contract_log "record $path has an invalid mode"; return 1 ;;
   esac
+  case "$(fm_afk_contract_read_field "$path" source)" in
+    ''|config/afk-words) ;;
+    *) fm_afk_contract_log "record $path has an invalid source"; return 1 ;;
+  esac
   words_header=$(sed -n '/^words: /{p;q;}' "$path")
   case "$words_header" in 'words: -'|'words: |'|'words: |-') ;; *) fm_afk_contract_log "record $path has no valid words field"; return 1 ;; esac
   fm_afk_contract_read_words "$path" >/dev/null || return 1
@@ -466,7 +488,11 @@ fm_afk_contract_render_announcement() {  # <path>
   words=$(fm_afk_contract_read_words "$path"; rc=$?; printf x; exit "$rc") || return 1
   words=${words%x}
   if [ -n "$words" ]; then
-    mandate_text='Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return.'
+    if [ "$(fm_afk_contract_read_field "$path" source)" = config/afk-words ]; then
+      mandate_text='Your standing away words were used; send /afk with new words to replace them. The away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return.'
+    else
+      mandate_text='Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return.'
+    fi
   else
     mandate_text='No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return.'
   fi
@@ -480,18 +506,49 @@ fm_afk_contract_render_announcement() {  # <path>
 
 # --- subcommands ------------------------------------------------------------
 
+# config/afk-words under the effective config directory. This script only reads it.
+fm_afk_contract_standing_words_path() {
+  printf '%s/afk-words' "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+}
+
+# Read the standing file into WORDS and mark provenance. Absent means no
+# mandate. An unreadable or non-regular path warns and records no mandate. The
+# sentinel keeps trailing newlines, the same way --words-file does. Nothing in
+# the file is parsed.
+fm_afk_contract_load_standing_words() {
+  local path
+  path=$(fm_afk_contract_standing_words_path)
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    return 0
+  fi
+  if [ ! -f "$path" ] || [ ! -r "$path" ]; then
+    fm_afk_contract_log "warning: standing away words were not used: $path is not a readable regular file"
+    return 0
+  fi
+  WORDS=$(cat "$path"; rc=$?; printf x; exit "$rc") || return 1
+  WORDS=${WORDS%x}
+  if [ -n "$WORDS" ]; then
+    FM_AFK_CONTRACT_WORDS_SOURCE=config/afk-words
+  fi
+  return 0
+}
+
 fm_afk_contract_parse_inputs() {  # <args...>; sets WORDS, EXPECTED_RETURN, SPEND
   local words_file='' spend_given=0
   WORDS=; EXPECTED_RETURN=-; SPEND=$FM_AFK_CONTRACT_SPEND_DEFAULT; FM_AFK_CONTRACT_SCALARS_GIVEN=0
+  FM_AFK_CONTRACT_WORDS_GIVEN=0
+  FM_AFK_CONTRACT_WORDS_SOURCE=
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --words-file)
         [ "$#" -gt 1 ] || { fm_afk_contract_log '--words-file requires a path'; return 2; }
         words_file=$2
+        FM_AFK_CONTRACT_WORDS_GIVEN=1
         shift 2 ;;
       --words)
         [ "$#" -gt 1 ] || { fm_afk_contract_log '--words requires text'; return 2; }
         WORDS=$2
+        FM_AFK_CONTRACT_WORDS_GIVEN=1
         shift 2 ;;
       --expected-return)
         [ "$#" -gt 1 ] || { fm_afk_contract_log '--expected-return requires a UTC ISO 8601 time'; return 2; }
@@ -571,6 +628,12 @@ fm_afk_contract_cmd_enter() {
     fm_afk_contract_render_announcement "$record" || return 1
     fm_afk_contract_render_readback "$record"
     return
+  fi
+  # A refresh already returned. An away write that was given no words takes the
+  # standing file; quiet mode and an explicit --words or --words-file do not.
+  if [ "${FM_AFK_CONTRACT_WORDS_GIVEN:-0}" -eq 0 ] && [ -z "$WORDS" ] \
+    && [ "$FM_AFK_CONTRACT_ENTRY_MODE" != quiet ]; then
+    fm_afk_contract_load_standing_words || return 1
   fi
   now=$(fm_afk_contract_now_iso)
   now_epoch=$(date +%s)
