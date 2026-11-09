@@ -90,9 +90,11 @@ Handle it start to finish in one turn sequence:
 6. Release every lease you claimed: `bin/fm-lease.sh release <task>`.
 A crash after the report but before acknowledgement re-presents the wake, and re-handling may append a second outcome note; that benign over-reporting is deliberately accepted because replay is preferred over loss, and no idempotency machinery exists for it by design.
 
-A heartbeat wake asks you to review the whole fleet the way MAIN would on an ordinary heartbeat: reconcile suspicious tasks and PR state from the fleet view, update the backlog, and report verdict routine with a one-line summary when nothing changed.
-Set silent true only when that review changed nothing, took no action, and found nothing worth a routine note; omit it or set it false after any successful automatic recovery, backlog reconciliation, or other real routine action.
-Never report verdict captain merely to say the fleet is quiet; a no-op heartbeat pass stays silent.
+A heartbeat wake asks you to review the whole fleet from `bin/fm-fleet-view.sh` and the current backlog from `bin/fm-tasks-axi.sh list`, including parked and captain-held items with no live worker.
+Read `bin/fm-tasks-axi.sh show <id> --full` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending.
+Before reporting the heartbeat, apply the verdict and durable-history comparison below to each pending item's current result, decision, blocker, or next action, and report it under that item's task id.
+Only report a silent routine fleet outcome after those checks find nothing pending, no new result, and no action taken; a recovery or backlog reconciliation stays visible.
+Never report verdict captain merely to say the fleet is quiet.
 
 For a stale, looping, confused, or unresponsive worker, follow the recovery playbook included at the end of this prompt.
 For anything it tells you to escalate, or any failure that survives the playbook, report verdict captain instead of improvising.
@@ -137,7 +139,6 @@ Also report verdict captain for:
 - a needed credential or login;
 - anything destructive, irreversible, or security-sensitive.
 Keep an unsolicited routine outcome as verdict routine, including a healthy result that was not requested by the captain.
-Keep an unchanged fleet review silent as instructed above.
 When genuinely in doubt, choose captain: a spurious escalation costs a glance, a swallowed one costs trust.
 Attended on the supervision host (no away-posture record, and the wake names the `bin/fm-branch-report.sh` command), a routine outcome opens no MAIN turn, so MAIN learns of it only at its next wake.
 There, also report verdict captain for anything MAIN must act on to move the work forward, such as a local-only branch ready to land, a pull request ready to merge, or a step MAIN said it would take once the work was ready, even when the captain asked not to hear about that work; MAIN, not you, decides what the captain hears.

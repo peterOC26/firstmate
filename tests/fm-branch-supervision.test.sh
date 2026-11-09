@@ -59,7 +59,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the inlined recovery playbook" ;;
   esac
   case "$out_a" in
-    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*"Keep an unchanged fleet review silent"*) ;;
+    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*) ;;
     *) fail "branch prompt lost the requested-result, progress-routine, or routine-silence rules" ;;
   esac
   case "$out_a" in
@@ -81,7 +81,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
   pass "branch prompt is byte-stable across homes, cwd, timezone, and time, above the cache floor"
 }
 
-test_branch_prompt_reports_unchanged_holds_without_repeated_escalation() {
+test_branch_prompt_emits_pending_decision_review_contract() {
   local surface prompt
   # Exercise the emitted contract on both public report surfaces. These
   # assertions verify instructions reach the model, not model adherence.
@@ -93,6 +93,18 @@ test_branch_prompt_reports_unchanged_holds_without_repeated_escalation() {
       prompt=$(FM_HOME="$TMP_ROOT/prompt-holds" bash "$ROOT/bin/fm-branch-prompt.sh") \
         || fail "Pi prompt generator failed"
     fi
+    assert_contains "$prompt" \
+      'A heartbeat wake asks you to review the whole fleet from `bin/fm-fleet-view.sh` and the current backlog from `bin/fm-tasks-axi.sh list`, including parked and captain-held items with no live worker.' \
+      "$surface emitted prompt omits backlog-only decisions from heartbeat review"
+    assert_contains "$prompt" \
+      'Read `bin/fm-tasks-axi.sh show <id> --full` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending.' \
+      "$surface emitted prompt omits current decision reads"
+    assert_contains "$prompt" \
+      "Before reporting the heartbeat, apply the verdict and durable-history comparison below to each pending item's current result, decision, blocker, or next action, and report it under that item's task id." \
+      "$surface emitted prompt omits per-item history comparison before reporting"
+    assert_contains "$prompt" \
+      'Only report a silent routine fleet outcome after those checks find nothing pending, no new result, and no action taken; a recovery or backlog reconciliation stays visible.' \
+      "$surface emitted prompt permits silence before pending decisions are checked"
     assert_contains "$prompt" \
       "Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces." \
       "$surface prompt does not apply deduplication to every escalation"
@@ -112,7 +124,7 @@ test_branch_prompt_reports_unchanged_holds_without_repeated_escalation() {
       "Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy." \
       "$surface prompt permits task or heartbeat silence over a pending hold"
   done
-  pass "both emitted prompts distinguish unreported holds, visible unchanged holds, and changed situations"
+  pass "both emitted prompts include pending-decision review and escalation comparison instructions"
 }
 
 # A home adds its own rules through config/branch-prompt-include.md: absent or
@@ -1722,7 +1734,7 @@ WRAPPER
 }
 
 test_branch_prompt_is_byte_stable_and_above_cache_floor
-test_branch_prompt_reports_unchanged_holds_without_repeated_escalation
+test_branch_prompt_emits_pending_decision_review_contract
 test_branch_prompt_home_include_is_appended_last
 test_branch_prompt_routes_completed_scouts_through_guarded_cleanup
 test_outcome_store_is_append_only_with_cursor_reads
