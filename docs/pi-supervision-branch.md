@@ -46,7 +46,7 @@ Some wakes stay on main:
 - Every watcher-failure alarm also stays on main.
 
 All of that describes the attended posture.
-The away posture, recorded by `state/.afk-contract`, hands every row to the branch and parks main (see "Postures" below).
+The away posture, recorded by `state/.afk-contract`, parks main and routes wakes under [Postures](#postures).
 
 ### How outcomes reach main
 
@@ -101,7 +101,7 @@ What is never offered, or falls back to main:
 - When a triggering close has no acceptor (extension absent, branch broken), it keeps today's wake-to-main path.
 - Watcher-failure alarms always go to main, because only main can repair the watcher cycle.
 
-Under the away-posture record, the check-kind and decision-owned exclusions lift and every actionable row is offered ("Postures" below).
+Under the away-posture record, the check-kind and decision-owned exclusions lift except for captain inbox notes ([Postures](#postures)).
 The no-acceptor fallback and the alarms still reach main in that posture.
 
 #### Decision-owned rows
@@ -483,7 +483,8 @@ The branch accepts it without a project only when every branch-ownable row obser
 
 ### Co-present main-owned rows
 
-A heartbeat is never vetoed or ridden into main by a co-present check row or decision-owned signal/stale row.
+An ordinary co-present check row or decision-owned signal/stale row never vetoes a heartbeat or routes it into main.
+Captain inbox notes while away use the return path in [Postures](#postures).
 Those rows are main-owned while attended.
 They are excluded from what the branch may claim and left queued for main.
 Main is woken for each on its own watcher cycle, so nothing starves by being left behind.
@@ -549,7 +550,7 @@ That is why `bin/fm-branch-prompt.sh`'s header is the contract's single owner an
 One supervision session runs in two postures, attended and away.
 The posture is a file: the away-posture record `state/.afk-contract`.
 Only `bin/fm-afk-contract.sh` writes it, in the same turn as `/afk`.
-The return path archives it on the captain's first unmarked message.
+The [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) owns when main archives it.
 
 ### Who reads the record
 
@@ -565,12 +566,17 @@ A leftover `state/.afk` flag declines nothing.
 
 ### While the record exists
 
-- Every actionable row is branch-eligible.
-  Check rows, decision-owned signal and stale rows, and heartbeat rows are claimed by the branch on whatever wake finds them unread.
-  The trigger class no longer forces a batch to main.
+- Captain inbox notes remain main-owned.
+  Any queued check row with an `inbox:` key returns the close to main, including an unrelated close.
+  The watcher adds an explicit away-return hand-back only when the record is not marked quiet; the dispatcher's presence-based posture checks remain unchanged.
+  The dispatcher checks before offering, and the branch rechecks before granting rows and prompting, so a note arriving after accept rejects delivery back to main without acknowledging the note.
+  Main applies the [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) to the preserved note.
+- Other actionable rows are branch-eligible.
+  Other check rows, decision-owned signal and stale rows, and heartbeat rows are claimed by the branch on whatever wake finds them unread.
+  Their trigger class no longer forces a batch to main.
   The fail-closed scope checks in [Decision-owned rows](#decision-owned-rows), including ambiguous metadata ownership, still apply, as does structural queue validation.
   A prompt that claims a check row is not scoped by task, so the branch may report it as `fleet`.
-- Main is parked, and reachable only for the classes only main can act on:
+- Besides captain inbox notes, main remains reachable for supervision failures:
   - A watcher-failure alarm is delivered to main as always, because `fm_watch_arm_pi` lives there.
   - A wake the branch declines or cannot take (a broken branch inside its cooldown, an unresolvable or corrupt scan) falls back to main exactly as attended.
 

@@ -6,6 +6,35 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Captain inbox return hand-backs
+
+Verified on 2026-11-09 on Linux x86_64 with Bash 5.2.37 and Node v22.23.2.
+The daemon regression publishes a real inbox note, defers its delivery behind an occupied fixture composer, retries through the existing digest transport, and verifies that main can still drain the note and its body.
+The Pi fixtures exercise the watcher offer and main follow-up, plus a note arriving after branch acceptance but before its prompt and row grant.
+Quiet-mode fixtures omit the away-return signal; ordinary away wakes keep their existing routing.
+These are isolated behavioral fixtures with a stub Pi SDK and transport; no live Jobs interface, model interpretation, or production conversation was exercised.
+Strict production-consumer checks also passed against the real Pi 1.1.0 and 1.2.0 SDKs with TypeScript 5.9.3.
+
+Refresh the routing cases with:
+
+```sh
+bash bin/fm-test-run.sh --jobs 1 tests/fm-daemon.test.sh tests/fm-pi-watch-extension.test.sh tests/fm-pi-branch-extension.test.sh tests/fm-supervision-host.test.sh
+bash bin/fm-test-run.sh tests/fm-pi-primary-types.test.sh
+```
+
+Selected observed output for the inbox boundary:
+
+```text
+ok - captain notes bypass daemon consumption, retry guarded delivery, and remain queued for main
+ok - a captain note arriving after accept prevents the branch prompt and stays main-owned
+ok - host: an away inbox note is handed back so main can end away mode, and the engine does not take it
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.1.0
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.2.0
+```
+
+The [away return policy](../../.agents/skills/afk/SKILL.md#how-to-exit-the-return) owns main's return action, and [Pi postures](../pi-supervision-branch.md#postures) owns the routing contract.
+Complete suite outcomes, including unrelated baseline failures, belong in delivery evidence.
+
 ## Durable task copy reservations
 
 Verified on 2026-10-22 with Treehouse v2.3.0 on Linux amd64, using offline pool and endpoint fixtures.

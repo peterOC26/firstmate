@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # fm-supervise-daemon.sh — presence-gated sub-supervisor (closes #27's P2).
 #
-# Wraps bin/fm-watch.sh: runs it as a child, presents and classifies every
-# durable wake after an actionable close, acknowledges only after routing, and
+# Wraps bin/fm-watch.sh: runs it as a child, presents and classifies ordinary
+# durable wakes after an actionable close, acknowledges only after routing, and
 # either SELF-HANDLES the routine majority in bash (no firstmate turn) or
 # ESCALATES a batched, distilled digest to the supervisor endpoint on
 # captain-relevant events plus bounded declared-wait rechecks. This is the
@@ -19,6 +19,15 @@
 # the /afk skill sets that flag and starts this daemon; any real (unmarked)
 # user message clears it and firstmate resumes full responsiveness.
 # When afk is off, normal fm-watch.sh always-on triage is the active mechanism.
+# In away mode, a queued captain inbox note hands supervision back to main for
+# the return; quiet mode keeps ordinary routing. The entire batch bypasses
+# classification and acknowledgement. Watcher restarts and other housekeeping
+# stand aside while the note stays queued, even after delivery is confirmed;
+# housekeeping ticks retry the guarded injection until confirmation.
+# Only confirmed delivery marks the inbox key surfaced; main keeps its row.
+# The return digest carries the short return signal and a full-text pointer
+# for accompanying events, so the byte bound cannot omit the return signal.
+# An already-frozen submission is retried unchanged before that return digest.
 # Any buffered daemon escalations that remain while afk is off survive in
 # state/.subsuper-escalations and are flushed on the next "while you were out"
 # catch-up or when afk is re-entered.
@@ -31,11 +40,9 @@
 # (fm_operational_harness_needs_record, Claude Code) instead receives the
 # owner's record-backed doorbell: the envelope is written to this home's
 # state/operational-inbox and only a plain doorbell line naming it is typed.
-# Firstmate's contract: a message that starts with the current prefix, a
-# legacy bare-marker daemon escalation, or a doorbell whose record this home
-# holds (a verbatim pasted copy of a live doorbell included) is internal (stay
-# afk); any other message means the captain is back
-# (exit afk, flush catch-up, resume per-wake responsiveness). The prefix and busy-guard solve the same problem - the
+# Main applies the /afk skill's "How to exit: the return" policy to marked
+# input and live record-backed doorbells (including verbatim pasted copies).
+# The prefix and busy-guard solve the same problem - the
 # daemon and the human share one input channel - so they live together under
 # /afk.
 #
@@ -44,8 +51,8 @@
 #     to daemon-owned one-shot behavior and enqueues every wake to
 #     state/.wake-queue BEFORE advancing its suppression markers, so a
 #     crash/restart/missed injection is recovered on the next fm-wake-drain.sh.
-#     After a watcher cycle, the daemon handles every durable row through that
-#     drain and acknowledges it only after routing completes.
+#     After a watcher cycle, the daemon drains and acknowledges routed rows;
+#     captain-note hand-backs leave the entire batch for main.
 #   - Fail-safe-to-escalate: any wake the classifier cannot confidently mark
 #     routine is escalated.
 #   - Bounded wedge latency: ordinary pane staleness without a declared wait escalates
@@ -860,6 +867,7 @@ ESCALATE_DIGEST_BYTES=8192
 ESCALATE_ITEM_BYTES=2048
 ESCALATE_ITEM_MIN_BYTES=128
 ESCALATE_FULL_DIR=.subsuper-digests
+CAPTAIN_INBOX_RETURN="away-daemon: the captain sent a note and away mode should end (captain inbox note queued). Run bin/fm-wake-drain.sh, run bin/fm-afk-return.sh, then answer the note."
 
 # escalate_digest_body: join <buf>'s items with " | " inside the byte budget.
 # Sets ESCALATE_BODY, ESCALATE_EVENTS (every buffered item), and
@@ -868,6 +876,14 @@ escalate_digest_body() {  # <buf>
   local LC_ALL=C buf=$1 item='' sep cut remaining=$ESCALATE_DIGEST_BYTES room cap shown=0 total=0
   ESCALATE_BODY=
   ESCALATE_BOUNDED=0
+  # A large paste can remain unsubmitted in a pane composer. Keep the return
+  # itself short; the existing full-text record carries accompanying events.
+  if grep -Fxq -- "$CAPTAIN_INBOX_RETURN" "$buf"; then
+    ESCALATE_BODY=$CAPTAIN_INBOX_RETURN
+    ESCALATE_EVENTS=$(( $(wc -l < "$buf") ))
+    [ "$ESCALATE_EVENTS" -le 1 ] || ESCALATE_BOUNDED=1
+    return 0
+  fi
   while IFS= read -r item || [ -n "$item" ]; do
     total=$((total + 1))
     sep=
@@ -1353,6 +1369,7 @@ _oldest_line_age() {  # <buf> -> seconds since the oldest buffered item first ar
 #     the block below and escalate what it finds; that block owns its file set.
 housekeeping() {  # <state>
   local state=$1 now due f key task win marker age last max_defer oldest pause_secs marker_epoch until bounded_until pause_reason dialog_name persisted
+  hand_back_captain_inbox "$state" && return 0
   now=$(_now)
   migrate_watcher_pause_markers "$state"
 
@@ -1907,15 +1924,68 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
+# Return 0 while a captain inbox note belongs to main, including when delivery
+# must retry. Leave every row untouched so a main drain owns the return and
+# catch-up. The queue, not the surfaced marker, decides whether to stand aside.
+captain_inbox_pending() {  # <state>
+  local state=$1
+  afk_active "$state" || return 1
+  [ -s "$state/.wake-queue" ] || return 1
+  [ "$(fm_afk_contract_mode "$state")" != quiet ] || return 1
+  awk -F '\t' '$3 == "check" && $4 ~ /^inbox:/ { found=1 } END { exit !found }' "$state/.wake-queue"
+}
+
+hand_back_captain_inbox() {  # <state>
+  local state=$1 key keys='' pending='' ids='' msg age max_defer
+  captain_inbox_pending "$state" || return 1
+  local STATE=$state FM_WAKE_QUEUE="$state/.wake-queue" FM_WAKE_QUEUE_LOCK="$state/.wake-queue.lock"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  keys=$(fm_wake_queued_keys_locked check)
+  for key in $keys; do
+    case "$key" in inbox:*) pending=1 ;; esac
+  done
+  keys=$(fm_wake_inbox_unsurfaced_keys_locked)
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ -n "$pending" ] || return 1
+  [ -n "$keys" ] || return 0
+  for key in $keys; do ids="$ids ${key#inbox:}"; done
+  # Use the existing bounded digest, frozen-submit retry and native request-id
+  # owner, including when other escalations were already waiting for delivery.
+  msg=$CAPTAIN_INBOX_RETURN
+  if ! grep -Fxq -- "$msg" "$state/.subsuper-escalations" 2>/dev/null; then
+    escalate_add "$state" "$msg" || { log "captain inbox return could not be buffered; wake rows retained"; return 0; }
+  fi
+  if escalate_flush "$state"; then
+    fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+    for key in $keys; do fm_wake_surfaced_mark_locked "$key" || true; done
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    log "captain inbox note${ids} handed back to main; wake rows retained"
+  else
+    log "captain inbox hand-back deferred: ${INJECT_LAST_FAILURE:-submit unconfirmed}; wake rows retained"
+    max_defer=${FM_MAX_DEFER_SECS:-$MAX_DEFER_SECS_DEFAULT}
+    age=$(_oldest_line_age "$state/.subsuper-escalations")
+    if [ "$max_defer" -gt 0 ] && [ "$age" -ge "$max_defer" ]; then
+      inject_wedge_alarm "$state" "$age"
+    fi
+  fi
+  return 0
+}
+
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
   local handled=0 failed=0 ack_through ack_generation
+  hand_back_captain_inbox "$state" && return 0
   out=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || return 1
   err=$(mktemp "$state/.subsuper-wake-drain.XXXXXX") || { rm -f "$out"; return 1; }
   if ! "$FM_DAEMON_DIR/fm-wake-drain.sh" > "$out" 2> "$err"; then
     cat "$err" >&2
     rm -f "$out" "$err"
     return 1
+  fi
+  # A note may have arrived between the pre-drain scan and presentation.
+  if hand_back_captain_inbox "$state"; then
+    rm -f "$out" "$err"
+    return 0
   fi
 
   tab=$(printf '\t')
@@ -2161,6 +2231,7 @@ fm_super_main() {
       if [ -n "${WATCHER_PID:-}" ]; then
         # child exited: reap + classify its wake reason
         if wait "${WATCHER_PID}"; then rc=0; else rc=$?; fi
+        WATCHER_PID=""
         reason=""
         if [ -n "${CUR_TMP:-}" ] && [ -e "${CUR_TMP:-}" ]; then
           reason=$(<"${CUR_TMP}")
@@ -2172,7 +2243,6 @@ fm_super_main() {
         if [ "$rc" -ne 0 ] || [ -z "$reason" ]; then
           record_crash
           log "watcher exited rc=$rc reason='$reason'; restarting after ${backoff_secs}s"
-          WATCHER_PID=""
           sleep "$backoff_secs"
           continue
         fi
@@ -2182,7 +2252,6 @@ fm_super_main() {
         # skipped (rc=0, this is normal idle, not a crash).
         if ! is_wake_reason "$reason"; then
           log "watcher non-wake stdout, idling: $reason"
-          WATCHER_PID=""
           sleep "${HOUSEKEEPING_TICK:-$HOUSEKEEPING_TICK_DEFAULT}"
           continue
         fi
@@ -2192,7 +2261,9 @@ fm_super_main() {
         fi
         trim_log
       fi
-      start_watcher || continue
+      if ! captain_inbox_pending "$STATE"; then
+        start_watcher || continue
+      fi
     fi
 
     # --- one housekeeping tick (gated to HOUSEKEEPING_TICK), then poll -------

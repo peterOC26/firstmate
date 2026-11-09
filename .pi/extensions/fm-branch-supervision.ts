@@ -32,8 +32,8 @@
 // posture and the recorded facts at execution time, captain-verdict outcomes
 // accumulate unprocessed in the store instead of opening the processing turn
 // on the parked main, and the guarded scripts pass the branch actor under
-// main's standing authority (bin/fm-lease-lib.sh). The first unmarked captain
-// message archives the record; the next run boundary then presents the
+// main's standing authority (bin/fm-lease-lib.sh). The return policy in
+// .agents/skills/afk/SKILL.md owns archival; the next run boundary presents the
 // accumulated captain rows exactly as after any other gap.
 //
 // Prefix stability (the cache contract, owner: bin/fm-branch-prompt.sh
@@ -114,6 +114,7 @@ import {
 import {
   activateEligibleRowsOwner,
   afkPostureRecordPresent,
+  pendingCaptainInboxIds,
   awayPostureTailFor,
   branchWakePrompt,
   deactivateEligibleRowsOwner,
@@ -1549,9 +1550,12 @@ ${context.command}
         // mid-operation; every relocated action revalidates at its own gate;
         // rows are store-first and the durable queue keeps them.
         const afk = afkPostureRecordPresent(state);
+        if (afk && pendingCaptainInboxIds(state).length > 0) {
+          throw new Error("the captain sent an inbox note; hand this wake back to main for the away return");
+        }
         const scope = scopeForUnreadWake(state, heartbeat, afk);
-        // A newly-arrived main-owned (check-kind) row never bounces this
-        // whole recheck back to main - scopeForUnreadWake excludes it from
+        // Except for the inbox return above, a newly-arrived main-owned check
+        // row never bounces this recheck - scopeForUnreadWake excludes it from
         // eligibleSeqs rather than vetoing the scan, in a heartbeat review as
         // in every other, so it stays queued for main while whatever else is
         // eligible right now still reaches the branch. A genuinely empty

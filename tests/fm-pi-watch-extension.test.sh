@@ -1485,7 +1485,7 @@ EOF
 # watcher-failure alarm still reach main exactly as attended
 # (docs/pi-supervision-branch.md "Postures").
 test_pi_away_record_collapses_eligibility_and_keeps_vetoes_on_main() {
-  local repo home plugin log stop out status label expect reason queue
+  local repo home plugin log stop out status label expect reason queue posture
   repo="$TMP_ROOT/pi-away-root"
   home="$TMP_ROOT/pi-away-home"
   mkdir -p "$repo/bin" "$home/state" "$home/config" "$home/projects/approved"
@@ -1509,13 +1509,16 @@ trap 'exit 0' TERM INT
 while [ ! -e "$FM_STOP_FILE" ] && [ -e "$0" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  while IFS='|' read -r label expect reason queue; do
+  while IFS='|' read -r label expect reason queue posture; do
     [ -n "$label" ] || continue
+    FM_HOME="$home" bash "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "posture archive failed"
+    FM_HOME="$home" FM_AFK_MODE="${posture:-away}" bash "$ROOT/bin/fm-afk-contract.sh" enter --words 'fixture routing posture' >/dev/null \
+      || fail "posture entry failed"
     log="$TMP_ROOT/pi-away-$label.log"
     stop="$TMP_ROOT/pi-away-$label.stop"
     out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" \
-      FM_TEST_REASON="$reason" FM_TEST_QUEUE="$queue" FM_TEST_EXPECT="$expect" node --input-type=module 2>&1 <<'EOF'
-import { writeFileSync } from "node:fs";
+      FM_TEST_REASON="$reason" FM_TEST_QUEUE="$queue" FM_TEST_EXPECT="$expect" FM_TEST_POSTURE="${posture:-away}" node --input-type=module 2>&1 <<'EOF'
+import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const offers = [];
@@ -1533,7 +1536,11 @@ const bus = {
 };
 bus.on("fm-branch-supervision:dispatch", (offer) => {
   offers.push({ message: offer.message, eligible: offer.eligible });
-  if (offer.eligible) offer.accept();
+  if (offer.eligible && process.env.FM_TEST_EXPECT === "reject") {
+    const path = `${process.env.FM_HOME}/state/.wake-queue`;
+    writeFileSync(path, readFileSync(path, "utf8") + "2\t2\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n");
+    offer.accept(Promise.reject(new Error("late captain note")));
+  } else if (offer.eligible) offer.accept();
 });
 const pi = {
   on() {},
@@ -1567,12 +1574,17 @@ if (process.env.FM_TEST_EXPECT === "branch") {
   }
   if (prompt) throw new Error(`a branch-eligible wake still woke the parked main: ${prompt}`);
 } else {
-  if (offers.length !== 1 || offers[0].eligible !== false) {
+  if (offers.length !== 1 || offers[0].eligible !== (process.env.FM_TEST_EXPECT === "reject")) {
     throw new Error(`a broken-queue wake was offered to the branch under the record: ${JSON.stringify(offers)}`);
   }
   if (!prompt.includes(`FIRSTMATE WATCHER WAKE: ${process.env.FM_TEST_REASON}`)) {
     throw new Error(`a wake the branch cannot take did not fall back to main: ${prompt}`);
   }
+  const hasNote = process.env.FM_TEST_POSTURE !== "quiet" && readFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "utf8").includes("inbox:jobs-answer");
+  if (prompt.includes("the captain sent a note and away mode should end") !== hasNote) {
+    throw new Error(`main must receive a return signal exactly for a captain note: ${prompt}`);
+  }
+  if (hasNote && !prompt.includes("bin/fm-afk-return.sh")) throw new Error("return action missing");
 }
 writeFileSync(process.env.FM_STOP_FILE, "stop\n");
 process.exit(0);
@@ -1586,6 +1598,12 @@ check-trigger|branch|check: task-a.check.sh: PR merged|1\t1\tsignal\ttask-a.stat
 check-only|branch|check: x-mention 1234567890|1\t1\tcheck\tmain-only\tcheck: x-mention 1234567890\n
 needs-decision|branch|signal: task-a.status|1\t1\tsignal\ttask-a.status\tneeds-decision: [key=scope] skip or re-implement\n
 unresolvable|main|signal: task-zz.status|1\t1\tsignal\ttask-zz.status\tsignal: task-zz.status\n
+captain-note|main|check: rearm-resurface|1\t1\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n
+captain-note-mixed|main|signal: task-a.status|1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n2\t2\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n
+late-note|reject|signal: task-a.status|1\t1\tsignal\ttask-a.status\tsignal: task-a.status\n
+note-prose-only|branch|check: captain inbox note fake|1\t1\tcheck\tmain-only\tcheck: captain inbox note fake\n
+quiet-check|branch|check: routine|1\t1\tcheck\tmain-only\tcheck: routine\n|quiet
+quiet-note|main|check: rearm-resurface|1\t1\tcheck\tinbox:jobs-answer\tcheck: captain inbox note jobs-answer\n|quiet
 corrupt|main|signal: task-a.status|not a queue row\n
 CASES
 

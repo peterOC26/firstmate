@@ -347,7 +347,7 @@ If a branch offer loses the claim race to main, it rejects its settlement so the
 While attended, a check-kind row is main-owned, including a heartbeat review.
 So it is never part of a branch claim and never defers one.
 Main is woken for it on that check's own triggering close.
-Under the away-posture record the exclusion lifts and a check row is offered to and claimed by the branch like every other actionable row.
+[Postures](pi-supervision-branch.md#postures) owns check-row routing while away.
 
 `fm-wake-drain.sh` never reclassifies a row itself.
 It filters the queue to the current actor's opaque claim before same-key deduplication, then presents and acknowledges only that actor-local view.
