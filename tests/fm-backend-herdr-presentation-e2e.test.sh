@@ -519,20 +519,19 @@ return_retired_copy() {  # <worktree>
   rm -f "$(dirname "$1")/.fm-slot-owner"
 }
 
-# Model an orphaned presentation after stopping its placeholder worker: only
-# the retained acquisition journal that refuses a same-id spawn is retired.
-# The record stays for the reclaim to read, and the copy stays leased until the
-# suite's own returns: a Treehouse return terminates processes in the copy,
-# which would kill the restored husk shell the reclaim under test must find.
+# Model an orphaned presentation after stopping its placeholder worker.
+# Herdr's treehouse get --lease writes no JSON journal. A journal left by the
+# durable lease path is the only thing retired here, so a later same-id spawn
+# is not refused by it. The record stays for the reclaim to read, and the copy
+# stays leased until the suite's own returns: a Treehouse return terminates
+# processes in the copy, which would kill the restored husk shell the reclaim
+# under test must find.
 retire_stopped_acquisition() {  # <meta>
-  local meta=$1 wt lease_id holder id
+  local meta=$1 wt id
   [ -f "$meta" ] || return 0
   wt=$(sed -n 's/^worktree=//p' "$meta")
-  lease_id=$(sed -n 's/^treehouse_lease_id=//p' "$meta")
-  holder=$(sed -n 's/^treehouse_lease_holder=//p' "$meta")
   id=$(basename "$meta" .meta)
-  [ -n "$wt" ] && [ -n "$lease_id" ] && [ -n "$holder" ] \
-    || fail "orphan presentation fixture has no acquisition identity: $meta"
+  [ -n "$wt" ] || return 0
   RECORDED_WORKTREES="${RECORDED_WORKTREES}${wt}"$'\n'
   rm -rf "$(dirname "$meta")/$id.treehouse-acquire"
 }
@@ -980,15 +979,8 @@ for ABORT_PANE in "$ABORT_A_PANE" "$ABORT_B_PANE"; do
 done
 [ ! -e "$HOME_DIR/state/abort-a.meta" ] && [ ! -e "$HOME_DIR/state/abort-b.meta" ] \
   || fail "post-create abort fixtures published task metadata before launch"
-for ABORT_ID in abort-a abort-b; do
-  ABORT_ALLOCATION="$HOME_DIR/state/$ABORT_ID.treehouse-acquire/allocation.json"
-  ABORT_WT=$(jq -er .path "$ABORT_ALLOCATION") || fail "aborted spawn lost its acquired path"
-  ABORT_LEASE_ID=$(jq -er .lease_id "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease id"
-  ABORT_HOLDER=$(jq -er .lease_holder "$ABORT_ALLOCATION") || fail "aborted spawn lost its lease holder"
-  "$REAL_TREEHOUSE" return --force --if-lease-id "$ABORT_LEASE_ID" --if-lease-holder "$ABORT_HOLDER" "$ABORT_WT" \
-    || fail "could not release the aborted fixture's exact reservation"
-  rm -rf "$HOME_DIR/state/$ABORT_ID.treehouse-acquire"
-done
+# The armed failure is an empty treehouse get --lease. It takes no pool slot
+# and writes no acquisition journal, so there is no reservation to release.
 rm -rf "$POST_CREATE_ABORT_CONTROL"
 rm -f "$HOME_DIR/state/abort-a.herdr-presentation" "$HOME_DIR/state/abort-b.herdr-presentation"
 pass "real Herdr lab: concurrent post-create abort cleanup stays serialized with exact focus restoration"
