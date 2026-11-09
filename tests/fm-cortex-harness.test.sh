@@ -189,7 +189,7 @@ fakebin=$(make_spawn_fakebin "$case_dir/fake" claude)
 fm_fake_exit0 "$fakebin" cortex
 home="$case_dir/home"
 proj="$case_dir/project"
-wt="$case_dir/wt"
+wt="$case_dir/slot-worker/repo"
 fm_test_spawn_home "$home" cortex
 fm_git_worktree "$proj" "$wt" cortex-test
 fm_test_spawn_brief "$home" cortex-worker
@@ -209,7 +209,7 @@ if out=$(fm_test_run_spawn "$home" "$wt" "$fakebin" cortex-sm "$proj" --secondma
 then fail 'Cortex secondmate launch accepted'; fi
 assert_contains "$out" 'crewmate/scout adapter only' 'wrong secondmate refusal'
 proj2="$case_dir/project2"
-wt2="$case_dir/wt2"
+wt2="$case_dir/slot-xhigh/repo"
 fm_git_worktree "$proj2" "$wt2" cortex-xhigh
 fm_test_spawn_brief "$home" cortex-xhigh
 if ! out=$(FM_FAKE_LAUNCH_LOG="$case_dir/launch-xhigh" fm_test_run_spawn "$home" "$wt2" "$fakebin" cortex-xhigh "$proj2" --scout --harness cortex --effort xhigh 2>&1)

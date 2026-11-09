@@ -47,7 +47,7 @@ ok - fm-teardown: a stale record on a claimed slot retires, then the claimant te
 ok - fm-teardown: mismatched or unknown lease/claim evidence refuses before all process, hook, scratch, and return effects
 ```
 
-The ordinary allocation path is shared by tmux, Herdr, Zellij, and cmux and is independent of the selected worker harness.
+The [shared allocation contract](../../bin/fm-spawn.sh) is independent of the selected worker harness.
 Relaunch compatibility additionally uses the mocked backend cases in `tests/fm-control-relaunch.test.sh` and `tests/fm-spawn-compact-adviser-disable.test.sh`.
 Orca owns its worktree allocation separately, and secondmate home seeding retains its existing lease contract; neither uses the new ordinary-worker acquisition path.
 This evidence does not claim a live backend or credentialed harness run.
@@ -3853,6 +3853,7 @@ Before reading the process group, the same launch read `ambiguous`.
 
 ### Spawn, steer, peek, and teardown
 
+This hc run predates the shared [journaled acquisition path](../../bin/fm-spawn.sh); its terminal transcript does not verify current allocation.
 A scout ran end to end in a scratch home with `HOME` and `TREEHOUSE_ROOT` in the scratch root, a private core (`HC_SESSION=fme1`), a local bare-origin project, and a compiled stand-in agent at `<root>/agents/claude/claude` that logs its argv, its `HC_*` and `FM_*` environment, and every input line:
 
 ```sh

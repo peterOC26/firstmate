@@ -79,7 +79,7 @@ The composer classifier reads that styled viewport with styling, row count, proc
 Where that cursor-anchored read is `unknown`, as for a harness that parks its cursor outside its composer, the cursorless read that takes the bottom-most shape decides instead.
 
 The `process` block method reports the foreground process with its cwd, its ancestors, and the last exit.
-Spawn's worktree discovery reads the foreground cwd, which follows the nested subshell `treehouse get` opens.
+Spawn reads that foreground cwd to verify placement under the shared [worktree handoff contract](../bin/fm-spawn.sh).
 Agent state is recovery-grade: a verified harness anywhere in the foreground process or its ancestors, or among a shell foreground's live descendants, reads `alive`, a shell foreground with no harness above or below it reads `dead`, an exited terminal child reads `dead`, anything else reads `ambiguous`, a structured not-found reads `missing`, and an unreachable server reads `unreadable`.
 The descendant check exists because a login shell that starts the harness through a wrapper in its own process group, such as a fish function or a shell shim, stays the reported foreground process while the harness runs below it.
 Passive reads never start a server.

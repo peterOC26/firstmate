@@ -431,12 +431,13 @@ case "$*" in
 esac
 [ -z "${FM_FAKE_TREEHOUSE_LOG:-}" ] || printf '%s\n' "$*" >> "$FM_FAKE_TREEHOUSE_LOG"
 cmd=$1; shift
-holder= expected_id= expected_holder= path=
+holder= expected_id= expected_holder= path= json=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --lease-holder) holder=$2; shift 2 ;;
     --if-lease-id) expected_id=$2; shift 2 ;;
     --if-lease-holder) expected_holder=$2; shift 2 ;;
+    --json) json=1; shift ;;
     --*) shift ;;
     *) path=$1; shift ;;
   esac
@@ -483,8 +484,12 @@ if [ "$cmd" = get ]; then
       [{path:$path, leased:true, lease_id:$id, lease_holder:$holder}]) end
   ' "$state" > "$state.tmp"
   mv "$state.tmp" "$state"
-  jq -cn --arg path "$path" --arg id "$id" --arg holder "$holder" \
-    '{path:$path, lease_id:$id, lease_holder:$holder, leased_at:"2026-10-22T00:00:00Z"}'
+  if [ "$json" = 1 ]; then
+    jq -cn --arg path "$path" --arg id "$id" --arg holder "$holder" \
+      '{path:$path, lease_id:$id, lease_holder:$holder, leased_at:"2026-10-22T00:00:00Z"}'
+  else
+    printf '%s\n' "$path"
+  fi
 elif [ "$cmd" = return ]; then
   path=$(cd "$path" && pwd -P)
   state="$(dirname "$(dirname "$path")")/treehouse-state.json"

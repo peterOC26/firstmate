@@ -90,8 +90,8 @@ fm_treehouse_legacy_unleased() {  # <worktree>
   ' >/dev/null 2>&1
 }
 
-# Herdr's treehouse get --lease --lease-holder records the task id on the pool
-# entry and does not write treehouse_lease_* into the task record.
+# Older Herdr records lack treehouse_lease_* fields; their compatibility check
+# uses the task id that the original durable acquisition stored on the pool entry.
 fm_treehouse_task_holds_pool_lease() {  # <worktree> <task-id>
   [ -n "$2" ] || return 1
   fm_treehouse_pool_entry "$1" | jq -e --arg id "$2" '
@@ -362,7 +362,10 @@ spawn_lease_treehouse_slot() {
     fi
     exit 1
   fi
-  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || exit 1
+  WT=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' "$TREEHOUSE_ACQUIRE_JOURNAL/allocation.json") || {
+    echo "error: durable Treehouse acquisition did not report a worktree; retain $TREEHOUSE_ACQUIRE_JOURNAL for reconciliation" >&2
+    exit 1
+  }
   TREEHOUSE_LEASE_ID=$(jq -er --arg holder "$TREEHOUSE_LEASE_HOLDER" '
     select(.lease_holder == $holder) | .lease_id |
     select(type == "string" and length > 0 and (test("[\\r\\n\\t]") | not))
