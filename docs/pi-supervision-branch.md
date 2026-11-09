@@ -462,7 +462,7 @@ This does not interpret waiting prose, launch a worker automatically, grant bran
 The generated [Pi supervision protocol](supervision-protocols/pi.md) owns event ownership for merged outcomes and main's acknowledgement duty.
 Deterministic entry delivery owns captain visibility.
 
-The branch prompt's "Verdict: routine or captain" section owns the classification criteria, including task-level silence eligibility and the rule to escalate doubt.
+The [branch prompt](../bin/fm-branch-prompt.sh)'s "Verdict: routine or captain" section owns classification criteria, durable-history comparison for unchanged situations, task and fleet silence eligibility, and the rule to escalate doubt.
 
 Its "PR identity: copy or abstain" section owns where a PR URL in a summary or tool argument may come from:
 
@@ -497,14 +497,8 @@ An unresolvable task-local row, an unknown row kind, or an unreadable queue stil
 
 ### Reporting the review
 
-The branch runs its normal operating procedure for the wake (`bin/fm-branch-prompt.sh` "Handling a wake") and performs the deeper fleet review that main previously performed.
-
-| Review result | Report |
-| --- | --- |
-| Found literally nothing worth reporting | Verdict `routine`, `task=fleet`, and `silent=true`, so it is stored without a rendered note. |
-| A fleet-wide routine action | Omits `silent` and keeps its rendered sailboat note. |
-
-Only a captain-worthy finding reports verdict `captain` and appends a visible captain outcome entry.
+The [branch prompt](../bin/fm-branch-prompt.sh)'s "Handling a wake" section owns heartbeat review scope, pending backlog-item checks, and per-item reporting.
+Its [verdict rules](#ownership-and-verdict-rules) govern the review's classification and silence eligibility; outcomes follow the [two-stage noise filter](#two-stage-noise-filter) delivery paths.
 
 Every other fleet-wide or unresolvable wake keeps today's wake-to-main path in both postures.
 That includes watcher-failure alarms, which are never offered to the branch.

@@ -90,9 +90,11 @@ Handle it start to finish in one turn sequence:
 6. Release every lease you claimed: `bin/fm-lease.sh release <task>`.
 A crash after the report but before acknowledgement re-presents the wake, and re-handling may append a second outcome note; that benign over-reporting is deliberately accepted because replay is preferred over loss, and no idempotency machinery exists for it by design.
 
-A heartbeat wake asks you to review the whole fleet the way MAIN would on an ordinary heartbeat: reconcile suspicious tasks and PR state from the fleet view, update the backlog, and report verdict routine with a one-line summary when nothing changed.
-Set silent true only when that review changed nothing, took no action, and found nothing worth a routine note; omit it or set it false after any successful automatic recovery, backlog reconciliation, or other real routine action.
-Never report verdict captain merely to say the fleet is quiet; a no-op heartbeat pass stays silent.
+A heartbeat wake asks you to review the whole fleet from `bin/fm-fleet-view.sh` and the current backlog from `bin/fm-tasks-axi.sh list`, including parked and captain-held items with no live worker.
+Read `bin/fm-tasks-axi.sh show <id> --full` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending.
+Before reporting the heartbeat, apply the verdict and durable-history comparison below to each pending item's current result, decision, blocker, or next action, and report it under that item's task id.
+Only report a silent routine fleet outcome after those checks find nothing pending, no new result, and no action taken; a recovery or backlog reconciliation stays visible.
+Never report verdict captain merely to say the fleet is quiet.
 
 For a stale, looping, confused, or unresponsive worker, follow the recovery playbook included at the end of this prompt.
 For anything it tells you to escalate, or any failure that survives the playbook, report verdict captain instead of improvising.
@@ -117,6 +119,7 @@ A second mate's stale wake is a liveness event: report it even when it presents 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
 Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken.
+A heartbeat fleet review is silent only as instructed under "Handling a wake" above.
 Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent.
 When in doubt, render.
 PROMPT
@@ -137,11 +140,15 @@ Also report verdict captain for:
 - a needed credential or login;
 - anything destructive, irreversible, or security-sensitive.
 Keep an unsolicited routine outcome as verdict routine, including a healthy result that was not requested by the captain.
-Keep an unchanged fleet review silent as instructed above.
 When genuinely in doubt, choose captain: a spurious escalation costs a glance, a swallowed one costs trust.
 Attended on the supervision host (no away-posture record, and the wake names the `bin/fm-branch-report.sh` command), a routine outcome opens no MAIN turn, so MAIN learns of it only at its next wake.
 There, also report verdict captain for anything MAIN must act on to move the work forward, such as a local-only branch ready to land, a pull request ready to merge, or a step MAIN said it would take once the work was ready, even when the captain asked not to hear about that work; MAIN, not you, decides what the captain hears.
-Report that captain outcome once per unchanged situation: an earlier routine outcome that mentioned it does not count, and an earlier captain outcome for the same unchanged situation does.
+Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces.
+For a situation meeting a captain trigger, make one bounded durable-history read: `bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task=="<id>" and .verdict=="captain")' | tail -n 1`, replacing <id> with this task's id, and compare that newest captain row with the current result, decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count.
+If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress.
+If a matching captain outcome exists and the situation is unchanged, report routine instead; while still waiting on MAIN or the captain, set silent false and name the pending action in the summary.
+A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation; a new result, changed decision or blocker, different next action, or recurrence after resolution does.
+Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy.
 Write summaries in the captain's outcome language - the project, the fix, the PR, the worker, the blocker - never internal mechanics like wake kinds, status prefixes, worktrees, or state file names.
 
 # PR identity: copy or abstain

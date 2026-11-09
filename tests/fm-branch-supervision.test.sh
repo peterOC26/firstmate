@@ -44,7 +44,6 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
   [ "$host_a" = "$host_b" ] || fail "host prompt lost prefix stability"
   assert_not_contains "$host_a" "continuation" "host must not request unsupported handoffs"
   assert_contains "$host_a" "also report verdict captain for anything MAIN must act on to move the work forward" "host must retain upstream routing"
-  assert_contains "$host_a" "Report that captain outcome once per unchanged situation" "host must retain upstream deduplication"
 
   # Below the provider's 1024-token caching minimum a branch prompt gets no
   # cache reuse at all (measured in the feasibility evidence), so hold a
@@ -60,7 +59,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the inlined recovery playbook" ;;
   esac
   case "$out_a" in
-    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*"Keep an unchanged fleet review silent"*) ;;
+    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*) ;;
     *) fail "branch prompt lost the requested-result, progress-routine, or routine-silence rules" ;;
   esac
   case "$out_a" in
@@ -80,6 +79,56 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the second-mate relay, signal-span, or stale-liveness rule" ;;
   esac
   pass "branch prompt is byte-stable across homes, cwd, timezone, and time, above the cache floor"
+}
+
+test_branch_prompt_emits_pending_decision_review_contract() {
+  local surface prompt
+  # Exercise the emitted contract on both public report surfaces. These
+  # assertions verify instructions reach the model, not model adherence.
+  for surface in pi host; do
+    if [ "$surface" = host ]; then
+      prompt=$(FM_HOME="$TMP_ROOT/prompt-holds" bash "$ROOT/bin/fm-branch-prompt.sh" --supervision-host) \
+        || fail "host prompt generator failed"
+    else
+      prompt=$(FM_HOME="$TMP_ROOT/prompt-holds" bash "$ROOT/bin/fm-branch-prompt.sh") \
+        || fail "Pi prompt generator failed"
+    fi
+    assert_contains "$prompt" \
+      "A heartbeat wake asks you to review the whole fleet from \`bin/fm-fleet-view.sh\` and the current backlog from \`bin/fm-tasks-axi.sh list\`, including parked and captain-held items with no live worker." \
+      "$surface emitted prompt omits backlog-only decisions from heartbeat review"
+    assert_contains "$prompt" \
+      "Read \`bin/fm-tasks-axi.sh show <id> --full\` for each item waiting on MAIN or the captain on every heartbeat, even without a mirrored message or new status; an empty live fleet or OPEN DECISIONS section does not establish that no decision is pending." \
+      "$surface emitted prompt omits current decision reads"
+    assert_contains "$prompt" \
+      "Before reporting the heartbeat, apply the verdict and durable-history comparison below to each pending item's current result, decision, blocker, or next action, and report it under that item's task id." \
+      "$surface emitted prompt omits per-item history comparison before reporting"
+    assert_contains "$prompt" \
+      'Only report a silent routine fleet outcome after those checks find nothing pending, no new result, and no action taken; a recovery or backlog reconciliation stays visible.' \
+      "$surface emitted prompt permits silence before pending decisions are checked"
+    case "$prompt" in
+      *'# Verdict: routine or captain'*'A heartbeat fleet review is silent only as instructed under "Handling a wake" above.'*'# PR identity: copy or abstain'*) ;;
+      *) fail "$surface emitted verdict section omits the heartbeat silence bridge" ;;
+    esac
+    assert_contains "$prompt" \
+      "Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces." \
+      "$surface prompt does not apply deduplication to every escalation"
+    assert_contains "$prompt" \
+      "For a situation meeting a captain trigger, make one bounded durable-history read: \`bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task==\"<id>\" and .verdict==\"captain\")' | tail -n 1\`, replacing <id> with this task's id, and compare that newest captain row with the current result, decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count." \
+      "$surface prompt omits the bounded task-filtered captain-history comparison"
+    assert_contains "$prompt" \
+      "If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress." \
+      "$surface prompt can swallow a previously unreported hold"
+    assert_contains "$prompt" \
+      "If a matching captain outcome exists and the situation is unchanged, report routine instead; while still waiting on MAIN or the captain, set silent false and name the pending action in the summary." \
+      "$surface prompt can repeat an escalation or hide the pending action"
+    assert_contains "$prompt" \
+      "A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation; a new result, changed decision or blocker, different next action, or recurrence after resolution does." \
+      "$surface prompt does not distinguish duplicate wakes from material changes"
+    assert_contains "$prompt" \
+      "Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy." \
+      "$surface prompt permits task or heartbeat silence over a pending hold"
+  done
+  pass "both emitted prompts include pending-decision review and escalation comparison instructions"
 }
 
 # A home adds its own rules through config/branch-prompt-include.md: absent or
@@ -1689,6 +1738,7 @@ WRAPPER
 }
 
 test_branch_prompt_is_byte_stable_and_above_cache_floor
+test_branch_prompt_emits_pending_decision_review_contract
 test_branch_prompt_home_include_is_appended_last
 test_branch_prompt_routes_completed_scouts_through_guarded_cleanup
 test_outcome_store_is_append_only_with_cursor_reads
