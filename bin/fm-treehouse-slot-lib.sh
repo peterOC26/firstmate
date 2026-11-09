@@ -470,3 +470,34 @@ spawn_treehouse_reservation_preflight() {
     fm_treehouse_records_reserved "$PROJ_ABS" "$STATE" || exit 1
   fi
 }
+
+# shellcheck disable=SC2154
+spawn_t3code_lease_cli_probe() {
+  [ "$KIND" != secondmate ] || return 0
+  fm_treehouse_lease_cli || {
+    echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
+    exit 1
+  }
+}
+
+# shellcheck disable=SC2154
+spawn_meta_treehouse_lease_lines() {
+  [ "$RELAUNCH" -eq 0 ] && [ -n "$TREEHOUSE_LEASE_ID" ] || return 0
+  echo "treehouse_lease_id=$TREEHOUSE_LEASE_ID"
+  echo "treehouse_lease_holder=$TREEHOUSE_LEASE_HOLDER"
+}
+
+# A durable acquisition journal outlives an aborted spawn. Never drop the claim
+# or unconditionally return a copy that may already contain work.
+# shellcheck disable=SC2154
+spawn_abort_retain_treehouse_journal() {
+  if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
+    [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
+    echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
+    spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
+  fi
+  if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
+    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
+    echo "warning: retaining task $ID's slot claim on $WT; reconcile its ownership using the acquisition journal before reuse" >&2
+  fi
+}

@@ -947,6 +947,10 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# The oversized Codex brief pointer is its own lint root so this file's
+# source-aware check stays under the 8G resident cap.
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-spawn-codex-brief-lib.sh"
 # shellcheck source=bin/fm-classify-lib.sh
 . "$SCRIPT_DIR/fm-classify-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
@@ -1991,19 +1995,7 @@ spawn_abort_cleanup() {
       echo "warning: the worktree $WT stays leased to $ID after the failed spawn; once inspected, run 'treehouse return --force $WT' from $PROJ_ABS" >&2
     fi
   fi
-  # Durable acquisitions survive aborts. The journal is written before get,
-  # with its raw response captured directly, so even an interrupted publication
-  # leaves identity evidence. Never drop the claim or unconditionally return a
-  # copy that may already contain work or a delivered launch.
-  if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
-    [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
-    echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
-    spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
-  fi
-  if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
-    echo "warning: retaining task $ID's slot claim on $WT; reconcile its ownership using the acquisition journal before reuse" >&2
-  fi
+  spawn_abort_retain_treehouse_journal
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
     fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
@@ -5325,14 +5317,8 @@ EOF
       echo "error: $PROJ_ABS tracks CLAUDE.local.md, which backend=t3code writes as the Claude task-worker channel statement; refusing to overwrite project instructions" >&2
       exit 1
     fi
-    # The JSON lease is t3code's only treehouse call. Project-policy refusals
-    # above must win before any treehouse invocation, including the CLI probe.
-    if [ "$KIND" != secondmate ]; then
-      fm_treehouse_lease_cli || {
-        echo "error: Treehouse durable task leases require jq and get --lease --lease-holder --json plus return --if-lease-id --if-lease-holder (use Treehouse v2.3.0 or newer); no allocation or endpoint mutation was attempted" >&2
-        exit 1
-      }
-    fi
+    # Project-policy refusals above must win before the lease CLI probe.
+    spawn_t3code_lease_cli_probe
     # The T3 project is the directory the agent runs in: the project for a
     # worker, the home itself for a secondmate.
     T3CODE_PROJECT_ID=$(fm_backend_t3code_project_ensure "$PROJ_ABS") || exit 1
@@ -7225,10 +7211,7 @@ preserve_relaunch_meta() {
   echo "window=$META_WINDOW"
   echo "endpoint_task_id=$ID"
   echo "worktree=$WT"
-  if [ "$RELAUNCH" -eq 0 ] && [ -n "$TREEHOUSE_LEASE_ID" ]; then
-    echo "treehouse_lease_id=$TREEHOUSE_LEASE_ID"
-    echo "treehouse_lease_holder=$TREEHOUSE_LEASE_HOLDER"
-  fi
+  spawn_meta_treehouse_lease_lines
   echo "project=$PROJ_ABS"
   echo "harness=$HARNESS"
   if [ "$RAW_LAUNCH" = 0 ]; then
@@ -7420,21 +7403,7 @@ fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
-# Linux limits each exec argument to 128 KiB independently of ARG_MAX.
-# Keep the encoded Codex prompt comfortably below that limit, including its
-# operational envelope, without trimming intent or accumulated progress notes.
-if [ "$HARNESS" = codex ] && [ "$(wc -c < "$BRIEF")" -gt 65536 ]; then
-  CODEX_PROMPT_FILE="$BRIEF_DIR_REAL/codex-launch-prompt.md"
-  CODEX_PROMPT_TMP="$CODEX_PROMPT_FILE.${BASHPID:-$$}.tmp"
-  # shellcheck disable=SC2016 # Backticks delimit the brief path in the prompt.
-  if ! (umask 077 && printf 'Read the complete launch brief at `%s` and follow it exactly. Its current role contract establishes your role before project instructions.\n' \
-      "$BRIEF_REAL" > "$CODEX_PROMPT_TMP" && mv -f "$CODEX_PROMPT_TMP" "$CODEX_PROMPT_FILE"); then
-    rm -f -- "$CODEX_PROMPT_TMP"
-    echo "error: could not stage the Codex launch brief pointer for $ID" >&2
-    exit 1
-  fi
-  sq_brief=$(shell_quote "$CODEX_PROMPT_FILE")
-fi
+spawn_stage_codex_brief_pointer
 sq_turnend=$(shell_quote "$TURNEND")
 sq_piext=$(shell_quote "$STATE/$ID.pi-ext.ts")
 sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts")

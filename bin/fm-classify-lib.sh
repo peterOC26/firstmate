@@ -48,6 +48,10 @@
 # Resolved at source time from BASH_SOURCE so it works whether sourced by a
 # bin/ script (which sets its own SCRIPT_DIR) or directly by a test.
 _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
+# The closing-epoch watch is its own lint root so spawn's source-aware check
+# stays under the 8G resident cap.
+# shellcheck disable=SC1091
+. "$_FM_CLASSIFY_LIB_DIR/fm-classify-close-lib.sh"
 
 # The kernel name, read once at source time rather than forked by every status
 # stat helper below. These helpers mostly run inside $() subshells, where a lazy
@@ -1064,7 +1068,7 @@ EOF
 status_key_closing_verb() {  # <status-file> <key> [<closing-epoch-out-var> <blocked-epoch>]
   local f=$1 want=$2 line resolve held open='' was verb='' kind event candidates __fm_close_at=''
   local __fm_close_watch=0 __fm_close_seen=0
-  if [ -n "${3:-}" ] && [ -n "${4:-}" ]; then printf -v "$3" '%s' ''; fi
+  fm_classify_close_watch_reset "${3:-}" "${4:-}"
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   [ -n "$want" ] || return 0
   kind=$(_fm_status_kind "$f")
@@ -1090,23 +1094,15 @@ status_key_closing_verb() {  # <status-file> <key> [<closing-epoch-out-var> <blo
     was=0
     _fm_open_set_has "$open" "$want" && was=1
     open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
-    if [ -n "${4:-}" ] && [ "$event" = blocked ] \
-      && [ "$(_fm_decision_key "$line")" = "$want" ] \
-      && [ "$(status_line_at_epoch "$line")" = "$4" ] \
-      && [ "$(_fm_open_set_verb "$open" "$want")" = blocked ]; then
-      __fm_close_watch=1 __fm_close_seen=0 __fm_close_at=''
-    fi
+    fm_classify_close_watch_arm "$line" "$event" "$want" "$open" "${4:-}"
     if [ "$was" = 1 ] && ! _fm_open_set_has "$open" "$want"; then
       verb=$event
-      if [ "$__fm_close_watch" -eq 1 ] && [ "$__fm_close_seen" -eq 0 ]; then
-        _fm_status_at_epoch "$line" __fm_close_at || true
-        __fm_close_seen=1
-      fi
+      fm_classify_close_watch_capture "$line"
     fi
   done <<EOF
 $candidates
 EOF
-  if [ -n "${3:-}" ] && [ -n "${4:-}" ]; then printf -v "$3" '%s' "$__fm_close_at"; fi
+  fm_classify_close_watch_publish "${3:-}" "${4:-}"
   if _fm_open_set_has "$open" "$want"; then
     _fm_open_set_verb "$open" "$want"
     return 0
