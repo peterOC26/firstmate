@@ -526,8 +526,9 @@ test_captain_note_hands_back_before_daemon_consumption() {
   [ "$(printf '%s' "$digest" | LC_ALL=C wc -c)" -lt 1024 ] \
     || fail "captain note: return still carries a large pasted digest"
   full=$(printf '%s' "$digest" | sed -n 's/.*full text of every event: \([^ )]*\).*/\1/p')
-  [ -n "$full" ] && cmp -s "$full" "$dir/buffer.orig" \
-    || fail "captain note: short return lost buffered events"
+  if [ -z "$full" ] || ! cmp -s "$full" "$dir/buffer.orig"; then
+    fail "captain note: short return lost buffered events"
+  fi
   calls=$(wc -l < "$sent")
   housekeeping "$state"
   handle_durable_wakes heartbeat "$state"
