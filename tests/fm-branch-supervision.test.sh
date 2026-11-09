@@ -113,8 +113,8 @@ test_branch_prompt_emits_pending_decision_review_contract() {
       "Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces." \
       "$surface prompt does not apply deduplication to every escalation"
     assert_contains "$prompt" \
-      "For a situation meeting a captain trigger, first check the durable outcome history (\`bin/fm-branch-outcome.sh list --recent <n>\`, expanding the window as needed) for a captain outcome covering this task and the same result, decision, blocker, or next action; an earlier routine outcome does not count." \
-      "$surface prompt does not require evidence of a matching captain outcome"
+      "For a situation meeting a captain trigger, make one bounded durable-history read: \`bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task==\"<id>\" and .verdict==\"captain\")' | tail -n 1\`, replacing <id> with this task's id, and compare that newest captain row with the current result, decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count." \
+      "$surface prompt omits the bounded task-filtered captain-history comparison"
     assert_contains "$prompt" \
       "If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress." \
       "$surface prompt can swallow a previously unreported hold"
