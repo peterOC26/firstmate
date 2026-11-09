@@ -1,0 +1,19 @@
+{
+  "tasks-axi": {
+    "stored_backlog_bytes": 174722,
+    "rendered_backlog_bytes": 22149,
+    "exact_counts": "108 parked, 108 watch",
+    "protected_rows": "all original decoded reasons retained",
+    "backlog_unchanged": true,
+    "valid_utf8": true
+  },
+  "manual": {
+    "stored_backlog_bytes": 174722,
+    "rendered_backlog_bytes": 29313,
+    "exact_counts": "108 parked, 108 watch",
+    "protected_rows": "all original decoded reasons retained",
+    "backlog_unchanged": true,
+    "valid_utf8": true
+  },
+  "detail_retrieval": "full encoded multiline Watch reason remains available through fm-tasks-axi.sh show quiet-109 --full"
+}

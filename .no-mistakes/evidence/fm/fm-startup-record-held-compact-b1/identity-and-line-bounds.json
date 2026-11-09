@@ -1,0 +1,14 @@
+{
+  "tasks-axi": {
+    "unique_short_rows": 216,
+    "max_title_characters": 80
+  },
+  "manual": {
+    "unique_short_rows": 216,
+    "max_short_row_bytes": 156
+  },
+  "unavailable": {
+    "unique_short_rows": 216,
+    "max_short_row_bytes": 156
+  }
+}

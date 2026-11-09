@@ -1,0 +1,13 @@
+{
+  "before-fix": {
+    "valid_utf8": false,
+    "first_invalid_byte_offset": 4792,
+    "hex_context": "61 61 61 61 61 61 61 61 c3 2e 2e 2e 20 28 68 6f 6c"
+  },
+  "after-fix": {
+    "valid_utf8": true,
+    "short_rows": 12,
+    "counts": "6 parked, 6 watch",
+    "maximum_row_bytes": 156
+  }
+}
