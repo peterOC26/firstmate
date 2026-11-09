@@ -78,7 +78,7 @@ The adapter fetches the scrollback whole and trims the tail locally; Paseo caps 
 `--start -<n>` is not used because it counts the blank screen rows below the prompt as part of the tail.
 Because capture strips styling, the capability descriptor declares `styled=0`, and the shared classifier in `bin/fm-composer-lib.sh` degrades a glyph row carrying trailing text to `unknown` rather than misreading an idle suggestion as unsent input.
 
-A terminal's `cwd` field in `terminal ls` is creation-time-frozen and never follows the foreground subshell opened by `treehouse get`.
+A terminal's `cwd` field in `terminal ls` is creation-time-frozen and does not follow later shell directory changes.
 Spawn-time worktree discovery therefore sends begin and end markers around `pwd`, captures the marked block, and joins wrapped path lines, exactly like cmux and zellij.
 
 Cleanup closes only the task's tab with `terminal kill`; sibling task tabs stay alive.

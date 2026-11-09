@@ -1980,12 +1980,9 @@ spawn_abort_cleanup() {
       fi
     fi
   fi
-  # A durable Herdr lease outlives the pane, unlike the process lease the
-  # interactive command used to take, so an abort that leaves no record returns
-  # it, whether or not the launch was sent. Only a pane Herdr reports gone and a
-  # copy with no uncommitted work prove nothing is left to inspect there; any
-  # other keeps the lease and names the command, as the pane used to hold the
-  # slot for the operator.
+  # Herdr's pane-gone and clean-copy proofs supplement the shared abort-return
+  # contract in this script's header; otherwise retain the acquisition journal
+  # and print its recovery procedure below, whether or not launch was sent.
   if [ "$HERDR_LEASED" = 1 ] && [ "$status" -ne 0 ] && [ -n "${WT:-}" ] &&
     [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; then
     HERDR_LEASED=0
@@ -5465,9 +5462,8 @@ spawn_send_key() { # <target> <key>
 # it and the pane's top-level shell stays in the project; Herdr restores a pane
 # from that top-level shell's cwd, so a host restart reopened every worker in
 # the primary clone. A durable lease needs no subshell, which lets the cd in
-# spawn_enter_recorded_worktree move the top-level shell itself. A lease
-# outlives its pane, so an aborted spawn returns it (spawn_abort_cleanup) and
-# bin/fm-teardown.sh returns it for a finished task.
+# spawn_enter_recorded_worktree move the top-level shell itself. Lease cleanup
+# follows this script's abort-return contract and bin/fm-teardown.sh's header.
 spawn_lease_herdr_slot() {
   # The same journaled acquisition as every other durable lease. Herdr still
   # sets HERDR_LEASED so an abort can return a clean copy once its pane is gone.

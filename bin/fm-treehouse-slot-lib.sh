@@ -90,8 +90,8 @@ fm_treehouse_legacy_unleased() {  # <worktree>
   ' >/dev/null 2>&1
 }
 
-# Herdr's treehouse get --lease --lease-holder records the task id on the pool
-# entry and does not write treehouse_lease_* into the task record.
+# Older Herdr records lack treehouse_lease_* fields; their compatibility check
+# uses the task id that the original durable acquisition stored on the pool entry.
 fm_treehouse_task_holds_pool_lease() {  # <worktree> <task-id>
   [ -n "$2" ] || return 1
   fm_treehouse_pool_entry "$1" | jq -e --arg id "$2" '
