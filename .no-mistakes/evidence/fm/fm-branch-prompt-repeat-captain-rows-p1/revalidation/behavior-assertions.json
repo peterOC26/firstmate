@@ -1,0 +1,182 @@
+[
+  {
+    "name": "initial-unreported",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 2,
+        "epoch": 1794202370,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "The migration is paused until the captain chooses Saturday or Sunday for the cutover; no work can resume before that choice.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "repeat-acknowledged",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 3,
+        "epoch": 1794202379,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Still waiting on the captain: he has not yet chosen Saturday or Sunday for the migration cutover (MAIN has relayed the question). Migration stays paused; no workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "repeat-again",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 4,
+        "epoch": 1794202388,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: the migration cutover is still waiting on the captain to choose Saturday or Sunday. No workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "repeat-buried-history",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 30,
+        "epoch": 1794202407,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: the migration stays paused until the captain chooses Saturday or Sunday for the cutover (already raised to him). No workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "changed-decision",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 31,
+        "epoch": 1794202423,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "Decision changed: the provider cancelled both the Saturday and Sunday cutover windows, so the migration stays paused. Captain must choose between postponing to next month or approving a paid emergency weekday cutover. No workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "changed-repeat",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 32,
+        "epoch": 1794202432,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: still waiting on the captain to choose between postponing the migration to next month or approving a paid emergency weekday cutover (both weekend windows were cancelled). No workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "resolved-idle",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 33,
+        "epoch": 1794202445,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Resolved: the captain chose to postpone the migration until next month, and that answer is recorded. Nothing is pending and no workers are running; no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "away-initial",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 34,
+        "epoch": 1794202467,
+        "task": "budget-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "Waiting on your choice for the migration budget: approve the paid emergency weekday cutover, or keep the free next-month window. Your earlier 'Postpone until next month' answer on the cutover window points toward the free window, but this is a separate open call, so per your away instructions ('Hold any question that needs my choice for my return') it is left for you; no workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "away-repeat",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 35,
+        "epoch": 1794202481,
+        "task": "budget-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: still waiting on your choice for the migration budget (paid emergency weekday cutover or the free next-month window), already raised and held for your return. No workers running, no action taken.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  },
+  {
+    "name": "idle-empty",
+    "result": "pass",
+    "rows": [
+      {
+        "seq": 1,
+        "epoch": 1794202499,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat review: no live workers, no queued or done backlog items, nothing pending; no action taken.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "failures": []
+  }
+]

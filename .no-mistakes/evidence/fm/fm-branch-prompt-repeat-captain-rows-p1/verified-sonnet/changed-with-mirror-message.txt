@@ -1,0 +1,6 @@
+MAIN DIALOG MIRROR
+[main] The provider cancelled both migration windows. I updated migration-choice: it now asks the captain to choose between postponing to next month or a paid emergency weekday cutover. No choice has been made.
+END MAIN DIALOG MIRROR
+
+watcher: heartbeat: review the fleet and its pending work
+Report each handled event using bin/fm-branch-report.sh.

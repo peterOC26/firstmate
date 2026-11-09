@@ -1,0 +1,110 @@
+[
+  {
+    "run": "fix-baseline",
+    "case": "initial-unreported",
+    "passed": false,
+    "outcomes": [
+      {
+        "seq": 2,
+        "epoch": 1794202064,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat: no active tasks, nothing changed.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  },
+  {
+    "run": "fix-baseline",
+    "case": "changed-decision",
+    "passed": false,
+    "outcomes": [
+      {
+        "seq": 4,
+        "epoch": 1794202080,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat: no active tasks, nothing changed.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  },
+  {
+    "run": "fix-baseline",
+    "case": "repeat-acknowledged",
+    "passed": false,
+    "outcomes": [
+      {
+        "seq": 5,
+        "epoch": 1794202093,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat: no active tasks. The migration cutover is still waiting on the captain to choose Saturday or Sunday; MAIN has told him and no window is chosen yet.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  },
+  {
+    "run": "fix-verified",
+    "case": "initial-unreported",
+    "passed": true,
+    "outcomes": [
+      {
+        "seq": 2,
+        "epoch": 1794202169,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "The migration is paused until the captain chooses Saturday or Sunday for the cutover; no work can resume before that choice.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  },
+  {
+    "run": "fix-verified",
+    "case": "changed-decision",
+    "passed": true,
+    "outcomes": [
+      {
+        "seq": 4,
+        "epoch": 1794202183,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "The provider cancelled both the Saturday and Sunday cutover windows, so the earlier choice is moot. The migration stays paused until you choose between postponing to next month or approving a paid emergency weekday cutover.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  },
+  {
+    "run": "fix-verified",
+    "case": "repeat-acknowledged",
+    "passed": true,
+    "outcomes": [
+      {
+        "seq": 5,
+        "epoch": 1794202192,
+        "task": "migration-choice",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Still waiting on the captain: the migration stays paused until he chooses between postponing to next month or approving a paid emergency weekday cutover. Nothing has changed since the last report.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ]
+  }
+]

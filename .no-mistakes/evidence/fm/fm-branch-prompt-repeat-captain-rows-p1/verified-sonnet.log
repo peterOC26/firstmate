@@ -1,0 +1,10 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZBK9817ZJ929WRNSQGN01S/.helper-lab.YstCuu
+Starting unreported-cold (sonnet)
+unreported-cold engine exit=0
+error=0 cost=0.01682 conversation_cost=0.01682 input=10 cache_read=90540 cache_write=684 output=501 turns=5
+Starting changed-with-mirror (sonnet)
+changed-with-mirror engine exit=0
+error=0 cost=0.021548 conversation_cost=0.021548 input=10 cache_read=92063 cache_write=1268 output=725 turns=5
+Starting repeated-changed (sonnet)
+repeated-changed engine exit=0
+error=0 cost=0.034715 conversation_cost=0.034715 input=8 cache_read=58587 cache_write=718 output=442 turns=3

@@ -1,0 +1,1 @@
+The first follow-up driver (reproduce-helper.sh; reproduction-sonnet/ and reproduction-opus/) serialized the literal ${POSTURE:-attended} into its turn record. These exploratory follow-up results are excluded. verified-helper-eval.sh fixes the serialization and re-drives them in fresh homes. The original live-helper-eval.sh correctly used posture=attended and is unaffected.

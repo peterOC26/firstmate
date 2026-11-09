@@ -1,0 +1,6 @@
+MAIN DIALOG MIRROR
+[main] I have seen the migration cutover question and told the captain. He has not chosen a window yet.
+END MAIN DIALOG MIRROR
+
+watcher: heartbeat: review the fleet and its pending work
+Report each handled event using bin/fm-branch-report.sh.

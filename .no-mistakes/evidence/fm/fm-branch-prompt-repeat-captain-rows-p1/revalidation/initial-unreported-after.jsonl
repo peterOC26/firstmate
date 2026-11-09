@@ -1,0 +1,2 @@
+{"seq":1,"epoch":1794202362,"task":"migration-choice","wake":"","verdict":"routine","summary":"The migration is paused pending the choice of Saturday or Sunday for cutover.","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":2,"epoch":1794202370,"task":"migration-choice","wake":"heartbeat: review the fleet and its pending work","verdict":"captain","summary":"The migration is paused until the captain chooses Saturday or Sunday for the cutover; no work can resume before that choice.","silent":false,"statusEndpoint":0,"statusIdent":"-"}

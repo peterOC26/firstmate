@@ -1,0 +1,10 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZBK9817ZJ929WRNSQGN01S/.helper-lab.PlMMTh
+Starting unreported-cold (opus)
+unreported-cold engine exit=0
+error=0 cost=0.099445 conversation_cost=0.099445 input=18 cache_read=174367 cache_write=4460 output=1441 turns=9
+Starting changed-with-mirror (opus)
+changed-with-mirror engine exit=0
+error=0 cost=0.080438 conversation_cost=0.080438 input=14 cache_read=131171 cache_write=3411 output=1343 turns=7
+Starting repeated-changed (opus)
+repeated-changed engine exit=0
+error=0 cost=0.122235 conversation_cost=0.122235 input=8 cache_read=62746 cache_write=1982 output=668 turns=4

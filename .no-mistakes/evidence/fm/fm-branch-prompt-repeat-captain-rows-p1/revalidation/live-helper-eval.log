@@ -1,0 +1,29 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZBK9817ZJ929WRNSQGN01S/.helper-lab.cF0Lh1
+Starting initial-unreported (sonnet)
+initial-unreported engine exit=0
+error=0 cost=0.021715 conversation_cost=0.021715 input=10 cache_read=93091 cache_write=1504 output=637 turns=6
+Starting repeat-acknowledged (sonnet)
+repeat-acknowledged engine exit=0
+error=0 cost=0.03692 conversation_cost=0.03692 input=8 cache_read=59709 cache_write=1162 output=457 turns=3
+Starting repeat-again (sonnet)
+repeat-again engine exit=0
+error=0 cost=0.050909 conversation_cost=0.050909 input=8 cache_read=62913 cache_write=918 output=401 turns=3
+Starting repeat-buried-history (opus)
+repeat-buried-history engine exit=0
+error=0 cost=0.209602 conversation_cost=0.209602 input=14 cache_read=124030 cache_write=20250 output=1137 turns=7
+Starting changed-decision (sonnet)
+changed-decision engine exit=0
+error=0 cost=0.031893 conversation_cost=0.031893 input=10 cache_read=96490 cache_write=3386 output=868 turns=5
+Starting changed-repeat (sonnet)
+changed-repeat engine exit=0
+error=0 cost=0.05063 conversation_cost=0.05063 input=8 cache_read=66111 cache_write=1875 output=461 turns=3
+Starting resolved-idle (sonnet)
+resolved-idle engine exit=0
+error=0 cost=0.03077 conversation_cost=0.03077 input=10 cache_read=97181 cache_write=3593 output=666 turns=6
+Starting away-initial (opus)
+away-initial engine exit=0
+error=0 cost=0.112024 conversation_cost=0.112024 input=14 cache_read=139220 cache_write=6088 output=1771 turns=7
+Starting away-repeat (opus)
+away-repeat engine exit=0
+error=0 cost=0.174125 conversation_cost=0.174125 input=12 cache_read=120905 cache_write=2734 output=800 turns=5
+Disposable lab removed by EXIT trap.

@@ -1,0 +1,1 @@
+1794201764	2	check	supervision-host-return:2	check: supervision-host outcome 2 for migration-choice [captain] was recorded after the captain returned, so the return brief may not show it; relay it to the captain: Migration cutover is waiting on the captain's choice of Saturday or Sunday; no active workers otherwise.

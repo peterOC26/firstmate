@@ -1,0 +1,242 @@
+[
+  {
+    "case": "First unreported decision, attended Sonnet",
+    "result": "fail",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 2,
+        "epoch": 1794201615,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat: no live workers; only queued item is a captain-held migration cutover choice. No change.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "initial-unreported-after.jsonl"
+  },
+  {
+    "case": "Independent first unreported decision, attended Sonnet",
+    "result": "fail",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 2,
+        "epoch": 1794201815,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat review: no active tasks, nothing changed.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-sonnet/unreported-cold-after.jsonl"
+  },
+  {
+    "case": "First unreported decision, away Opus",
+    "result": "pass",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 2,
+        "epoch": 1794201827,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "Fleet is quiet with no workers running; the migration stays paused until you choose Saturday or Sunday for the cutover. Per your away instructions (\"Do not choose a cutover window for me\"), that choice is held for your return and nothing was decided.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-opus/unreported-cold-after.jsonl"
+  },
+  {
+    "case": "Unchanged repeat after acknowledgement",
+    "result": "pass",
+    "expected": {
+      "verdict": "routine",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 4,
+        "epoch": 1794201638,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: migration cutover window (Saturday or Sunday) still awaits the captain's choice; no workers running.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "repeat-again-after.jsonl"
+  },
+  {
+    "case": "Fresh Opus helper; captain outcome behind 25 unrelated rows",
+    "result": "pass",
+    "expected": {
+      "verdict": "routine",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 30,
+        "epoch": 1794201668,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Unchanged: the migration cutover is still paused until the captain picks Saturday or Sunday; no workers are running and nothing else is queued.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "repeat-buried-history-after.jsonl"
+  },
+  {
+    "case": "Changed choice in durable backlog, no mirror hint",
+    "result": "fail",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 31,
+        "epoch": 1794201686,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat review: no active tasks, nothing changed.",
+        "silent": true,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "changed-decision-after.jsonl"
+  },
+  {
+    "case": "Changed choice mirrored to attended Sonnet",
+    "result": "pass",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 3,
+        "epoch": 1794201831,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "Migration is paused: the provider cancelled both cutover windows, so the captain must choose between postponing to next month or approving a paid emergency weekday cutover. No choice has been made; no other fleet changes.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-sonnet/changed-with-mirror-after.jsonl"
+  },
+  {
+    "case": "Changed choice mirrored to away Opus",
+    "result": "pass",
+    "expected": {
+      "verdict": "captain",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 3,
+        "epoch": 1794201848,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "captain",
+        "summary": "Fleet is quiet with no workers running, and the migration decision has changed: the provider cancelled both weekend cutover windows, so the choice is now between postponing the migration to next month or approving a paid emergency weekday cutover. Per your away instructions (\"Hold any question that needs my choice for my return. Do not choose a cutover window for me.\"), the migration stays paused and this choice is held for your return; nothing was decided.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-opus/changed-with-mirror-after.jsonl"
+  },
+  {
+    "case": "Unchanged updated choice, attended Sonnet",
+    "result": "pass",
+    "expected": {
+      "verdict": "routine",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 4,
+        "epoch": 1794201841,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Heartbeat: no fleet changes. Still waiting on the captain to choose between postponing the migration to next month or a paid emergency weekday cutover; MAIN has seen the question and the captain has not answered.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-sonnet/repeated-changed-after.jsonl"
+  },
+  {
+    "case": "Unchanged updated choice, away Opus",
+    "result": "pass",
+    "expected": {
+      "verdict": "routine",
+      "silent": false
+    },
+    "observed": [
+      {
+        "seq": 4,
+        "epoch": 1794201868,
+        "task": "fleet",
+        "wake": "heartbeat: review the fleet and its pending work",
+        "verdict": "routine",
+        "summary": "Fleet is quiet with no workers running; the migration stays paused, still waiting on your choice between postponing to next month or a paid emergency weekday cutover, held for your return per your away instructions. Nothing was decided or changed.",
+        "silent": false,
+        "statusEndpoint": 0,
+        "statusIdent": "-"
+      }
+    ],
+    "engine_error": false,
+    "permission_denials": [],
+    "evidence": "verified-opus/repeated-changed-after.jsonl"
+  }
+]

@@ -1,0 +1,4 @@
+{"seq":1,"epoch":1794202054,"task":"migration-choice","wake":"","verdict":"routine","summary":"The migration is paused pending the choice of Saturday or Sunday for cutover.","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":2,"epoch":1794202064,"task":"fleet","wake":"heartbeat: review the fleet and its pending work","verdict":"routine","summary":"Heartbeat: no active tasks, nothing changed.","silent":true,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":3,"epoch":1794202068,"task":"migration-choice","wake":"","verdict":"captain","summary":"Choose Saturday or Sunday for the migration cutover; the migration is paused until that choice.","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":4,"epoch":1794202080,"task":"fleet","wake":"heartbeat: review the fleet and its pending work","verdict":"routine","summary":"Heartbeat: no active tasks, nothing changed.","silent":true,"statusEndpoint":0,"statusIdent":"-"}

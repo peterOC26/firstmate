@@ -1,0 +1,7 @@
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, one line per task, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement):
+[seq 3, recorded 1m ago] fleet: Migration cutover is still waiting on the captain's choice of window (Saturday or Sunday); no worker is running and nothing else changed.
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 3; until then every drain presents them again
+BRANCH OUTCOMES, ROUTINE (handled by the supervision session since your last drain; for your awareness, nothing to acknowledge):
+[seq 1] migration-choice: The migration is paused pending the choice of Saturday or Sunday for cutover.
+[seq 4] fleet: Unchanged: migration cutover window (Saturday or Sunday) still awaits the captain's choice; no workers running.
+[seq 30] fleet: Unchanged: the migration cutover is still paused until the captain picks Saturday or Sunday; no workers are running and nothing else is queued.

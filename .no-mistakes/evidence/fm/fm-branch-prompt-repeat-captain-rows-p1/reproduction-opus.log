@@ -1,0 +1,10 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZBK9817ZJ929WRNSQGN01S/.helper-lab.9YYkzl
+Starting unreported-cold (opus)
+unreported-cold engine exit=0
+error=0 cost=0.104557 conversation_cost=0.104557 input=16 cache_read=155884 cache_write=5147 output=1607 turns=8
+Starting changed-with-mirror (opus)
+changed-with-mirror engine exit=0
+error=0 cost=0.079836 conversation_cost=0.079836 input=12 cache_read=112181 cache_write=3969 output=1280 turns=7
+Starting repeated-changed (opus)
+repeated-changed engine exit=0
+error=0 cost=0.117242 conversation_cost=0.117242 input=8 cache_read=63708 cache_write=1454 output=650 turns=4

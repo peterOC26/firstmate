@@ -1,0 +1,16 @@
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZBK9817ZJ929WRNSQGN01S/.helper-lab.67CiGP
+Starting initial-unreported (sonnet)
+initial-unreported engine exit=0
+error=0 cost=0.082626 conversation_cost=0.082626 input=12 cache_read=94102 cache_write=16648 output=660 turns=6
+Starting repeat-acknowledged (sonnet)
+repeat-acknowledged engine exit=0
+error=0 cost=0.097348 conversation_cost=0.097348 input=8 cache_read=58102 cache_write=1014 output=484 turns=3
+Starting repeat-again (sonnet)
+repeat-again engine exit=0
+error=0 cost=0.110668 conversation_cost=0.110668 input=8 cache_read=60857 cache_write=782 output=409 turns=3
+Starting repeat-buried-history (opus)
+repeat-buried-history engine exit=0
+error=0 cost=0.266144 conversation_cost=0.266144 input=18 cache_read=173979 cache_write=24867 output=1617 turns=9
+Starting changed-decision (sonnet)
+changed-decision engine exit=0
+error=0 cost=0.014277 conversation_cost=0.014277 input=8 cache_read=72269 cache_write=626 output=453 turns=4

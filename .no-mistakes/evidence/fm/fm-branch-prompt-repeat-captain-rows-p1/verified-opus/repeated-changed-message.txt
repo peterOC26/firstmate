@@ -1,0 +1,13 @@
+MAIN DIALOG MIRROR
+[main] I have seen the updated migration question; the captain has not answered it.
+END MAIN DIALOG MIRROR
+
+watcher: heartbeat: review the fleet and its pending work
+Report each handled event using bin/fm-branch-report.sh.
+Away posture (recorded):
+  entered: 2026-11-09T05:23:27Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Hold any question that needs my choice for my return. Do not choose a cutover window for me.
