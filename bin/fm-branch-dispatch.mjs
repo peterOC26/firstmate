@@ -89,8 +89,12 @@ const [command, ...args] = process.argv.slice(2);
 
 if (command === "recovery-settled") {
   if (args.length) usage();
-  if (!dispatch.recoveryStatusSettled(stateDir())) process.exit(1);
   try {
+    const excludedStatus = execFileSync("bash", ["-c", 'source "$1"; status_scan_parent_channel_exclude "$2"',
+      "_", path.join(root, "bin", "fm-classify-lib.sh"), stateDir()], {
+      encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!dispatch.recoveryStatusSettled(stateDir(), excludedStatus)) process.exit(1);
     const pending = execFileSync("bash", [path.join(root, "bin", "fm-branch-outcome.sh"), "present"], {
       encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"],
     });

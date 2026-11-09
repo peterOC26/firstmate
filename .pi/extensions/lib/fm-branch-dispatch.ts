@@ -373,7 +373,7 @@ function spanIsDecisionOwned(
 // Read-only evidence for the watcher's generation-bound empty recovery
 // settlement. A missing presentation cursor is uncertainty, never proof that
 // an interrupted turn finished. Outcome-store validation stays with its owner.
-export function recoveryStatusSettled(state: string): boolean {
+export function recoveryStatusSettled(state: string, excludedStatus: string): boolean {
   try {
     const cursor = readPresentationCursor(state);
     if (!cursor) return false;
@@ -383,6 +383,7 @@ export function recoveryStatusSettled(state: string): boolean {
     for (const name of readdirSync(state)) {
       if (name.startsWith(".") || !name.endsWith(".status")) continue;
       const file = join(state, name);
+      if (file === excludedStatus) continue;
       if (!lstatSync(file).isFile()) return false;
       const version = statusFileVersion(file);
       const contents = readFileSync(file);

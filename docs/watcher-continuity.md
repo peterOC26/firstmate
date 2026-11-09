@@ -199,7 +199,7 @@ So a finished, hung, or identity-mismatched claim cannot suppress that recovery 
 The recovery-episode contract below owns once-per-generation announcement.
 A handling successor does not re-announce the predecessor-delivered wake while its handling handoff remains open.
 It enters its poll loop immediately and keeps scanning signals, stale panes, and checks.
-An external durable append still republishes that episode as pending downtime, so the successor surfaces it whether the prior handling turn is still running or has acknowledged its rows.
+An external durable append still republishes that episode as pending interrupted recovery, so the successor surfaces it whether the prior handling turn is still running or has acknowledged its rows.
 The append numbers past every queued row, so a lost or malformed sequence counter cannot let an outstanding acknowledgement consume it.
 Once those rows are acknowledged, a later append that repeats one byte for byte still opens a new recovery generation, which the successor recovers.
 Notification never consumes rows; sequence-bound, per-actor acknowledgement remains the owner of consumption.
@@ -242,7 +242,8 @@ Its ordinary arm check still announces a never-announced generation, including o
 ### Empty settlement
 
 Before emitting a recovery close, the watcher may retire that exact announced downtime token under the queue and marker locks when the durable queue is a readable empty regular file.
-The shared dispatcher must also prove that every status byte matches its presentation cursor, no status decision remains open, and the outcome store has no unread or unprocessed record.
+Only a generation that never entered handling is eligible.
+The shared dispatcher must also prove that every status byte tracked by the presentation snapshot matches its cursor (using the snapshot owner’s parent-channel exclusion), no status decision remains open, and the outcome store has no unread or unprocessed record.
 Missing, changed, malformed or unreadable evidence preserves the recovery wake; settlement consumes no queue rows or outcomes and a later append opens a fresh generation.
 `tests/fm-supervision-host-drain.test.sh` exercises the generation guard and evidence refusals; `tests/fm-supervision-host.test.sh` proves that settled recovery uses no engine turn and leaves supervision live.
 
@@ -253,7 +254,8 @@ A watcher closing to resurface the recovery it found at its start preserves the 
 If EXIT cleanup cannot acquire the downtime-marker lock within its bound, it retains the stale singleton for the next arm to publish the missing downtime before clearing that lock (see [Grace, beacon, and stop signals](#grace-beacon-and-stop-signals)).
 A downtime republication of a pending episode reuses its generation.
 A watcher close leaves an announced downtime episode announced, while a successful durable append opens a fresh pending generation so a live watcher can recover the new work.
-An announced handling episode becomes pending downtime on the same generation because its handling turn may have been interrupted.
+A handling episode becomes pending interrupted recovery on the same generation because its handling turn may have been interrupted.
+The interrupted kind preserves that handling history across publication, announcement, and queued-work reopening until generation-bound acknowledgement.
 That handling republication gives a successor exactly one recovery presentation without orphaning the acknowledgement already printed for that generation.
 A watcher stopped so an arm can take its cycle over (`bin/fm-watch-arm.sh --take-over`) publishes downtime like any close, but the taking arm restores an acknowledged episode that stop reopened only when the taken-over arm's cycle-ledger row for that exact arm and watcher records the watcher ending by the take-over's TERM and no wake was appended in between.
 The taking arm waits within a short bound for that row; a missing row or any other signal leaves downtime for the fresh cycle's ordinary recovery wake, while take-over still proceeds.
@@ -272,7 +274,8 @@ It is a non-fatal result that names its own remedy: re-drain, then acknowledge t
 The acknowledgement retires the marker only when no rows remain after sequence-bound consumption.
 A concurrently appended wake has a higher sequence, remains queued, and keeps the episode pending for presentation.
 Consequently, a watcher close during handling republishes the same generation as pending, while the outstanding generation-bound acknowledgement stays valid.
-An empty episode still requires recovery unless it passes the empty-settlement proof above.
+An interrupted handling episode forces one recovery turn even when no queue row remains; its presentation cursor never substitutes for post-handling acknowledgement.
+An episode that never entered handling still requires recovery unless it passes the empty-settlement proof above.
 An acknowledged episode does not freeze the generation, because the next downtime after it opens an episode of its own.
 
 ## Per-actor acknowledgement

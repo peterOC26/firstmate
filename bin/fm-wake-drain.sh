@@ -997,7 +997,7 @@ if [ ! -s "$FM_WAKE_QUEUE" ]; then
   fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
   RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
   case "$RECOVERY_MARKER_TOKEN" in
-    pending:downtime:*|announced:downtime:*)
+    pending:downtime:*|announced:downtime:*|pending:interrupted:*|announced:interrupted:*)
       fm_recovery_marker_begin_handling "$RECOVERY_MARKER" || {
         echo "wake drain: decision recovery could not begin handling safely" >&2
         exit 1

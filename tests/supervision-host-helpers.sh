@@ -589,7 +589,7 @@ SH
   [ "$(engine_calls "$home")" -eq 1 ] || fail "the engine took the main-only close"
   if [ "$mode" = restore ]; then
     assert_rewoke_main "$home" "inherited handling"
-    assert_re '^(pending|announced):downtime:' "$home/state/.watcher-down" \
+    assert_re '^(pending|announced):(downtime|interrupted):' "$home/state/.watcher-down" \
       "the inherited episode must become deliverable downtime"
     watcher_live "$home" || fail "the repaired hand-back must keep its successor alive"
   else

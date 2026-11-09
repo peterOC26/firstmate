@@ -670,7 +670,81 @@ SH
   pass "empty recovery requires presented status, closed decisions, processed outcomes and the exact generation"
 }
 
+test_interrupted_empty_recovery_requires_ack() {
+  local home
+  home="$TMP_ROOT/recovery-interrupted"
+  mkdir -p "$home/state"
+  FM_HOME="$home" bash -s "$ROOT" <<'SH' || fail "interrupted recovery lost its acknowledgement requirement"
+set -eu
+root=$1
+. "$root/bin/fm-wake-lib.sh"
+: > "$FM_WAKE_QUEUE"
+printf 'note: deployment failed and stopped\n' > "$STATE/demo.status"
+marker="$STATE/.watcher-down"
+fm_recovery_marker_publish "$marker" downtime
+fm_recovery_marker_arm_check "$marker"
+generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+out=$(bash "$root/bin/fm-wake-drain.sh" 2>&1)
+[[ "$out" == *"WAKE_ACK_REQUIRED:"*"--recovery-generation $generation"* ]]
+[ "$(cat "$marker")" = "announced:handling:$generation" ]
+node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+for source in watcher append handback; do
+  _fm_recovery_marker_publish "$marker" downtime "" "$source"
+  fm_recovery_marker_arm_check "$marker"
+  token=$FM_RECOVERY_MARKER_TOKEN
+  if [ "$source" = watcher ]; then [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; fi
+  [ "$token" = "announced:interrupted:$generation" ]
+  ! fm_recovery_marker_settle_empty "$marker" "$token" node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+  [ "$(cat "$marker")" = "$token" ]
+done
+out=$(bash "$root/bin/fm-wake-drain.sh" 2>&1)
+[[ "$out" == *"WAKE_ACK_REQUIRED:"*"--recovery-generation $generation"* ]]
+fm_recovery_marker_publish "$marker" downtime
+bash "$root/bin/fm-wake-drain.sh" --ack-through 0 --recovery-generation "$generation"
+[ "$(cat "$marker")" = "acked:interrupted:$generation" ]
+fm_recovery_marker_arm_check "$marker"
+[ "$FM_RECOVERY_MARKER_ACTION" = none ]
+fm_recovery_marker_publish "$marker" downtime
+fm_recovery_marker_arm_check "$marker"
+[ "${FM_RECOVERY_MARKER_TOKEN##*:}" != "$generation" ]
+fm_recovery_marker_settle_empty "$marker" "$FM_RECOVERY_MARKER_TOKEN" node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+SH
+  pass "interrupted empty recovery preserves its generation until main acknowledges"
+}
+
+test_empty_recovery_uses_snapshot_parent_channel_exclusion() {
+  local home
+  home="$TMP_ROOT/recovery-remote"
+  mkdir -p "$home/state"
+  FM_HOME="$home" bash -s "$ROOT" <<'SH' || fail "recovery status set differs from presentation snapshot"
+set -eu
+root=$1
+. "$root/bin/fm-classify-lib.sh"
+printf '%s\n' mate > "$FM_HOME/.fm-secondmate-home"
+printf 'schema=fm-secondmate-parent.v1\nroute=remote\nparent_host=remote.example\n' > "$FM_HOME/.fm-secondmate-parent"
+state="$FM_HOME/state"
+printf 'needs-decision [key=parent]: parent must decide\n' > "$state/parent-replies.status"
+printf 'working: task started\n' > "$state/demo.status"
+snapshot=$(status_presentation_snapshot "$state")
+status_commit_presentation_snapshot "$state" "$snapshot"
+node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+printf 'failed: new failure\n' >> "$state/demo.status"
+! node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+snapshot=$(status_presentation_snapshot "$state")
+status_commit_presentation_snapshot "$state" "$snapshot"
+node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+rm "$FM_HOME/.fm-secondmate-home"
+! node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+snapshot=$(status_presentation_snapshot "$state")
+status_commit_presentation_snapshot "$state" "$snapshot"
+! node "$root/bin/fm-branch-dispatch.mjs" recovery-settled
+SH
+  pass "empty recovery excludes only the remote mate parent channel"
+}
+
 fm_test_run \
+  test_interrupted_empty_recovery_requires_ack \
+  test_empty_recovery_uses_snapshot_parent_channel_exclusion \
   test_recovery_offer_preserves_original_task_scope \
   test_empty_recovery_settlement_requires_positive_evidence \
   test_report_surface_enforces_actor_turn_and_scope \

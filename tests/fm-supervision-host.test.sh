@@ -697,7 +697,7 @@ test_away_turn_without_a_report_hands_the_wake_to_main() {
   watcher_live "$home" && fail "the host left its successor cycle running when it handed the wake to main"
   token=$(cat "$home/state/.watcher-down")
   case "$token" in
-    pending:downtime:*|announced:downtime:*) ;;
+    pending:downtime:*|announced:downtime:*|pending:interrupted:*|announced:interrupted:*) ;;
     *) fail "a handback must leave the recovery marker in downtime for the owner's rewake, got: $token" ;;
   esac
   assert_absent "$home/state/.supervision-host-engine" "a turn that did not handle its wake must not keep its conversation"
