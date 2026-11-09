@@ -105,6 +105,10 @@ test_branch_prompt_emits_pending_decision_review_contract() {
     assert_contains "$prompt" \
       'Only report a silent routine fleet outcome after those checks find nothing pending, no new result, and no action taken; a recovery or backlog reconciliation stays visible.' \
       "$surface emitted prompt permits silence before pending decisions are checked"
+    case "$prompt" in
+      *'# Verdict: routine or captain'*'A heartbeat fleet review is silent only as instructed under "Handling a wake" above.'*'# PR identity: copy or abstain'*) ;;
+      *) fail "$surface emitted verdict section omits the heartbeat silence bridge" ;;
+    esac
     assert_contains "$prompt" \
       "Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces." \
       "$surface prompt does not apply deduplication to every escalation"

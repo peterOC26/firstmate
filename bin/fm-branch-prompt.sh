@@ -119,6 +119,7 @@ A second mate's stale wake is a liveness event: report it even when it presents 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
 Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken.
+A heartbeat fleet review is silent only as instructed under "Handling a wake" above.
 Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent.
 When in doubt, render.
 PROMPT
