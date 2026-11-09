@@ -533,7 +533,7 @@ test_captain_note_hands_back_before_daemon_consumption() {
   pass "captain notes bypass daemon consumption, retry guarded delivery, and remain queued for main"
 }
 
-test_captain_note_retains_retry_state() (
+test_captain_note_retains_retry_state() {
   local dir state item full
   dir=$(make_bordered_case captain-note-retry)
   state="$dir/state"
@@ -541,26 +541,28 @@ test_captain_note_retains_retry_state() (
   local -x FM_FAKE_COMPOSER="$dir/composer" FM_FAKE_SENT="$dir/sent"
   local -x FM_FAKE_SEND_MAX_BYTES=100 FM_MAX_DEFER_SECS=60
   local -x FM_WEDGE_ALARM_CHANNEL=osascript FM_WEDGE_ALARM_LOG="$dir/alarms"
-  FM_HOME="$dir" bash "$ROOT/bin/fm-afk-contract.sh" enter --words 'watch the fleet' >/dev/null || fail "retry: away record failed"
-  afk_enter "$state"
-  append_wake "$state" check inbox:retry 'check: captain inbox note retry'
-  item='blocked: '
-  while [ "${#item}" -lt 5000 ]; do item+='waiting on review ; '; done
-  escalate_add "$state" "$item"
-  printf '%s\n' "$(( $(_now) - 120 ))" > "$state/.subsuper-escalations.since"
-  ESCALATE_KEPT_FULL=
-  WEDGE_ALARM_LAST_EPOCH=0
-  hand_back_captain_inbox "$state" || fail "retry: hand-back declined"
-  full=$ESCALATE_KEPT_FULL
-  [ -n "$full" ] && [ -f "$full" ] || fail "retry: lost retained digest"
-  [ "$WEDGE_ALARM_LAST_EPOCH" -gt 0 ] || fail "retry: lost alarm state"
-  rm -f "$state/.subsuper-inject-wedged"
-  housekeeping "$state"
-  [ "$ESCALATE_KEPT_FULL" = "$full" ] || fail "retry: replaced retained digest"
-  [ "$(ls -A "$state/.subsuper-digests")" = "$(basename "$full")" ] || fail "retry: orphaned digest"
-  [ "$(wc -l < "$dir/alarms")" -eq 1 ] || fail "retry: repeated alarm"
-  pass "captain inbox retries retain digest and alarm state"
-)
+  (
+    FM_HOME="$dir" bash "$ROOT/bin/fm-afk-contract.sh" enter --words 'watch the fleet' >/dev/null || fail "retry: away record failed"
+    afk_enter "$state"
+    append_wake "$state" check inbox:retry 'check: captain inbox note retry'
+    item='blocked: '
+    while [ "${#item}" -lt 5000 ]; do item+='waiting on review ; '; done
+    escalate_add "$state" "$item"
+    printf '%s\n' "$(( $(_now) - 120 ))" > "$state/.subsuper-escalations.since"
+    ESCALATE_KEPT_FULL=
+    WEDGE_ALARM_LAST_EPOCH=0
+    hand_back_captain_inbox "$state" || fail "retry: hand-back declined"
+    full=$ESCALATE_KEPT_FULL
+    [ -n "$full" ] && [ -f "$full" ] || fail "retry: lost retained digest"
+    [ "$WEDGE_ALARM_LAST_EPOCH" -gt 0 ] || fail "retry: lost alarm state"
+    rm -f "$state/.subsuper-inject-wedged"
+    housekeeping "$state"
+    [ "$ESCALATE_KEPT_FULL" = "$full" ] || fail "retry: replaced retained digest"
+    [ "$(ls -A "$state/.subsuper-digests")" = "$(basename "$full")" ] || fail "retry: orphaned digest"
+    [ "$(wc -l < "$dir/alarms")" -eq 1 ] || fail "retry: repeated alarm"
+    pass "captain inbox retries retain digest and alarm state"
+  )
+}
 
 test_durable_wake_failure_retains_entire_batch() {
   local dir state fakebin attempts
