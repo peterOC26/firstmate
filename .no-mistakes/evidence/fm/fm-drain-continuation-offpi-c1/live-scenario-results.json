@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Drain repeats a multiline continuation until acknowledged and preserves legacy/routine behavior",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Newer plain notes and another handoff cannot hide an older continuation for the same task",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "Long UTF-8 handoffs stay bounded, resolve through full lookups, and overflow follows contiguous acknowledgements",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  },
+  {
+    "name": "The delivered processing prompt requires authorized continuation handling before acknowledgement",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-cli-transcript.log",
+    "reason": ""
+  }
+]
