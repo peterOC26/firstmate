@@ -597,6 +597,23 @@ test_recovery_offer_preserves_original_task_scope() {
   assert_contains "$out" 'rows=1' "recovery must preserve sequence ids"
   assert_contains "$out" 'tasks=demo' "recovery must preserve exact task scope"
   assert_contains "$out" 'unscoped=0' "recovery must not grant arbitrary checks"
+  out=$(node --input-type=module - "$ROOT/.pi/extensions/lib/fm-branch-dispatch.ts" "$state" <<'JS'
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+const { branchOfferForWake } = await import(pathToFileURL(process.argv[2]).href);
+const state = process.argv[3];
+for (const host of [false, true]) {
+  const attended = branchOfferForWake(state, "check: rearm-resurface", false, host);
+  assert.equal(attended.eligible, host);
+  assert.deepEqual(attended.scope.eligibleSeqs, ["1"]);
+  const away = branchOfferForWake(state, "check: rearm-resurface", true, host);
+  assert.equal(away.eligible, true);
+  assert.equal(away.awayOnly, !host);
+  assert.equal(branchOfferForWake(state, "check: unrelated", false, host).eligible, false);
+  assert.equal(branchOfferForWake(state, `signal: ${state}/demo.status`, false, host).eligible, true);
+}
+JS
+  ) || fail "recovery offering must be host-only while Pi away recovery stays away-only"
   printf 'needs-decision [key=choice]: choose\n' > "$state/demo.status"
   out=$(printf 'check: rearm-resurface\n' | FM_HOME="$home" node "$DISPATCH" offer)
   assert_contains "$out" 'eligible=0' "an open decision must remain main-owned during recovery"
@@ -610,7 +627,7 @@ if (!away.eligible || !away.awayOnly) throw new Error("away recovery lost its au
 console.log("pi-recovery-scope=ok");
 JS
   ) || fail "Pi recovery did not preserve the decision partition"
-  assert_contains "$out" 'pi-recovery-scope=ok' "Pi must apply the same recovery scope"
+  assert_contains "$out" 'pi-recovery-scope=ok' "Pi must preserve its recovery authority partition"
   printf 'corrupt\n' >> "$state/.wake-queue"
   out=$(printf 'check: rearm-resurface\n' | FM_HOME="$home" node "$DISPATCH" offer --afk)
   assert_contains "$out" 'eligible=0' "corrupt recovery must reach main in both postures"

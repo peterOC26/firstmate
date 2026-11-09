@@ -507,9 +507,9 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
     // Projectless records may establish ambiguity, never routing authority.
     if (!project || !task) return UNSAFE_SCOPE;
     // A second mate's signal is judged by its new span on both paths. For a
-    // single-task log, an attended host or recovery close may revisit a signal
-    // after its task gained a main-owned decision, so it checks the whole log;
-    // other Pi wakes retain their existing per-row scan.
+    // single-task log, an attended host can have accepted a routine signal
+    // before its task gained a main-owned decision, so it checks the whole
+    // log; Pi retains its existing per-row scan.
     const spanRule = kind === "signal" && secondmates.has(task);
     if (task && (kind === "stale" || (kind === "signal" && (attendedHost || spanRule)))) {
       const statusPath = `${state}/${task}.status`;
@@ -612,24 +612,6 @@ export interface BranchOfferVerdict {
   awayOnly: boolean;
 }
 
-// The offer rule for one actionable close: whether a branch may take it, in
-// either posture. The Pi watcher (fm-primary-pi-watch.ts) and the supervision
-// host off Pi (bin/fm-branch-dispatch.mjs offer) both route through this one
-// owner, so a close reaches main off Pi exactly when it would on Pi.
-//
-// A recovery close offers the original eligible rows, with their exact task
-// scope and sequence ids; it never grants the synthetic check or main-owned
-// rows. An empty recovery is not a branch turn.
-// Any other check-kind close (merge-confirmation polls, Relay mentions,
-// credential/auth failures, and every other legitimately main-only class -
-// docs/pi-supervision-branch.md) is never routed to the branch while attended,
-// even when other currently-unread rows are individually eligible: this
-// watcher cycle's own triggering event stays on main, exactly as before
-// scopeForUnreadWake stopped letting a co-present check row veto the whole
-// scan. That relaxation is what lets an UNRELATED eligible signal/stale row
-// still reach the branch on this cycle; it must never also let a check-kind
-// trigger itself slip past main's delivery.
-//
 // A signal close containing a needs-decision status file, or a stale close for
 // a captain-held task, gets the identical main-only treatment as a check-kind
 // trigger. The cross-reference deliberately includes every unread decision
@@ -642,8 +624,8 @@ export interface BranchOfferVerdict {
 export function branchOfferForWake(state: string, message: string, afk: boolean, attendedHost = false): BranchOfferVerdict {
   const heartbeat = /^heartbeat($|:)/.test(message);
   const isRecoveryTrigger = message === "check: rearm-resurface";
-  const isCheckTrigger = /^check:/.test(message) && !isRecoveryTrigger;
-  const scope = scopeForUnreadWake(state, heartbeat, afk, (attendedHost || isRecoveryTrigger) && !afk);
+  const isCheckTrigger = /^check:/.test(message) && !(attendedHost && isRecoveryTrigger);
+  const scope = scopeForUnreadWake(state, heartbeat, afk, attendedHost && !afk);
   const triggerKeys = /^signal:/.test(message)
     ? message
       .slice("signal:".length)
@@ -658,7 +640,7 @@ export function branchOfferForWake(state: string, message: string, afk: boolean,
   const needsDecisionTasks = new Set(scope.needsDecisionKeys.map(taskIdentity));
   const isNeedsDecisionTrigger = triggerKeys.some((key) => needsDecisionTasks.has(taskIdentity(key)));
   const attendedEligible = !isCheckTrigger && !isNeedsDecisionTrigger && (
-    afk ? scopeForUnreadWake(state, heartbeat, false, isRecoveryTrigger).eligible : scope.eligible
+    afk ? scopeForUnreadWake(state, heartbeat, false).eligible : scope.eligible
   );
   const eligible = afk ? scope.eligible : attendedEligible;
   return { scope, heartbeat, eligible, awayOnly: Boolean(eligible && !attendedEligible) };

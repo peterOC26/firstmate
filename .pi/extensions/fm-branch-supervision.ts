@@ -1549,8 +1549,7 @@ ${context.command}
         // mid-operation; every relocated action revalidates at its own gate;
         // rows are store-first and the durable queue keeps them.
         const afk = afkPostureRecordPresent(state);
-        const recovery = message === "check: rearm-resurface";
-        const scope = scopeForUnreadWake(state, heartbeat, afk, recovery && !afk);
+        const scope = scopeForUnreadWake(state, heartbeat, afk);
         // A newly-arrived main-owned (check-kind) row never bounces this
         // whole recheck back to main - scopeForUnreadWake excludes it from
         // eligibleSeqs rather than vetoing the scan, in a heartbeat review as
@@ -1563,8 +1562,8 @@ ${context.command}
         // metadata could not be read safely, or an unresolvable task-local
         // row) still falls back to main.
         if (scope.status === "empty" || (!scope.corrupted && scope.eligibleSeqs.length === 0)) {
-          if (acceptedAwayOnly || (recovery && scope.status !== "empty")) {
-            throw new Error(acceptedAwayOnly ? "accepted away-only wake is no longer branch-eligible" : "accepted recovery wake is no longer branch-eligible");
+          if (acceptedAwayOnly) {
+            throw new Error("accepted away-only wake is no longer branch-eligible");
           }
           return;
         }
