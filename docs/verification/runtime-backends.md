@@ -11,7 +11,7 @@ Exact task chronology, branch names, temporary homes, local paths, process ids, 
 Verified on 2026-11-09 on Linux x86_64 with Bash 5.2.37 and Node v22.23.2.
 The daemon regression publishes a real inbox note, defers its delivery behind an occupied fixture composer, retries through the existing digest transport, and verifies that main can still drain the note and its body.
 The Pi fixtures exercise the watcher offer and main follow-up, plus a note arriving after branch acceptance but before its prompt and row grant.
-Quiet records keep the attended path, and ordinary away wakes keep their existing routing.
+Quiet-mode fixtures omit the away-return signal; ordinary away wakes keep their existing routing.
 These are isolated behavioral fixtures with a stub Pi SDK and transport; no live Jobs interface, model interpretation, or production conversation was exercised.
 Strict production-consumer checks also passed against the real Pi 1.1.0 and 1.2.0 SDKs with TypeScript 5.9.3.
 

@@ -19,7 +19,7 @@
 # the /afk skill sets that flag and starts this daemon; any real (unmarked)
 # user message clears it and firstmate resumes full responsiveness.
 # When afk is off, normal fm-watch.sh always-on triage is the active mechanism.
-# A queued captain inbox note hands supervision back to main for the return.
+# In away mode, a queued captain inbox note hands supervision back to main for the return.
 # It bypasses classification and acknowledgement, and retries the existing
 # guarded injection on housekeeping ticks until submission is confirmed.
 # Only confirmed delivery marks the inbox key surfaced; main keeps its row.
@@ -35,11 +35,9 @@
 # (fm_operational_harness_needs_record, Claude Code) instead receives the
 # owner's record-backed doorbell: the envelope is written to this home's
 # state/operational-inbox and only a plain doorbell line naming it is typed.
-# Firstmate's contract: a message that starts with the current prefix, a
-# legacy bare-marker daemon escalation, or a doorbell whose record this home
-# holds (a verbatim pasted copy of a live doorbell included) is internal (stay
-# afk); any other message means the captain is back
-# (exit afk, flush catch-up, resume per-wake responsiveness). The prefix and busy-guard solve the same problem - the
+# Main applies the /afk skill's "How to exit: the return" policy to marked
+# input and live record-backed doorbells (including verbatim pasted copies).
+# The prefix and busy-guard solve the same problem - the
 # daemon and the human share one input channel - so they live together under
 # /afk.
 #
@@ -48,8 +46,8 @@
 #     to daemon-owned one-shot behavior and enqueues every wake to
 #     state/.wake-queue BEFORE advancing its suppression markers, so a
 #     crash/restart/missed injection is recovered on the next fm-wake-drain.sh.
-#     After a watcher cycle, the daemon handles every durable row through that
-#     drain and acknowledges it only after routing completes.
+#     After a watcher cycle, the daemon drains and acknowledges routed rows;
+#     captain-note hand-backs leave the entire batch for main.
 #   - Fail-safe-to-escalate: any wake the classifier cannot confidently mark
 #     routine is escalated.
 #   - Bounded wedge latency: ordinary pane staleness without a declared wait escalates

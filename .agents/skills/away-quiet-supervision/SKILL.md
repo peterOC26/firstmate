@@ -15,9 +15,9 @@ These safety facts apply to both:
 - `state/.afk-contract` is the away posture, written in the same turn as `/afk` before any other work, because `/afk` is itself the go: no read-back gates entry or waits for a go; entry announces hold-for-return only, and the away session acts on those words by its own judgment through the guarded scripts under standing authority, holding for the return on doubt.
   A record carrying quiet mode (`bin/fm-afk-contract.sh mode`) is quiet mode's instead: the captain is present, it holds nothing for a return, and requested actions proceed under ordinary attended authority.
 - While `state/.afk` exists, the daemon owns supervision; do not arm a separate watcher.
-  The daemon is never launched on Pi, where the ordinary supervision session continues under the record with main parked: the branch takes every safe actionable wake it can, and only a declined wake (including a broken branch or unsafe scan) or a watcher failure wakes main.
+  On Pi, follow the ordinary session's [Postures contract](../../../docs/pi-supervision-branch.md#postures).
   Away mode on a non-Pi home that runs the supervision host (by default on Claude; `docs/configuration.md` "Supervision host") uses the host as its branch; follow the [`/afk` return contract](../afk/SKILL.md#how-to-exit-the-return) for wakes it hands back.
-- A marked message while away or quiet mode is active is internal escalation and does not exit that mode.
+- Marked input while away follows the [`/afk` return policy](../afk/SKILL.md#how-to-exit-the-return); in quiet mode it remains internal escalation.
 - A message beginning `/afk` refreshes away mode; a message beginning `/quiet` refreshes quiet mode.
 - Any other unmarked message means the captain returned in away mode (load `/afk`, run the return owner, and do not process that message as ordinary work until its durable catch-up gate clears), or, in quiet mode, is simply answered as ordinary work with the flag and daemon left untouched until an explicit `/quiet off`.
 - Away and quiet mode never expand approval authority for merges, ask-user findings, destructive actions, irreversible actions, or security-sensitive choices.

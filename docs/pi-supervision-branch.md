@@ -556,7 +556,7 @@ That is why `bin/fm-branch-prompt.sh`'s header is the contract's single owner an
 One supervision session runs in two postures, attended and away.
 The posture is a file: the away-posture record `state/.afk-contract`.
 Only `bin/fm-afk-contract.sh` writes it, in the same turn as `/afk`.
-The return path archives it on the captain's first unmarked message or captain inbox note, under the [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return).
+The [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) owns when main archives it.
 
 ### Who reads the record
 
@@ -573,15 +573,16 @@ A leftover `state/.afk` flag declines nothing.
 ### While the record exists
 
 - Captain inbox notes remain main-owned.
-  Any queued check row with an `inbox:` key returns the close to main, including an unrelated close, and the watcher adds an explicit return hand-back.
+  Any queued check row with an `inbox:` key returns the close to main, including an unrelated close.
+  The watcher adds an explicit away-return hand-back only when the record is not marked quiet; the dispatcher's presence-based posture checks remain unchanged.
   The dispatcher checks before offering, and the branch rechecks before granting rows and prompting, so a note arriving after accept rejects delivery back to main without acknowledging the note.
-  Main applies the [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return), renders the return brief, and answers the preserved note.
+  Main applies the [away return policy](../.agents/skills/afk/SKILL.md#how-to-exit-the-return) to the preserved note.
 - Other actionable rows are branch-eligible.
   Other check rows, decision-owned signal and stale rows, and heartbeat rows are claimed by the branch on whatever wake finds them unread.
   Their trigger class no longer forces a batch to main.
   The fail-closed scope checks in [Decision-owned rows](#decision-owned-rows), including ambiguous metadata ownership, still apply, as does structural queue validation.
   A prompt that claims a check row is not scoped by task, so the branch may report it as `fleet`.
-- Main is parked, and reachable only for the classes only main can act on:
+- Besides captain inbox notes, main remains reachable for supervision failures:
   - A watcher-failure alarm is delivered to main as always, because `fm_watch_arm_pi` lives there.
   - A wake the branch declines or cannot take (a broken branch inside its cooldown, an unresolvable or corrupt scan) falls back to main exactly as attended.
 
