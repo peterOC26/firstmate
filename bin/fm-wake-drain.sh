@@ -593,10 +593,12 @@ EOF
 # nothing is new or unprocessed.
 #   - Captain outcomes come first and never wait behind routine ones. Every
 #     unprocessed captain row is presented on every drain until main
-#     acknowledges it, with continuation rows kept separately and other rows collapsed per task: the task's newest
-#     presented summary, naming how many unprocessed captain outcomes it
-#     carries, with tasks in order of their oldest unprocessed row. The byte
-#     cap presents only the oldest contiguous run of captain rows and counts
+#     acknowledges it. Plain rows collapse per task to the newest presented
+#     plain summary, naming how many plain rows it carries. Each continuation
+#     stays separate so a newer row cannot hide a pending handoff; abbreviated
+#     handoff lines retain a lookup command for the full outcome. Lines keep
+#     the order of their oldest represented row. The byte cap presents only
+#     the oldest contiguous run of captain rows and counts
 #     the newer ones it holds back, so the printed bin/fm-branch-outcome.sh
 #     mark-processed target, the newest presented row, acknowledges exactly
 #     what was presented and always at least the oldest row. An unprocessed
@@ -608,7 +610,7 @@ EOF
 #     presenter never advanced the read cursor), and the section asks main to
 #     check the task's current state first and reply to the captain only
 #     about outcomes still open, as if settled ones had never been listed,
-#     then acknowledge every presented outcome, settled and open alike.
+#     then follow the emitted processing instructions before acknowledging.
 #   - Visible routine outcomes are listed once, for awareness, the way the Pi
 #     branch's routine notes reach main's transcript without a turn; silent
 #     routine outcomes never appear. The newest visible rows that fit a byte

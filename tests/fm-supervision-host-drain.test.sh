@@ -238,8 +238,8 @@ test_branch_outcomes_put_captain_first_and_collapse_routine_overflow() {
 }
 
 
-# Repeated captain outcomes for one task collapse to its newest, one line per
-# task; when the byte cap holds rows back, the section shows only the oldest
+# Repeated plain captain outcomes for one task collapse to its newest plain
+# row; when the byte cap holds rows back, the section shows only the oldest
 # contiguous run its acknowledgement covers - a shown task's newer row that
 # follows a held-back one waits too, so no presented situation repeats - and
 # the next drain shows the rest.
@@ -291,8 +291,8 @@ test_branch_outcomes_collapse_repeated_captain_outcomes_per_task() {
 
 # The reference experience after a long away window: the drain is the only
 # presenter, so the first drain once the away record is gone shows the window
-# once - each task's captain outcomes collapsed to one line, routine ones past
-# the section's limit as a count - and once main acknowledges them, a second
+# once - each task's plain captain outcomes collapsed to one line, routine
+# ones past the section's limit as a count - and once main acknowledges them, a second
 # drain shows nothing from the window.
 test_branch_outcomes_present_a_long_away_window_once() {
   local home drained pad n target
