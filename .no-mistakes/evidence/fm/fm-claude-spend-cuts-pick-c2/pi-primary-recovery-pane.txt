@@ -1,0 +1,40 @@
+ to drain it, report a routine observation, and acknowledge with the exact printed recovery generation. Leave
+ monitoring active. Keep all writes within FM_HOME.
+
+
+ I will begin by running bin/fm-lock.sh.
+
+ Aye, captain — locking this home, then arming the first watcher cycle for the demo observation.
+
+
+ $ bin/fm-lock.sh (timeout 30000s)
+
+ lock acquired: harness pid 625073
+
+ Took 0.5s
+
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1; future ordinary re-arms are automatic; call fm_watch_arm_pi again only
+ after a later notification says the cycle is missing, failed, or unhealthy
+
+
+ The watcher is running. Waiting for the supervision branch to drain the demo observation.
+
+ No wait tool is available to catch the supervision drain. I will report to the captain that the lock is acquired and
+ monitoring is active.
+
+ The demo observation will be drained by the supervision branch in a subsequent inject. I will confirm the lock and arm
+ are complete and leave monitoring active.
+
+ Captain, lock is held and monitoring is active for this home’s demo observation. No workers were started or
+ controlled.
+
+ ⛵ demo: Demo lab observation recorded; no work or decision was requested.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX (detached)
+↑18k ↓952 R54k CH99.3% $0.068 (sub) 3.7%/500k (auto)                                             (xai) grok-4.6 • medium

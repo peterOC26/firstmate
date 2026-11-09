@@ -1,0 +1,7 @@
+[
+  "empty recovery silently retires and keeps monitoring",
+  "interrupted handling requires the original post-handling acknowledgement",
+  "remote parent-channel exclusion preserves child status safeguards",
+  "uncertain or unhandled recovery evidence cannot silently settle",
+  "recovery preserves original row grants and main ownership"
+]

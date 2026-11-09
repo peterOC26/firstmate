@@ -1,0 +1,12 @@
+Earlier pristine-home check correctly woke recovery because no presentation cursor existed. The scenarios below create real presentation evidence first.
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty-presented
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty-presented
+[exit 0]
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+demo note: previously observed result
+[exit 0]
+watcher output:
+
+recovery marker: pending:downtime:440209.1794208592.eO2Zpt
+Completed: []

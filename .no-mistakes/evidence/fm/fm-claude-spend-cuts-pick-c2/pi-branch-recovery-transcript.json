@@ -1,0 +1,199 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "text": "FIRSTMATE SUPERVISION WAKE: check: rearm-resurface\n\nHandle this per your operating procedure and finish with fm_branch_report."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "I'll drain the wake first, then handle the demo observation per procedure."
+      },
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-wake-drain.sh"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "1794208819\t1\tsignal\tdemo.status\tsignal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.l/state/demo.status\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 747046.1794208819.nISgeJ\nwake annotation: latest wake-EVENT observed at drain, not current state: demo.status: note: lab observation recorded; no work or decision requested\nUNREAD STATUS (new since last drain, not re-printed after this presentation):\ndemo note: lab observation recorded; no work or decision requested\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-crew-state.sh demo"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "fm_branch_report",
+        "arguments": {
+          "task": "demo",
+          "verdict": "routine",
+          "summary": "Demo lab observation recorded; no work or decision was requested.",
+          "wake": "check: rearm-resurface"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "recorded seq 1 and delivered [routine] into main"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 747046.1794208819.nISgeJ"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "(no output)"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "Acknowledged through recovery generation 747046.1794208819.nISgeJ."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "text": "FIRSTMATE SUPERVISION WAKE: signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.l/state/demo.status\n\nHandle this per your operating procedure and finish with fm_branch_report."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "Draining the wake, then I'll handle the demo status signal."
+      },
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-wake-drain.sh"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "1794208835\t3\tsignal\tdemo.status\tsignal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.l/state/demo.status\nWAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 747046.1794208819.nISgeJ\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-crew-state.sh demo"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "state: unknown \u00b7 source: none \u00b7 worktree gone (torn down?)\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "fm_branch_report",
+        "arguments": {
+          "task": "demo",
+          "verdict": "routine",
+          "summary": "Demo lab observation is unchanged; no work or decision was requested.",
+          "wake": "signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.l/state/demo.status",
+          "silent": true
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "recorded seq 2 and delivered [routine] into main"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "tool": "bash",
+        "arguments": {
+          "command": "bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 747046.1794208819.nISgeJ"
+        }
+      }
+    ]
+  },
+  {
+    "role": "toolResult",
+    "content": [
+      {
+        "text": "(no output)"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "Acknowledged through recovery generation 747046.1794208819.nISgeJ."
+      }
+    ]
+  }
+]

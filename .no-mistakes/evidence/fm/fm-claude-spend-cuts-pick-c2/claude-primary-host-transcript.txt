@@ -1,0 +1,20 @@
+primary-output.log
+Captain, the park command returned without handling the notification. The lab lock was acquired and monitoring started, but the supervision host couldn't read its dialog mirror, so it handed this notification (`check: rearm-resurface`) back to this session. It printed no generation, so I had nothing to acknowledge.
+
+
+state/.supervision-host.log
+1794208952	start	gen=host-924626-1794208950	primary=claude
+1794208966	to-main	the supervision session could not take this wake: the dialog mirror could not be read; this wake is yours
+
+
+state/.wake-queue
+1794208929	1	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.c/state/demo.status
+1794208963	2	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.c/state/demo.status
+1794208963	3	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.c/state/demo.status
+
+
+state/.watcher-down
+pending:interrupted:902092.1794208930.ysr9gy
+
+
+state/.host-mirror.jsonl exists: False

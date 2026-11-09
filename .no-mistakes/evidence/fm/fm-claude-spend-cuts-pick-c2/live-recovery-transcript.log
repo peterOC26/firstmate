@@ -1,0 +1,180 @@
+Earlier pristine-home check correctly woke recovery because no presentation cursor existed. The scenarios below create real presentation evidence first.
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty-presented-v4
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty-presented-v4
+[exit 0]
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+demo note: previously observed result
+[exit 0]
+watcher output:
+
+recovery marker: pending:downtime:658155.1794208757.UFwZES
+Marker before cleanup: acked:downtime:658155.1794208757.UFwZES
+Observed empty recovery retired with the same generation, no queued wake, watcher still running.
+watcher output:
+
+recovery marker: pending:downtime:660528.1794208760.9Pog8t
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/interrupted-live-v4
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/interrupted-live-v4
+[exit 0]
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+demo note: previously observed result
+[exit 0]
+watcher output:
+
+recovery marker: pending:downtime:671652.1794208763.AsmlmW
+watcher output:
+check: rearm-resurface
+
+recovery marker: announced:downtime:671652.1794208763.AsmlmW
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+demo note: deployment failed and stopped
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 671652.1794208763.AsmlmW
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 0]
+watcher output:
+
+recovery marker: pending:interrupted:671652.1794208763.AsmlmW
+watcher output:
+check: rearm-resurface
+
+recovery marker: announced:interrupted:671652.1794208763.AsmlmW
+$ bin/fm-wake-drain.sh
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 671652.1794208763.AsmlmW
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation stale-generation
+wake drain: acknowledged wakes through 0 (0 row(s) consumed), but a newer recovery episode is pending; re-run bin/fm-wake-drain.sh and use the new WAKE_ACK_REQUIRED command
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 671652.1794208763.AsmlmW
+[exit 0]
+Handling survived a real watcher close and forced recovery again; stale ack could not retire it; the exact generation ack retired it.
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/remote-live-v4
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/remote-live-v4
+[exit 0]
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+demo note: previously observed result
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 0]
+watcher output:
+
+recovery marker: pending:downtime:695873.1794208782.iRqydZ
+Marker before cleanup: acked:downtime:695873.1794208782.iRqydZ
+Remote parent-owned open decision did not prevent settlement of the child home.
+watcher output:
+
+recovery marker: pending:downtime:697351.1794208783.MJ19KA
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 1]
+A new child status still prevents settlement.
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/guards-live-v4
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/guards-live-v4
+[exit 0]
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+demo [key=capacity] blocked: unavailable
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+OPEN DECISIONS: <key> is the [key=...] printed before the verb; a token inside a note is prose, not a key.
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 1]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 1]
+$ bash -c . bin/fm-wake-lib.sh; fm_wake_append signal demo.status "signal: $STATE/demo.status"
+[exit 0]
+$ bin/fm-wake-drain.sh
+1794208788	1	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/guards-live-v4/state/demo.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 705471.1794208788.s13m3T
+wake annotation: unread wake-EVENT since last drain, not current state: demo.status: blocked [key=capacity]: unavailable
+wake annotation: unread wake-EVENT since last drain, not current state: demo.status: working: newer prose
+wake annotation: latest wake-EVENT observed at drain, not current state: demo.status: resolved [key=capacity]: available
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 0]
+$ bin/fm-branch-outcome.sh append --task demo --verdict captain --summary decision pending
+1
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 1]
+$ bin/fm-branch-outcome.sh mark-read --through 1
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 1]
+$ bin/fm-branch-outcome.sh mark-processed --through 1
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs recovery-settled
+[exit 0]
+Open decision, unseen resolution, unread and unprocessed captain outcome all refused settlement.
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/scope-live-v4
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/scope-live-v4
+[exit 0]
+$ bash -c . bin/fm-wake-lib.sh; fm_wake_append signal demo.status "signal: $STATE/demo.status"; fm_wake_append check merge "check: merge landed: lab"
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs offer
+eligible=1
+status=safe
+corrupted=0
+rows=1
+tasks=demo
+unscoped=0
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs offer
+eligible=0
+status=safe
+corrupted=0
+rows=1
+tasks=demo
+unscoped=0
+[exit 0]
+$ bin/fm-wake-grant.sh activate 653289 live-scope
+[exit 0]
+$ bin/fm-wake-grant.sh publish live-scope 1
+[exit 0]
+$ bin/fm-wake-drain.sh
+1794208796	1	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/scope-live-v4/state/demo.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 712880.1794208796.mTzsNp
+[exit 0]
+Branch grant drain only: 1794208796	1	signal	demo.status	signal: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/scope-live-v4/state/demo.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 712880.1794208796.mTzsNp
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 712880.1794208796.mTzsNp
+[exit 0]
+Persisted queue after branch acknowledgement through 2:
+1794208796	2	check	merge	check: merge landed: lab
+
+$ bin/fm-wake-grant.sh release live-scope
+[exit 0]
+$ bin/fm-wake-grant.sh deactivate 653289 live-scope
+[exit 0]
+$ bash -c . bin/fm-wake-lib.sh; fm_wake_append signal demo.status "signal: $STATE/demo.status"
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs offer
+eligible=0
+status=unsafe
+corrupted=0
+rows=
+tasks=
+unscoped=0
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs offer --afk
+eligible=1
+status=safe
+corrupted=0
+rows=2 3
+tasks=demo
+unscoped=1
+[exit 0]
+$ node bin/fm-branch-dispatch.mjs offer --afk
+eligible=0
+status=unsafe
+corrupted=1
+rows=
+tasks=
+unscoped=0
+[exit 0]
+Recovery offered original row 1 only, branch ack left main row 2 durable, generic attended check refused, decision partition and corrupt-queue refusal preserved.
+Completed: ["empty recovery silently retires and keeps monitoring", "interrupted handling requires the original post-handling acknowledgement", "remote parent-channel exclusion preserves child status safeguards", "uncertain or unhandled recovery evidence cannot silently settle", "recovery preserves original row grants and main ownership"]

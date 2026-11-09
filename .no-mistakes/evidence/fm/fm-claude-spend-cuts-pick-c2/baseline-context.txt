@@ -1,0 +1,3 @@
+Supplied baseline context; not rerun in this test phase.
+The fm-pi-branch-extension.test.sh case "broken-branch settlement must return delivery ownership to the watcher" is documented by the outer run as failing identically on candidate and unchanged baseline 5d6b207ff0edd67f27b130c27072795d753c638a, with: Error: branch settlement did not expose the startup failure: Error: supervision session no longer owns the fleet lock.
+The user explicitly excluded fixing that unrelated baseline failure. Targeted drain/host tests and live scenarios in this phase are reported separately.

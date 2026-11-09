@@ -1,0 +1,9 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M6ZH33R26FD539A9M8MN0VCX/.test-lab/empty
+[exit 0]
+$ bin/fm-wake-drain.sh
+[exit 0]
+watcher output:
+
+recovery marker: pending:downtime:287191.1794208502.U9V4I1
+Completed: []
