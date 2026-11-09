@@ -1,0 +1,67 @@
+[
+  {
+    "command": [
+      "bin/fm-lab-home.sh",
+      "create",
+      "<LAB>"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-tasks-axi.sh",
+      "--version"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-tasks-axi.sh",
+      "list",
+      "--state",
+      "held",
+      "--fields",
+      "blocked_by,hold_kind,hold_reason"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-session-start.sh",
+      "--reemit"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-startup-network.sh",
+      "wait",
+      "30"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-session-start.sh",
+      "--reemit"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-startup-network.sh",
+      "wait",
+      "30"
+    ],
+    "exit": 0
+  },
+  {
+    "command": [
+      "bin/fm-tasks-axi.sh",
+      "show",
+      "quiet-109",
+      "--full"
+    ],
+    "exit": 0
+  }
+]

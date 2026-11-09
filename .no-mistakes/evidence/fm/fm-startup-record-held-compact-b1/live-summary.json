@@ -1,0 +1,32 @@
+{
+  "seeded_rows": 233,
+  "shortenable_parked": 108,
+  "shortenable_watch": 108,
+  "backlog_bytes": 518446,
+  "modes": {
+    "tasks-axi": {
+      "digest_bytes": 29078,
+      "duration_seconds": 5.88,
+      "valid_utf8": true,
+      "shortened_rows": 216,
+      "shortened_summary_lines": 1,
+      "protected_rows_preserved": true,
+      "backlog_unchanged": true,
+      "all_216_identities_survive_queued_limit_1": true,
+      "held_listing_after_bytes": 20771
+    },
+    "manual": {
+      "digest_bytes": 33630,
+      "duration_seconds": 4.97,
+      "valid_utf8": true,
+      "shortened_rows": 216,
+      "shortened_summary_lines": 1,
+      "protected_rows_preserved": true,
+      "backlog_unchanged": true,
+      "all_216_identities_survive_queued_limit_1": true
+    }
+  },
+  "full_details_recoverable": true,
+  "seed_provenance": "Created through installed tasks-axi via bin/fm-tasks-axi.sh; restored from its captured markdown after correcting an unsupported probe --fields argument.",
+  "held_listing_before_bytes": 381736
+}

@@ -1,59 +1,28 @@
-[
-  {
-    "backend": "tasks-axi",
-    "scenario": "216 unblocked queued parked/Watch/Wait holds become bounded single lines with exact 108/108 counts",
-    "result": "pass",
-    "input_bytes": 455838
+{
+  "seeded_rows": 233,
+  "shortenable_parked": 108,
+  "shortenable_watch": 108,
+  "backlog_bytes": 518446,
+  "modes": {
+    "tasks-axi": {
+      "digest_bytes": 29078,
+      "duration_seconds": 5.88,
+      "valid_utf8": true,
+      "shortened_rows": 216,
+      "shortened_summary_lines": 1,
+      "protected_rows_preserved": true,
+      "backlog_unchanged": true
+    },
+    "manual": {
+      "digest_bytes": 33630,
+      "duration_seconds": 4.97,
+      "valid_utf8": true,
+      "shortened_rows": 216,
+      "shortened_summary_lines": 1,
+      "protected_rows_preserved": true,
+      "backlog_unchanged": true
+    }
   },
-  {
-    "backend": "tasks-axi",
-    "scenario": "In-flight, blocked, ordinary captain, and external holds retain full listing details; blocked overlap is not counted",
-    "result": "pass"
-  },
-  {
-    "backend": "tasks-axi",
-    "scenario": "Metadata-like prose inside an encoded captain question stays whole and cannot increment parked counts",
-    "result": "pass"
-  },
-  {
-    "backend": "tasks-axi",
-    "scenario": "Queued limit bounds ready work only, omits done rows, retains all held identities and leaves durable data unchanged",
-    "result": "pass"
-  },
-  {
-    "backend": "tasks-axi",
-    "scenario": "Long 2-, 3-, and 4-byte UTF-8 titles cut at each partial-character boundary stay valid and bounded",
-    "result": "pass"
-  },
-  {
-    "backend": "manual",
-    "scenario": "216 unblocked queued parked/Watch/Wait holds become bounded single lines with exact 108/108 counts",
-    "result": "pass",
-    "input_bytes": 455838
-  },
-  {
-    "backend": "manual",
-    "scenario": "In-flight, blocked, ordinary captain, and external holds retain full listing details; blocked overlap is not counted",
-    "result": "pass"
-  },
-  {
-    "backend": "manual",
-    "scenario": "Metadata-like prose inside an encoded captain question stays whole and cannot increment parked counts",
-    "result": "pass"
-  },
-  {
-    "backend": "manual",
-    "scenario": "Queued limit bounds ready work only, omits done rows, retains all held identities and leaves durable data unchanged",
-    "result": "pass"
-  },
-  {
-    "backend": "manual",
-    "scenario": "Long 2-, 3-, and 4-byte UTF-8 titles cut at each partial-character boundary stay valid and bounded",
-    "result": "pass"
-  },
-  {
-    "scenario": "Use the printed full-details command to retrieve a complete encoded watch reason after startup",
-    "result": "pass"
-  }
-]
-Disposable lab home removed.
+  "full_details_recoverable": true
+}
+Disposable lab removed: .fm-lab-startup-56u8bon1

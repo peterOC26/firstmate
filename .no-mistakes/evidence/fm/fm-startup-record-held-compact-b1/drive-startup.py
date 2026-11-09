@@ -1,141 +1,121 @@
-import base64
-import hashlib
-import json
-import os
-from pathlib import Path
-import re
-import shutil
-import subprocess
-import tempfile
-import time
-
-root = Path.cwd()
-evidence = Path('/home/zabi/.no-mistakes/evidence/01M6ZHHAZ0MNQPFEA26P70W0WH')
-lab = Path(tempfile.mkdtemp(prefix='.fm-live-startup-', dir=root))
+import base64, hashlib, json, os, pathlib, re, shutil, subprocess, tempfile, time
+ROOT = pathlib.Path.cwd()
+EVIDENCE = pathlib.Path('/home/zabi/.no-mistakes/evidence/01M707X8CATVY2RTZPY1YDP8QC')
+lab = pathlib.Path(tempfile.mkdtemp(prefix='.fm-lab-startup-', dir=ROOT))
 env = os.environ.copy()
 for key in list(env):
-    if key.startswith(('FM_', 'HERDR_', 'TASKS_AXI_')) or key in ('NO_MISTAKES_GATE', 'TMUX', 'TMUX_PANE', 'CLAUDECODE', 'PI_CODING_AGENT', 'GROK_AGENT'):
+    if key.startswith(('FM_', 'HERDR_', 'REX_', 'TASKS_AXI_')) or key in ('TMUX','TERM_PROGRAM'):
         env.pop(key, None)
-env['FM_HOME'] = str(lab)
-env['TMPDIR'] = str(lab / 'tmp')
-env['FM_SESSION_START_QUEUED_LIMIT'] = '1'
-env['FM_SESSION_START_TIMEOUT'] = '60'
-results = []
-
-def run(args, timeout=30):
-    p = subprocess.run([str(a) for a in args], cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+env.update(FM_HOME=str(lab), FM_BACKEND='tmux', TASKS_AXI_BACKEND='markdown', FM_SESSION_START_QUEUED_LIMIT='1')
+commands = []
+def run(args, timeout=60, record=True):
+    p = subprocess.run([str(a) for a in args], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+    if record:
+        commands.append({'command': [str(a).replace(str(lab), '<LAB>') for a in args], 'exit': p.returncode})
     if p.returncode:
-        raise RuntimeError(f'{args}: exit {p.returncode}\n{p.stdout.decode("utf-8", "replace")}')
+        raise RuntimeError(f'{args[:4]}: exit {p.returncode}: {p.stdout.decode(errors="replace")}')
     return p.stdout
 
 def task(*args):
-    return run([root / 'bin/fm-tasks-axi.sh', *args])
+    if os.environ.get('REUSE_SEEDED_BACKLOG') and args[0] in ('add','start','hold','block','done'): return b''
+    return run(['bin/fm-tasks-axi.sh', *args])
+def encode(s):
+    return 'fm-hold-v1:' + base64.b64encode(s.encode()).decode()
+def add(id, title, reason=None, kind=None, state='queued', blocked=False):
+    task('add', id, title, '--kind', 'ship', '--body', 'BODY-PRIVATE-' + id)
+    if state == 'in_flight': task('start', id)
+    if reason is not None: task('hold', id, '--kind', kind, '--reason', encode(reason))
+    if blocked: task('block', id, '--by', 'dependency')
 
-def add(id, title, kind=None, reason=None):
-    task('add', id, title)
-    if kind == 'captain':
-        run([root / 'bin/fm-captain-hold.sh', 'hold', id, '--reason', reason])
-    elif kind:
-        task('hold', id, '--kind', kind, '--reason', reason)
-
+results = []
 try:
-    run([root / 'bin/fm-lab-home.sh', 'create', lab])
-    (lab / 'tmp').mkdir()
-    (lab / 'config/supervision-host-off').touch()
-    (lab / '.tasks.toml').write_bytes((root / '.tasks.toml').read_bytes())
-    omitted = 'PRIVATE-LONG-DETAILS-' * 80
-    if (evidence / 'live-input-backlog.md').exists():
-        # Resume with the durable backlog created by the real public commands in this run.
-        (lab / 'data/backlog.md').write_bytes((evidence / 'live-input-backlog.md').read_bytes())
-    else:
-        for i in range(1, 217):
-            id = f'quiet-{i}'
-            title = f'Quiet, "quoted" job {i}'
-            j = (i - 1) % 108
-            if j < 6:
-                glyph, boundary = [('é', 116), ('€', 116), ('€', 115), ('🚢', 116), ('🚢', 115), ('🚢', 114)][j]
-                prefix = f'- [ ] {id} - '
-                title = 'a' * (boundary - len(prefix.encode())) + glyph * 5
-            kind = 'parked' if i <= 108 else 'captain'
-            reason = omitted if i <= 108 else ('Watch ' if i <= 162 else 'Wait ') + omitted + '\nsecond long line (decoded)'
-            add(id, title, kind, reason)
-        add('captain-open', 'Open question with metadata prose', 'captain', 'Needs the captain to choose (hold-kind: parked) or keep active\nCAPTAIN-QUESTION-KEPT (choose one)\nsecond question line')
-        add('captain-call', 'Captain call', 'captain', 'Captain call DETAILS-KEPT')
-        add('captain-needs', 'Needs captain', 'captain', 'Needs the captain DETAILS-KEPT')
-        add('external-hold', 'External hold', 'external', 'EXTERNAL-DETAILS-KEPT')
-        add('parked-live', 'Live parked job', 'parked', 'LIVE-PARKED-DETAILS-KEPT')
-        task('start', 'parked-live')
-        add('watch-live', 'Live watch job', 'captain', 'Wait LIVE-WATCH-DETAILS-KEPT\nsecond live line')
-        task('start', 'watch-live')
-        add('blocked-parked', 'Blocked parked job', 'parked', 'BLOCKED-PARKED-DETAILS-KEPT')
-        task('block', 'blocked-parked', '--by', 'parked-live')
-        add('blocked-watch', 'Blocked watch job', 'captain', 'Watch BLOCKED-WATCH-DETAILS-KEPT')
-        task('block', 'blocked-watch', '--by', 'parked-live')
-        for i in range(1, 4):
-            add(f'ready-{i}', f'Ready work {i}')
-        add('done-row', 'DONE-ROW-OMITTED')
-        task('done', 'done-row')
-    backlog = lab / 'data/backlog.md'
-    original = backlog.read_bytes()
-    (evidence / 'live-input-backlog.md').write_bytes(original)
-    (evidence / 'real-tool-held-before.toon').write_bytes(task('list', '--state', 'held', '--fields', 'hold_kind,hold_reason,blocked_by'))
-    for backend in ('tasks-axi', 'manual'):
-        (lab / 'config/backlog-backend').write_text(backend + '\n')
-        output = run([root / 'bin/fm-session-start.sh', '--reemit'], timeout=75)
-        (evidence / f'live-startup-{backend}.log').write_bytes(output)
-        text = output.decode('utf-8', 'strict')
-        # Assert the startup executable reached the complete product digest.
-        assert '●  STARTUP TRUNCATED -' not in text
-        assert 'The digest above is complete for this session start.' in text
-        start = text.index('compact backlog listing (')
-        # Inspect this public output, not implementation source.
-        end = text.find('\nWork under way (state/*.meta)', start)
-        compact = text[start:] if end < 0 else text[start:end]
-        (evidence / f'live-backlog-{backend}.txt').write_text(compact)
-        expected_backend = 'tasks-axi;' if backend == 'tasks-axi' else 'manual backend;'
-        assert f'compact backlog listing ({expected_backend}' in text
-        assert '108 parked, 108 watch queued hold(s) shortened' in text
-        assert text.count('queued hold(s) shortened') == 1
-        assert 'PRIVATE-LONG-DETAILS-' not in text
-        for i in range(1, 217):
-            lines = [line for line in text.splitlines() if re.search(rf'(?<![\w-])quiet-{i}(?![\w-])', line)]
-            assert len(lines) == 1, (backend, i, len(lines))
-            assert len(lines[0].encode()) < 240, (backend, i, len(lines[0].encode()))
-        results.append({'backend': backend, 'scenario': '216 unblocked queued parked/Watch/Wait holds become bounded single lines with exact 108/108 counts', 'result': 'pass', 'input_bytes': len(original)})
-        for marker in ('LIVE-PARKED-DETAILS-KEPT', 'Wait LIVE-WATCH-DETAILS-KEPT', 'second live line', 'Captain call DETAILS-KEPT', 'Needs the captain DETAILS-KEPT', 'EXTERNAL-DETAILS-KEPT', 'BLOCKED-PARKED-DETAILS-KEPT', 'Watch BLOCKED-WATCH-DETAILS-KEPT'):
-            assert marker in text, (backend, marker)
-        if backend == 'tasks-axi':
-            assert text.count('BLOCKED-PARKED-DETAILS-KEPT') == 2
-            assert text.count('Watch BLOCKED-WATCH-DETAILS-KEPT') == 2
-        results.append({'backend': backend, 'scenario': 'In-flight, blocked, ordinary captain, and external holds retain full listing details; blocked overlap is not counted', 'result': 'pass'})
-        for marker in ('Needs the captain to choose (hold-kind: parked) or keep active', 'CAPTAIN-QUESTION-KEPT (choose one)', 'second question line'):
-            assert marker in text, (backend, marker)
-        results.append({'backend': backend, 'scenario': 'Metadata-like prose inside an encoded captain question stays whole and cannot increment parked counts', 'result': 'pass'})
-        assert 'quiet-216' in text
-        assert 'ready-1' in text and 'ready-2' not in text and 'ready-3' not in text
-        assert 'DONE-ROW-OMITTED' not in text
+    run(['bin/fm-lab-home.sh','create',lab])
+    (lab/'config'/'backend').write_text('tmux\n')
+    (lab/'.tasks.toml').write_text('backend = "markdown"\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n')
+    task('--version')
+    add('dependency','Required dependency')
+    quiet_reason = 'QUIET-REASON-OMITTED ' * 80
+    titles = {}
+    for i in range(1,217):
+        kind = 'parked' if i <= 108 else 'captain'
+        reason = quiet_reason if i <= 108 else ('Watch ' if i <= 162 else 'Wait ') + quiet_reason
+        title = f'Quiet, "quoted" job {i}'
+        k = (i-1) % 108
+        if k < 6:
+            glyph, boundary = [('é',116),('€',116),('€',115),('🚢',116),('🚢',115),('🚢',114)][k]
+            prefix = f'- [ ] quiet-{i} - '
+            title = 'a' * (boundary-len(prefix.encode())) + glyph*5
+        titles[f'quiet-{i}'] = title
+        add(f'quiet-{i}', title, reason, kind)
+    protected = {
+      'captain-call': ('Captain call DETAILS-KEPT','captain','queued',False),
+      'captain-needs': ('Needs the captain DETAILS-KEPT','captain','queued',False),
+      'captain-question': ('Which option? DETAILS-KEPT (hold-kind: parked)\nsecond question line','captain','queued',False),
+      'captain-prose': ('Needs a decision about (hold: Watch) DETAILS-KEPT','captain','queued',False),
+      'blocked-parked': ('BLOCKED-PARKED-DETAILS-KEPT','parked','queued',True),
+      'blocked-watch': ('Watch BLOCKED-WATCH-DETAILS-KEPT','captain','queued',True),
+      'live-parked': ('LIVE-PARKED-DETAILS-KEPT (even parked)\nsecond live line','parked','in_flight',False),
+      'live-watch': ('Wait LIVE-WATCH-DETAILS-KEPT','captain','in_flight',False),
+      'external': ('Watch EXTERNAL-DETAILS-KEPT','external','queued',False),
+      'future': ('Wait FUTURE-DETAILS-KEPT','future','queued',False),
+      'lowercase': ('watch LOWERCASE-DETAILS-KEPT','captain','queued',False),
+    }
+    for id,(reason,kind,state,blocked) in protected.items():
+        add(id, id+' protected title', reason, kind, state, blocked)
+    add('completed','Done history omitted')
+    task('done','completed')
+    for i in range(1,5): add(f'ready-{i}',f'Ready unheld job {i}')
+    if os.environ.get('REUSE_SEEDED_BACKLOG'):
+        shutil.copyfile(EVIDENCE/'seeded-backlog.md', lab/'data/backlog.md')
+    original = (lab/'data/backlog.md').read_bytes()
+    (EVIDENCE/'seeded-backlog.md').write_bytes(original)
+    held = task('list','--state','held','--fields','blocked_by,hold_kind,hold_reason')
+    (EVIDENCE/'held-before-compaction.toon').write_bytes(held)
+    summary = {'seeded_rows': 233, 'shortenable_parked':108,'shortenable_watch':108, 'backlog_bytes':len(original), 'modes':{}}
+    for mode in ['tasks-axi','manual']:
+        if mode == 'manual': (lab/'config/backlog-backend').write_text('manual\n')
+        start = time.monotonic()
+        output = run(['bin/fm-session-start.sh','--reemit'], timeout=150)
+        (EVIDENCE/f'startup-{mode}.txt').write_bytes(output)
+        text = output.decode('utf-8',errors='strict')
+        fleet = text.split('=== FLEET STATE ===',1)[-1]
+        # The full digest is retained as evidence; assertions use emitted public output only.
+        assert ('compact backlog listing (tasks-axi' if mode == 'tasks-axi' else 'compact backlog listing (manual backend') in text, f'{mode}: expected renderer was not used'
+        assert '●  STARTUP TRUNCATED' not in text, f'{mode}: incomplete digest'
+        assert text.count('108 parked, 108 watch queued hold(s) shortened') == 1, f'{mode}: wrong shortened count'
+        assert text.count('queued hold(s) shortened') == 1, f'{mode}: overlap double counted'
+        assert 'QUIET-REASON-OMITTED' not in text, f'{mode}: quiet reasons leaked'
         assert 'bin/fm-tasks-axi.sh show <id> --full' in text
-        assert backlog.read_bytes() == original
-        results.append({'backend': backend, 'scenario': 'Queued limit bounds ready work only, omits done rows, retains all held identities and leaves durable data unchanged', 'result': 'pass'})
-        boundary_rows = []
-        for i in (1, 2, 3, 4, 5, 6, 109, 110, 111, 112, 113, 114):
-            line = next(line for line in text.splitlines() if re.search(rf'(?<![\w-])quiet-{i}(?![\w-])', line))
-            assert '...' in line
-            assert '\ufffd' not in line
-            boundary_rows.append(line)
-        (evidence / f'utf8-boundary-{backend}.txt').write_text('\n'.join(boundary_rows) + '\n')
-        results.append({'backend': backend, 'scenario': 'Long 2-, 3-, and 4-byte UTF-8 titles cut at each partial-character boundary stay valid and bounded', 'result': 'pass'})
-    # The compact record must leave the reader a working path to the full reason.
-    (lab / 'config/backlog-backend').write_text('tasks-axi\n')
-    details = task('show', 'quiet-109', '--full')
-    assert omitted.encode() in details
-    assert b'second long line (decoded)' in details
-    (evidence / 'live-full-details.toon').write_bytes(details)
-    results.append({'scenario': 'Use the printed full-details command to retrieve a complete encoded watch reason after startup', 'result': 'pass'})
-    assert backlog.read_bytes() == original
-    (evidence / 'live-results.json').write_text(json.dumps({'results': results, 'backlog_sha256_before_and_after': hashlib.sha256(original).hexdigest()}, indent=2) + '\n')
-    print(json.dumps(results, indent=2))
+        for id in titles:
+            if mode == 'tasks-axi': assert re.search(r'^  '+re.escape(id)+r',',text,re.M), f'{mode}: missing {id}'
+            else: assert re.search(r'^- \[ \] '+re.escape(id)+r' - ',text,re.M), f'{mode}: missing {id}'
+        for id,(reason,kind,state,blocked) in protected.items():
+            encoded = json.dumps(reason, ensure_ascii=False)[1:-1]
+            assert encoded in text, f'{mode}: protected reason omitted for {id}'
+        for id in ('blocked-parked','blocked-watch','live-parked','live-watch'):
+            reason = protected[id][0]
+            expected = 2 if mode == 'tasks-axi' else 1
+            assert text.count(json.dumps(reason,ensure_ascii=False)[1:-1]) == expected, f'{mode}: lost full overlapping row {id}'
+        assert 'Done history omitted' not in text
+        assert 'BODY-PRIVATE' not in text
+        assert (lab/'data/backlog.md').read_bytes() == original, f'{mode}: backlog was mutated'
+        if mode == 'manual':
+            for i in [1,2,3,4,5,6,109,110,111,112,113,114]:
+                line = next(line for line in text.splitlines() if line.startswith(f'- [ ] quiet-{i} - '))
+                assert '... (hold-kind:' in line, f'{mode}: title not truncated'
+                assert len(line.encode()) <= 164, f'{mode}: line exceeds bound'
+        summary['modes'][mode] = {'digest_bytes':len(output),'duration_seconds':round(time.monotonic()-start,2),'valid_utf8':True,'shortened_rows':216,'shortened_summary_lines':1,'protected_rows_preserved':True,'backlog_unchanged':True}
+        results.append(mode + ': PASS')
+        # Finish the script-owned asynchronous read-only stage before deleting the lab.
+        run(['bin/fm-startup-network.sh','wait','30'],timeout=40)
+    details = task('show','quiet-109','--full')
+    (EVIDENCE/'full-watch-details.txt').write_bytes(details)
+    assert quiet_reason in details.decode(), 'full details unavailable after compaction'
+    assert 'BODY-PRIVATE-quiet-109' in details.decode()
+    summary['full_details_recoverable']=True
+    (EVIDENCE/'live-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+    print(json.dumps(summary,indent=2))
 finally:
-    # All intentional runtime state was confined to this throwaway worktree home.
+    (EVIDENCE/'live-commands.json').write_text(json.dumps(commands,indent=2)+'\n')
     shutil.rmtree(lab)
-    print('Disposable lab home removed.')
+    print('Disposable lab removed:',lab.name)

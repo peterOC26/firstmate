@@ -1,0 +1,10 @@
+{
+  "baseline_commit": "747c89c1",
+  "before_fix": {
+    "offset": 6090,
+    "error": "'utf-8' codec can't decode byte 0xc3 in position 6090: invalid continuation byte",
+    "nearby_hex": "6161616161616161c32e2e2e2028686f"
+  },
+  "after_fix": "valid UTF-8; all six byte boundaries bounded; exact count; backlog unchanged"
+}
+Temporary baseline executable and lab removed
