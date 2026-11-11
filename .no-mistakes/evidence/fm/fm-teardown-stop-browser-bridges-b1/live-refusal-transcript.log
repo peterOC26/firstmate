@@ -1,0 +1,78 @@
+$ bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/project init -q -b main
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/project -c user.name=Lab -c user.email=lab@example.invalid commit -q --allow-empty -m baseline
+
+exit=0
+$ git clone -q /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/project /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/unlanded
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/unlanded checkout -q -b task-unlanded
+
+exit=0
+$ chrome-devtools-axi start
+status: ready
+port: 60015
+exit=0
+BRIDGE refused: {"pid": 3136205, "state": "S", "ppid": 1, "pgid": 3136205, "start": "106684029", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ tasks-axi add bridge-refused-b1 Disposable live bridge validation --kind ship --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/data/backlog.md
+ok: added bridge-refused-b1 (ship) -> Queued
+task:
+  id: bridge-refused-b1
+  title: Disposable live bridge validation
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-11
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start bridge-refused-b1 --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block bridge-refused-b1 --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/data/backlog.md` to record a dependency
+exit=0
+$ tasks-axi start bridge-refused-b1 --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/data/backlog.md
+ok: start bridge-refused-b1 -> In flight
+help[1]:
+  - Run `tasks-axi done bridge-refused-b1 --pr <url> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/data/backlog.md` when it ships
+exit=0
+$ bash bin/fm-teardown.sh bridge-refused-b1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.2tj1qq7p/unlanded has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  uncommitted.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+After dirty-worktree refusal bridge: {"pid": 3136205, "state": "S", "ppid": 1, "pgid": 3136205, "start": "106684029", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi pages
+pages[1]{id,url,selected}:
+  1,about:blank,false
+help[2]:
+  Run `chrome-devtools-axi selectpage <id>` to switch tabs
+  Run `chrome-devtools-axi newpage <url>` to open a new tab
+exit=0
+OBSERVED: dirty-worktree refusal preserved the byte-identical task record, uncommitted file, and responsive real bridge.
+LIVE DIRTY REFUSAL PASS
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+Disposable lab and owned bridge groups removed.

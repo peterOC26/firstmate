@@ -1,0 +1,191 @@
+$ bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi
+exit=0
+$ tasks-axi add bridge-live-b1 Disposable live bridge validation --kind ship --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md
+ok: added bridge-live-b1 (ship) -> Queued
+task:
+  id: bridge-live-b1
+  title: Disposable live bridge validation
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-11
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start bridge-live-b1 --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block bridge-live-b1 --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` to record a dependency
+exit=0
+$ tasks-axi start bridge-live-b1 --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md
+ok: start bridge-live-b1 -> In flight
+help[1]:
+  - Run `tasks-axi done bridge-live-b1 --pr <url> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` when it ships
+exit=0
+Installed product versions:
+$ chrome-devtools-axi --version
+0.1.46
+exit=0
+$ chrome-devtools-axi start
+status: ready
+port: 37287
+exit=0
+BRIDGE own: {"pid": 3097215, "state": "S", "ppid": 1, "pgid": 3097215, "start": "106676887", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi pages
+pages[1]{id,url,selected}:
+  1,about:blank,false
+help[2]:
+  Run `chrome-devtools-axi selectpage <id>` to switch tabs
+  Run `chrome-devtools-axi newpage <url>` to open a new tab
+exit=0
+$ chrome-devtools-axi start
+status: ready
+port: 55819
+exit=0
+BRIDGE stopped: {"pid": 3097614, "state": "S", "ppid": 1, "pgid": 3097614, "start": "106677206", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi start
+status: ready
+port: 37563
+exit=0
+BRIDGE other-task: {"pid": 3098030, "state": "R", "ppid": 1, "pgid": 3098030, "start": "106677457", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi start
+status: ready
+port: 50195
+exit=0
+BRIDGE other-home: {"pid": 3099024, "state": "S", "ppid": 1, "pgid": 3099024, "start": "106677710", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi start
+status: ready
+port: 42357
+exit=0
+BRIDGE missing-inbox: {"pid": 3100579, "state": "S", "ppid": 1, "pgid": 3100579, "start": "106677956", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi start
+status: ready
+port: 59395
+exit=0
+BRIDGE missing-task: {"pid": 3100848, "state": "S", "ppid": 1, "pgid": 3100848, "start": "106678200", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+Group member before teardown: {"pid": 3097215, "state": "S", "ppid": 1, "pgid": 3097215, "start": "106676887", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+Group member before teardown: {"pid": 3097239, "state": "S", "ppid": 3097215, "pgid": 3097215, "start": "106676924", "command": "npm exec chrome-devtools-mcp@latest --userDataDir=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/chrome-own --headless --chrome-arg=--use-mock-keychain --chrome-arg=--password-store=basic --executablePath=/usr/bin/chromium --chrome-arg=--no-sandbox --chrome-arg=--disable-dev-shm-usage             "}
+Group member before teardown: {"pid": 3097353, "state": "S", "ppid": 3097239, "pgid": 3097215, "start": "106677055", "command": "sh -c 'chrome-devtools-mcp' --userDataDir=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/chrome-own --headless --chrome-arg=--use-mock-keychain --chrome-arg=--password-store=basic --executablePath=/usr/bin/chromium --chrome-arg=--no-sandbox --chrome-arg=--disable-dev-shm-usage "}
+Group member before teardown: {"pid": 3097354, "state": "S", "ppid": 3097353, "pgid": 3097215, "start": "106677055", "command": "chrome-devtools-mcp                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               "}
+Group member before teardown: {"pid": 3097614, "state": "T", "ppid": 1, "pgid": 3097614, "start": "106677206", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+Group member before teardown: {"pid": 3097650, "state": "S", "ppid": 3097614, "pgid": 3097614, "start": "106677238", "command": "npm exec chrome-devtools-mcp@latest --userDataDir=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/chrome-stopped --headless --chrome-arg=--use-mock-keychain --chrome-arg=--password-store=basic --executablePath=/usr/bin/chromium --chrome-arg=--no-sandbox --chrome-arg=--disable-dev-shm-usage             "}
+Group member before teardown: {"pid": 3097775, "state": "S", "ppid": 3097650, "pgid": 3097614, "start": "106677309", "command": "sh -c 'chrome-devtools-mcp' --userDataDir=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/chrome-stopped --headless --chrome-arg=--use-mock-keychain --chrome-arg=--password-store=basic --executablePath=/usr/bin/chromium --chrome-arg=--no-sandbox --chrome-arg=--disable-dev-shm-usage "}
+Group member before teardown: {"pid": 3097776, "state": "S", "ppid": 3097775, "pgid": 3097614, "start": "106677309", "command": "chrome-devtools-mcp                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   "}
+Stopped bridge before teardown: {"pid": 3097614, "state": "T", "ppid": 1, "pgid": 3097614, "start": "106677206", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ bash bin/fm-teardown.sh bridge-live-b1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for bridge-live-b1
+teardown: stopping chrome-devtools-axi bridge process group for bridge-live-b1: 3097215
+teardown: stopping chrome-devtools-axi bridge process group for bridge-live-b1: 3097614
+teardown: force-killing chrome-devtools-axi bridge process group for bridge-live-b1: 3097614
+teardown bridge-live-b1 complete (window none, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/gone-worktree, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261111T151949Z-3101386)
+Backlog: bridge-live-b1 is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+After accepted teardown own: {"pid": 3097215, "state": "absent"}
+After accepted teardown stopped: {"pid": 3097614, "state": "absent"}
+Owned group member after teardown: {"pid": 3097215, "state": "absent"}
+Owned group member after teardown: {"pid": 3097239, "state": "absent"}
+Owned group member after teardown: {"pid": 3097353, "state": "absent"}
+Owned group member after teardown: {"pid": 3097354, "state": "absent"}
+Owned group member after teardown: {"pid": 3097614, "state": "absent"}
+Owned group member after teardown: {"pid": 3097650, "state": "absent"}
+Owned group member after teardown: {"pid": 3097775, "state": "absent"}
+Owned group member after teardown: {"pid": 3097776, "state": "absent"}
+After accepted teardown other-task: {"pid": 3098030, "state": "S", "ppid": 1, "pgid": 3098030, "start": "106677457", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+After accepted teardown other-home: {"pid": 3099024, "state": "S", "ppid": 1, "pgid": 3099024, "start": "106677710", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+After accepted teardown missing-inbox: {"pid": 3100579, "state": "S", "ppid": 1, "pgid": 3100579, "start": "106677956", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+After accepted teardown missing-task: {"pid": 3100848, "state": "S", "ppid": 1, "pgid": 3100848, "start": "106678200", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+After accepted teardown non-bridge: {"pid": 3101384, "state": "S", "ppid": 3097162, "pgid": 3101384, "start": "106678441", "command": "sleep 300 "}
+$ chrome-devtools-axi pages
+pages[1]{id,url,selected}:
+  1,about:blank,false
+help[2]:
+  Run `chrome-devtools-axi selectpage <id>` to switch tabs
+  Run `chrome-devtools-axi newpage <url>` to open a new tab
+exit=0
+OBSERVED: matching bridges stopped; stopped leader required KILL; all ownership exclusions survived; other task browser still responds.
+$ chrome-devtools-axi start
+status: ready
+port: 42471
+exit=0
+BRIDGE refused: {"pid": 3108407, "state": "S", "ppid": 1, "pgid": 3108407, "start": "106679767", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/unlanded init -q -b main
+
+exit=0
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/unlanded -c user.name=Lab -c user.email=lab@example.invalid commit -q --allow-empty -m baseline
+
+exit=0
+$ tasks-axi add bridge-refused-b1 Disposable live bridge validation --kind ship --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md
+ok: added bridge-refused-b1 (ship) -> Queued
+task:
+  id: bridge-refused-b1
+  title: Disposable live bridge validation
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-11
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start bridge-refused-b1 --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block bridge-refused-b1 --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` to record a dependency
+exit=0
+$ tasks-axi start bridge-refused-b1 --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md
+ok: start bridge-refused-b1 -> In flight
+help[1]:
+  - Run `tasks-axi done bridge-refused-b1 --pr <url> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/data/backlog.md` when it ships
+exit=0
+$ bash bin/fm-teardown.sh bridge-refused-b1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: cannot determine default branch for /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.khvytkfi/project; expected origin/HEAD, main, or master.
+exit=1
+After refused teardown bridge: {"pid": 3108407, "state": "S", "ppid": 1, "pgid": 3108407, "start": "106679767", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+OBSERVED: refusal preserved the task record, uncommitted bytes, and real browser bridge.
+LIVE SCENARIOS PASS
+$ chrome-devtools-axi stop
+status: stopped (no-op)
+exit=0
+$ chrome-devtools-axi stop
+status: stopped (no-op)
+exit=0
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+Disposable lab and owned bridge groups removed.

@@ -1,0 +1,20 @@
+Before base teardown:
+    PID    PPID    PGID S COMMAND
+3169336       1 3169336 S node
+3169338 3169336 3169336 S mcp-child
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-teardown-tests.TAK4ks/baseline-bridge-leak/project: already current
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-teardown-tests.TAK4ks/baseline-bridge-leak/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-teardown-tests.TAK4ks/baseline-bridge-leak/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-teardown-tests.TAK4ks/baseline-bridge-leak/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-x1
+After completed base teardown, both bridge processes are still executing:
+    PID    PPID    PGID S COMMAND
+3169336       1 3169336 S node
+3169338 3169336 3169336 S mcp-child
+ok - reported bridge leak reproduced against base executable
