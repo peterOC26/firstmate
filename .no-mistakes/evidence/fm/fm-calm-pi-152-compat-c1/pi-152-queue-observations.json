@@ -1,0 +1,59 @@
+{
+  "piVersion": "1.5.2",
+  "evidenceKind": "Real Pi methods over test stand-in; not a live Pi session",
+  "observations": [
+    {
+      "scenario": "supported queue then Escape",
+      "queuedRows": "\n Follow-up: CAPTAIN_QUEUED_TEXT                                                                                                                                                                         \n Follow-up: FIRSTMATE_OP: v1 away-supervisor: CAPTAIN_TYPED_LOOKALIKE                                                                                                                                   \n ↳ Alt+Up to edit all queued messages                                                                                                                                                                   ",
+      "editorAfterEscape": "CAPTAIN_QUEUED_TEXT\n\nFIRSTMATE_OP: v1 away-supervisor: CAPTAIN_TYPED_LOOKALIKE\n\nCAPTAIN_DRAFT",
+      "delivered": [
+        "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_TWO",
+        "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE",
+        "⁣Supervisor escalate (QUEUED_LEGACY_AWAY)"
+      ],
+      "continuationNotice": [
+        "Firstmate supervision continues in a new turn."
+      ]
+    },
+    {
+      "scenario": "unsupported session fallback",
+      "missing": "_queueSteer",
+      "queuedRows": "\n Follow-up: ⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE                                                                                                                                                \n Follow-up: CAPTAIN_QUEUED_TEXT                                                                                                                                                                         \n ↳ Alt+Up to edit all queued messages                                                                                                                                                                   ",
+      "editorAfterEscape": "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE\n\nCAPTAIN_QUEUED_TEXT",
+      "warnings": [
+        "Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible."
+      ]
+    },
+    {
+      "scenario": "unsupported session fallback",
+      "missing": "_queueFollowUp",
+      "queuedRows": "\n Follow-up: ⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE                                                                                                                                                \n Follow-up: CAPTAIN_QUEUED_TEXT                                                                                                                                                                         \n ↳ Alt+Up to edit all queued messages                                                                                                                                                                   ",
+      "editorAfterEscape": "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE\n\nCAPTAIN_QUEUED_TEXT",
+      "warnings": [
+        "Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible."
+      ]
+    },
+    {
+      "scenario": "unsupported session fallback",
+      "missing": "sendUserMessage",
+      "queuedRows": "\n Follow-up: ⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE                                                                                                                                                \n Follow-up: CAPTAIN_QUEUED_TEXT                                                                                                                                                                         \n ↳ Alt+Up to edit all queued messages                                                                                                                                                                   ",
+      "editorAfterEscape": "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE\n\nCAPTAIN_QUEUED_TEXT",
+      "warnings": [
+        "Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible."
+      ]
+    },
+    {
+      "scenario": "unsupported session fallback",
+      "missing": "waitForIdle",
+      "queuedRows": "\n Follow-up: ⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE                                                                                                                                                \n Follow-up: CAPTAIN_QUEUED_TEXT                                                                                                                                                                         \n ↳ Alt+Up to edit all queued messages                                                                                                                                                                   ",
+      "editorAfterEscape": "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE\n\nCAPTAIN_QUEUED_TEXT",
+      "warnings": [
+        "Firstmate Calm: this Pi session cannot keep queued messages across Escape, so queued Firstmate rows stay visible."
+      ]
+    },
+    {
+      "scenario": "Calm off stock dequeue",
+      "editor": "⁣FIRSTMATE_OP: v1 watcher: QUEUED_MONITOR_ONE\n\nCAPTAIN_QUEUED_TEXT"
+    }
+  ]
+}
