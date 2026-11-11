@@ -1,0 +1,65 @@
+$ bash bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo
+exit=0
+$ chrome-devtools-axi start
+status: ready
+port: 50227
+exit=0
+BRIDGE override: {"pid": 2542757, "state": "S", "ppid": 1, "pgid": 2542757, "start": "108480569", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ tasks-axi add bridge-live-b1 Disposable live bridge validation --kind ship --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md
+ok: added bridge-live-b1 (ship) -> Queued
+task:
+  id: bridge-live-b1
+  title: Disposable live bridge validation
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-11-11
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start bridge-live-b1 --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block bridge-live-b1 --by <other> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md` to record a dependency
+exit=0
+$ tasks-axi start bridge-live-b1 --file /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md
+ok: start bridge-live-b1 -> In flight
+help[1]:
+  - Run `tasks-axi done bridge-live-b1 --pr <url> --file=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md` when it ships
+exit=0
+Teardown environment: FM_PROC_ROOT_OVERRIDE is set to the empty string.
+$ bash bin/fm-teardown.sh bridge-live-b1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 5s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for bridge-live-b1
+teardown bridge-live-b1 complete (window none, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/gone-worktree, legacy record accepted without spawn_gen: endpoint missing, incarnation legacy-20261111T202014Z-2545203)
+Backlog: bridge-live-b1 is closed in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M75HG71DW0AXQEVWWFWAR53K/.phase-test-tmp/fm-lab.ht5y8vuo/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+Real bridge after override teardown: {"pid": 2542757, "state": "S", "ppid": 1, "pgid": 2542757, "start": "108480569", "command": "node /usr/lib/node_modules/chrome-devtools-axi/dist/bin/chrome-devtools-axi-bridge.js "}
+$ chrome-devtools-axi pages
+pages[1]{id,url,selected}:
+  1,about:blank,false
+help[2]:
+  Run `chrome-devtools-axi selectpage <id>` to switch tabs
+  Run `chrome-devtools-axi newpage <url>` to open a new tab
+exit=0
+OBSERVED: accepted teardown silently skipped bridge cleanup with a set-but-empty /proc override; bridge and browser remain responsive.
+LIVE OVERRIDE PASS
+$ chrome-devtools-axi stop
+status: stopped
+exit=0
+Disposable lab and owned bridge groups removed.

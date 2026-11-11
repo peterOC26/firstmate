@@ -1,0 +1,5 @@
+ok - teardown leaves opencode's busy plugin in the returned pool worktree as on main
+ok - teardown stops this task's browser bridge groups, including one that ignores TERM, and leaves every other process alone
+ok - a refused teardown leaves the task's browser bridge running
+ok - a proc override silently skips browser bridge cleanup
+ok - bridge KILL skips a group whose recorded member identity changed
