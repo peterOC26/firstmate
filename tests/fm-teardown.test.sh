@@ -6716,6 +6716,55 @@ test_teardown_stops_own_browser_bridge_groups() {
   pass "teardown stops this task's browser bridge groups, including one that ignores TERM, and leaves every other process alone"
 }
 
+test_teardown_bridge_kill_rechecks_member_identity() {
+  local case_dir leader rc
+  case_dir=$(make_case browser-bridge-kill-identity)
+  add_lsof_no_holder "$case_dir"
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ensure_fake_bridge_bins "$case_dir"
+  start_fake_bridge_group "$case_dir" stubborn leader ""
+  bridge_wait_comm "$leader" node "browser-bridge-kill-identity"
+  cat > "$case_dir/identity-env.sh" <<'SH'
+sleep() {
+  if [ "${FUNCNAME[1]:-}" = stop_task_browser_bridges_inner ]; then
+    : > "$FM_BRIDGE_CHECK_DIR/kill-phase"
+  fi
+  command sleep "$@"
+}
+cat() {
+  local count line prefix
+  local -a fields
+  if [ "${1:-}" = "/proc/$FM_BRIDGE_CHECK_PID/stat" ] &&
+     [ "${FUNCNAME[1]:-}" = task_process_identity ] &&
+     [ -f "$FM_BRIDGE_CHECK_DIR/kill-phase" ]; then
+    count=0
+    [ ! -f "$FM_BRIDGE_CHECK_DIR/reads" ] || read -r count < "$FM_BRIDGE_CHECK_DIR/reads"
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$FM_BRIDGE_CHECK_DIR/reads"
+    if [ "$count" -ge 3 ]; then
+      line=$(command cat "$@") || return
+      prefix="${line%)*})"
+      read -r -a fields <<< "${line##*)}"
+      fields[19]=$((${fields[19]} + 1))
+      printf '%s %s\n' "$prefix" "${fields[*]}"
+      return
+    fi
+  fi
+  command cat "$@"
+}
+SH
+  rc=0
+  BASH_ENV="$case_dir/identity-env.sh" FM_BRIDGE_CHECK_DIR="$case_dir" FM_BRIDGE_CHECK_PID="$leader" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bridge-kill-identity: teardown should succeed"
+  [ "$(cat "$case_dir/reads")" -ge 3 ] || fail "bridge-kill-identity: member identity was not rechecked"
+  assert_no_grep "force-killing chrome-devtools-axi" "$case_dir/stderr" "bridge-kill-identity: stale identity authorized KILL"
+  bridge_wait_comm "$leader" node "bridge-kill-identity survived"
+  bridge_stop_fixture "$leader" "$case_dir"
+  pass "bridge KILL skips a group whose recorded member identity changed"
+}
+
 test_teardown_proc_override_leaves_browser_bridges() {
   local case_dir rc leader override
   for override in /proc "" missing; do
@@ -6921,3 +6970,4 @@ test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_teardown_stops_own_browser_bridge_groups
 test_teardown_refusal_leaves_browser_bridges
 test_teardown_proc_override_leaves_browser_bridges
+test_teardown_bridge_kill_rechecks_member_identity

@@ -344,7 +344,7 @@
 # signaled. The group gets TERM, then KILL after a short wait. A group that is
 # already gone is fine. Failure to stop one is reported and does not change
 # the teardown result. When FM_PROC_ROOT_OVERRIDE is set, bridge cleanup
-# returns without a message.
+# returns without a message. A host without /proc also returns without a message.
 # After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2725,10 +2725,7 @@ stop_task_browser_bridges_inner() { # <task-id>
   [ -n "$task" ] || return 0
   task_inbox=$(canonical_existing_dir "$STATE") || return 0
   task_inbox="$task_inbox/$task.inbox"
-  if [ ! -d "$proc_root" ]; then
-    echo "warning: could not inspect chrome-devtools-axi bridges for $task (/proc is unavailable); cleanup continues" >&2
-    return 0
-  fi
+  [ -d "$proc_root" ] || return 0
   my_uid=$(id -u 2>/dev/null) || {
     echo "warning: could not inspect chrome-devtools-axi bridges for $task (uid is unavailable); cleanup continues" >&2
     return 0
@@ -2827,9 +2824,17 @@ stop_task_browser_bridges_inner() { # <task-id>
       [ "$uid" = "$my_uid" ] || continue
       teardown_proc_still_running "$member" || continue
       identity=$(task_process_identity "$member" 2>/dev/null) || continue
-      targets="$targets $member"
+      targets="$targets$member $identity"$'\n'
     done <<< "$members"
     [ -n "${targets# }" ] || continue
+    current=0
+    while read -r member identity; do
+      [ -n "$member" ] || continue
+      task_process_identity_matches "$member" "$identity" || continue
+      current=1
+      break
+    done <<< "$targets"
+    [ "$current" = 1 ] || continue
     echo "teardown: force-killing chrome-devtools-axi bridge process group for $task: $pgrp" >&2
     kill -KILL -- "-$pgrp" 2>/dev/null || true
   done
