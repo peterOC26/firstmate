@@ -2784,15 +2784,15 @@ teardown_user_process_snapshot() { # <uid>
 # not undone. See the script header for the ownership rules.
 stop_task_browser_bridges_inner() { # <task-id>
   local task=$1 proc_root my_uid own_pgrp snapshot pid pgrp comm
-  local task_env uid identity current members member protected targets
+  local task_env inbox_env task_inbox uid identity current members member protected targets
   local still cdp_inodes i leader leader_identity
   local -a groups leader_ids leader_identities signaled_groups
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  [ "${FM_PROC_ROOT_OVERRIDE+x}" != x ] || return 0
+  proc_root=/proc
   [ -n "$task" ] || return 0
+  task_inbox=$(canonical_existing_dir "$STATE") || return 0
+  task_inbox="$task_inbox/$task.inbox"
   if [ ! -d "$proc_root" ]; then
-    if [ -n "${FM_PROC_ROOT_OVERRIDE:-}" ]; then
-      return 0
-    fi
     echo "warning: could not inspect chrome-devtools-axi bridges for $task (/proc is unavailable); cleanup continues" >&2
     return 0
   fi
@@ -2801,22 +2801,10 @@ stop_task_browser_bridges_inner() { # <task-id>
     return 0
   }
   own_pgrp=$(teardown_proc_pgrp "$$" 2>/dev/null || true)
-  if [ -n "${FM_PROC_ROOT_OVERRIDE:-}" ]; then
-    snapshot=$(
-      for pid_path in "$proc_root"/[0-9]*; do
-        [ -d "$pid_path" ] || continue
-        pid=${pid_path##*/}
-        pgrp=$(teardown_proc_pgrp "$pid" 2>/dev/null) || continue
-        comm=$(teardown_proc_comm "$pid" 2>/dev/null) || comm=
-        printf '%s %s %s\n' "$pid" "$pgrp" "$comm"
-      done
-    )
-  else
-    snapshot=$(teardown_user_process_snapshot "$my_uid") || snapshot=
-    if [ -z "$snapshot" ]; then
-      echo "warning: could not inspect chrome-devtools-axi bridges for $task; cleanup continues" >&2
-      return 0
-    fi
+  snapshot=$(teardown_user_process_snapshot "$my_uid") || snapshot=
+  if [ -z "$snapshot" ]; then
+    echo "warning: could not inspect chrome-devtools-axi bridges for $task; cleanup continues" >&2
+    return 0
   fi
   groups=()
   leader_ids=()
@@ -2832,6 +2820,8 @@ stop_task_browser_bridges_inner() { # <task-id>
     teardown_pid_is_browser_bridge "$pid" || continue
     task_env=$(teardown_proc_env_value "$pid" FM_TASK_ID) || continue
     [ "$task_env" = "$task" ] || continue
+    inbox_env=$(teardown_proc_env_value "$pid" FM_TASK_INBOX) || continue
+    [ "$inbox_env" = "$task_inbox" ] || continue
     pgrp=$(teardown_proc_pgrp "$pid" 2>/dev/null) || continue
     [ "$pgrp" = "$pid" ] || continue
     [ -n "$own_pgrp" ] && [ "$pgrp" = "$own_pgrp" ] && continue
@@ -2858,6 +2848,8 @@ stop_task_browser_bridges_inner() { # <task-id>
     teardown_pid_is_browser_bridge "$leader" || continue
     task_env=$(teardown_proc_env_value "$leader" FM_TASK_ID) || continue
     [ "$task_env" = "$task" ] || continue
+    inbox_env=$(teardown_proc_env_value "$leader" FM_TASK_INBOX) || continue
+    [ "$inbox_env" = "$task_inbox" ] || continue
     current=$(teardown_proc_pgrp "$leader" 2>/dev/null) || continue
     [ "$current" = "$pgrp" ] || continue
     members=$(teardown_user_process_snapshot "$my_uid" 2>/dev/null || true)

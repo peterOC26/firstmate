@@ -6458,12 +6458,19 @@ ensure_fake_bridge_bins() { # <case-dir>
   ln -sfn "$perl_bin" "$case_dir/sleeper"
   cat > "$case_dir/bridge-launcher.pl" <<'PERL'
 use strict;
+use Cwd qw(realpath);
 use POSIX qw(setsid);
 my ($pidfile, $case, $kind) = @ARGV;
 die "usage\n" unless defined $kind && $kind ne "";
 defined(my $pid = fork()) or die "fork: $!";
 exit 0 if $pid;
 setsid() >= 0 or die "setsid: $!";
+$ENV{FM_TASK_INBOX} = realpath("$case/state") . "/task-x1.inbox";
+if ($kind eq "other-home") {
+  $ENV{FM_TASK_INBOX} = "$case/other-home/state/task-x1.inbox";
+} elsif ($kind eq "no-inbox") {
+  delete $ENV{FM_TASK_INBOX};
+}
 my $child = 0;
 if ($kind eq "bridge-mcp" || $kind eq "bridge-cdp") {
   defined($child = fork()) or die "fork child: $!";
@@ -6643,6 +6650,7 @@ test_teardown_stops_own_browser_bridge_groups() {
   local case_dir rc
   local mcp_leader mcp_child cdp_leader cdp_child
   local other_leader unmarked_leader plain_leader stubborn_leader gone_leader
+  local other_home_leader no_inbox_leader
   case_dir=$(make_case browser-bridges)
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
@@ -6652,6 +6660,8 @@ test_teardown_stops_own_browser_bridge_groups() {
   start_fake_bridge_group "$case_dir" bridge-mcp mcp_leader mcp_child
   start_fake_bridge_group "$case_dir" bridge-cdp cdp_leader cdp_child
   start_fake_bridge_group "$case_dir" other-task other_leader ""
+  start_fake_bridge_group "$case_dir" other-home other_home_leader ""
+  start_fake_bridge_group "$case_dir" no-inbox no_inbox_leader ""
   start_fake_bridge_group "$case_dir" unmarked unmarked_leader ""
   start_fake_bridge_group "$case_dir" plain plain_leader ""
   start_fake_bridge_group "$case_dir" stubborn stubborn_leader ""
@@ -6662,6 +6672,8 @@ test_teardown_stops_own_browser_bridge_groups() {
   bridge_wait_comm "$cdp_leader" node "browser-bridges cdp leader"
   bridge_wait_comm "$cdp_child" chromium "browser-bridges cdp browser"
   bridge_wait_comm "$other_leader" node "browser-bridges other task"
+  bridge_wait_comm "$other_home_leader" node "browser-bridges other home"
+  bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox"
   bridge_wait_comm "$unmarked_leader" node "browser-bridges unmarked"
   bridge_wait_comm "$plain_leader" sleeper "browser-bridges plain"
   bridge_wait_comm "$stubborn_leader" node "browser-bridges stubborn"
@@ -6707,13 +6719,37 @@ test_teardown_stops_own_browser_bridge_groups() {
     || fail "browser-bridges: an unmarked bridge was stopped"
   kill -0 "$plain_leader" 2>/dev/null \
     || fail "browser-bridges: a non-bridge process with this task id was stopped"
+  bridge_wait_comm "$other_home_leader" node "browser-bridges other home survived"
+  bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox survived"
   assert_foreign_bridges_survived "$case_dir/foreign-bridges" "browser-bridges"
 
   bridge_stop_fixture "$cdp_child" "$case_dir"
   bridge_stop_fixture "$other_leader" "$case_dir"
+  bridge_stop_fixture "$other_home_leader" "$case_dir"
+  bridge_stop_fixture "$no_inbox_leader" "$case_dir"
   bridge_stop_fixture "$unmarked_leader" "$case_dir"
   bridge_stop_fixture "$plain_leader" "$case_dir"
   pass "teardown stops this task's browser bridge groups, including one that ignores TERM, and leaves every other process alone"
+}
+
+test_teardown_proc_override_leaves_browser_bridges() {
+  local case_dir rc leader override
+  for override in /proc "" missing; do
+    case_dir=$(make_case "browser-bridge-override-${override##*/}")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    ensure_fake_bridge_bins "$case_dir"
+    start_fake_bridge_group "$case_dir" bridge leader ""
+    bridge_wait_comm "$leader" node "browser-bridge-override"
+    [ "$override" != missing ] || override="$case_dir/no-proc"
+    rc=0
+    FM_PROC_ROOT_OVERRIDE="$override" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "browser-bridge-override: teardown should succeed"
+    assert_no_grep "chrome-devtools-axi" "$case_dir/stderr" "browser-bridge-override: cleanup was not silently skipped"
+    bridge_wait_comm "$leader" node "browser-bridge-override survived"
+    bridge_stop_fixture "$leader" "$case_dir"
+  done
+  pass "a proc override silently skips browser bridge cleanup"
 }
 
 test_teardown_refusal_leaves_browser_bridges() {
@@ -6900,3 +6936,4 @@ test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_teardown_stops_own_browser_bridge_groups
 test_teardown_refusal_leaves_browser_bridges
+test_teardown_proc_override_leaves_browser_bridges
