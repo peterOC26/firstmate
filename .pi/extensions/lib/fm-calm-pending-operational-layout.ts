@@ -136,6 +136,25 @@ export function installCalmPendingOperationalLayout(): void {
 
   // The interactive mode that last drew queued rows, so a /calm toggle can redraw them.
   let lastHost: PendingRowsHost | undefined;
+  // One listing walks pendingBashComponents after it clears the pending area,
+  // so user bash output stays put while queued rows redraw. The other listing
+  // never reads that field. An iterable is the walking shape and is left alone.
+  // An absent field is the other shape, including a stand-in host that never
+  // ran Pi's constructor; an empty collection lets the walk succeed and is
+  // ignored by the listing that does not read it. A present non-iterable is
+  // neither shape and is left for that listing to reject.
+  const pendingBashIterable = (value: unknown): value is Iterable<unknown> =>
+    value != null && typeof (value as Iterable<unknown>)[Symbol.iterator] === "function";
+  const callPendingMessagesDisplay = (host: PendingRowsHost): void => {
+    const record = host as PendingRowsHost & { pendingBashComponents?: unknown };
+    const components = record.pendingBashComponents;
+    if (pendingBashIterable(components)) {
+      originalUpdatePendingMessagesDisplay.call(host);
+      return;
+    }
+    if (components === undefined) record.pendingBashComponents = [];
+    originalUpdatePendingMessagesDisplay.call(host);
+  };
   const patch: CalmPendingOperationalLayoutPatch = {
     hidesOperationalInput,
     isOperationalInput: isFirstmateOperationalPresentationText,
@@ -196,7 +215,7 @@ export function installCalmPendingOperationalLayout(): void {
     lastHost = this;
     if (!patch.hidesOperationalInput() || !retainingSession(this)) {
       hidden = undefined;
-      originalUpdatePendingMessagesDisplay.call(this);
+      callPendingMessagesDisplay(this);
       return;
     }
     const texts = new Set<string>();
@@ -204,7 +223,7 @@ export function installCalmPendingOperationalLayout(): void {
     try {
       // Pi skips the spacer and dequeue hint when nothing is left to list, so an
       // all-operational queue draws no rows at all.
-      originalUpdatePendingMessagesDisplay.call(this);
+      callPendingMessagesDisplay(this);
     } finally {
       hidingInto = undefined;
     }
