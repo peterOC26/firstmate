@@ -336,14 +336,16 @@
 # in the task copy, so Fix 2 never sees them, and they keep running after the
 # task is gone. Once this teardown has passed the landed-work and discard
 # gates and is about to report completion, it stops every such bridge owned by
-# this user whose /proc/<pid>/environ FM_TASK_ID is exactly this task. The
-# bridge is the group leader: command name node, and an argument that is
-# chrome-devtools-axi-bridge.js. A different task id, a missing FM_TASK_ID,
-# another user's process, and the shared CDP browsers (Chromium on port 9223
-# or 9224, including one that shares the bridge's process group) are never
-# signaled. The group gets TERM, then KILL after a short wait. A group that is
+# this user whose /proc/<pid>/environ FM_TASK_ID is exactly this task and
+# FM_TASK_INBOX is this home's resolved state directory plus /<id>.inbox.
+# The bridge is the group leader: command name node, and an argument that is
+# chrome-devtools-axi-bridge.js. A different or missing task id, a missing
+# inbox or another home's inbox, another user's process, and the shared CDP
+# browsers (Chromium on port 9223 or 9224, including one that shares the
+# bridge's process group) are never signaled. The group gets TERM, then KILL after a short wait. A group that is
 # already gone is fine. Failure to stop one is reported and does not change
-# the teardown result.
+# the teardown result. When FM_PROC_ROOT_OVERRIDE is set, bridge cleanup
+# returns without a message.
 # After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2625,12 +2627,11 @@ EOF
 # Process-group id from /proc/<pid>/stat, or failure when it is missing or not
 # a signalable group. pgrp is the third field after the comm's closing paren.
 teardown_proc_pgrp() { # <pid>
-  local pid=$1 proc_root stat_line
+  local pid=$1 stat_line
   local -a stat_fields
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  [ -r "$proc_root/$pid/stat" ] || return 1
-  stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+  [ -r "/proc/$pid/stat" ] || return 1
+  stat_line=$(cat "/proc/$pid/stat" 2>/dev/null) || return 1
   read -r -a stat_fields <<< "${stat_line##*)}"
   [ "${#stat_fields[@]}" -ge 3 ] || return 1
   case "${stat_fields[2]}" in
@@ -2642,12 +2643,11 @@ teardown_proc_pgrp() { # <pid>
 # True when the pid is still executing. A missing pid, a zombie, or a
 # process that has already exited is not a signal target.
 teardown_proc_still_running() { # <pid>
-  local pid=$1 proc_root stat_line state
+  local pid=$1 stat_line state
   local -a stat_fields
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  [ -r "$proc_root/$pid/stat" ] || return 1
-  stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+  [ -r "/proc/$pid/stat" ] || return 1
+  stat_line=$(cat "/proc/$pid/stat" 2>/dev/null) || return 1
   read -r -a stat_fields <<< "${stat_line##*)}"
   [ "${#stat_fields[@]}" -ge 1 ] || return 1
   state=${stat_fields[0]}
@@ -2658,11 +2658,10 @@ teardown_proc_still_running() { # <pid>
 }
 
 teardown_proc_real_uid() { # <pid>
-  local pid=$1 proc_root uid
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 uid
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  [ -r "$proc_root/$pid/status" ] || return 1
-  uid=$(awk '/^Uid:/ { print $2; exit }' "$proc_root/$pid/status" 2>/dev/null) || return 1
+  [ -r "/proc/$pid/status" ] || return 1
+  uid=$(awk '/^Uid:/ { print $2; exit }' "/proc/$pid/status" 2>/dev/null) || return 1
   case "$uid" in ''|*[!0-9]*) return 1 ;; esac
   printf '%s\n' "$uid"
 }
@@ -2670,11 +2669,10 @@ teardown_proc_real_uid() { # <pid>
 # Exact environ value. Missing key, unreadable environ, or another user's
 # process (the kernel refuses the read) is not a value.
 teardown_proc_env_value() { # <pid> <key>
-  local pid=$1 key=$2 proc_root line
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 key=$2 line
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$key" ] || return 1
-  [ -r "$proc_root/$pid/environ" ] || return 1
+  [ -r "/proc/$pid/environ" ] || return 1
   while IFS= read -r -d '' line || [ -n "$line" ]; do
     case "$line" in
       "$key"=*)
@@ -2682,33 +2680,31 @@ teardown_proc_env_value() { # <pid> <key>
         return 0
         ;;
     esac
-  done < "$proc_root/$pid/environ"
+  done < "/proc/$pid/environ"
   return 1
 }
 
 teardown_proc_comm() { # <pid>
-  local pid=$1 proc_root comm
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 comm
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  [ -r "$proc_root/$pid/comm" ] || return 1
-  comm=$(tr -d '\0' < "$proc_root/$pid/comm" 2>/dev/null) || return 1
+  [ -r "/proc/$pid/comm" ] || return 1
+  comm=$(tr -d '\0' < "/proc/$pid/comm" 2>/dev/null) || return 1
   printf '%s' "$comm"
 }
 
 # True when this pid is the leader of a chrome-devtools-axi bridge group.
 teardown_pid_is_browser_bridge() { # <pid>
-  local pid=$1 proc_root line comm pgrp found=0
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 line comm pgrp found=0
   comm=$(teardown_proc_comm "$pid") || return 1
   [ "$comm" = node ] || return 1
   pgrp=$(teardown_proc_pgrp "$pid") || return 1
   [ "$pgrp" = "$pid" ] || return 1
-  [ -r "$proc_root/$pid/cmdline" ] || return 1
+  [ -r "/proc/$pid/cmdline" ] || return 1
   while IFS= read -r -d '' line || [ -n "$line" ]; do
     case "$line" in
       chrome-devtools-axi-bridge.js|*/chrome-devtools-axi-bridge.js) found=1; break ;;
     esac
-  done < "$proc_root/$pid/cmdline"
+  done < "/proc/$pid/cmdline"
   [ "$found" = 1 ]
 }
 
@@ -2736,11 +2732,10 @@ teardown_shared_cdp_inodes() {
 }
 
 teardown_pid_holds_inode() { # <pid> <inode-list>
-  local pid=$1 inodes=$2 proc_root fd target inode
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 inodes=$2 fd target inode
   [ -n "$inodes" ] || return 1
-  [ -d "$proc_root/$pid/fd" ] || return 1
-  for fd in "$proc_root/$pid/fd"/*; do
+  [ -d "/proc/$pid/fd" ] || return 1
+  for fd in "/proc/$pid/fd"/*; do
     [ -L "$fd" ] || continue
     target=$(readlink "$fd" 2>/dev/null) || continue
     case "$target" in
@@ -2757,19 +2752,18 @@ teardown_pid_holds_inode() { # <pid> <inode-list>
 # Shared CDP browser: Chromium (or Chrome) on port 9223 or 9224. Command names
 # are the kernel's 15-character comm, so chromium-browser arrives truncated.
 teardown_pid_is_shared_cdp_browser() { # <pid> <inode-list>
-  local pid=$1 inodes=$2 proc_root line comm
-  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  local pid=$1 inodes=$2 line comm
   comm=$(teardown_proc_comm "$pid") || return 1
   case "$comm" in
     chromium|chromium-browse|chrome|google-chrome|chrome-headless|headless_shell) ;;
     *) return 1 ;;
   esac
-  if [ -r "$proc_root/$pid/cmdline" ]; then
+  if [ -r "/proc/$pid/cmdline" ]; then
     while IFS= read -r -d '' line || [ -n "$line" ]; do
       case "$line" in
         --remote-debugging-port=9223|--remote-debugging-port=9224) return 0 ;;
       esac
-    done < "$proc_root/$pid/cmdline"
+    done < "/proc/$pid/cmdline"
   fi
   teardown_pid_holds_inode "$pid" "$inodes"
 }
