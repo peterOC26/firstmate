@@ -332,6 +332,18 @@
 #     root still exists, so the account's healthy LaunchAgent worker and every
 #     live remote secondmate worker are out of scope. Best effort: a sweep
 #     failure never blocks this teardown.
+# Chrome-devtools-axi bridges are detached process groups. They are not rooted
+# in the task copy, so Fix 2 never sees them, and they keep running after the
+# task is gone. Once this teardown has passed the landed-work and discard
+# gates and is about to report completion, it stops every such bridge owned by
+# this user whose /proc/<pid>/environ FM_TASK_ID is exactly this task. The
+# bridge is the group leader: command name node, and an argument that is
+# chrome-devtools-axi-bridge.js. A different task id, a missing FM_TASK_ID,
+# another user's process, and the shared CDP browsers (Chromium on port 9223
+# or 9224, including one that shares the bridge's process group) are never
+# signaled. The group gets TERM, then KILL after a short wait. A group that is
+# already gone is fine. Failure to stop one is reported and does not change
+# the teardown result.
 # After Fix 1 and Fix 2, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2610,6 +2622,364 @@ EOF
   return 1
 }
 
+# Process-group id from /proc/<pid>/stat, or failure when it is missing or not
+# a signalable group. pgrp is the third field after the comm's closing paren.
+teardown_proc_pgrp() { # <pid>
+  local pid=$1 proc_root stat_line
+  local -a stat_fields
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -r "$proc_root/$pid/stat" ] || return 1
+  stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+  read -r -a stat_fields <<< "${stat_line##*)}"
+  [ "${#stat_fields[@]}" -ge 3 ] || return 1
+  case "${stat_fields[2]}" in
+    ''|*[!0-9]*|0|1) return 1 ;;
+  esac
+  printf '%s\n' "${stat_fields[2]}"
+}
+
+# True when the pid is still executing. A missing pid, a zombie, or a
+# process that has already exited is not a signal target.
+teardown_proc_still_running() { # <pid>
+  local pid=$1 proc_root stat_line state
+  local -a stat_fields
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -r "$proc_root/$pid/stat" ] || return 1
+  stat_line=$(cat "$proc_root/$pid/stat" 2>/dev/null) || return 1
+  read -r -a stat_fields <<< "${stat_line##*)}"
+  [ "${#stat_fields[@]}" -ge 1 ] || return 1
+  state=${stat_fields[0]}
+  case "$state" in
+    Z*|X*) return 1 ;;
+  esac
+  return 0
+}
+
+teardown_proc_real_uid() { # <pid>
+  local pid=$1 proc_root uid
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -r "$proc_root/$pid/status" ] || return 1
+  uid=$(awk '/^Uid:/ { print $2; exit }' "$proc_root/$pid/status" 2>/dev/null) || return 1
+  case "$uid" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$uid"
+}
+
+# Exact environ value. Missing key, unreadable environ, or another user's
+# process (the kernel refuses the read) is not a value.
+teardown_proc_env_value() { # <pid> <key>
+  local pid=$1 key=$2 proc_root line
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -n "$key" ] || return 1
+  [ -r "$proc_root/$pid/environ" ] || return 1
+  while IFS= read -r -d '' line || [ -n "$line" ]; do
+    case "$line" in
+      "$key"=*)
+        printf '%s' "${line#"$key"=}"
+        return 0
+        ;;
+    esac
+  done < "$proc_root/$pid/environ"
+  return 1
+}
+
+teardown_proc_comm() { # <pid>
+  local pid=$1 proc_root comm
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -r "$proc_root/$pid/comm" ] || return 1
+  comm=$(tr -d '\0' < "$proc_root/$pid/comm" 2>/dev/null) || return 1
+  printf '%s' "$comm"
+}
+
+# True when this pid is the leader of a chrome-devtools-axi bridge group.
+teardown_pid_is_browser_bridge() { # <pid>
+  local pid=$1 proc_root line comm pgrp found=0
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  comm=$(teardown_proc_comm "$pid") || return 1
+  [ "$comm" = node ] || return 1
+  pgrp=$(teardown_proc_pgrp "$pid") || return 1
+  [ "$pgrp" = "$pid" ] || return 1
+  [ -r "$proc_root/$pid/cmdline" ] || return 1
+  while IFS= read -r -d '' line || [ -n "$line" ]; do
+    case "$line" in
+      chrome-devtools-axi-bridge.js|*/chrome-devtools-axi-bridge.js) found=1; break ;;
+    esac
+  done < "$proc_root/$pid/cmdline"
+  [ "$found" = 1 ]
+}
+
+# Inodes of listeners on the shared CDP ports 9223 and 9224.
+teardown_shared_cdp_inodes() {
+  local file header local_addr state inode port
+  for file in /proc/net/tcp /proc/net/tcp6; do
+    [ -r "$file" ] || continue
+    header=1
+    while read -r _ local_addr _ state _ _ _ _ _ inode _; do
+      if [ "$header" = 1 ]; then
+        header=0
+        continue
+      fi
+      [ "$state" = 0A ] || continue
+      port=$(printf '%s' "${local_addr##*:}" | tr '[:lower:]' '[:upper:]')
+      case "$port" in
+        2407|2408) ;;
+        *) continue ;;
+      esac
+      case "$inode" in ''|*[!0-9]*) continue ;; esac
+      printf '%s\n' "$inode"
+    done < "$file"
+  done
+}
+
+teardown_pid_holds_inode() { # <pid> <inode-list>
+  local pid=$1 inodes=$2 proc_root fd target inode
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  [ -n "$inodes" ] || return 1
+  [ -d "$proc_root/$pid/fd" ] || return 1
+  for fd in "$proc_root/$pid/fd"/*; do
+    [ -L "$fd" ] || continue
+    target=$(readlink "$fd" 2>/dev/null) || continue
+    case "$target" in
+      socket:\[*\])
+        inode=${target#socket:[}
+        inode=${inode%]}
+        printf '%s\n' "$inodes" | grep -Fxq -- "$inode" && return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+# Shared CDP browser: Chromium (or Chrome) on port 9223 or 9224. Command names
+# are the kernel's 15-character comm, so chromium-browser arrives truncated.
+teardown_pid_is_shared_cdp_browser() { # <pid> <inode-list>
+  local pid=$1 inodes=$2 proc_root line comm
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  comm=$(teardown_proc_comm "$pid") || return 1
+  case "$comm" in
+    chromium|chromium-browse|chrome|google-chrome|chrome-headless|headless_shell) ;;
+    *) return 1 ;;
+  esac
+  if [ -r "$proc_root/$pid/cmdline" ]; then
+    while IFS= read -r -d '' line || [ -n "$line" ]; do
+      case "$line" in
+        --remote-debugging-port=9223|--remote-debugging-port=9224) return 0 ;;
+      esac
+    done < "$proc_root/$pid/cmdline"
+  fi
+  teardown_pid_holds_inode "$pid" "$inodes"
+}
+
+teardown_user_process_snapshot() { # <uid>
+  local uid=$1
+  ps -u "$uid" -o pid=,pgid=,comm= 2>/dev/null
+}
+
+# Stop this task's chrome-devtools-axi bridge process groups. Best effort:
+# every failure is reported and this function still returns 0 so cleanup is
+# not undone. See the script header for the ownership rules.
+stop_task_browser_bridges_inner() { # <task-id>
+  local task=$1 proc_root my_uid own_pgrp snapshot pid pgrp comm
+  local task_env uid identity current members member protected targets
+  local still cdp_inodes i leader leader_identity
+  local -a groups leader_ids leader_identities signaled_groups
+  proc_root=${FM_PROC_ROOT_OVERRIDE:-/proc}
+  [ -n "$task" ] || return 0
+  if [ ! -d "$proc_root" ]; then
+    if [ -n "${FM_PROC_ROOT_OVERRIDE:-}" ]; then
+      return 0
+    fi
+    echo "warning: could not inspect chrome-devtools-axi bridges for $task (/proc is unavailable); cleanup continues" >&2
+    return 0
+  fi
+  my_uid=$(id -u 2>/dev/null) || {
+    echo "warning: could not inspect chrome-devtools-axi bridges for $task (uid is unavailable); cleanup continues" >&2
+    return 0
+  }
+  own_pgrp=$(teardown_proc_pgrp "$$" 2>/dev/null || true)
+  if [ -n "${FM_PROC_ROOT_OVERRIDE:-}" ]; then
+    snapshot=$(
+      for pid_path in "$proc_root"/[0-9]*; do
+        [ -d "$pid_path" ] || continue
+        pid=${pid_path##*/}
+        pgrp=$(teardown_proc_pgrp "$pid" 2>/dev/null) || continue
+        comm=$(teardown_proc_comm "$pid" 2>/dev/null) || comm=
+        printf '%s %s %s\n' "$pid" "$pgrp" "$comm"
+      done
+    )
+  else
+    snapshot=$(teardown_user_process_snapshot "$my_uid") || snapshot=
+    if [ -z "$snapshot" ]; then
+      echo "warning: could not inspect chrome-devtools-axi bridges for $task; cleanup continues" >&2
+      return 0
+    fi
+  fi
+  groups=()
+  leader_ids=()
+  leader_identities=()
+  while read -r pid pgrp comm; do
+    [ -n "$pid" ] || continue
+    [ "$comm" = node ] || continue
+    case "$pgrp" in ''|*[!0-9]*|0|1) continue ;; esac
+    [ -n "$own_pgrp" ] && [ "$pgrp" = "$own_pgrp" ] && continue
+    uid=$(teardown_proc_real_uid "$pid" 2>/dev/null) || continue
+    [ "$uid" = "$my_uid" ] || continue
+    teardown_proc_still_running "$pid" || continue
+    teardown_pid_is_browser_bridge "$pid" || continue
+    task_env=$(teardown_proc_env_value "$pid" FM_TASK_ID) || continue
+    [ "$task_env" = "$task" ] || continue
+    pgrp=$(teardown_proc_pgrp "$pid" 2>/dev/null) || continue
+    [ "$pgrp" = "$pid" ] || continue
+    [ -n "$own_pgrp" ] && [ "$pgrp" = "$own_pgrp" ] && continue
+    identity=$(task_process_identity "$pid" 2>/dev/null) || continue
+    current=0
+    for i in "${groups[@]+"${groups[@]}"}"; do
+      [ "$i" = "$pgrp" ] && current=1 && break
+    done
+    [ "$current" = 1 ] && continue
+    groups+=("$pgrp")
+    leader_ids+=("$pid")
+    leader_identities+=("$identity")
+  done <<< "$snapshot"
+  [ "${#groups[@]}" -gt 0 ] || return 0
+  cdp_inodes=$(teardown_shared_cdp_inodes 2>/dev/null || true)
+  signaled_groups=()
+  for i in "${!groups[@]}"; do
+    pgrp=${groups[$i]}
+    leader=${leader_ids[$i]}
+    leader_identity=${leader_identities[$i]}
+    # A reused pid, or a leader that is no longer this task's bridge, is not
+    # this group. An already-gone leader is success and is left alone.
+    task_process_identity_matches "$leader" "$leader_identity" || continue
+    teardown_pid_is_browser_bridge "$leader" || continue
+    task_env=$(teardown_proc_env_value "$leader" FM_TASK_ID) || continue
+    [ "$task_env" = "$task" ] || continue
+    current=$(teardown_proc_pgrp "$leader" 2>/dev/null) || continue
+    [ "$current" = "$pgrp" ] || continue
+    members=$(teardown_user_process_snapshot "$my_uid" 2>/dev/null || true)
+    protected=
+    targets=
+    while read -r member _ _; do
+      [ -n "$member" ] || continue
+      current=$(teardown_proc_pgrp "$member" 2>/dev/null) || continue
+      [ "$current" = "$pgrp" ] || continue
+      uid=$(teardown_proc_real_uid "$member" 2>/dev/null) || continue
+      [ "$uid" = "$my_uid" ] || continue
+      teardown_proc_still_running "$member" || continue
+      if teardown_pid_is_shared_cdp_browser "$member" "$cdp_inodes"; then
+        protected="$protected $member"
+        echo "teardown: leaving shared CDP browser $member running while stopping bridge process group $pgrp for $task" >&2
+        continue
+      fi
+      identity=$(task_process_identity "$member" 2>/dev/null) || continue
+      targets="$targets $member $identity"
+    done <<< "$members"
+    [ -n "$targets" ] || continue
+    echo "teardown: stopping chrome-devtools-axi bridge process group for $task: $pgrp" >&2
+    if [ -n "$protected" ]; then
+      # shellcheck disable=SC2086 # targets is a flat pid/identity list
+      set -- $targets
+      while [ "$#" -ge 2 ]; do
+        member=$1
+        identity=$2
+        shift 2
+        task_process_identity_matches "$member" "$identity" || continue
+        kill -TERM "$member" 2>/dev/null || true
+      done
+    else
+      kill -TERM -- "-$pgrp" 2>/dev/null || true
+    fi
+    signaled_groups+=("$pgrp")
+  done
+  [ "${#signaled_groups[@]}" -gt 0 ] || return 0
+  sleep 1
+  for pgrp in "${signaled_groups[@]}"; do
+    # A reused leader pid is a different process that now owns this group id.
+    leader=
+    leader_identity=
+    for i in "${!groups[@]}"; do
+      if [ "${groups[$i]}" = "$pgrp" ]; then
+        leader=${leader_ids[$i]}
+        leader_identity=${leader_identities[$i]}
+        break
+      fi
+    done
+    if [ -n "$leader" ] && [ -r "$proc_root/$leader/stat" ]; then
+      task_process_identity_matches "$leader" "$leader_identity" || continue
+    fi
+    members=$(teardown_user_process_snapshot "$my_uid" 2>/dev/null || true)
+    protected=
+    targets=
+    while read -r member _ _; do
+      [ -n "$member" ] || continue
+      current=$(teardown_proc_pgrp "$member" 2>/dev/null) || continue
+      [ "$current" = "$pgrp" ] || continue
+      uid=$(teardown_proc_real_uid "$member" 2>/dev/null) || continue
+      [ "$uid" = "$my_uid" ] || continue
+      teardown_proc_still_running "$member" || continue
+      if teardown_pid_is_shared_cdp_browser "$member" "$cdp_inodes"; then
+        protected="$protected $member"
+        continue
+      fi
+      identity=$(task_process_identity "$member" 2>/dev/null) || continue
+      targets="$targets $member"
+    done <<< "$members"
+    [ -n "${targets# }" ] || continue
+    echo "teardown: force-killing chrome-devtools-axi bridge process group for $task: $pgrp" >&2
+    if [ -n "$protected" ]; then
+      # shellcheck disable=SC2086
+      set -- $targets
+      while [ "$#" -ge 1 ]; do
+        kill -KILL "$1" 2>/dev/null || true
+        shift
+      done
+    else
+      kill -KILL -- "-$pgrp" 2>/dev/null || true
+    fi
+  done
+  for pgrp in "${signaled_groups[@]}"; do
+    leader=
+    leader_identity=
+    for i in "${!groups[@]}"; do
+      if [ "${groups[$i]}" = "$pgrp" ]; then
+        leader=${leader_ids[$i]}
+        leader_identity=${leader_identities[$i]}
+        break
+      fi
+    done
+    if [ -n "$leader" ] && [ -r "$proc_root/$leader/stat" ]; then
+      task_process_identity_matches "$leader" "$leader_identity" || continue
+    fi
+    still=
+    members=$(teardown_user_process_snapshot "$my_uid" 2>/dev/null || true)
+    while read -r member _ _; do
+      [ -n "$member" ] || continue
+      current=$(teardown_proc_pgrp "$member" 2>/dev/null) || continue
+      [ "$current" = "$pgrp" ] || continue
+      uid=$(teardown_proc_real_uid "$member" 2>/dev/null) || continue
+      [ "$uid" = "$my_uid" ] || continue
+      teardown_proc_still_running "$member" || continue
+      teardown_pid_is_shared_cdp_browser "$member" "$cdp_inodes" && continue
+      still="$still $member"
+    done <<< "$members"
+    [ -n "${still# }" ] || continue
+    echo "warning: could not stop chrome-devtools-axi bridge process group $pgrp for $task; cleanup continues" >&2
+  done
+  return 0
+}
+
+stop_task_browser_bridges() { # <task-id>
+  (
+    set +e
+    stop_task_browser_bridges_inner "$1"
+  ) || true
+  return 0
+}
+
 require_orca_worktree_path_match() {
   local worktree_id=$1 inspected=$2 resolved inspected_abs resolved_abs
   resolved=$(fm_backend_worktree_path orca "$worktree_id") || {
@@ -4398,6 +4768,9 @@ fi
 if [ -d "$STATE" ]; then
   "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
 fi
+# Detached browser bridges are not under the task copy. Stopping them never
+# changes the result of a cleanup that has already been accepted (header).
+stop_task_browser_bridges "$ID"
 if [ "$TEARDOWN_POOL_SLOT_LOST" = 1 ]; then
   echo "teardown $ID finished its cleanup and removed its task record, but a returned pool slot did not come back clean (see the warning above); clear those paths so the pool can reuse the slot" >&2
 elif [ "$TEARDOWN_LEGACY_UNCLAIMED" = 1 ]; then
