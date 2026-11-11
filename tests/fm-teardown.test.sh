@@ -78,7 +78,7 @@
 #
 # Detached chrome-devtools-axi bridges are stopped only once cleanup is accepted:
 #   (br1) landed teardown stops this task's groups; another task, an unmarked
-#         bridge, a non-bridge, and a shared CDP browser in the group stay
+#         bridge and a non-bridge stay
 #   (br2) a refused teardown leaves this task's bridge running
 set -u
 
@@ -6453,7 +6453,6 @@ ensure_fake_bridge_bins() { # <case-dir>
   local case_dir=$1 perl_bin
   perl_bin=$(command -v perl) || fail "browser-bridge fixture: perl is required"
   ln -sfn "$perl_bin" "$case_dir/node"
-  ln -sfn "$perl_bin" "$case_dir/chromium"
   ln -sfn "$perl_bin" "$case_dir/mcp-child"
   ln -sfn "$perl_bin" "$case_dir/sleeper"
   cat > "$case_dir/bridge-launcher.pl" <<'PERL'
@@ -6472,15 +6471,11 @@ if ($kind eq "other-home") {
   delete $ENV{FM_TASK_INBOX};
 }
 my $child = 0;
-if ($kind eq "bridge-mcp" || $kind eq "bridge-cdp") {
+if ($kind eq "bridge-mcp") {
   defined($child = fork()) or die "fork child: $!";
   if ($child == 0) {
     delete $ENV{FM_TASK_ID};
-    if ($kind eq "bridge-mcp") {
-      exec "$case/mcp-child", "-e", "sleep 300", "$case/mcp-hold";
-    } else {
-      exec "$case/chromium", "-e", q{$SIG{HUP}="IGNORE"; sleep 300}, "--", "--remote-debugging-port=9224", "$case/cdp-hold";
-    }
+    exec "$case/mcp-child", "-e", "sleep 300", "$case/mcp-hold";
     die "exec child: $!";
   }
 }
@@ -6648,7 +6643,7 @@ assert_foreign_bridges_survived() { # <record> <label>
 
 test_teardown_stops_own_browser_bridge_groups() {
   local case_dir rc
-  local mcp_leader mcp_child cdp_leader cdp_child
+  local mcp_leader mcp_child
   local other_leader unmarked_leader plain_leader stubborn_leader gone_leader
   local other_home_leader no_inbox_leader
   case_dir=$(make_case browser-bridges)
@@ -6658,7 +6653,6 @@ test_teardown_stops_own_browser_bridge_groups() {
   record_foreign_bridge_leaders "$case_dir/foreign-bridges"
 
   start_fake_bridge_group "$case_dir" bridge-mcp mcp_leader mcp_child
-  start_fake_bridge_group "$case_dir" bridge-cdp cdp_leader cdp_child
   start_fake_bridge_group "$case_dir" other-task other_leader ""
   start_fake_bridge_group "$case_dir" other-home other_home_leader ""
   start_fake_bridge_group "$case_dir" no-inbox no_inbox_leader ""
@@ -6669,8 +6663,6 @@ test_teardown_stops_own_browser_bridge_groups() {
 
   bridge_wait_comm "$mcp_leader" node "browser-bridges mcp leader"
   bridge_wait_comm "$mcp_child" mcp-child "browser-bridges mcp child"
-  bridge_wait_comm "$cdp_leader" node "browser-bridges cdp leader"
-  bridge_wait_comm "$cdp_child" chromium "browser-bridges cdp browser"
   bridge_wait_comm "$other_leader" node "browser-bridges other task"
   bridge_wait_comm "$other_home_leader" node "browser-bridges other home"
   bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox"
@@ -6691,10 +6683,6 @@ test_teardown_stops_own_browser_bridge_groups() {
     "browser-bridges: teardown refused a landed task"
   assert_grep "teardown: stopping chrome-devtools-axi bridge process group for task-x1: $mcp_leader" \
     "$case_dir/stderr" "browser-bridges: did not report stopping the mcp bridge group"
-  assert_grep "teardown: stopping chrome-devtools-axi bridge process group for task-x1: $cdp_leader" \
-    "$case_dir/stderr" "browser-bridges: did not report stopping the browser-sharing group"
-  assert_grep "teardown: leaving shared CDP browser $cdp_child running while stopping bridge process group $cdp_leader for task-x1" \
-    "$case_dir/stderr" "browser-bridges: did not report leaving the shared CDP browser"
   assert_grep "teardown: stopping chrome-devtools-axi bridge process group for task-x1: $stubborn_leader" \
     "$case_dir/stderr" "browser-bridges: did not report stopping the stubborn bridge"
   assert_grep "teardown: force-killing chrome-devtools-axi bridge process group for task-x1: $stubborn_leader" \
@@ -6709,10 +6697,7 @@ test_teardown_stops_own_browser_bridge_groups() {
     "browser-bridges: an already-gone group was reported as stopped or unstoppable"
   bridge_wait_dead "$mcp_leader" "browser-bridges mcp leader"
   bridge_wait_dead "$mcp_child" "browser-bridges mcp child"
-  bridge_wait_dead "$cdp_leader" "browser-bridges cdp leader"
   bridge_wait_dead "$stubborn_leader" "browser-bridges stubborn"
-  kill -0 "$cdp_child" 2>/dev/null \
-    || fail "browser-bridges: shared CDP browser $cdp_child was stopped"
   kill -0 "$other_leader" 2>/dev/null \
     || fail "browser-bridges: another task's bridge was stopped"
   kill -0 "$unmarked_leader" 2>/dev/null \
@@ -6723,7 +6708,6 @@ test_teardown_stops_own_browser_bridge_groups() {
   bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox survived"
   assert_foreign_bridges_survived "$case_dir/foreign-bridges" "browser-bridges"
 
-  bridge_stop_fixture "$cdp_child" "$case_dir"
   bridge_stop_fixture "$other_leader" "$case_dir"
   bridge_stop_fixture "$other_home_leader" "$case_dir"
   bridge_stop_fixture "$no_inbox_leader" "$case_dir"
