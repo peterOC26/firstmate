@@ -1945,6 +1945,17 @@ printf 'signal: fixture.status\n'
 printf 'supervision-host: branch-outcome: fixture\n'
 SH
         ;;
+      refused-downtime|refused-announced-downtime)
+        local marker=pending
+        [ "$kind" = refused-downtime ] || marker=announced
+        printf "printf '%s:downtime:fixture-generation\\\\n' > \"\$FM_HOME/state/.watcher-down\"\\n" "$marker"
+        cat <<'SH'
+printf 'signal: fixture.status\n'
+printf 'supervision-host: branch-outcome: fixture\n'
+printf '1\n' > "$FM_HOME/state/.lock"
+printf 'other-session\n' > "$FM_HOME/state/.lock-session"
+SH
+        ;;
       handed-back-many)
         cat <<'SH'
 printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
@@ -2125,6 +2136,36 @@ test_host_stand_down_is_silent() {
 # Main already drained and acknowledged the wake, so the rewake is refused on a
 # marker that is no longer downtime: that refusal stays silent and opens no
 # failure episode.
+# The owning generation printed an actionable host close, then the rewake
+# commit was refused while the recovery marker was still downtime: the
+# session lock moved during the park. That refusal must leave the failure
+# episode. An acknowledged marker stays the benign case above.
+assert_host_refused_downtime_rewake_leaves_durable_failure() {
+  local kind=$1 dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
+  mkdir -p "$dir/config"
+  rm -f "$dir/config/supervision-host-off"
+  : > "$dir/state/task.meta"
+  write_host_fixture "$dir" "$kind"
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "a refused downtime rewake must reach main"
+  assert_contains "$out" "signal: fixture.status" "a refused downtime rewake must keep the actionable close"
+  assert_contains "$out" "auto-arm FAILED - the supervision host returned an actionable wake" "a refused downtime rewake must deliver the failure notice"
+  assert_present "$dir/state/.claude-autoarm-failure-notified" "a refused downtime rewake did not record its failure episode"
+  [ "$(epoch_outcome "$dir")" = failed ] || fail "a refused downtime rewake must record outcome=failed, got: $(epoch_outcome "$dir")"
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "a repeated refused downtime rewake must still reach main"
+  assert_not_contains "$out" "auto-arm FAILED" "a repeated refused downtime rewake must not repeat the failure notice"
+  [ "$(epoch_outcome "$dir")" = failed-suppressed ] \
+    || fail "a repeated refused downtime rewake must record outcome=failed-suppressed, got: $(epoch_outcome "$dir")"
+}
+
+test_host_owner_refused_downtime_rewake_leaves_durable_failure() {
+  assert_host_refused_downtime_rewake_leaves_durable_failure refused-downtime
+  assert_host_refused_downtime_rewake_leaves_durable_failure refused-announced-downtime
+  pass "auto-arm: an owning generation whose downtime rewake is refused leaves a durable failure"
+}
+
 test_host_benign_rewake_refusal_opens_no_failure_episode() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-benign-refusal")
@@ -2385,6 +2426,7 @@ test_plain_arm_banner_keeps_its_wake_line_cap
 test_host_handback_carries_every_host_line
 test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
+test_host_owner_refused_downtime_rewake_leaves_durable_failure
 test_host_lost_handback_notifies_once_per_episode
 test_host_lost_announced_handback_notifies_once_per_episode
 test_host_crash_is_retried_then_reported
