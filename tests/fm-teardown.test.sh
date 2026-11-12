@@ -75,6 +75,11 @@
 #   (ah) hung fetch                                               -> bounded, REFUSE
 #   (ai) commits held only by the no-mistakes gate                -> REFUSE, gate not fetched
 #   (aj) file saved during the refresh, work landed                -> REFUSE, file intact
+#
+# Detached chrome-devtools-axi bridges are stopped only once cleanup is accepted:
+#   (br1) landed teardown stops this task's groups; another task, an unmarked
+#         bridge and a non-bridge stay
+#   (br2) a refused teardown leaves this task's bridge running
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -6439,6 +6444,370 @@ SH
   pass "post-reap proof retains late work and retry records on ordinary and Orca paths, preserving clean/force/scout behavior"
 }
 
+# Fixture bridges are perl invoked through a symlink named node, so the kernel
+# command name is node, one argument is chrome-devtools-axi-bridge.js, and the
+# process stays up. sleep cannot do that: it treats the script path as a time
+# interval and exits. Each fixture is its own session. Every argument names the
+# case directory so suite cleanup can reap a fixture this test fails to stop.
+ensure_fake_bridge_bins() { # <case-dir>
+  local case_dir=$1 perl_bin
+  perl_bin=$(command -v perl) || fail "browser-bridge fixture: perl is required"
+  ln -sfn "$perl_bin" "$case_dir/node"
+  ln -sfn "$perl_bin" "$case_dir/mcp-child"
+  ln -sfn "$perl_bin" "$case_dir/sleeper"
+  cat > "$case_dir/bridge-launcher.pl" <<'PERL'
+use strict;
+use Cwd qw(realpath);
+use POSIX qw(setsid);
+my ($pidfile, $case, $kind) = @ARGV;
+die "usage\n" unless defined $kind && $kind ne "";
+defined(my $pid = fork()) or die "fork: $!";
+exit 0 if $pid;
+setsid() >= 0 or die "setsid: $!";
+$ENV{FM_TASK_INBOX} = realpath("$case/state") . "/task-x1.inbox";
+if ($kind eq "other-home") {
+  $ENV{FM_TASK_INBOX} = "$case/other-home/state/task-x1.inbox";
+} elsif ($kind eq "no-inbox") {
+  delete $ENV{FM_TASK_INBOX};
+}
+my $child = 0;
+if ($kind eq "bridge-mcp") {
+  defined($child = fork()) or die "fork child: $!";
+  if ($child == 0) {
+    delete $ENV{FM_TASK_ID};
+    exec "$case/mcp-child", "-e", "sleep 300", "$case/mcp-hold";
+    die "exec child: $!";
+  }
+}
+open my $out, ">", $pidfile or die "pidfile: $!";
+print $out "$$ $child\n";
+close $out or die "pidfile close: $!";
+if ($kind eq "unmarked") {
+  delete $ENV{FM_TASK_ID};
+  exec "$case/node", "-e", "sleep 300", "$case/chrome-devtools-axi-bridge.js";
+} elsif ($kind eq "other-task") {
+  $ENV{FM_TASK_ID} = "task-other";
+  exec "$case/node", "-e", "sleep 300", "$case/chrome-devtools-axi-bridge.js";
+} elsif ($kind eq "plain") {
+  $ENV{FM_TASK_ID} = "task-x1";
+  exec "$case/sleeper", "-e", "sleep 300", "$case/plain-hold";
+} elsif ($kind eq "stubborn") {
+  $ENV{FM_TASK_ID} = "task-x1";
+  exec "$case/node", "-e", q{$SIG{TERM}="IGNORE"; sleep 30 while 1;}, "$case/chrome-devtools-axi-bridge.js";
+} else {
+  $ENV{FM_TASK_ID} = "task-x1";
+  exec "$case/node", "-e", "sleep 300", "$case/chrome-devtools-axi-bridge.js";
+}
+die "exec leader: $!";
+PERL
+}
+
+# Set the named variables to the leader pid and the partner pid. The partner
+# is 0 when the kind has no other process in the group. Runs in the current
+# shell so a fixture failure stops the test instead of only its subshell.
+start_fake_bridge_group() { # <case-dir> <kind> <leader-var> <child-var>
+  local case_dir=$1 kind=$2 leader_var=$3 child_var=${4:-} pidfile got_leader="" got_child="" i
+  pidfile=$(mktemp "$case_dir/bridge-pids.XXXXXX")
+  perl "$case_dir/bridge-launcher.pl" "$pidfile" "$case_dir" "$kind" \
+    >/dev/null || fail "browser-bridge fixture: launcher failed for $kind"
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if [ -s "$pidfile" ]; then
+      read -r got_leader got_child < "$pidfile"
+      break
+    fi
+    sleep 0.05
+  done
+  case "$got_leader" in
+    ''|*[!0-9]*) fail "browser-bridge fixture: $kind wrote no leader pid" ;;
+  esac
+  case "${got_child:-0}" in
+    ''|*[!0-9]*) fail "browser-bridge fixture: $kind wrote a bad child pid" ;;
+  esac
+  printf -v "$leader_var" '%s' "$got_leader"
+  if [ -n "$child_var" ]; then
+    printf -v "$child_var" '%s' "$got_child"
+  fi
+}
+
+bridge_wait_comm() { # <pid> <expected> <label>
+  local pid=$1 expected=$2 label=$3 i comm=""
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if [ -r "/proc/$pid/comm" ]; then
+      comm=$(tr -d '\0\n' < "/proc/$pid/comm" 2>/dev/null || true)
+      [ "$comm" = "$expected" ] && return 0
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      fail "$label: fixture $pid exited before its command name became $expected"
+    fi
+    sleep 0.05
+  done
+  fail "$label: fixture $pid command name stayed ${comm:-missing}, wanted $expected"
+}
+
+bridge_wait_dead() { # <pid> <label>
+  local pid=$1 label=$2 i
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    kill -0 "$pid" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  fail "$label: fixture $pid was still running"
+}
+
+# Kill only a fixture whose command line still names this case. Never signal
+# pid 0 or 1, and never signal a recycled pid that no longer names the case.
+bridge_stop_fixture() { # <pid> <case-dir>
+  local pid=$1 case_dir=$2
+  case "$pid" in ''|*[!0-9]*|0|1) return 0 ;; esac
+  [ -r "/proc/$pid/cmdline" ] || return 0
+  if ! tr '\0' '\n' < "/proc/$pid/cmdline" | grep -F -q -- "$case_dir/"; then
+    return 0
+  fi
+  kill -KILL "$pid" 2>/dev/null || true
+}
+
+# pid and start time of bridge leaders that are not this suite's task-x1.
+# A later teardown of task-x1 must leave every one of them running.
+record_foreign_bridge_leaders() { # <dest>
+  local dest=$1
+  UID_WANTED=$(id -u) perl - "$dest" <<'PERL'
+use strict;
+my $dest = $ARGV[0];
+my $uid = $ENV{UID_WANTED} // "";
+open my $out, ">", $dest or die $!;
+opendir my $dh, "/proc" or exit 0;
+while (my $pid = readdir $dh) {
+  next unless $pid =~ /^\d+$/;
+  open my $sf, "<", "/proc/$pid/status" or next;
+  my $real;
+  while (<$sf>) {
+    if (/^Uid:\s+(\d+)/) { $real = $1; last; }
+  }
+  close $sf;
+  next unless defined $real && $real eq $uid;
+  open my $cf, "<", "/proc/$pid/comm" or next;
+  my $comm = <$cf> // "";
+  close $cf;
+  chomp $comm;
+  next unless $comm eq "node";
+  open my $cmd, "<", "/proc/$pid/cmdline" or next;
+  local $/ = "\0";
+  my $bridge = 0;
+  while (<$cmd>) {
+    s/\0\z//;
+    $bridge = 1 if $_ eq "chrome-devtools-axi-bridge.js" || m{/chrome-devtools-axi-bridge\.js\z};
+  }
+  close $cmd;
+  next unless $bridge;
+  open my $st, "<", "/proc/$pid/stat" or next;
+  my $stat = <$st> // "";
+  close $st;
+  $stat =~ s/.*\)//;
+  my @fields = split " ", $stat;
+  next unless defined $fields[2] && $fields[2] eq $pid;
+  next unless defined $fields[19] && $fields[19] =~ /^\d+$/;
+  my $task = "";
+  my $saw_env = 0;
+  if (open my $ef, "<", "/proc/$pid/environ") {
+    $saw_env = 1;
+    local $/ = "\0";
+    while (<$ef>) {
+      s/\0\z//;
+      if (/^FM_TASK_ID=(.*)\z/s) { $task = $1; last; }
+    }
+    close $ef;
+  }
+  next unless $saw_env;
+  next if $task eq "task-x1";
+  print $out "$pid $fields[19]\n";
+}
+close $out;
+PERL
+}
+
+bridge_starttime() { # <pid>
+  local stat_line
+  local -a stat_fields
+  stat_line=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  read -r -a stat_fields <<< "${stat_line##*)}"
+  printf '%s\n' "${stat_fields[19]}"
+}
+
+assert_foreign_bridges_survived() { # <record> <label>
+  local record=$1 label=$2 pid start now
+  while read -r pid start; do
+    [ -n "$pid" ] || continue
+    now=$(bridge_starttime "$pid" 2>/dev/null || true)
+    [ "$now" = "$start" ] || fail "$label: pre-existing bridge $pid did not survive teardown"
+  done < "$record"
+}
+
+test_teardown_stops_own_browser_bridge_groups() {
+  local case_dir rc
+  local mcp_leader mcp_child
+  local other_leader unmarked_leader plain_leader stubborn_leader gone_leader
+  local other_home_leader no_inbox_leader
+  case_dir=$(make_case browser-bridges)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ensure_fake_bridge_bins "$case_dir"
+  record_foreign_bridge_leaders "$case_dir/foreign-bridges"
+
+  start_fake_bridge_group "$case_dir" bridge-mcp mcp_leader mcp_child
+  start_fake_bridge_group "$case_dir" other-task other_leader ""
+  start_fake_bridge_group "$case_dir" other-home other_home_leader ""
+  start_fake_bridge_group "$case_dir" no-inbox no_inbox_leader ""
+  start_fake_bridge_group "$case_dir" unmarked unmarked_leader ""
+  start_fake_bridge_group "$case_dir" plain plain_leader ""
+  start_fake_bridge_group "$case_dir" stubborn stubborn_leader ""
+  start_fake_bridge_group "$case_dir" bridge gone_leader ""
+
+  bridge_wait_comm "$mcp_leader" node "browser-bridges mcp leader"
+  bridge_wait_comm "$mcp_child" mcp-child "browser-bridges mcp child"
+  bridge_wait_comm "$other_leader" node "browser-bridges other task"
+  bridge_wait_comm "$other_home_leader" node "browser-bridges other home"
+  bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox"
+  bridge_wait_comm "$unmarked_leader" node "browser-bridges unmarked"
+  bridge_wait_comm "$plain_leader" sleeper "browser-bridges plain"
+  bridge_wait_comm "$stubborn_leader" node "browser-bridges stubborn"
+  bridge_wait_comm "$gone_leader" node "browser-bridges already gone"
+  kill -TERM -- "-$gone_leader" 2>/dev/null || true
+  bridge_wait_dead "$gone_leader" "browser-bridges already gone"
+
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "browser-bridges: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "teardown task-x1 complete" "$case_dir/stdout" \
+    "browser-bridges: teardown did not report completion"
+  assert_no_grep "REFUSED" "$case_dir/stderr" \
+    "browser-bridges: teardown refused a landed task"
+  assert_grep "teardown: stopping chrome-devtools-axi bridge process group for task-x1: $mcp_leader" \
+    "$case_dir/stderr" "browser-bridges: did not report stopping the mcp bridge group"
+  assert_grep "teardown: stopping chrome-devtools-axi bridge process group for task-x1: $stubborn_leader" \
+    "$case_dir/stderr" "browser-bridges: did not report stopping the stubborn bridge"
+  assert_grep "teardown: force-killing chrome-devtools-axi bridge process group for task-x1: $stubborn_leader" \
+    "$case_dir/stderr" "browser-bridges: a bridge that ignored TERM was not force-killed"
+  assert_no_grep "could not stop chrome-devtools-axi bridge" "$case_dir/stderr" \
+    "browser-bridges: teardown reported a bridge it could not stop"
+  assert_no_grep "bridge process group for task-x1: $other_leader" "$case_dir/stderr" \
+    "browser-bridges: teardown reported stopping another task's bridge"
+  assert_no_grep "bridge process group for task-x1: $unmarked_leader" "$case_dir/stderr" \
+    "browser-bridges: teardown reported stopping an unmarked bridge"
+  assert_no_grep "bridge process group for task-x1: $gone_leader" "$case_dir/stderr" \
+    "browser-bridges: an already-gone group was reported as stopped or unstoppable"
+  bridge_wait_dead "$mcp_leader" "browser-bridges mcp leader"
+  bridge_wait_dead "$mcp_child" "browser-bridges mcp child"
+  bridge_wait_dead "$stubborn_leader" "browser-bridges stubborn"
+  kill -0 "$other_leader" 2>/dev/null \
+    || fail "browser-bridges: another task's bridge was stopped"
+  kill -0 "$unmarked_leader" 2>/dev/null \
+    || fail "browser-bridges: an unmarked bridge was stopped"
+  kill -0 "$plain_leader" 2>/dev/null \
+    || fail "browser-bridges: a non-bridge process with this task id was stopped"
+  bridge_wait_comm "$other_home_leader" node "browser-bridges other home survived"
+  bridge_wait_comm "$no_inbox_leader" node "browser-bridges missing inbox survived"
+  assert_foreign_bridges_survived "$case_dir/foreign-bridges" "browser-bridges"
+
+  bridge_stop_fixture "$other_leader" "$case_dir"
+  bridge_stop_fixture "$other_home_leader" "$case_dir"
+  bridge_stop_fixture "$no_inbox_leader" "$case_dir"
+  bridge_stop_fixture "$unmarked_leader" "$case_dir"
+  bridge_stop_fixture "$plain_leader" "$case_dir"
+  pass "teardown stops this task's browser bridge groups, including one that ignores TERM, and leaves every other process alone"
+}
+
+test_teardown_bridge_kill_rechecks_member_identity() {
+  local case_dir leader rc
+  case_dir=$(make_case browser-bridge-kill-identity)
+  add_lsof_no_holder "$case_dir"
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  ensure_fake_bridge_bins "$case_dir"
+  start_fake_bridge_group "$case_dir" stubborn leader ""
+  bridge_wait_comm "$leader" node "browser-bridge-kill-identity"
+  cat > "$case_dir/identity-env.sh" <<'SH'
+sleep() {
+  if [ "${FUNCNAME[1]:-}" = stop_task_browser_bridges_inner ]; then
+    : > "$FM_BRIDGE_CHECK_DIR/kill-phase"
+  fi
+  command sleep "$@"
+}
+cat() {
+  local count line prefix
+  local -a fields
+  if [ "${1:-}" = "/proc/$FM_BRIDGE_CHECK_PID/stat" ] &&
+     [ "${FUNCNAME[1]:-}" = task_process_identity ] &&
+     [ -f "$FM_BRIDGE_CHECK_DIR/kill-phase" ]; then
+    count=0
+    [ ! -f "$FM_BRIDGE_CHECK_DIR/reads" ] || read -r count < "$FM_BRIDGE_CHECK_DIR/reads"
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$FM_BRIDGE_CHECK_DIR/reads"
+    if [ "$count" -ge 3 ]; then
+      line=$(command cat "$@") || return
+      prefix="${line%)*})"
+      read -r -a fields <<< "${line##*)}"
+      fields[19]=$((${fields[19]} + 1))
+      printf '%s %s\n' "$prefix" "${fields[*]}"
+      return
+    fi
+  fi
+  command cat "$@"
+}
+SH
+  rc=0
+  BASH_ENV="$case_dir/identity-env.sh" FM_BRIDGE_CHECK_DIR="$case_dir" FM_BRIDGE_CHECK_PID="$leader" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "bridge-kill-identity: teardown should succeed"
+  [ "$(cat "$case_dir/reads")" -ge 3 ] || fail "bridge-kill-identity: member identity was not rechecked"
+  assert_no_grep "force-killing chrome-devtools-axi" "$case_dir/stderr" "bridge-kill-identity: stale identity authorized KILL"
+  bridge_wait_comm "$leader" node "bridge-kill-identity survived"
+  bridge_stop_fixture "$leader" "$case_dir"
+  pass "bridge KILL skips a group whose recorded member identity changed"
+}
+
+test_teardown_proc_override_leaves_browser_bridges() {
+  local case_dir rc leader override
+  for override in /proc "" missing; do
+    case_dir=$(make_case "browser-bridge-override-${override##*/}")
+    write_meta "$case_dir" no-mistakes ship
+    land_shippable_commit "$case_dir"
+    ensure_fake_bridge_bins "$case_dir"
+    start_fake_bridge_group "$case_dir" bridge leader ""
+    bridge_wait_comm "$leader" node "browser-bridge-override"
+    [ "$override" != missing ] || override="$case_dir/no-proc"
+    rc=0
+    FM_PROC_ROOT_OVERRIDE="$override" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "browser-bridge-override: teardown should succeed"
+    assert_no_grep "chrome-devtools-axi" "$case_dir/stderr" "browser-bridge-override: cleanup was not silently skipped"
+    bridge_wait_comm "$leader" node "browser-bridge-override survived"
+    bridge_stop_fixture "$leader" "$case_dir"
+  done
+  pass "a proc override silently skips browser bridge cleanup"
+}
+
+test_teardown_refusal_leaves_browser_bridges() {
+  local case_dir rc leader
+  case_dir=$(make_case browser-bridge-refusal)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "unpushed work"
+  ensure_fake_bridge_bins "$case_dir"
+  start_fake_bridge_group "$case_dir" bridge leader ""
+  bridge_wait_comm "$leader" node "browser-bridge-refusal"
+
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 1 "$rc" "browser-bridge-refusal: teardown should refuse"
+  assert_grep "REFUSED" "$case_dir/stderr" \
+    "browser-bridge-refusal: no REFUSED line in stderr"
+  assert_no_grep "stopping chrome-devtools-axi" "$case_dir/stderr" \
+    "browser-bridge-refusal: a refused teardown reported stopping a bridge"
+  kill -0 "$leader" 2>/dev/null \
+    || fail "browser-bridge-refusal: the task's bridge was stopped"
+  bridge_stop_fixture "$leader" "$case_dir"
+  pass "a refused teardown leaves the task's browser bridge running"
+}
+
 test_hidden_untracked_work_refuses_before_return
 test_content_fallback_git_capability_boundary
 test_work_written_at_reap_boundary_is_preserved
@@ -6598,3 +6967,7 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+test_teardown_stops_own_browser_bridge_groups
+test_teardown_refusal_leaves_browser_bridges
+test_teardown_proc_override_leaves_browser_bridges
+test_teardown_bridge_kill_rechecks_member_identity
