@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Empty-home away entry records cap 5 and announces five new workers",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Away entry with 3, 6, or 15 retained workers adds five slots and excludes secondmates",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Explicit limit equal to six workers stays six and warns with a remedy",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Explicit limit below worker count stays two and shows zero room plus overage",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Refresh preserves the cap; following the warning with new words and --spend 10 opens four slots",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Quiet entry omits away-room messaging; conversion to away reports five new slots",
+    "result": "pass",
+    "live": true
+  }
+]

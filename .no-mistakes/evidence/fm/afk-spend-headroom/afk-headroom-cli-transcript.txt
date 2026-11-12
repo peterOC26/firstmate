@@ -1,0 +1,347 @@
+
+SETUP baseline-six: marked disposable home; 6 retained ordinary worker records (ships/scouts), 1 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:baseline-six> bash bin/.afk-before-live-987rh9a2.sh enter --words Continue the queued overnight work.
+Away posture recorded at 2026-11-12T08:54:54Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 6 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-12T08:54:54Z
+  expected return: not given
+  spend cap: 6 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the queued overnight work.
+[exit 0]
+$ FM_HOME=<lab:baseline-six> bash bin/.afk-before-live-987rh9a2.sh field spend_max_concurrent_workers
+6
+[exit 0]
+$ FM_HOME=<lab:baseline-six> bash bin/.afk-before-live-987rh9a2.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:54Z
+entered_epoch: 1794473694
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 6
+confirmed: 2026-11-12T08:54:54Z
+confirmed_epoch: 1794473694
+words: |-
+  Continue the queued overnight work.
+
+$ FM_HOME=<lab:baseline-six> bash bin/.afk-before-live-987rh9a2.sh live-workers
+6
+[exit 0]
+BASELINE REPRODUCED: saved cap 6 equals 6 retained ordinary records; no headroom.
+
+SETUP empty: marked disposable home; 0 retained ordinary worker records (ships/scouts), 0 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:empty> bash bin/fm-afk-contract.sh enter --words Continue the queued overnight work.
+Away posture recorded at 2026-11-12T08:54:55Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 5 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T08:54:55Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the queued overnight work.
+[exit 0]
+$ FM_HOME=<lab:empty> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+5
+[exit 0]
+$ FM_HOME=<lab:empty> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:55Z
+entered_epoch: 1794473695
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 5
+confirmed: 2026-11-12T08:54:55Z
+confirmed_epoch: 1794473695
+words: |-
+  Continue the queued overnight work.
+
+SCENARIO PASS: Empty-home away entry records cap 5 and announces five new workers
+
+SETUP ordinary-3: marked disposable home; 3 retained ordinary worker records (ships/scouts), 2 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:ordinary-3> bash bin/fm-afk-contract.sh live-workers
+3
+[exit 0]
+$ FM_HOME=<lab:ordinary-3> bash bin/fm-afk-contract.sh enter --words Continue the queued overnight work.
+Away posture recorded at 2026-11-12T08:54:55Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 8 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T08:54:55Z
+  expected return: not given
+  spend cap: 8 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the queued overnight work.
+[exit 0]
+$ FM_HOME=<lab:ordinary-3> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+8
+[exit 0]
+$ FM_HOME=<lab:ordinary-3> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:55Z
+entered_epoch: 1794473695
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 8
+confirmed: 2026-11-12T08:54:55Z
+confirmed_epoch: 1794473695
+words: |-
+  Continue the queued overnight work.
+
+
+SETUP ordinary-6: marked disposable home; 6 retained ordinary worker records (ships/scouts), 2 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:ordinary-6> bash bin/fm-afk-contract.sh live-workers
+6
+[exit 0]
+$ FM_HOME=<lab:ordinary-6> bash bin/fm-afk-contract.sh enter --words Continue the queued overnight work.
+Away posture recorded at 2026-11-12T08:54:56Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 11 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T08:54:56Z
+  expected return: not given
+  spend cap: 11 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the queued overnight work.
+[exit 0]
+$ FM_HOME=<lab:ordinary-6> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+11
+[exit 0]
+$ FM_HOME=<lab:ordinary-6> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:56Z
+entered_epoch: 1794473696
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 11
+confirmed: 2026-11-12T08:54:56Z
+confirmed_epoch: 1794473696
+words: |-
+  Continue the queued overnight work.
+
+
+SETUP ordinary-15: marked disposable home; 15 retained ordinary worker records (ships/scouts), 2 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:ordinary-15> bash bin/fm-afk-contract.sh live-workers
+15
+[exit 0]
+$ FM_HOME=<lab:ordinary-15> bash bin/fm-afk-contract.sh enter --words Continue the queued overnight work.
+Away posture recorded at 2026-11-12T08:54:56Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 20 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T08:54:56Z
+  expected return: not given
+  spend cap: 20 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue the queued overnight work.
+[exit 0]
+$ FM_HOME=<lab:ordinary-15> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+20
+[exit 0]
+$ FM_HOME=<lab:ordinary-15> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:56Z
+entered_epoch: 1794473696
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 20
+confirmed: 2026-11-12T08:54:56Z
+confirmed_epoch: 1794473696
+words: |-
+  Continue the queued overnight work.
+
+SCENARIO PASS: Away entry with 3, 6, or 15 retained workers adds five slots and excludes secondmates
+
+SETUP explicit: marked disposable home; 6 retained ordinary worker records (ships/scouts), 1 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh enter --words Keep the current cap. --spend 6
+Away posture recorded at 2026-11-12T08:54:57Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 6 concurrent workers.
+  new workers that can start: 0
+  warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.
+Away posture (recorded):
+  entered: 2026-11-12T08:54:57Z
+  expected return: not given
+  spend cap: 6 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep the current cap.
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+6
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:57Z
+entered_epoch: 1794473697
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 6
+confirmed: 2026-11-12T08:54:57Z
+confirmed_epoch: 1794473697
+words: |-
+  Keep the current cap.
+
+SCENARIO PASS: Explicit limit equal to six workers stays six and warns with a remedy
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh enter --words Constrain the overnight work. --spend 2
+Away posture recorded at 2026-11-12T08:54:57Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 2 concurrent workers.
+  new workers that can start: 0 (4 over the cap)
+  warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.
+Away posture (recorded):
+  entered: 2026-11-12T08:54:57Z
+  expected return: not given
+  spend cap: 2 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Constrain the overnight work.
+fm-afk-contract: replaced the earlier away posture; its record is archived at /home/zabi/.no-mistakes/worktrees/6a54b52975c8/01M77F5H0HXT2FQP6RKSWDKNFJ/.afk-headroom-live-laigkdjl/explicit/state/afk-contracts/1794473697-superseded-1794473697.afk-contract
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+2
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:57Z
+entered_epoch: 1794473697
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 2
+confirmed: 2026-11-12T08:54:57Z
+confirmed_epoch: 1794473697
+words: |-
+  Constrain the overnight work.
+
+SCENARIO PASS: Explicit limit below worker count stays two and shows zero room plus overage
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh enter --spend 10
+Away posture recorded at 2026-11-12T08:54:57Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 2 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-12T08:54:57Z
+  expected return: not given
+  spend cap: 2 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Constrain the overnight work.
+fm-afk-contract: away posture already recorded at 2026-11-12T08:54:57Z; a refresh leaves it untouched
+fm-afk-contract: the expected return and spend cap given with this refresh were not applied; enter new words to replace the mandate
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+2
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:57Z
+entered_epoch: 1794473697
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 2
+confirmed: 2026-11-12T08:54:57Z
+confirmed_epoch: 1794473697
+words: |-
+  Constrain the overnight work.
+
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh readback
+Away posture (recorded):
+  entered: 2026-11-12T08:54:57Z
+  expected return: not given
+  spend cap: 2 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Constrain the overnight work.
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh enter --words Continue with more room. --spend 10
+Away posture recorded at 2026-11-12T08:54:58Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 10 concurrent workers.
+  new workers that can start: 4
+Away posture (recorded):
+  entered: 2026-11-12T08:54:57Z
+  expected return: not given
+  spend cap: 10 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue with more room.
+fm-afk-contract: replaced the earlier away posture; its record is archived at /home/zabi/.no-mistakes/worktrees/6a54b52975c8/01M77F5H0HXT2FQP6RKSWDKNFJ/.afk-headroom-live-laigkdjl/explicit/state/afk-contracts/1794473697-superseded-1794473698.afk-contract
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+10
+[exit 0]
+$ FM_HOME=<lab:explicit> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:57Z
+entered_epoch: 1794473697
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 10
+confirmed: 2026-11-12T08:54:58Z
+confirmed_epoch: 1794473698
+words: |-
+  Continue with more room.
+
+SCENARIO PASS: Refresh preserves the cap; following the warning with new words and --spend 10 opens four slots
+
+SETUP quiet-to-away: marked disposable home; 3 retained ordinary worker records (ships/scouts), 1 secondmate records; no worker endpoints launched.
+$ FM_HOME=<lab:quiet-to-away> FM_AFK_MODE=quiet bash bin/fm-afk-contract.sh enter --words Reduce routine updates.
+Quiet mode recorded at 2026-11-12T08:54:59Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-12T08:54:59Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    Reduce routine updates.
+[exit 0]
+$ FM_HOME=<lab:quiet-to-away> bash bin/fm-afk-contract.sh enter
+Away posture recorded at 2026-11-12T08:54:59Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 8 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T08:54:59Z
+  expected return: not given
+  spend cap: 8 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+fm-afk-contract: quiet mode became the away posture; the quiet record is archived at /home/zabi/.no-mistakes/worktrees/6a54b52975c8/01M77F5H0HXT2FQP6RKSWDKNFJ/.afk-headroom-live-laigkdjl/quiet-to-away/state/afk-contracts/1794473699-superseded-1794473699.afk-contract
+[exit 0]
+$ FM_HOME=<lab:quiet-to-away> bash bin/fm-afk-contract.sh field spend_max_concurrent_workers
+8
+[exit 0]
+$ FM_HOME=<lab:quiet-to-away> bash bin/fm-afk-contract.sh validate
+[exit 0]
+PERSISTED PUBLIC RECORD:
+version: 2
+entered: 2026-11-12T08:54:59Z
+entered_epoch: 1794473699
+expected_return: -
+reach_channels: none
+reach_announced: No phone channel is configured; anything that needs you waits for your return.
+spend_max_concurrent_workers: 8
+confirmed: 2026-11-12T08:54:59Z
+confirmed_epoch: 1794473699
+words: -
+
+$ FM_HOME=<lab:quiet-to-away> bash bin/fm-afk-contract.sh mode
+away
+[exit 0]
+SCENARIO PASS: Quiet entry omits away-room messaging; conversion to away reports five new slots
+CLEANUP: disposable lab homes and prior-version executable removed; no backend or fleet session was used.
