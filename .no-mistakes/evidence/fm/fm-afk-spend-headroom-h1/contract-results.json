@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Empty home enters with cap 5 and five available new workers",
+    "result": "pass"
+  },
+  {
+    "name": "Three and fifteen mixed-status ordinary records get five headroom, excluding secondmates",
+    "result": "pass"
+  },
+  {
+    "name": "Zero-room warning is entry-only; refresh preserves cap; new words plus spend raises cap",
+    "result": "pass"
+  },
+  {
+    "name": "Explicit cap below count prints zero and over-cap amount",
+    "result": "pass"
+  },
+  {
+    "name": "Quiet entry omits away room; conversion to away prints room",
+    "result": "pass"
+  },
+  {
+    "name": "Original 15-record stall reproduced at base commit",
+    "result": "pass"
+  }
+]

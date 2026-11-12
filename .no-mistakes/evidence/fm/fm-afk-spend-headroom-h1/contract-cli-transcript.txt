@@ -1,0 +1,275 @@
+
+=== empty: 0 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<empty> bin/fm-afk-launch.sh enter --words Keep accepted work moving.
+Away posture recorded at 2026-11-12T07:21:28Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 5 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T07:21:28Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep accepted work moving.
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=<empty> bin/fm-afk-contract.sh live-workers
+0
+[exit 0]
+$ FM_HOME=<empty> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+5
+[exit 0]
+
+=== workers-3: 3 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<workers-3> bin/fm-afk-launch.sh enter --words Keep accepted work moving.
+Away posture recorded at 2026-11-12T07:21:29Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 8 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T07:21:29Z
+  expected return: not given
+  spend cap: 8 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep accepted work moving.
+Live work:
+  worker-0: 2026-11-12T00
+  worker-1: 2026-11-12T00
+  worker-2: 2026-11-12T00
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=<workers-3> bin/fm-afk-contract.sh live-workers
+3
+[exit 0]
+$ FM_HOME=<workers-3> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+8
+[exit 0]
+
+=== workers-15: 15 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<workers-15> bin/fm-afk-launch.sh enter --words Keep accepted work moving.
+Away posture recorded at 2026-11-12T07:21:31Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 20 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T07:21:31Z
+  expected return: not given
+  spend cap: 20 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep accepted work moving.
+Live work:
+  worker-0: 2026-11-12T00
+  worker-1: 2026-11-12T00
+  worker-10: 2026-11-12T00
+  worker-11: 2026-11-12T00
+  worker-12: 2026-11-12T00
+  worker-13: 2026-11-12T00
+  worker-14: 2026-11-12T00
+  worker-2: 2026-11-12T00
+  worker-3: 2026-11-12T00
+  worker-4: 2026-11-12T00
+  worker-5: 2026-11-12T00
+  worker-6: 2026-11-12T00
+  worker-7: 2026-11-12T00
+  worker-8: 2026-11-12T00
+  worker-9: 2026-11-12T00
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=<workers-15> bin/fm-afk-contract.sh live-workers
+15
+[exit 0]
+$ FM_HOME=<workers-15> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+20
+[exit 0]
+
+=== zero-room: 15 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<zero-room> bin/fm-afk-launch.sh enter --words Wait for room. --spend 15
+Away posture recorded at 2026-11-12T07:21:32Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 15 concurrent workers.
+  new workers that can start: 0
+  warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.
+Away posture (recorded):
+  entered: 2026-11-12T07:21:32Z
+  expected return: not given
+  spend cap: 15 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Wait for room.
+Live work:
+  worker-0: 2026-11-12T00
+  worker-1: 2026-11-12T00
+  worker-10: 2026-11-12T00
+  worker-11: 2026-11-12T00
+  worker-12: 2026-11-12T00
+  worker-13: 2026-11-12T00
+  worker-14: 2026-11-12T00
+  worker-2: 2026-11-12T00
+  worker-3: 2026-11-12T00
+  worker-4: 2026-11-12T00
+  worker-5: 2026-11-12T00
+  worker-6: 2026-11-12T00
+  worker-7: 2026-11-12T00
+  worker-8: 2026-11-12T00
+  worker-9: 2026-11-12T00
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+15
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-contract.sh readback
+Away posture (recorded):
+  entered: 2026-11-12T07:21:32Z
+  expected return: not given
+  spend cap: 15 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Wait for room.
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-contract.sh enter
+Away posture recorded at 2026-11-12T07:21:32Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 15 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-12T07:21:32Z
+  expected return: not given
+  spend cap: 15 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Wait for room.
+fm-afk-contract: away posture already recorded at 2026-11-12T07:21:32Z; a refresh leaves it untouched
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-contract.sh enter --spend 25
+Away posture recorded at 2026-11-12T07:21:32Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 15 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-12T07:21:32Z
+  expected return: not given
+  spend cap: 15 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Wait for room.
+fm-afk-contract: away posture already recorded at 2026-11-12T07:21:32Z; a refresh leaves it untouched
+fm-afk-contract: the expected return and spend cap given with this refresh were not applied; enter new words to replace the mandate
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-launch.sh enter --words Continue with more room. --spend 25
+Away posture recorded at 2026-11-12T07:21:34Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 25 concurrent workers.
+  new workers that can start: 10
+Away posture (recorded):
+  entered: 2026-11-12T07:21:32Z
+  expected return: not given
+  spend cap: 25 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Continue with more room.
+Live work:
+  worker-0: 2026-11-12T00
+  worker-1: 2026-11-12T00
+  worker-10: 2026-11-12T00
+  worker-11: 2026-11-12T00
+  worker-12: 2026-11-12T00
+  worker-13: 2026-11-12T00
+  worker-14: 2026-11-12T00
+  worker-2: 2026-11-12T00
+  worker-3: 2026-11-12T00
+  worker-4: 2026-11-12T00
+  worker-5: 2026-11-12T00
+  worker-6: 2026-11-12T00
+  worker-7: 2026-11-12T00
+  worker-8: 2026-11-12T00
+  worker-9: 2026-11-12T00
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+fm-afk-contract: replaced the earlier away posture; its record is archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M77978F36175B7GRV0CDSZPB/.afk-live-egr9f3i2/zero-room/state/afk-contracts/1794468092-superseded-1794468094.afk-contract
+[exit 0]
+$ FM_HOME=<zero-room> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+25
+[exit 0]
+
+=== over-cap: 6 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<over-cap> bin/fm-afk-launch.sh enter --words Hold the lane. --spend 2
+Away posture recorded at 2026-11-12T07:21:36Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 2 concurrent workers.
+  new workers that can start: 0 (4 over the cap)
+  warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.
+Away posture (recorded):
+  entered: 2026-11-12T07:21:36Z
+  expected return: not given
+  spend cap: 2 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Hold the lane.
+Live work:
+  worker-0: 2026-11-12T00
+  worker-1: 2026-11-12T00
+  worker-2: 2026-11-12T00
+  worker-3: 2026-11-12T00
+  worker-4: 2026-11-12T00
+  worker-5: 2026-11-12T00
+
+Read-back checklist:
+  Name every green pull request and the exact sentence that would permit its merge, or say that "no merges" is a valid reading.
+  A named merge still waits while a slower advisory suite has not reported.
+  Name any sentence dropped when /afk is sent again with only a stop clause.
+  Name any job the inventory shows with 3 or more consecutive failed checks on the same findings, and park that job.
+[exit 0]
+$ FM_HOME=<over-cap> bin/fm-afk-contract.sh field spend_max_concurrent_workers
+2
+[exit 0]
+
+=== quiet-to-away: 0 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<quiet-to-away> bin/fm-afk-contract.sh enter --words Stay quiet.
+Quiet mode recorded at 2026-11-12T07:21:37Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-11-12T07:21:37Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    Stay quiet.
+[exit 0]
+$ FM_HOME=<quiet-to-away> bin/fm-afk-contract.sh mode
+quiet
+[exit 0]
+$ FM_HOME=<quiet-to-away> bin/fm-afk-contract.sh enter
+Away posture recorded at 2026-11-12T07:21:37Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 5 concurrent workers.
+  new workers that can start: 5
+Away posture (recorded):
+  entered: 2026-11-12T07:21:37Z
+  expected return: not given
+  spend cap: 5 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+fm-afk-contract: quiet mode became the away posture; the quiet record is archived at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M77978F36175B7GRV0CDSZPB/.afk-live-egr9f3i2/quiet-to-away/state/afk-contracts/1794468097-superseded-1794468097.afk-contract
+[exit 0]
+$ FM_HOME=<quiet-to-away> bin/fm-afk-contract.sh mode
+away
+[exit 0]
+
+=== baseline-fifteen: 15 prepared ordinary worker records, mixed idle/parked/done ===
+$ FM_HOME=<baseline-fifteen> /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M77978F36175B7GRV0CDSZPB/.afk-live-egr9f3i2/baseline-bin/fm-afk-contract.sh enter --words Keep accepted work moving.
+Away posture recorded at 2026-11-12T07:21:38Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 15 concurrent workers.
+Away posture (recorded):
+  entered: 2026-11-12T07:21:38Z
+  expected return: not given
+  spend cap: 15 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Keep accepted work moving.
+[exit 0]
+$ FM_HOME=<baseline-fifteen> /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M77978F36175B7GRV0CDSZPB/.afk-live-egr9f3i2/baseline-bin/fm-afk-contract.sh field spend_max_concurrent_workers
+15
+[exit 0]
+BASELINE REPRODUCTION: 15 ordinary records, cap 15, available new workers 0. Target records cap 20 for the same count.
