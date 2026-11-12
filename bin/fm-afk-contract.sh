@@ -53,11 +53,8 @@
 #   expected_return: <UTC ISO 8601> | -
 #   reach_channels: none
 #   reach_announced: <the one-sentence reach announcement>
-#   spend_max_concurrent_workers: <n>   without --spend, the ordinary worker
-#                                  records this home already holds at entry
-#                                  plus FM_AFK_CONTRACT_SPEND_HEADROOM, and
-#                                  never fewer than the default
-#                                  (SPEND CAP below)
+#   spend_max_concurrent_workers: <n>   SPEND CAP below owns the entry default
+#                                  and the counting rule
 #   confirmed: <UTC ISO 8601>       when this mandate was recorded; /afk itself
 #   confirmed_epoch: <seconds>        is the go, so no later human step stamps it
 #   mode: quiet                    only on a quiet entry (FM_AFK_MODE=quiet); absent
@@ -157,9 +154,11 @@
 # room for new workers and never narrows work already under way. It never
 # records less than FM_AFK_CONTRACT_SPEND_DEFAULT, so an idle home still enters
 # with at least the ordinary room to work, and never 0. An explicit --spend is
-# the captain's number and is recorded unchanged. The entry read-back states
-# how many new workers can start (the cap minus the live count) and warns when
-# that is zero or less.
+# the captain's number and is recorded unchanged. When an away record is
+# written, the entry read-back states how many new workers can start (the cap
+# minus the live count, displayed as at least zero), reports how far over the
+# cap the home is when applicable, and warns when no new worker can start.
+# The room count and warning are omitted on refresh and from shared `readback`.
 #
 # Sourceable: with the BASH_SOURCE guard, other scripts get the path, presence,
 # posture, spend-cap, and lock helpers (fm_afk_contract_path,
