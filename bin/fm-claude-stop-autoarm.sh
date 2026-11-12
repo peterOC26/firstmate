@@ -317,9 +317,10 @@ MY_GEN=$FM_AUTOARM_MY_GEN
 # this generation. Success means this generation's translation WINS and the
 # caller exits 2 unconditionally. Markerless outcomes commit with the owned
 # ledger write; a notice wins only when its following marker write succeeds in
-# the same hold. Failure means refused or unverifiable: the caller goes silent
-# (cleanup, exit 0) - the harness discards the collected stderr on exit 0, so
-# even an already-printed banner is never delivered by a losing generation.
+# the same hold. Failure means refused or unverifiable; a refused host rewake
+# can still take the failure fallback (docs/supervision-host.md, Failure
+# direction). Without a later winning commit, the caller goes silent (cleanup,
+# exit 0), so the harness discards even an already-printed banner.
 autoarm_commit() {  # <outcome> [marker-file] [interrupted-session-identity]
   local outcome=$1 marker=${2:-} marker_identity=${3:-} session_pid recovery
   if [ "$outcome" = rewake ]; then
