@@ -112,9 +112,8 @@
 #     Without --spend the recorded cap follows SPEND CAP below.
 #   fm-afk-contract.sh readback
 #     The record's content for the captain and for the away session: the words
-#     verbatim plus the entry time, expected return, spend cap, how many new
-#     workers can start, and reach line (for a quiet record, the entry time
-#     and that nothing is held).
+#     verbatim plus the entry time, expected return, spend cap, and reach line
+#     (for a quiet record, the entry time and that nothing is held).
 #   fm-afk-contract.sh mode [--path <record>]
 #     Print `away` or `quiet` (AWAY OR QUIET above); exit 1 with no record.
 #   fm-afk-contract.sh field <name> [--path <record>]
@@ -154,8 +153,7 @@
 # the one implementation both the entry default and that refusal read, so the
 # two can never count differently.
 # Without --spend, entry records the count standing at that moment plus
-# FM_AFK_CONTRACT_SPEND_HEADROOM (default 5; a non-negative integer in the
-# environment overrides it, and any other value is ignored), so away mode keeps
+# FM_AFK_CONTRACT_SPEND_HEADROOM (5), so away mode keeps
 # room for new workers and never narrows work already under way. It never
 # records less than FM_AFK_CONTRACT_SPEND_DEFAULT, so an idle home still enters
 # with at least the ordinary room to work, and never 0. An explicit --spend is
@@ -183,10 +181,7 @@ FM_AFK_CONTRACT_VERSION=2
 FM_AFK_CONTRACT_READABLE_VERSIONS="1 2"
 FM_AFK_CONTRACT_REACH_ANNOUNCED='No phone channel is configured; anything that needs you waits for your return.'
 FM_AFK_CONTRACT_SPEND_DEFAULT=4
-# Extra ordinary-worker slots recorded when entry has no --spend.
-# A non-negative integer in the environment overrides 5; any other value is
-# ignored at use. The recorded cap is still never below the floor.
-FM_AFK_CONTRACT_SPEND_HEADROOM=${FM_AFK_CONTRACT_SPEND_HEADROOM:-5}
+FM_AFK_CONTRACT_SPEND_HEADROOM=5
 FM_AFK_CONTRACT_QUIET_HOLDS_NOTHING='you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.'
 # Generous against the longest legitimate holder, a merge waiting on the forge,
 # so the bound only ever trips on something genuinely wedged.
@@ -228,13 +223,9 @@ fm_afk_contract_live_ordinary_workers() {  # [state-dir]
 # The cap to record when the captain gave no --spend: the live count plus
 # headroom, never below the default and so never 0.
 fm_afk_contract_entry_spend_default() {  # [state-dir]
-  local live headroom
+  local live
   live=$(fm_afk_contract_live_ordinary_workers "${1:-$FM_AFK_CONTRACT_STATE}")
-  headroom=${FM_AFK_CONTRACT_SPEND_HEADROOM:-5}
-  case "$headroom" in
-    ''|*[!0-9]*) headroom=5 ;;
-  esac
-  live=$((live + 10#$headroom))
+  live=$((live + FM_AFK_CONTRACT_SPEND_HEADROOM))
   [ "$live" -gt "$FM_AFK_CONTRACT_SPEND_DEFAULT" ] || live=$FM_AFK_CONTRACT_SPEND_DEFAULT
   printf '%s\n' "$live"
 }
@@ -458,23 +449,18 @@ fm_afk_contract_validate() {  # <path>
 
 # --- rendering --------------------------------------------------------------
 
-# The read-back is the record's content: the words verbatim beside the entry
-# time, expected return, spend cap, and reach line, plus how many new workers
-# that cap still admits (SPEND CAP). Firstmate's plain-sentence restatement is
-# spoken in chat after entry, and the execution rules live in
-# bin/fm-branch-prompt.sh, so this render stays a mirror of the record for the
-# captain at entry and for the away session on every wake. It never asks for a
-# go: the record already stands when it is printed.
+# The read-back is the record's content and nothing else: the words verbatim
+# beside the entry time, expected return, spend cap, and reach line. Firstmate's
+# plain-sentence restatement is spoken in chat after entry, and the execution
+# rules live in bin/fm-branch-prompt.sh, so this render stays a faithful mirror
+# of the record for the captain at entry and for the away session on every wake.
+# It never asks for a go: the record already stands when it is printed.
 # A quiet record reads back as quiet mode: no return, reach, or spend cap
 # applies while the captain is present.
 # Room under the recorded cap: the cap minus the ordinary workers this home
-# holds now. A non-numeric cap prints nothing. Zero or less warns that no new
-# worker can start while away.
+# holds now. Zero or less warns that no new worker can start while away.
 fm_afk_contract_render_spend_room() {  # <record-path> <spend>
   local path=$1 spend=$2 live room state
-  case "$spend" in
-    ''|*[!0-9]*) return 0 ;;
-  esac
   state=$(dirname "$path")
   live=$(fm_afk_contract_live_ordinary_workers "$state")
   room=$((10#$spend - live))
@@ -497,7 +483,6 @@ fm_afk_contract_render_readback() {  # <path>
     printf '  entered: %s\n' "$(fm_afk_contract_read_field "$path" entered)"
     printf '  expected return: %s\n' "$( [ "$expected" = - ] && printf 'not given' || printf '%s' "$expected")"
     printf '  spend cap: %s concurrent workers\n' "$spend"
-    fm_afk_contract_render_spend_room "$path" "$spend"
     printf '  reach: hold-for-return only. %s\n' "$(fm_afk_contract_read_field "$path" reach_announced)"
   fi
   words=$(fm_afk_contract_read_words "$path"; rc=$?; printf x; exit "$rc") || return 1
@@ -708,6 +693,9 @@ fm_afk_contract_cmd_enter() {
   fi
   rm -f "$legacy"
   fm_afk_contract_render_announcement "$record" || return 1
+  if [ "$FM_AFK_CONTRACT_ENTRY_MODE" = away ]; then
+    fm_afk_contract_render_spend_room "$record" "$SPEND" || return 1
+  fi
   fm_afk_contract_render_readback "$record"
 }
 

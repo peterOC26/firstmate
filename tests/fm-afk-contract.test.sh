@@ -608,6 +608,7 @@ test_away_entry_over_quiet_mode_becomes_away_and_quiet_never_masks_away() {
   quiet_entered=$(contract "$home" field entered_epoch)
   out=$(contract "$home" enter 2>&1) || fail "away refresh over quiet failed: $out"
   assert_contains "$out" 'quiet mode became the away posture' 'the conversion names itself'
+  assert_contains "$out" 'new workers that can start: 5' 'conversion to away states entry room'
   assert_contains "$out" 'hold-for-return only' 'the converted record holds for the return'
   [ "$(contract "$home" mode)" = away ] || fail "an /afk refresh over quiet mode left the record quiet"
   ls "$home/state/afk-contracts/$quiet_entered-superseded-"*.afk-contract >/dev/null 2>&1 \
@@ -632,7 +633,7 @@ test_entry_without_spend_records_live_count_plus_headroom() {
   local home out i
 
   home=$(make_home spend-live-zero)
-  out=$(contract "$home" enter --words 'nothing running' 2>&1) || fail "empty entry failed: $out"
+  out=$(FM_AFK_CONTRACT_SPEND_HEADROOM=0 contract "$home" enter --words 'nothing running' 2>&1) || fail "empty entry failed: $out"
   [ "$(contract "$home" live-workers)" = 0 ] || fail "an empty home did not count zero workers"
   [ "$(contract "$home" field spend_max_concurrent_workers)" = 5 ] \
     || fail "an empty home recorded $(contract "$home" field spend_max_concurrent_workers), not live plus headroom"
@@ -666,28 +667,27 @@ test_entry_without_spend_records_live_count_plus_headroom() {
   assert_contains "$out" '  new workers that can start: 5' 'fifteen-worker read-back states the headroom'
   assert_not_contains "$out" 'no new worker can start while away' 'fifteen-worker entry must not warn'
 
-  # The floor still binds when headroom does not lift the count to it.
-  home=$(make_home spend-floor)
-  fm_write_meta "$home/state/task-1.meta" "window=fm-task-1" "kind=ship"
-  out=$(FM_AFK_CONTRACT_SPEND_HEADROOM=0 contract "$home" enter --words 'below the floor' 2>&1) \
-    || fail "floor entry failed: $out"
-  [ "$(contract "$home" field spend_max_concurrent_workers)" = 4 ] \
-    || fail "a home below the floor did not keep the default cap: $(contract "$home" field spend_max_concurrent_workers)"
-  assert_contains "$out" '  new workers that can start: 3' 'floor read-back is cap minus the live count'
-  assert_not_contains "$out" 'no new worker can start while away' 'floor room must not warn'
-
-  # Zero room: no headroom, and the live count is already at or above the floor.
   home=$(make_home spend-zero-room)
   for ((i = 1; i <= 15; i++)); do
     fm_write_meta "$home/state/task-$i.meta" "window=fm-task-$i" "kind=ship"
   done
-  out=$(FM_AFK_CONTRACT_SPEND_HEADROOM=0 contract "$home" enter --words 'no room' 2>&1) \
+  out=$(contract "$home" enter --words 'no room' --spend 15 2>&1) \
     || fail "zero-room entry failed: $out"
   [ "$(contract "$home" field spend_max_concurrent_workers)" = 15 ] \
-    || fail "zero headroom did not record the live count: $(contract "$home" field spend_max_concurrent_workers)"
+    || fail "explicit spend did not record the live count: $(contract "$home" field spend_max_concurrent_workers)"
   assert_contains "$out" '  new workers that can start: 0' 'zero-room read-back states no room'
   assert_contains "$out" 'warning: no new worker can start while away; raise the limit with /afk again with --spend.' \
     'zero-room read-back warns and names how to raise the limit'
+
+  out=$(contract "$home" readback 2>&1) || fail "zero-room readback failed: $out"
+  assert_not_contains "$out" 'new workers that can start' 'shared readback omits entry room'
+  assert_not_contains "$out" 'no new worker can start while away' 'shared readback omits entry warning'
+  out=$(contract "$home" enter 2>&1) || fail "zero-room refresh failed: $out"
+  assert_not_contains "$out" 'new workers that can start' 'refresh omits entry room'
+  assert_not_contains "$out" 'no new worker can start while away' 'refresh omits entry warning'
+  out=$(contract "$home" enter --words 'replacement mandate' --spend 15 2>&1) || fail "replacement failed: $out"
+  assert_contains "$out" 'new workers that can start: 0' 'replacement entry states room'
+  assert_contains "$out" 'no new worker can start while away' 'replacement entry warns'
 
   home=$(make_home spend-explicit)
   for i in 1 2 3 4 5 6; do
