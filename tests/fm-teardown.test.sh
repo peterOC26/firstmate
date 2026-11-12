@@ -80,6 +80,16 @@
 #   (br1) landed teardown stops this task's groups; another task, an unmarked
 #         bridge and a non-bridge stay
 #   (br2) a refused teardown leaves this task's bridge running
+#
+# Claude Code session temp under a fake temp root (never the real /tmp/claude-*):
+#   (ct1) landed teardown removes only this worktree's slug folder and reports
+#         the freed size; another slug and the firstmate home slug stay
+#   (ct2) a slug symlink is left in place and does not block cleanup
+#   (ct3) a missing slug folder is fine
+#   (ct4) a relative worktree path removes nothing
+#   (ct5) a refused teardown leaves the slug folder in place
+#   (ct6) a failed removal is reported and cleanup still finishes
+#   (ct7) a slug longer than 200 characters removes only the hashed name
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -6967,7 +6977,237 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+# Claude's project slug for a worktree path. Independent of bin/fm-teardown.sh:
+# non-alphanumerics become '-', and past 200 characters the suffix is Claude's
+# 32-bit hash in base 36. Args: path
+claude_session_slug() {
+  python3 - "$1" <<'PY'
+import sys
+path = sys.argv[1]
+while len(path) > 1 and path.endswith("/"):
+    path = path[:-1]
+
+def to_int32(n):
+    n %= 4294967296
+    if n >= 2147483648:
+        n -= 4294967296
+    return n
+
+def java_hash(text):
+    value = 0
+    for char in text:
+        shifted = to_int32(value * 32)
+        value = to_int32(shifted - value + ord(char))
+    return value
+
+def base36(number):
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    if number == 0:
+        return "0"
+    out = ""
+    while number:
+        number, remainder = divmod(number, 36)
+        out = digits[remainder] + out
+    return out
+
+slug = "".join(char if char.isalnum() else "-" for char in path)
+if len(slug) <= 200:
+    print(slug)
+else:
+    hashed = java_hash(path)
+    absolute = 2147483648 if hashed == -2147483648 else abs(hashed)
+    print(slug[:200] + "-" + base36(absolute))
+PY
+}
+
+claude_session_dir() { # <fake-tmp> <worktree>
+  local root=$1 worktree=$2 slug
+  slug=$(claude_session_slug "$worktree")
+  printf '%s\n' "$root/claude-$(id -u)/$slug"
+}
+
+plant_claude_session() { # <fake-tmp> <worktree>
+  local dir
+  dir=$(claude_session_dir "$1" "$2")
+  mkdir -p "$dir/session"
+  printf 'payload\n' > "$dir/session/keep"
+  printf '%s\n' "$dir"
+}
+
+test_teardown_removes_own_claude_session_temp() {
+  local case_dir root own other home_dir primary_dir bytes rc=0
+  local parent marker
+  case_dir=$(make_case claude-temp-own)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  own=$(plant_claude_session "$root" "$case_dir/wt")
+  other=$(plant_claude_session "$root" "$case_dir/other-task")
+  home_dir=$(plant_claude_session "$root" "$ROOT")
+  primary_dir=$(plant_claude_session "$root" "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')")
+  parent=$(dirname "$own")
+  marker=$parent/not-a-session
+  printf 'marker\n' > "$marker"
+  bytes=$(du -sb -- "$own" | awk 'NR==1 { print $1; exit }')
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-own: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "teardown: removed claude session temp for task-x1 ($bytes bytes)" \
+    "$case_dir/stderr" "claude-temp-own: freed size was not reported"
+  [ ! -e "$own" ] || fail "claude-temp-own: own session folder was not removed"
+  [ -f "$other/session/keep" ] || fail "claude-temp-own: another task's session folder was removed"
+  [ -f "$home_dir/session/keep" ] || fail "claude-temp-own: the firstmate home session folder was removed"
+  [ -f "$primary_dir/session/keep" ] || fail "claude-temp-own: the primary checkout session folder was removed"
+  [ -f "$marker" ] || fail "claude-temp-own: a file directly under claude-<uid> was removed"
+  [ -d "$parent" ] || fail "claude-temp-own: the claude-<uid> parent was removed"
+  pass "landed teardown removes only this worktree's claude session folder and reports its size"
+}
+
+test_teardown_refuses_claude_session_symlink() {
+  local case_dir root slug_dir target rc=0
+  case_dir=$(make_case claude-temp-symlink)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  slug_dir=$(claude_session_dir "$root" "$case_dir/wt")
+  target=$case_dir/symlink-target
+  mkdir -p "$target/session" "$(dirname "$slug_dir")"
+  printf 'keep\n' > "$target/session/keep"
+  ln -s "$target" "$slug_dir"
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-symlink: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "is a symlink" "$case_dir/stderr" "claude-temp-symlink: teardown did not report the symlink"
+  [ -L "$slug_dir" ] || fail "claude-temp-symlink: the slug symlink was removed"
+  [ -f "$target/session/keep" ] || fail "claude-temp-symlink: the symlink target was removed"
+  pass "a claude session symlink is left in place and does not block cleanup"
+}
+
+test_teardown_missing_claude_session_is_fine() {
+  local case_dir root other rc=0
+  case_dir=$(make_case claude-temp-missing)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  other=$(plant_claude_session "$root" "$case_dir/other-task")
+  mkdir -p "$root/claude-$(id -u)"
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-missing: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_no_grep "removed claude session temp" "$case_dir/stderr" \
+    "claude-temp-missing: a missing folder was reported as removed"
+  assert_no_grep "could not remove claude session temp" "$case_dir/stderr" \
+    "claude-temp-missing: a missing folder was reported as a failure"
+  [ -f "$other/session/keep" ] || fail "claude-temp-missing: another task's session folder was removed"
+  pass "a missing claude session folder does not affect cleanup"
+}
+
+test_teardown_unknown_worktree_removes_no_claude_session() {
+  local case_dir root planted rc=0
+  case_dir=$(make_case claude-temp-unknown)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  planted=$(plant_claude_session "$root" "$case_dir/wt")
+  sed -i 's|^worktree=.*|worktree=relative/wt|' "$case_dir/state/task-x1.meta"
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  assert_no_grep "removed claude session temp" "$case_dir/stderr" \
+    "claude-temp-unknown: teardown reported removing a session folder (rc=$rc)"
+  [ -f "$planted/session/keep" ] || fail "claude-temp-unknown: a session folder was removed (rc=$rc)"
+  pass "an unknown worktree path removes no claude session folder"
+}
+
+test_teardown_refusal_leaves_claude_session() {
+  local case_dir root planted rc=0
+  case_dir=$(make_case claude-temp-refused)
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "unpushed work"
+  root=$case_dir/fake-tmp
+  planted=$(plant_claude_session "$root" "$case_dir/wt")
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 1 "$rc" "claude-temp-refused: teardown should refuse"
+  grep -q REFUSED "$case_dir/stderr" || fail "claude-temp-refused: no REFUSED line in stderr"
+  assert_no_grep "removed claude session temp" "$case_dir/stderr" \
+    "claude-temp-refused: a refused teardown reported removing a session folder"
+  [ -f "$planted/session/keep" ] || fail "claude-temp-refused: the session folder was removed"
+  pass "a refused teardown leaves the claude session folder in place"
+}
+
+test_teardown_claude_session_removal_failure_does_not_block() {
+  local case_dir root planted real_rm rc=0
+  case_dir=$(make_case claude-temp-rm-fails)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  planted=$(plant_claude_session "$root" "$case_dir/wt")
+  real_rm=$(command -v rm)
+  cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  if [ "\$arg" = "$planted" ]; then
+    echo "blocked rm of claude session temp" >&2
+    exit 1
+  fi
+done
+exec "$real_rm" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/rm"
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-rm-fails: teardown should still succeed: $(cat "$case_dir/stderr")"
+  assert_grep "could not remove claude session temp for task-x1 at $planted" \
+    "$case_dir/stderr" "claude-temp-rm-fails: the failed removal was not reported"
+  [ -f "$planted/session/keep" ] || fail "claude-temp-rm-fails: the session folder was removed despite rm failing"
+  pass "a failed claude session removal is reported and does not block cleanup"
+}
+
+test_teardown_removes_hashed_long_claude_session_slug() {
+  local case_dir root long pad need slug near own rc=0
+  case_dir=$(make_case claude-temp-long)
+  need=211
+  [ "${#case_dir}" -lt $((need - 2)) ] || fail "claude-temp-long: fixture path leaves no room for a 211-character worktree"
+  pad=$(printf 'p%.0s' $(seq 1 $((need - ${#case_dir} - 1))))
+  long=$case_dir/$pad
+  [ "${#long}" -eq 211 ] || fail "claude-temp-long: worktree length is ${#long}, not 211"
+  git -C "$case_dir/project" worktree add -q -b fm/task-long "$long" main
+  write_meta "$case_dir" no-mistakes ship "$long"
+  git -C "$long" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "long slug"
+  git -C "$long" push -q origin fm/task-long
+  git -C "$case_dir/project" fetch -q origin
+  root=$case_dir/fake-tmp
+  slug=$(claude_session_slug "$long")
+  [ "${#slug}" -gt 200 ] || fail "claude-temp-long: slug was not longer than 200: $slug"
+  own=$(plant_claude_session "$root" "$long")
+  near=$root/claude-$(id -u)/${slug:0:200}-notthehash
+  mkdir -p "$near"
+  printf 'keep\n' > "$near/keep"
+
+  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-long: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "removed claude session temp for task-x1" "$case_dir/stderr" \
+    "claude-temp-long: hashed session folder was not reported removed"
+  [ ! -e "$own" ] || fail "claude-temp-long: hashed session folder was not removed"
+  [ -f "$near/keep" ] || fail "claude-temp-long: a same-prefix slug was removed"
+  pass "a worktree path longer than 200 characters removes only its hashed claude session folder"
+}
+
 test_teardown_stops_own_browser_bridge_groups
 test_teardown_refusal_leaves_browser_bridges
 test_teardown_proc_override_leaves_browser_bridges
 test_teardown_bridge_kill_rechecks_member_identity
+test_teardown_removes_own_claude_session_temp
+test_teardown_refuses_claude_session_symlink
+test_teardown_missing_claude_session_is_fine
+test_teardown_unknown_worktree_removes_no_claude_session
+test_teardown_refusal_leaves_claude_session
+test_teardown_claude_session_removal_failure_does_not_block
+test_teardown_removes_hashed_long_claude_session_slug

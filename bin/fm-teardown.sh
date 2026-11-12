@@ -366,6 +366,31 @@
 # Opt-in config/record-export-root delegates the record archive transaction to
 # bin/fm-record-export.sh immediately before status, metadata, or inbox records
 # for the retiring task are removed. A failed commit retains those sources.
+# Claude Code session temp for the task's recorded worktree is removed once
+# this teardown has confirmed the work is landed or discardable and the worker
+# has stopped, and only when this teardown still owns that copy.
+# Claude Code 2.1.319 stores it at <tmp>/claude-<uid>/<slug>/, and on this host
+# <tmp> is /tmp.
+# <uid> is the current user's id.
+# <slug> is that worktree path with trailing slashes removed and every character
+# outside A-Za-z0-9 replaced by '-'.
+# The path is not symlink-resolved, matching Claude's originalCwd, which is
+# process.cwd() passed through identity normalizers in that build.
+# A slug longer than 200 characters keeps the first 200, a hyphen, and the
+# base-36 absolute value of Claude's 32-bit hash of the same path.
+# That hash starts at 0 and, for each byte, applies ToInt32((ToInt32(h * 32) - h) + byte).
+# ToInt32 keeps the low 32 bits and then subtracts 2^32 when the high bit is set.
+# Only a real directory owned by the current user, whose parent is the real
+# directory <tmp>/claude-<uid> also owned by that user, is removed.
+# A symlink, another owner's directory, the parent, another slug, a non-ASCII
+# path, and the slug of the active firstmate home, the code root, or the
+# primary checkout are left in place.
+# An unknown, empty, or relative worktree path removes nothing.
+# A missing folder is silent.
+# A skipped or failed removal is reported and does not change the teardown result.
+# One line reports the freed size when removal succeeds.
+# FM_CLAUDE_TEMP_ROOT replaces /tmp for tests and must be an absolute real
+# directory; when it is set and unusable, nothing under /tmp is touched.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -4319,6 +4344,266 @@ fi
 # returning it on either backend path.
 if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
   validate_worktree_teardown_safety || exit 1
+fi
+
+# The worker is stopped and the copy is confirmed landed or discardable.
+# Removal never changes the teardown result. The slug rule is the header's.
+teardown_claude_temp_strip() {
+  local path=$1
+  while [ "$path" != "/" ] && [ "${path%/}" != "$path" ]; do
+    path=${path%/}
+  done
+  printf '%s\n' "$path"
+}
+
+teardown_claude_to_int32() {
+  local n=$1
+  n=$(( n % 4294967296 ))
+  if [ "$n" -lt 0 ]; then
+    n=$(( n + 4294967296 ))
+  fi
+  if [ "$n" -ge 2147483648 ]; then
+    n=$(( n - 4294967296 ))
+  fi
+  printf '%s\n' "$n"
+}
+
+teardown_claude_java_hash() {
+  local text=$1 byte hash=0 shifted count=0
+  while IFS= read -r byte; do
+    [ -n "$byte" ] || continue
+    case "$byte" in
+      *[!0-9]*) return 1 ;;
+    esac
+    shifted=$(teardown_claude_to_int32 $(( hash * 32 )))
+    hash=$(teardown_claude_to_int32 $(( shifted - hash + byte )))
+    count=$(( count + 1 ))
+  done < <(printf '%s' "$text" | od -An -tu1 -v | tr -s '[:space:]' '\n' | sed '/^$/d')
+  # A short read would publish a different slug and could remove another folder.
+  [ "$count" -eq "${#text}" ] || return 1
+  printf '%s\n' "$hash"
+}
+
+teardown_claude_base36() {
+  local n=$1 digits=0123456789abcdefghijklmnopqrstuvwxyz out="" r
+  if [ "$n" -eq -2147483648 ]; then
+    n=2147483648
+  elif [ "$n" -lt 0 ]; then
+    n=$(( -n ))
+  fi
+  if [ "$n" -eq 0 ]; then
+    printf '0\n'
+    return 0
+  fi
+  while [ "$n" -gt 0 ]; do
+    r=$(( n % 36 ))
+    out="${digits:r:1}$out"
+    n=$(( n / 36 ))
+  done
+  printf '%s\n' "$out"
+}
+
+# Prints the slug, or returns 1 when the path must not select a folder.
+teardown_claude_project_slug() {
+  local path=$1 slug hash suffix
+  path=$(teardown_claude_temp_strip "$path")
+  case "$path" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  if printf '%s' "$path" | LC_ALL=C grep -q '[^[:print:]]'; then
+    return 1
+  fi
+  slug=$(printf '%s' "$path" | LC_ALL=C sed 's/[^A-Za-z0-9]/-/g')
+  case "$slug" in
+    ''|*[!A-Za-z0-9-]*) return 1 ;;
+  esac
+  if [ "${#slug}" -le 200 ]; then
+    printf '%s\n' "$slug"
+    return 0
+  fi
+  hash=$(teardown_claude_java_hash "$path") || return 1
+  suffix=$(teardown_claude_base36 "$hash") || return 1
+  case "$suffix" in
+    ''|*[!0-9a-z]*) return 1 ;;
+  esac
+  printf '%s\n' "${slug:0:200}-${suffix}"
+}
+
+teardown_claude_temp_uid() {
+  local path=$1 uid
+  if [ "$(uname -s)" = Darwin ]; then
+    uid=$(/usr/bin/stat -f %u "$path" 2>/dev/null) || return 1
+  else
+    uid=$(stat -c %u -- "$path" 2>/dev/null) || return 1
+  fi
+  case "$uid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$uid"
+}
+
+teardown_claude_temp_bytes() {
+  local path=$1 bytes=
+  bytes=$(du -sb -- "$path" 2>/dev/null | awk 'NR==1 { print $1; exit }' || true)
+  case "$bytes" in
+    ''|*[!0-9]*)
+      bytes=$(du -sk -- "$path" 2>/dev/null | awk 'NR==1 { print $1; exit }' || true)
+      case "$bytes" in
+        ''|*[!0-9]*) printf 'unknown\n' ;;
+        *) printf '%s\n' $(( bytes * 1024 )) ;;
+      esac
+      ;;
+    *) printf '%s\n' "$bytes" ;;
+  esac
+}
+
+teardown_claude_protected_paths() {
+  local common primary physical path
+  common=$(git -C "$FM_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [ -z "$common" ]; then
+    common=$(git -C "$FM_ROOT" rev-parse --git-common-dir 2>/dev/null || true)
+    case "$common" in
+      /*|"") ;;
+      *) common=$FM_ROOT/$common ;;
+    esac
+  fi
+  primary=
+  case "$common" in
+    */.git) primary=${common%/.git} ;;
+  esac
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    path=$(teardown_claude_temp_strip "$path")
+    printf '%s\n' "$path"
+    [ -d "$path" ] || continue
+    physical=$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P) || continue
+    [ "$physical" = "$path" ] || printf '%s\n' "$physical"
+  done <<EOF
+$FM_HOME
+$FM_ROOT
+$primary
+EOF
+}
+
+teardown_claude_temp_is_protected() {
+  local path=$1 slug=$2 candidate candidate_slug
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    candidate=$(teardown_claude_temp_strip "$candidate")
+    [ "$path" = "$candidate" ] && return 0
+    candidate_slug=$(teardown_claude_project_slug "$candidate" 2>/dev/null) || continue
+    [ "$slug" = "$candidate_slug" ] && return 0
+  done < <(teardown_claude_protected_paths)
+  return 1
+}
+
+teardown_claude_temp_root() {
+  local root
+  if [ -n "${FM_CLAUDE_TEMP_ROOT:-}" ]; then
+    root=$FM_CLAUDE_TEMP_ROOT
+    case "$root" in
+      /*) ;;
+      *)
+        echo "warning: FM_CLAUDE_TEMP_ROOT is not absolute; leaving claude session temp for $ID in place" >&2
+        return 1
+        ;;
+    esac
+  else
+    root=/tmp
+  fi
+  root=$(teardown_claude_temp_strip "$root")
+  if [ -L "$root" ] || [ ! -d "$root" ]; then
+    if [ -n "${FM_CLAUDE_TEMP_ROOT:-}" ]; then
+      echo "warning: FM_CLAUDE_TEMP_ROOT is not a real directory; leaving claude session temp for $ID in place" >&2
+    fi
+    return 1
+  fi
+  printf '%s\n' "$root"
+}
+
+teardown_remove_claude_session_temp() {
+  local path=$1 root parent slug target me owner bytes
+  path=${path:-}
+  [ -n "$path" ] || return 0
+  path=$(teardown_claude_temp_strip "$path")
+  case "$path" in
+    /*) ;;
+    *) return 0 ;;
+  esac
+  slug=$(teardown_claude_project_slug "$path") || {
+    echo "warning: could not derive the claude session slug for $ID; leaving session temp in place" >&2
+    return 0
+  }
+  case "$slug" in
+    ''|*[!A-Za-z0-9-]*|*/*|.) return 0 ;;
+  esac
+  if teardown_claude_temp_is_protected "$path" "$slug"; then
+    echo "warning: left claude session temp for $ID in place: $path is the firstmate home or primary checkout" >&2
+    return 0
+  fi
+  root=$(teardown_claude_temp_root) || return 0
+  me=$(id -u) || {
+    echo "warning: could not read the current user id; leaving claude session temp for $ID in place" >&2
+    return 0
+  }
+  parent=$root/claude-$me
+  if [ ! -e "$parent" ] && [ ! -L "$parent" ]; then
+    return 0
+  fi
+  if [ -L "$parent" ] || [ ! -d "$parent" ]; then
+    echo "warning: left claude session temp for $ID in place: $parent is not a real directory" >&2
+    return 0
+  fi
+  owner=$(teardown_claude_temp_uid "$parent") || {
+    echo "warning: left claude session temp for $ID in place: could not verify the owner of $parent" >&2
+    return 0
+  }
+  if [ "$owner" != "$me" ]; then
+    echo "warning: left claude session temp for $ID in place: $parent is owned by uid $owner, not $me" >&2
+    return 0
+  fi
+  target=$parent/$slug
+  case "$target" in
+    "$parent"/*) ;;
+    *)
+      echo "warning: left claude session temp for $ID in place: $target is not directly under $parent" >&2
+      return 0
+      ;;
+  esac
+  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    return 0
+  fi
+  if [ -L "$target" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is a symlink" >&2
+    return 0
+  fi
+  if [ ! -d "$target" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is not a directory" >&2
+    return 0
+  fi
+  owner=$(teardown_claude_temp_uid "$target") || {
+    echo "warning: left claude session temp for $ID in place: could not verify the owner of $target" >&2
+    return 0
+  }
+  if [ "$owner" != "$me" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is owned by uid $owner, not $me" >&2
+    return 0
+  fi
+  bytes=$(teardown_claude_temp_bytes "$target")
+  if ! rm -rf -- "$target"; then
+    echo "warning: could not remove claude session temp for $ID at $target" >&2
+    return 0
+  fi
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    echo "warning: could not remove claude session temp for $ID at $target" >&2
+    return 0
+  fi
+  echo "teardown: removed claude session temp for $ID ($bytes bytes)" >&2
+}
+
+if teardown_owns_worktree; then
+  teardown_remove_claude_session_temp "$WT"
 fi
 
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
