@@ -1,0 +1,43 @@
+Claude 2.1.319; marked lab FM_HOME inside gate worktree; private socket minted by fm-lab-home tmux-dir; 120x40 terminal.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M77B848ZR8RM6N0HGGGJZAR0
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source
+ project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+RESULT: workspace trust blocks hook execution. No trust choice was submitted and no user configuration was edited. Private tmux server stopped and marked lab removed.

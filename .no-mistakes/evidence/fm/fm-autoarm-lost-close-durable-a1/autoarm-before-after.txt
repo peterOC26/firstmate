@@ -1,0 +1,79 @@
+ISOLATED BEHAVIORAL REPRODUCTION: fake Claude ancestry and host fixtures; NOT live Claude delivery.
+
+CASE revision=base marker=refused-downtime attempt=1 exit=0
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+Persisted recovery marker: pending:downtime:fixture-generation
+Persisted epoch ledger:
+epoch=1 owner_pid=3448250 outcome=arming updated_at=1794469537
+linux-starttime=112593548 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f626173652d726566757365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+Failure-notified marker: ABSENT
+
+CASE revision=target marker=refused-downtime attempt=1 exit=2
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.
+Persisted recovery marker: pending:downtime:fixture-generation
+Persisted epoch ledger:
+epoch=1 owner_pid=3448876 outcome=failed updated_at=1794469539
+linux-starttime=112593642 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f7461726765742d726566757365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+Failure-notified marker: PRESENT
+
+CASE revision=target marker=refused-downtime attempt=2 exit=2
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+firstmate watcher auto-arm rewake refused - the supervision host returned an actionable wake, but its rewake could not be committed, and the failure episode notice was already consumed; no operator notice repeats in this episode, and this suppressed continuation keeps the Stop-owned retry alive.
+Persisted epoch ledger:
+epoch=2 owner_pid=3449392 outcome=failed-suppressed updated_at=1794469540
+linux-starttime=112593733 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f7461726765742d726566757365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+
+CASE revision=base marker=refused-announced-downtime attempt=1 exit=0
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+Persisted recovery marker: announced:downtime:fixture-generation
+Persisted epoch ledger:
+epoch=1 owner_pid=3449877 outcome=arming updated_at=1794469540
+linux-starttime=112593835 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f626173652d726566757365642d616e6e6f756e6365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+Failure-notified marker: ABSENT
+
+CASE revision=target marker=refused-announced-downtime attempt=1 exit=2
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.
+Persisted recovery marker: announced:downtime:fixture-generation
+Persisted epoch ledger:
+epoch=1 owner_pid=3450355 outcome=failed updated_at=1794469541
+linux-starttime=112593911 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f7461726765742d726566757365642d616e6e6f756e6365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+Failure-notified marker: PRESENT
+
+CASE revision=target marker=refused-announced-downtime attempt=2 exit=2
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+firstmate watcher auto-arm rewake refused - the supervision host returned an actionable wake, but its rewake could not be committed, and the failure episode notice was already consumed; no operator notice repeats in this episode, and this suppressed continuation keeps the Stop-owned retry alive.
+Persisted epoch ledger:
+epoch=2 owner_pid=3451056 outcome=failed-suppressed updated_at=1794469542
+linux-starttime=112593988 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f7461726765742d726566757365642d616e6e6f756e6365642d646f776e74696d652f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+
+CASE revision=target marker=benign-refusal attempt=1 exit=0
+firstmate watcher wake - one supervision event needs a handling turn now.
+signal: fixture.status
+supervision-host: branch-outcome: fixture
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+Persisted recovery marker: acked:downtime:fixture-generation
+Persisted epoch ledger:
+epoch=1 owner_pid=3451784 outcome=arming updated_at=1794469543
+linux-starttime=112594075 cmdline-hex=62617368002f686f6d652f7a6162692f2e6e6f2d6d697374616b65732f776f726b74726565732f3766306563313831383162362f30314d3737423834385a5238524d364e30484747474a5a4152302f2e746573742d6175746f61726d2d746d702f666d2d636c617564652d73746f702d6175746f61726d2e79747742564c2f7461726765742d62656e69676e2d7265667573616c2f62696e2f666d2d636c617564652d73746f702d6175746f61726d2e736800
+Failure-notified marker: ABSENT
+ok - auto-arm: a superseded owner goes silent - one supersession episode, one translation, no held mutex
