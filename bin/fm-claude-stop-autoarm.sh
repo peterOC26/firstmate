@@ -88,7 +88,9 @@
 #     the harness delivers the collected stderr only on exit 2, so an owned
 #     terminal commit decides the exit. Markerless outcomes commit with the
 #     ledger write; the failure notice additionally requires its marker write.
-#     A refused generation exits 0 silently even after printing. A close that
+#     A refused generation exits 0 silently even after printing. A host
+#     rewake that this generation still owns, refused while the recovery
+#     marker is still downtime, commits the failure episode instead. A close that
 #     reports no actionable reason is benign when a live identity-matched
 #     watcher still has a fresh beacon.
 #   - Failure handling: a typed failure is rechecked against the same live,
@@ -730,6 +732,20 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     && ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
     [ ! -e "$FAILURE_NOTICE" ] \
       || autoarm_exit_suppressed 'firstmate watcher auto-arm hand-back still uncommitted - the supervision host returned an actionable wake, but its rewake could not be committed, and the failure episode notice was already consumed'
+    printf 'firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.\n' >&2
+    if autoarm_commit failed "$FAILURE_NOTICE"; then
+      [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
+      exit 2
+    fi
+  fi
+  # Downtime still names this generation's undelivered rewake. The handling
+  # fallback above does not match it, so a refused commit would otherwise
+  # exit 0 and the harness would discard the actionable close.
+  if [ "$HOST_MODE" -eq 1 ] && fm_autoarm_still_owner "$STATE" "$MY_GEN" \
+    && fm_recovery_marker_snapshot "$STATE/.watcher-down" \
+    && [[ "$FM_RECOVERY_MARKER_TOKEN" == pending:downtime:* || "$FM_RECOVERY_MARKER_TOKEN" == announced:downtime:* ]]; then
+    [ ! -e "$FAILURE_NOTICE" ] \
+      || autoarm_exit_suppressed 'firstmate watcher auto-arm rewake refused - the supervision host returned an actionable wake, but its rewake could not be committed, and the failure episode notice was already consumed'
     printf 'firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.\n' >&2
     if autoarm_commit failed "$FAILURE_NOTICE"; then
       [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
