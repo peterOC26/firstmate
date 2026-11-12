@@ -633,7 +633,7 @@ test_entry_without_spend_records_live_count_plus_headroom() {
   local home out i
 
   home=$(make_home spend-live-zero)
-  out=$(FM_AFK_CONTRACT_SPEND_HEADROOM=0 contract "$home" enter --words 'nothing running' 2>&1) || fail "empty entry failed: $out"
+  out=$(contract "$home" enter --words 'nothing running' 2>&1) || fail "empty entry failed: $out"
   [ "$(contract "$home" live-workers)" = 0 ] || fail "an empty home did not count zero workers"
   [ "$(contract "$home" field spend_max_concurrent_workers)" = 5 ] \
     || fail "an empty home recorded $(contract "$home" field spend_max_concurrent_workers), not live plus headroom"
@@ -676,7 +676,7 @@ test_entry_without_spend_records_live_count_plus_headroom() {
   [ "$(contract "$home" field spend_max_concurrent_workers)" = 15 ] \
     || fail "explicit spend did not record the live count: $(contract "$home" field spend_max_concurrent_workers)"
   assert_contains "$out" '  new workers that can start: 0' 'zero-room read-back states no room'
-  assert_contains "$out" 'warning: no new worker can start while away; raise the limit with /afk again with --spend.' \
+  assert_contains "$out" 'warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.' \
     'zero-room read-back warns and names how to raise the limit'
 
   out=$(contract "$home" readback 2>&1) || fail "zero-room readback failed: $out"
@@ -697,9 +697,20 @@ test_entry_without_spend_records_live_count_plus_headroom() {
   [ "$(contract "$home" field spend_max_concurrent_workers)" = 2 ] \
     || fail "an explicit --spend lost to the live count plus headroom"
   assert_contains "$out" '  spend cap: 2 concurrent workers' 'an explicit cap is what the read-back shows'
-  assert_contains "$out" '  new workers that can start: -4' 'explicit cap below the live count states the shortfall'
-  assert_contains "$out" 'warning: no new worker can start while away; raise the limit with /afk again with --spend.' \
+  assert_contains "$out" '  new workers that can start: 0 (4 over the cap)' 'explicit cap below the live count states the shortfall'
+  assert_contains "$out" 'warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.' \
     'an explicit cap with no room warns'
+  out=$(contract "$home" enter --spend 10 2>&1) || fail "spend-only refresh failed: $out"
+  [ "$(contract "$home" field spend_max_concurrent_workers)" = 2 ] || fail "refresh changed the cap"
+  out=$(contract "$home" enter --words 'continue with more room' --spend 10 2>&1) || fail "cap replacement failed: $out"
+  [ "$(contract "$home" field spend_max_concurrent_workers)" = 10 ] || fail "replacement did not raise the cap"
+  assert_contains "$out" 'new workers that can start: 4' 'following the warning creates room'
+  assert_not_contains "$out" 'no new worker can start while away' 'raised cap must not warn'
+  for i in '' invalid -1; do
+    out=$(bash -c '. "$1"; fm_afk_contract_render_spend_room "$2" "$3"' _ "$CONTRACT" "$home/state/.afk-contract" "$i") \
+      || fail "nonnumeric spend failed"
+    [ -z "$out" ] || fail "nonnumeric spend printed room: $out"
+  done
   pass "entry without --spend records the live count plus headroom, never below the floor, and an explicit --spend still wins"
 }
 

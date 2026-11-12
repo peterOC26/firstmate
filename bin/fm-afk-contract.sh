@@ -449,6 +449,26 @@ fm_afk_contract_validate() {  # <path>
 
 # --- rendering --------------------------------------------------------------
 
+# Room under the recorded cap: the cap minus the ordinary workers this home
+# holds now. Zero or less warns that no new worker can start while away.
+fm_afk_contract_render_spend_room() {  # <record-path> <spend>
+  local path=$1 spend=$2 live room state
+  case "$spend" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  state=$(dirname "$path")
+  live=$(fm_afk_contract_live_ordinary_workers "$state")
+  room=$((10#$spend - live))
+  if [ "$room" -lt 0 ]; then
+    printf '  new workers that can start: 0 (%s over the cap)\n' "$((-room))"
+  else
+    printf '  new workers that can start: %s\n' "$room"
+  fi
+  if [ "$room" -le 0 ]; then
+    printf '  warning: no new worker can start while away; send /afk again with new words and --spend to raise the limit.\n'
+  fi
+}
+
 # The read-back is the record's content and nothing else: the words verbatim
 # beside the entry time, expected return, spend cap, and reach line. Firstmate's
 # plain-sentence restatement is spoken in chat after entry, and the execution
@@ -457,19 +477,6 @@ fm_afk_contract_validate() {  # <path>
 # It never asks for a go: the record already stands when it is printed.
 # A quiet record reads back as quiet mode: no return, reach, or spend cap
 # applies while the captain is present.
-# Room under the recorded cap: the cap minus the ordinary workers this home
-# holds now. Zero or less warns that no new worker can start while away.
-fm_afk_contract_render_spend_room() {  # <record-path> <spend>
-  local path=$1 spend=$2 live room state
-  state=$(dirname "$path")
-  live=$(fm_afk_contract_live_ordinary_workers "$state")
-  room=$((10#$spend - live))
-  printf '  new workers that can start: %s\n' "$room"
-  if [ "$room" -le 0 ]; then
-    printf '  warning: no new worker can start while away; raise the limit with /afk again with --spend.\n'
-  fi
-}
-
 fm_afk_contract_render_readback() {  # <path>
   local path=$1 words expected spend
   if [ "$(fm_afk_contract_record_mode "$path")" = quiet ]; then
