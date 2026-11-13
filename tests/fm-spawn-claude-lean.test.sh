@@ -65,6 +65,13 @@ for arg in "$@"; do
   printf ' %s' "$arg"
 done
 printf '\n'
+previous=
+for arg in "$@"; do
+  if [ "$previous" = --settings ]; then
+    printf '%s\n' "$arg" | jq -r '"EMPTY_MCP_ALLOWLIST=\(has("allowedMcpServers") and .allowedMcpServers == [])"'
+  fi
+  previous=$arg
+done
 SH
   chmod +x "$1/claude"
 }
@@ -118,6 +125,10 @@ assert_lean_probe() { # <seen> <label>
     "$label: the compact-adviser floor must stay on under a lean launch"
   assert_contains "$seen" ' --strict-mcp-config' \
     "$label: claude must be started with --strict-mcp-config"
+  assert_contains "$seen" ' --disallowedTools mcp__*' \
+    "$label: plugin-registered MCP tools must also be denied"
+  assert_equals true "$(field_of "$seen" EMPTY_MCP_ALLOWLIST)" \
+    "$label: session settings must exclude plugin MCP servers"
   assert_not_contains "$seen" ' --bare' \
     "$label: a lean launch must not pass --bare"
   assert_not_contains "$seen" ' --mcp-config' \
@@ -142,6 +153,10 @@ assert_plain_probe() { # <seen> <label>
     "$label: the compact-adviser floor must stay on"
   assert_not_contains "$seen" '--strict-mcp-config' \
     "$label: an ordinary launch must not pass --strict-mcp-config"
+  assert_not_contains "$seen" '--disallowedTools' \
+    "$label: an ordinary launch must not deny MCP tools"
+  assert_equals false "$(field_of "$seen" EMPTY_MCP_ALLOWLIST)" \
+    "$label: an ordinary launch must not restrict MCP servers"
   assert_not_contains "$seen" ' --bare' \
     "$label: an ordinary launch must not pass --bare"
   assert_contains "$seen" ' --settings ' \
@@ -310,3 +325,120 @@ test_ordinary_launch_is_unchanged
 test_non_claude_refuses
 test_raw_command_refuses
 test_t3code_refuses_before_runtime_check
+
+# This credentialed guard consumes emitted launches with the installed Claude,
+# including a mod that registers tools without an MCP configuration file.
+# It stays opt-in because it submits short model turns.
+fm_live_gate opt-in FM_CLAUDE_LEAN_LIVE claude python3
+REAL_CLAUDE=$(command -v claude)
+CLAUDE_VERSION=$(claude --version)
+
+test_plugin_mcp_live() {
+  local mode rec id out
+  for mode in plain lean lean-allowlisted; do
+    id="plugin-$mode-a1"
+    rec=$(make_case "plugin-$mode" claude "$id")
+    read_case "$rec"
+    if [ "$mode" = plain ]; then
+      out=$(run_case_spawn "$id" "$PROJ_DIR" --scout)
+    else
+      out=$(run_case_spawn "$id" "$PROJ_DIR" --scout --claude-lean)
+    fi
+    expect_code 0 "$?" "live fixture spawn failed: $out"
+    python3 - "$CASE_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$REAL_CLAUDE" "$mode" <<'PY' \
+      || fail "Claude Code $CLAUDE_VERSION: plugin MCP exclusion failed ($mode)"
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+case, worktree, fakebin, launchlog, claude, mode = sys.argv[1:]
+case, worktree = Path(case), Path(worktree)
+plugin = case / 'plugin'
+(plugin / '.claude-plugin').mkdir(parents=True)
+(plugin / '.claude-plugin/plugin.json').write_text(json.dumps({'name': 'lean-probe', 'version': '1.0.0'}))
+(plugin / 'hooks').mkdir()
+# Both startup and mid-turn registrations must be excluded. Mark the attempts
+# independently, so disabling the plugin cannot make this test pass vacuously.
+(plugin / 'hooks/hooks.json').write_text(json.dumps({'modules': ['./register.js']}))
+(plugin / 'hooks/register.js').write_text('''
+export function register(on) {
+  on('session.start', async ($, e, next) => {
+    await $.tool.register({name: 'early', description: 'Startup probe', inputSchema: {type: 'object', properties: {}}});
+    await $.fs.write('registered-early', 'attempted');
+    return next(e);
+  });
+  on('tool.call', {tool: 'Bash'}, async ($, e, next) => {
+    await $.tool.register({name: 'late', description: 'Mid-turn probe', inputSchema: {type: 'object', properties: {}}});
+    await $.fs.write('registered-late', 'attempted');
+    return next(e);
+  });
+}
+''')
+(plugin / 'skills/probe').mkdir(parents=True)
+(plugin / 'skills/probe/SKILL.md').write_text('---\nname: probe\ndescription: Local regression skill.\n---\nReply concisely.\n')
+(worktree / 'CLAUDE.md').write_text('Local read-only regression project.\n')
+config = case / 'claude-config'
+config.mkdir()
+root = Path.cwd()
+settings = {'claudeMdExcludes': [str(root / 'CLAUDE.md'), str(root / 'AGENTS.md'), str(Path.home() / '.claude/CLAUDE.md')]}
+if mode == 'lean-allowlisted':
+    # Claude merges server allowlists across settings sources. This must not
+    # re-enable tools even when the plugin's synthetic server is allowlisted.
+    settings['allowedMcpServers'] = [{'serverName': 'lean-probe'}]
+(config / 'settings.json').write_text(json.dumps(settings))
+env = os.environ.copy()
+normal = Path(env.get('CLAUDE_CONFIG_DIR') or Path.home() / '.claude')
+if not env.get('CLAUDE_CODE_OAUTH_TOKEN') and (normal / '.credentials.json').is_file():
+    env['CLAUDE_CODE_OAUTH_TOKEN'] = json.loads((normal / '.credentials.json').read_text())['claudeAiOauth']['accessToken']
+env.update(CLAUDE_CONFIG_DIR=str(config), DISABLE_AUTOUPDATER='1', CLAUDE_CODE_ENABLE_FUNCTION_HOOKS='1',
+           PATH=f'{fakebin}:' + env['PATH'])
+env.pop('CLAUDECODE', None)
+# The wrapper preserves every emitted launch option and replaces only the
+# task doorbell with a bounded fixture prompt, adding print-mode transport.
+wrapper = Path(fakebin) / 'claude'
+prompt = 'Use Bash exactly once to run true. Then reply OK. Do not read or change files, call other tools, delegate, or run any pipeline.'
+wrapper.write_text('#!/usr/bin/env python3\nimport os, sys\nos.execv(' + repr(claude) + ', [' + repr(claude) +
+                  ', "--plugin-dir", ' + repr(str(plugin)) + ', "--print", "--verbose", "--output-format", "stream-json", *sys.argv[1:-1], "--", ' + repr(prompt) + '])\n')
+wrapper.chmod(0o755)
+p = subprocess.run(['/bin/sh', '-c', Path(launchlog).read_text()], cwd=worktree, env=env,
+                   text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+(case / 'stream.jsonl').write_text(p.stdout)
+assert p.returncode == 0, p.stdout[-2000:]
+stream = [json.loads(line) for line in p.stdout.splitlines() if line.startswith('{')]
+init = next(row for row in stream if row.get('subtype') == 'init')
+result = next(row for row in stream if row.get('type') == 'result')
+assert not result.get('is_error'), result
+assert 'lean-probe:probe' in init['skills'], 'plugin skill disappeared'
+assert (worktree / 'registered-early').is_file(), 'startup plugin hook did not run'
+assert (worktree / 'registered-late').is_file(), 'mid-turn plugin hook did not run'
+assert list((case / 'home/state').glob('*.turn-ended')), 'Firstmate Stop hook did not run'
+# The init event alone misses tools registered after the first call. Inspect
+# Claude's persisted runtime attachment protocol across the whole session too.
+transcripts = list(config.glob('projects/*/*.jsonl'))
+assert transcripts, 'Claude did not persist a runtime transcript'
+names = set(init['tools'])
+instructions = set()
+for transcript in transcripts:
+    for line in transcript.read_text().splitlines():
+        row = json.loads(line)
+        attachment = row.get('attachment', {})
+        if attachment.get('type') == 'deferred_tools_delta':
+            names.update(attachment.get('addedNames', []))
+        elif attachment.get('type') == 'mcp_instructions_delta':
+            instructions.update(attachment.get('addedNames', []))
+mcp = sorted(name for name in names if name.startswith('mcp__'))
+if mode == 'plain':
+    assert 'mcp__lean-probe__early' in mcp and 'mcp__lean-probe__late' in mcp, mcp
+else:
+    assert not mcp, f'MCP tools leaked: {mcp}'
+    if mode == 'lean':
+        assert 'lean-probe' not in instructions, 'plugin MCP instructions leaked'
+print(f'{mode}: MCP exclusion and retained hooks/skills verified')
+PY
+  done
+  pass "Claude Code $CLAUDE_VERSION excludes startup and mid-turn plugin MCP tools only on lean launches, keeping hooks and skills"
+}
+
+test_plugin_mcp_live

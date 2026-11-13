@@ -501,8 +501,12 @@
 #      assignment after the allowlist floor pin. The floor names above are
 #      unchanged. Claude Code reads the variable as an order to use the
 #      five-minute prompt cache (ttl 5m, reason force_5m_env).
-#   2. Starts claude with --strict-mcp-config and no --mcp-config, so no MCP
-#      server is loaded, and with CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 on the
+#   2. Starts claude with --strict-mcp-config and no --mcp-config, an empty
+#      allowedMcpServers session setting, and --disallowedTools 'mcp__*'.
+#      The allowlist excludes plugin-registered servers and their instructions;
+#      the deny rule keeps their tools unavailable even if another settings
+#      source adds server allowlist entries, including mid-turn registrations.
+#      CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 is set on the
 #      claude process, so auto memory files are neither created nor loaded.
 #      Hooks, CLAUDE.md and AGENTS.md project instructions, skills, the
 #      permission flag, session settings, and the Firstmate busy hooks stay.
@@ -7509,7 +7513,7 @@ CLAUDE_LEAN_ENV=
 CLAUDE_LEAN_FLAGS=
 if [ "$CLAUDE_LEAN" = 1 ]; then
   CLAUDE_LEAN_ENV='CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 '
-  CLAUDE_LEAN_FLAGS=' --strict-mcp-config'
+  CLAUDE_LEAN_FLAGS=" --strict-mcp-config --disallowedTools 'mcp__*'"
 fi
 LAUNCH=${LAUNCH//__CLAUDELEANENV__/$CLAUDE_LEAN_ENV}
 LAUNCH=${LAUNCH//__CLAUDELEANFLAGS__/$CLAUDE_LEAN_FLAGS}
@@ -7519,6 +7523,9 @@ case "$LAUNCH" in
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$(shell_quote "$STATE_REAL/$ID.claude-settings.json")}
   else
     claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION__}'"
+    if [ "$CLAUDE_LEAN" = 1 ]; then
+      claude_settings="'{\"feedbackDrafts\":\"off\",\"allowedMcpServers\":[]__CLAUDEATTRIBUTION__}'"
+    fi
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$claude_settings}
   fi
   ;;

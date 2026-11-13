@@ -6,6 +6,32 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Claude lean plugin MCP exclusion
+
+Verified on 2026-11-13 on Linux with Claude Code 2.1.323.
+The focused regression consumes emitted spawn commands with the real Claude consumer and a local mod that registers MCP tools at session start and during a Bash call.
+Ordinary launches expose both tools; lean launches expose neither, including when another settings source allowlists the plugin server.
+Without that additional allowlist, lean launches also omit the plugin's MCP instructions.
+Plugin hooks, plugin skill discovery, and Firstmate's Stop hook remain active.
+The portable portion checks the emitted launch environment and normalized session settings with and without environment clearing.
+The live guard submits model turns and is opt-in.
+
+Refresh with:
+
+```sh
+mkdir -p .test-tmp
+TMPDIR="$PWD/.test-tmp" FM_CLAUDE_LEAN_LIVE=1 bash tests/fm-spawn-claude-lean.test.sh
+```
+
+Selected observed output:
+
+```text
+plain: MCP exclusion and retained hooks/skills verified
+lean: MCP exclusion and retained hooks/skills verified
+lean-allowlisted: MCP exclusion and retained hooks/skills verified
+ok - Claude Code 2.1.323 (Claude Code) excludes startup and mid-turn plugin MCP tools only on lean launches, keeping hooks and skills
+```
+
 ## Captain inbox return hand-backs
 
 Verified on 2026-11-09 on Linux x86_64 with Bash 5.2.37 and Node v22.23.2.
