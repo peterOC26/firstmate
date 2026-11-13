@@ -470,7 +470,7 @@ Each arm owner's own suite covers its host mode against a stub host.
 | `tests/fm-supervision-host-drain.test.sh` | Report surface, dispatch entry, and the drain's `BRANCH OUTCOMES` section against the shared stub-engine fixtures. |
 | `tests/fm-supervision-host.test.sh` | Drives the real host against a stub engine for wakes, closes, the dialog mirror, and return outcomes, in both postures, including an away inbox note handed to main, a note-free away wake left on the engine, a quiet-mode note left on the attended path, an away note beside a closed successor, and the park-bound return. |
 | `tests/fm-supervision-host-park.test.sh` | Latch, park boundary, compaction, and lock ownership against the same stub-engine fixtures. |
-| `tests/fm-supervision-host-hook.test.sh` | Claude Stop-hook re-arm, successor take-over, lost hand-back continuations, guarded retry submission, and captain inbox notes that reach main while parked, mid-turn, or after an unrelated successor close. |
+| `tests/fm-supervision-host-hook.test.sh` | Claude Stop-hook re-arm, successor take-over with `FM_HOME` initially unset, routine wake retention after acknowledgement, fallback to main when successor verification fails, lost hand-back continuations, guarded retry submission, and captain inbox notes that reach main while parked, mid-turn, or after an unrelated successor close. |
 | `tests/fm-claude-stop-autoarm.test.sh` | The Claude arm owner's host mode against a stub host. |
 | `tests/fm-cursor-primary.test.sh` | The Cursor arm owner's host mode against a stub host. |
 | `tests/fm-pi-watch-extension.test.sh` | The OpenCode plugin's host mode against a stub host. |
