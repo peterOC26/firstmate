@@ -3,7 +3,7 @@
 # secondmate in its isolated firstmate home.
 # Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
-#        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--claude-lean] [--backend <name>] --secondmate
+#        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
 #   per task at intake (AGENTS.md section 7); data/projects.md holds the captain's
@@ -83,11 +83,8 @@
 #   backend, kind, project or home, worktree, endpoint - comes from the task's
 #   validated state/<id>.meta, so --backend, --scout, --secondmate, a project
 #   positional, and batch pairs are all refused alongside it; only harness,
-#   model, effort, a declared Claude account, and --claude-lean may change,
-#   which is what makes a harness switch one ordinary relaunch. --claude-lean
-#   on a relaunch turns that posture on; omitting it keeps a recorded
-#   claude_lean=1 and does not turn the posture off. A recorded lean posture
-#   refuses a replacement harness other than claude. It refuses unless the
+#   model, effort, and a declared Claude account may change,
+#   which is what makes a harness switch one ordinary relaunch. It refuses unless the
 #   recorded endpoint is positively agent-free on a backend with both a
 #   recovery-grade agent-state classifier and replacement-agent support
 #   (tmux or herdr), and clears the previous harness's per-task wiring
@@ -497,10 +494,10 @@
 #   restart, and it is inherited into secondmate homes (bin/fm-config-inherit-lib.sh).
 # Claude lean launch (--claude-lean):
 #   Opt-in and per spawn. Absent, every launch stays byte-identical, and the
-#   task record gains no claude_lean= line. Present on a Firstmate-built claude
-#   launch (ship, scout, secondmate, or relaunch) it does two things:
+#   task record stores no lean choice. Present on a Firstmate-built claude
+#   ship or scout launch it does two things:
 #   1. Sets FORCE_PROMPT_CACHING_5M=1 in the worker launch environment: an
-#      export in the launch command, a pre-launch pane export, and a literal
+#      export in the launch command and a literal
 #      assignment after the allowlist floor pin. The floor names above are
 #      unchanged. Claude Code reads the variable as an order to use the
 #      five-minute prompt cache (ttl 5m, reason force_5m_env).
@@ -510,9 +507,8 @@
 #      Hooks, CLAUDE.md and AGENTS.md project instructions, skills, the
 #      permission flag, session settings, and the Firstmate busy hooks stay.
 #      --bare is not used, because it skips hooks and CLAUDE.md auto-discovery.
-#   The choice is recorded as claude_lean=1. A relaunch reuses that line when
-#   --claude-lean is omitted, and passing the flag turns the posture on.
-#   A non-claude harness, a raw launch command, or backend=t3code refuses:
+#   Each launch requires the flag; omitting it restores the ordinary start.
+#   A secondmate, non-claude harness, raw launch command, or backend=t3code refuses:
 #   T3 starts Claude itself and cannot pass --strict-mcp-config. Other
 #   harnesses are not launched without the lean behavior.
 # Codex approval mode (config/codex-approval-mode):
@@ -1050,7 +1046,6 @@ TRACEPARENT_SET=0
 ACCOUNT_ARG=
 ACCOUNT_SET=0
 # Opt-in Claude-only launch posture. 0 leaves every launch byte-identical.
-CLAUDE_LEAN_FLAG=0
 CLAUDE_LEAN=0
 RELAUNCH=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
@@ -1191,7 +1186,7 @@ for a in "$@"; do
     ACCOUNT_ARG=${a#--account=}
     ACCOUNT_SET=1
     ;;
-  --claude-lean) CLAUDE_LEAN_FLAG=1 ;;
+  --claude-lean) CLAUDE_LEAN=1 ;;
   --claude-lean=*)
     echo "error: --claude-lean takes no value" >&2
     exit 1
@@ -2191,7 +2186,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$BASE_BRANCH_SET" -eq 0 ] || shared_args+=(--base-branch "$BASE_BRANCH")
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   [ "$ACCOUNT_SET" -eq 0 ] || shared_args+=(--account "$ACCOUNT_ARG")
-  [ "$CLAUDE_LEAN_FLAG" -eq 0 ] || shared_args+=(--claude-lean)
+  [ "$CLAUDE_LEAN" -eq 0 ] || shared_args+=(--claude-lean)
   for pair in "${POS[@]}"; do
     case "$pair" in
     *=*) : ;;
@@ -2421,7 +2416,7 @@ if [ "$RELAUNCH" -eq 0 ]; then
     echo "error: backend=hc does not support --secondmate spawns yet" >&2
     exit 1
   fi
-  if [ "$CLAUDE_LEAN_FLAG" -eq 1 ] && [ "$BACKEND" = t3code ]; then
+  if [ "$CLAUDE_LEAN" -eq 1 ] && [ "$BACKEND" = t3code ]; then
     echo "error: --claude-lean cannot run on backend=t3code; T3 starts Claude itself and cannot pass --strict-mcp-config. Choose another backend." >&2
     exit 1
   fi
@@ -3260,22 +3255,11 @@ case "$ARG3" in
   ;;
 esac
 
-# --claude-lean (header). A relaunch keeps a recorded claude_lean=1 without
-# the flag, and the flag turns the posture on. Refusing here is before any
-# worktree or endpoint is created for a fresh spawn.
-CLAUDE_LEAN=$CLAUDE_LEAN_FLAG
-if [ "$RELAUNCH" -eq 1 ]; then
-  claude_lean_recorded=$(fm_meta_get "$RELAUNCH_META" claude_lean)
-  case "$claude_lean_recorded" in
-    '') ;;
-    1) CLAUDE_LEAN=1 ;;
-    *)
-      echo "error: task $ID records claude_lean=$claude_lean_recorded; expected 1 or no line" >&2
-      exit 1
-      ;;
-  esac
-fi
 if [ "$CLAUDE_LEAN" = 1 ]; then
+  if [ "$KIND" = secondmate ]; then
+    echo "error: --claude-lean does not apply to secondmate supervision sessions" >&2
+    exit 1
+  fi
   if [ "$RAW_LAUNCH" = 1 ]; then
     echo "error: --claude-lean applies to a Firstmate-built claude launch, not a raw launch command" >&2
     exit 1
@@ -7295,7 +7279,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness hermes_profile hermes_home kind mode yolo branch tasktmp base_branch upstream_consent forge backup_remote backup_prefix model effort opencode_version account account_provider omp_profile busy_gen spawn_gen approval_mode claude_lean traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id paseo_terminal_id paseo_workspace_id rex_server rex_session_id rex_window_id rex_block_id t3_thread_id t3_project_id tern_session_id tern_tab_id tern_block_id hc_session hc_terminal home projects control_relaunch_tx polytoken_session polytoken_port polytoken_credential", keys, " ")
+      split("window endpoint_task_id worktree project harness hermes_profile hermes_home kind mode yolo branch tasktmp base_branch upstream_consent forge backup_remote backup_prefix model effort opencode_version account account_provider omp_profile busy_gen spawn_gen approval_mode traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id paseo_terminal_id paseo_workspace_id rex_server rex_session_id rex_window_id rex_block_id t3_thread_id t3_project_id tern_session_id tern_tab_id tern_block_id hc_session hc_terminal home projects control_relaunch_tx polytoken_session polytoken_port polytoken_credential", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -7327,9 +7311,6 @@ preserve_relaunch_meta() {
   [ -z "$EXTERNAL_BACKUP_REMOTE" ] || echo "backup_prefix=$EXTERNAL_BACKUP_PREFIX"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
-  # Written only when this launch is lean, so an ordinary task record stays
-  # byte-identical. A relaunch reads the line back (header).
-  [ "$CLAUDE_LEAN" != 1 ] || echo "claude_lean=1"
   # The detected OpenCode major, recorded so fm-control sends the exit key this
   # agent's TUI understands. Written only when a version was resolved, so a
   # non-opencode or undetectable task record stays byte-identical.
@@ -7899,9 +7880,6 @@ spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
 spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=1"
-if [ "$CLAUDE_LEAN" = 1 ]; then
-  spawn_send_text_line "$T" "export FORCE_PROMPT_CACHING_5M=1"
-fi
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi

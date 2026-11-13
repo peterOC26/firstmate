@@ -1468,9 +1468,10 @@ The [Claude adapter reference](../.agents/skills/harness-adapters/references/har
 
 `--claude-lean` is an opt-in flag on `bin/fm-spawn.sh` for one Claude worker.
 Pass it when a short plan or code check should use the five-minute prompt cache and start without MCP servers or auto memory.
-Leave it off for every other launch, including the main chat.
+Leave it off for every other launch, including the main chat, drivers, try copies, and supervision sessions.
 An ordinary launch stays unchanged.
-A relaunch of that task keeps the choice.
+The choice is per launch; omitting the flag restores the ordinary start, including on relaunch.
+Secondmate supervision sessions refuse the flag.
 It is independent of `config/claude-permission-mode`, which still selects only the permission flag.
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact switches, what stays loaded, and the refusals.
