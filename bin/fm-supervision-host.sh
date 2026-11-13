@@ -124,7 +124,6 @@
 # A shell assignment is not visible to the branch offer or to that owner,
 # the owner stops immediately when FM_HOME is absent, and the offer's own
 # fallback is the repository that contains its script rather than that home.
-# The launch repeats the home on the owner.
 # Without the flag all hand-back paths below are unchanged.
 #
 # THE LATCH. An opted-in host persists engine health across short-lived
@@ -768,11 +767,8 @@ acknowledged_handback() {  # [extra output lines]; returns only when disabled
     exit 1
   fi
   out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || exit 1
-  # Repeat the computed home on the owner. See ACKNOWLEDGED HAND-BACK above.
-  [ -z "${FM_STATE_OVERRIDE:-}" ] || export FM_STATE_OVERRIDE
-  [ -z "${FM_CONFIG_OVERRIDE:-}" ] || export FM_CONFIG_OVERRIDE
   set -m
-  FM_HOME="$FM_HOME" FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
+  FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
     nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$GEN" "$predecessor" > "$out" 2>&1 </dev/null &
   pid=$!
   set +m
