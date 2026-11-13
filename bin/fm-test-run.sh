@@ -409,6 +409,7 @@ family_for_basename() {
     fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|fm-spawn-slot-ownership.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
     fm-spawn-compact-adviser-disable-remote.test.sh|\
+    fm-spawn-claude-lean.test.sh|\
     fm-project-capacity.test.sh|\
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
@@ -940,6 +941,7 @@ tests/fm-sessionstart-nudge.test.sh 84195
 tests/fm-shared-captain-inheritance.test.sh 10907
 tests/fm-spawn-compact-adviser-disable-remote.test.sh 76299
 tests/fm-spawn-compact-adviser-disable.test.sh 39465
+tests/fm-spawn-claude-lean.test.sh 80000
 tests/fm-spawn-dispatch-profile.test.sh 534489
 tests/fm-spawn-orca-worktree.test.sh 52519
 tests/fm-spawn-pool-base-freshen.test.sh 175551
