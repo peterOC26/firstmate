@@ -366,6 +366,31 @@
 # Opt-in config/record-export-root delegates the record archive transaction to
 # bin/fm-record-export.sh immediately before status, metadata, or inbox records
 # for the retiring task are removed. A failed commit retains those sources.
+# Claude Code session temp for the task's recorded worktree is removed once
+# this teardown has confirmed the work is landed or discardable and the worker
+# has stopped, and only when this teardown still owns that copy.
+# For secondmates, removal also waits for successful home removal; a refusal
+# before that point leaves session temp in place.
+# The supported layout is <tmp>/claude-<uid>/<slug>/, with <tmp> defaulting to /tmp.
+# <uid> is the current user's id.
+# <slug> is that worktree path with trailing slashes removed and every character
+# outside A-Za-z0-9 replaced by '-'.
+# Use the recorded path without resolving symlinks: Claude's session key
+# depends on the working-directory spelling used at launch.
+# Slugs longer than 200 characters are left in place.
+# Only a real directory owned by the current user, whose parent is the real
+# directory <tmp>/claude-<uid> also owned by that user, is removed.
+# A symlink, another owner's directory, the parent, another slug, a non-ASCII
+# path, and the slug of the active firstmate home, the code root, or the
+# primary checkout are left in place.
+# An empty or relative worktree path removes nothing.
+# A missing folder is silent.
+# Guard refusals and failed removals warn without changing the teardown result;
+# an empty worktree path is silent.
+# Successful removal reports the pre-removal folder size in bytes, or unknown
+# when measurement fails.
+# FM_CLAUDE_TEMP_ROOT replaces /tmp for tests and must be an absolute real
+# directory; when it is set and unusable, nothing under /tmp is touched.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -4321,6 +4346,208 @@ if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
   validate_worktree_teardown_safety || exit 1
 fi
 
+# Non-secondmate cleanup follows process reaping and the landed-or-discardable check.
+# Secondmate cleanup follows successful home removal.
+# Removal never changes the teardown result. The slug rule is the header's.
+teardown_claude_temp_strip() {
+  local path=$1
+  while [ "$path" != "/" ] && [ "${path%/}" != "$path" ]; do
+    path=${path%/}
+  done
+  printf '%s\n' "$path"
+}
+
+# Prints the slug, or returns 1 when the path must not select a folder.
+teardown_claude_project_slug() {
+  local path=$1 slug
+  path=$(teardown_claude_temp_strip "$path")
+  case "$path" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  if printf '%s' "$path" | LC_ALL=C grep -q '[^[:print:]]'; then
+    return 1
+  fi
+  slug=$(printf '%s' "$path" | LC_ALL=C sed 's/[^A-Za-z0-9]/-/g')
+  case "$slug" in
+    ''|*[!A-Za-z0-9-]*) return 1 ;;
+  esac
+  [ "${#slug}" -le 200 ] || return 1
+  printf '%s\n' "$slug"
+}
+
+teardown_claude_temp_uid() {
+  local path=$1 uid
+  if [ "$(uname -s)" = Darwin ]; then
+    uid=$(/usr/bin/stat -f %u "$path" 2>/dev/null) || return 1
+  else
+    uid=$(stat -c %u -- "$path" 2>/dev/null) || return 1
+  fi
+  case "$uid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$uid"
+}
+
+teardown_claude_temp_bytes() {
+  local path=$1 bytes=
+  bytes=$(du -sb -- "$path" 2>/dev/null | awk 'NR==1 { print $1; exit }' || true)
+  case "$bytes" in
+    ''|*[!0-9]*)
+      bytes=$(du -sk -- "$path" 2>/dev/null | awk 'NR==1 { print $1; exit }' || true)
+      case "$bytes" in
+        ''|*[!0-9]*) printf 'unknown\n' ;;
+        *) printf '%s\n' $(( bytes * 1024 )) ;;
+      esac
+      ;;
+    *) printf '%s\n' "$bytes" ;;
+  esac
+}
+
+teardown_claude_protected_paths() {
+  local common primary physical path
+  common=$(git -C "$FM_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [ -z "$common" ]; then
+    common=$(git -C "$FM_ROOT" rev-parse --git-common-dir 2>/dev/null || true)
+    case "$common" in
+      /*|"") ;;
+      *) common=$FM_ROOT/$common ;;
+    esac
+  fi
+  primary=
+  case "$common" in
+    */.git) primary=${common%/.git} ;;
+  esac
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    path=$(teardown_claude_temp_strip "$path")
+    printf '%s\n' "$path"
+    [ -d "$path" ] || continue
+    physical=$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P) || continue
+    [ "$physical" = "$path" ] || printf '%s\n' "$physical"
+  done <<EOF
+$FM_HOME
+$FM_ROOT
+$primary
+EOF
+}
+
+teardown_claude_temp_is_protected() {
+  local path=$1 slug=$2 candidate candidate_slug
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    candidate=$(teardown_claude_temp_strip "$candidate")
+    [ "$path" = "$candidate" ] && return 0
+    candidate_slug=$(teardown_claude_project_slug "$candidate" 2>/dev/null) || continue
+    [ "$slug" = "$candidate_slug" ] && return 0
+  done < <(teardown_claude_protected_paths)
+  return 1
+}
+
+teardown_claude_temp_root() {
+  local root
+  if [ -n "${FM_CLAUDE_TEMP_ROOT:-}" ]; then
+    root=$FM_CLAUDE_TEMP_ROOT
+    case "$root" in
+      /*) ;;
+      *)
+        echo "warning: FM_CLAUDE_TEMP_ROOT is not absolute; leaving claude session temp for $ID in place" >&2
+        return 1
+        ;;
+    esac
+  else
+    root=/tmp
+  fi
+  root=$(teardown_claude_temp_strip "$root")
+  if [ -L "$root" ] || [ ! -d "$root" ]; then
+    if [ -n "${FM_CLAUDE_TEMP_ROOT:-}" ]; then
+      echo "warning: FM_CLAUDE_TEMP_ROOT is not a real directory; leaving claude session temp for $ID in place" >&2
+    fi
+    return 1
+  fi
+  printf '%s\n' "$root"
+}
+
+teardown_remove_claude_session_temp() {
+  local path=$1 root parent slug target me owner bytes
+  path=${path:-}
+  [ -n "$path" ] || return 0
+  path=$(teardown_claude_temp_strip "$path")
+  slug=$(teardown_claude_project_slug "$path") || {
+    echo "warning: could not derive the claude session slug for $ID; leaving session temp in place" >&2
+    return 0
+  }
+  case "$slug" in
+    ''|*[!A-Za-z0-9-]*|*/*|.) return 0 ;;
+  esac
+  if teardown_claude_temp_is_protected "$path" "$slug"; then
+    echo "warning: left claude session temp for $ID in place: $path is the firstmate home or primary checkout" >&2
+    return 0
+  fi
+  root=$(teardown_claude_temp_root) || return 0
+  me=$(id -u) || {
+    echo "warning: could not read the current user id; leaving claude session temp for $ID in place" >&2
+    return 0
+  }
+  parent=$root/claude-$me
+  if [ ! -e "$parent" ] && [ ! -L "$parent" ]; then
+    return 0
+  fi
+  if [ -L "$parent" ] || [ ! -d "$parent" ]; then
+    echo "warning: left claude session temp for $ID in place: $parent is not a real directory" >&2
+    return 0
+  fi
+  owner=$(teardown_claude_temp_uid "$parent") || {
+    echo "warning: left claude session temp for $ID in place: could not verify the owner of $parent" >&2
+    return 0
+  }
+  if [ "$owner" != "$me" ]; then
+    echo "warning: left claude session temp for $ID in place: $parent is owned by uid $owner, not $me" >&2
+    return 0
+  fi
+  target=$parent/$slug
+  case "$target" in
+    "$parent"/*) ;;
+    *)
+      echo "warning: left claude session temp for $ID in place: $target is not directly under $parent" >&2
+      return 0
+      ;;
+  esac
+  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    return 0
+  fi
+  if [ -L "$target" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is a symlink" >&2
+    return 0
+  fi
+  if [ ! -d "$target" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is not a directory" >&2
+    return 0
+  fi
+  owner=$(teardown_claude_temp_uid "$target") || {
+    echo "warning: left claude session temp for $ID in place: could not verify the owner of $target" >&2
+    return 0
+  }
+  if [ "$owner" != "$me" ]; then
+    echo "warning: left claude session temp for $ID in place: $target is owned by uid $owner, not $me" >&2
+    return 0
+  fi
+  bytes=$(teardown_claude_temp_bytes "$target")
+  if ! rm -rf -- "$target"; then
+    echo "warning: could not remove claude session temp for $ID at $target" >&2
+    return 0
+  fi
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    echo "warning: could not remove claude session temp for $ID at $target" >&2
+    return 0
+  fi
+  echo "teardown: removed claude session temp for $ID ($bytes bytes)" >&2
+}
+
+if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
+  teardown_remove_claude_session_temp "$WT"
+fi
+
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
 # Roll the accepted legacy incarnation's stamp back to the record's exact
 # pre-stamp bytes. Uses perl - already in the teardown lifecycle's curated PATH
@@ -4528,7 +4755,9 @@ if [ "$KIND" = secondmate ]; then
   pending_replies_recovery_validate recheck \
     || { echo "error: local pending-reply recovery paths changed; preserving the secondmate home and route" >&2; exit 1; }
   if remove_firstmate_home "$HOME_PATH" "secondmate home" "$ID" "$BACKEND"; then
-    :
+    if teardown_owns_worktree; then
+      teardown_remove_claude_session_temp "$WT"
+    fi
   else
     rc=$?
     handoff_wake_retire_stage_restore \
