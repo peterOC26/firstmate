@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--backend <name>] [--herdr-resume-lock-wait]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--backend <name>] [--herdr-resume-lock-wait]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
@@ -72,7 +72,7 @@
 #   and accumulated progress notes, remains intact on disk, keeping the launch
 #   argument below Linux's per-argument limit without manual note archiving.
 #   tests/fm-control-relaunch.test.sh covers inline and oversized delivery.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--account <entry>]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--account <entry>] [--claude-lean]
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
@@ -83,8 +83,9 @@
 #   backend, kind, project or home, worktree, endpoint - comes from the task's
 #   validated state/<id>.meta, so --backend, --scout, --secondmate, a project
 #   positional, and batch pairs are all refused alongside it; only harness,
-#   model, effort, and a declared Claude account may change, which is what
-#   makes a harness switch one ordinary relaunch. It refuses unless the
+#   model, effort, a declared Claude account, and the per-launch Claude lean
+#   option below may change. This makes a harness switch one ordinary relaunch.
+#   It refuses unless the
 #   recorded endpoint is positively agent-free on a backend with both a
 #   recovery-grade agent-state classifier and replacement-agent support
 #   (tmux or herdr), and clears the previous harness's per-task wiring
@@ -440,6 +441,7 @@
 #   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor also
 #   pins to 1 with a literal assignment so it survives the cleared environment
 #   even on a host that never had it set.
+#   See Claude lean launch below for its additional environment assignment.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
@@ -490,6 +492,29 @@
 #   worktree, or record exists and names the accepted values. The file is read
 #   on every spawn and relaunch, so a change reaches the next launch without a
 #   restart, and it is inherited into secondmate homes (bin/fm-config-inherit-lib.sh).
+# Claude lean launch (--claude-lean):
+#   Opt-in and per spawn. Absent, every launch stays byte-identical, and the
+#   task record stores no lean choice. Present on a Firstmate-built claude
+#   ship or scout launch it does two things:
+#   1. Sets FORCE_PROMPT_CACHING_5M=1 in the worker launch environment: an
+#      export in the launch command and a literal
+#      assignment after the allowlist floor pin. The floor names above are
+#      unchanged. Claude Code reads the variable as an order to use the
+#      five-minute prompt cache (ttl 5m, reason force_5m_env).
+#   2. Starts claude with --strict-mcp-config and no --mcp-config, an empty
+#      allowedMcpServers session setting, and --disallowedTools 'mcp__*'.
+#      The allowlist excludes plugin-registered servers and their instructions;
+#      the deny rule keeps their tools unavailable even if another settings
+#      source adds server allowlist entries, including mid-turn registrations.
+#      CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 is set on the
+#      claude process, so auto memory files are neither created nor loaded.
+#      Hooks, CLAUDE.md and AGENTS.md project instructions, skills, the
+#      permission flag, session settings, and the Firstmate busy hooks stay.
+#      --bare is not used, because it skips hooks and CLAUDE.md auto-discovery.
+#   Each launch requires the flag; omitting it restores the ordinary start.
+#   A secondmate, non-claude harness, raw launch command, or backend=t3code refuses:
+#   T3 starts Claude itself and cannot pass --strict-mcp-config. Other
+#   harnesses are not launched without the lean behavior.
 # Codex approval mode (config/codex-approval-mode):
 #   One whitespace-trimmed token: absent or `bypass` selects
 #   --dangerously-bypass-approvals-and-sandbox; `approve-for-me` selects
@@ -1024,6 +1049,8 @@ UPSTREAM_CONSENT_SET=0
 TRACEPARENT_SET=0
 ACCOUNT_ARG=
 ACCOUNT_SET=0
+# Opt-in Claude-only launch posture. 0 leaves every launch byte-identical.
+CLAUDE_LEAN=0
 RELAUNCH=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
 # Absent/unset keeps upstream refuse-on-contention. See header.
@@ -1162,6 +1189,11 @@ for a in "$@"; do
   --account=*)
     ACCOUNT_ARG=${a#--account=}
     ACCOUNT_SET=1
+    ;;
+  --claude-lean) CLAUDE_LEAN=1 ;;
+  --claude-lean=*)
+    echo "error: --claude-lean takes no value" >&2
+    exit 1
     ;;
   *) POS+=("$a") ;;
   esac
@@ -2158,6 +2190,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$BASE_BRANCH_SET" -eq 0 ] || shared_args+=(--base-branch "$BASE_BRANCH")
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   [ "$ACCOUNT_SET" -eq 0 ] || shared_args+=(--account "$ACCOUNT_ARG")
+  [ "$CLAUDE_LEAN" -eq 0 ] || shared_args+=(--claude-lean)
   for pair in "${POS[@]}"; do
     case "$pair" in
     *=*) : ;;
@@ -2385,6 +2418,10 @@ if [ "$RELAUNCH" -eq 0 ]; then
   fi
   if [ "$BACKEND" = hc ] && [ "$KIND" = secondmate ]; then
     echo "error: backend=hc does not support --secondmate spawns yet" >&2
+    exit 1
+  fi
+  if [ "$CLAUDE_LEAN" -eq 1 ] && [ "$BACKEND" = t3code ]; then
+    echo "error: --claude-lean cannot run on backend=t3code; T3 starts Claude itself and cannot pass --strict-mcp-config. Choose another backend." >&2
     exit 1
   fi
   fm_backend_runtime_check "$BACKEND" || exit 1
@@ -2886,7 +2923,10 @@ launch_template() {
   # project and fetched content. A persistent secondmate receives its own
   # supervisor contract instead, so this task-worker statement does not apply.
   claude)
-    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings __CLAUDESETTINGS__ '
+    # __CLAUDELEANENV__ and __CLAUDELEANFLAGS__ stay empty unless --claude-lean
+    # is on. Empty substitution is what keeps an ordinary launch byte-identical.
+    # The header owns the set values. --bare is never one of them.
+    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 __CLAUDELEANENV__claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings __CLAUDESETTINGS____CLAUDELEANFLAGS__ '
     if [ "$kind" != secondmate ]; then
       printf '%s' "--append-system-prompt '$(spawn_claude_task_channel_statement)' "
     fi
@@ -3218,6 +3258,25 @@ case "$ARG3" in
   }
   ;;
 esac
+
+if [ "$CLAUDE_LEAN" = 1 ]; then
+  if [ "$KIND" = secondmate ]; then
+    echo "error: --claude-lean does not apply to secondmate supervision sessions" >&2
+    exit 1
+  fi
+  if [ "$RAW_LAUNCH" = 1 ]; then
+    echo "error: --claude-lean applies to a Firstmate-built claude launch, not a raw launch command" >&2
+    exit 1
+  fi
+  if [ "$HARNESS" != claude ]; then
+    echo "error: --claude-lean applies only to the claude harness (this launch is $HARNESS)" >&2
+    exit 1
+  fi
+  if [ "$BACKEND" = t3code ]; then
+    echo "error: --claude-lean cannot run on backend=t3code; T3 starts Claude itself and cannot pass --strict-mcp-config. Choose another backend." >&2
+    exit 1
+  fi
+fi
 
 # muse, gemini, devin, commandcode, polytoken, cortex, and kiro are verified as CREWMATE/SCOUT adapters only. A secondmate is
 # a firstmate instance, so it needs a primary supervision protocol.
@@ -7450,12 +7509,23 @@ if [ "$RELAUNCH" -eq 1 ]; then
 fi
 LAUNCH=${LAUNCH//__PIRESUME__/$RESUME_ARGS}
 LAUNCH=${LAUNCH//__CLAUDEPERMFLAG__/$CLAUDE_PERM_FLAG}
+CLAUDE_LEAN_ENV=
+CLAUDE_LEAN_FLAGS=
+if [ "$CLAUDE_LEAN" = 1 ]; then
+  CLAUDE_LEAN_ENV='CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 '
+  CLAUDE_LEAN_FLAGS=" --strict-mcp-config --disallowedTools 'mcp__*'"
+fi
+LAUNCH=${LAUNCH//__CLAUDELEANENV__/$CLAUDE_LEAN_ENV}
+LAUNCH=${LAUNCH//__CLAUDELEANFLAGS__/$CLAUDE_LEAN_FLAGS}
 case "$LAUNCH" in
 *__CLAUDESETTINGS__*)
   if [ "$KIND" = secondmate ]; then
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$(shell_quote "$STATE_REAL/$ID.claude-settings.json")}
   else
     claude_settings="'{\"feedbackDrafts\":\"off\"__CLAUDEATTRIBUTION__}'"
+    if [ "$CLAUDE_LEAN" = 1 ]; then
+      claude_settings="'{\"feedbackDrafts\":\"off\",\"allowedMcpServers\":[]__CLAUDEATTRIBUTION__}'"
+    fi
     LAUNCH=${LAUNCH//__CLAUDESETTINGS__/$claude_settings}
   fi
   ;;
@@ -7726,6 +7796,12 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+# Same shape as the kill switch above, and only for a lean Claude launch, so
+# an ordinary launch command stays byte-identical. The allowlist pin below
+# sets it again at the env -i boundary.
+if [ "$CLAUDE_LEAN" = 1 ]; then
+  LAUNCH="export FORCE_PROMPT_CACHING_5M=1; $LAUNCH"
+fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the
@@ -7882,6 +7958,11 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   # $LAUNCH is what gives the wrapping `/bin/sh` itself the switch, not only the
   # agent command it runs.
   LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX COMPACT_ADVISER_DISABLE=1"
+  # Lean-only, after the floor pin, so env applies it last and a cleared
+  # environment cannot drop it. Ordinary launches do not append it.
+  if [ "$CLAUDE_LEAN" = 1 ]; then
+    LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX FORCE_PROMPT_CACHING_5M=1"
+  fi
   if [ -n "$SPAWN_TRACEPARENT" ]; then
     # shellcheck disable=SC2016
     LAUNCH_ENV_PREFIX="$LAUNCH_ENV_PREFIX "'${TRACEPARENT+"TRACEPARENT=$TRACEPARENT"}'
