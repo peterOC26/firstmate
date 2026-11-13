@@ -83,12 +83,14 @@
 #
 # Claude Code session temp under a fake temp root (never the real /tmp/claude-*):
 #   (ct1) landed teardown removes only this worktree's slug folder and reports
-#         the freed size; another task slug stays
+#         its size; another task slug stays
 #   (ct2) a slug symlink is left in place and does not block cleanup
 #   (ct3) a missing slug folder is fine
 #   (ct4) a relative worktree path removes nothing
 #   (ct5) a refused teardown leaves the slug folder in place
 #   (ct6) a failed removal is reported and cleanup still finishes
+#   (protected) selecting the active firstmate home warns and keeps its folder
+#   (secondmate) session temp stays until endpoint stop and successful home removal
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091

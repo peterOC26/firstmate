@@ -369,23 +369,26 @@
 # Claude Code session temp for the task's recorded worktree is removed once
 # this teardown has confirmed the work is landed or discardable and the worker
 # has stopped, and only when this teardown still owns that copy.
-# Claude Code 2.1.319 stores it at <tmp>/claude-<uid>/<slug>/, and on this host
-# <tmp> is /tmp.
+# For secondmates, removal also waits for successful home removal; a refusal
+# before that point leaves session temp in place.
+# The supported layout is <tmp>/claude-<uid>/<slug>/, with <tmp> defaulting to /tmp.
 # <uid> is the current user's id.
 # <slug> is that worktree path with trailing slashes removed and every character
 # outside A-Za-z0-9 replaced by '-'.
-# The path is not symlink-resolved, matching Claude's originalCwd, which is
-# process.cwd() passed through identity normalizers in that build.
+# Use the recorded path without resolving symlinks: Claude's session key
+# depends on the working-directory spelling used at launch.
 # Slugs longer than 200 characters are left in place.
 # Only a real directory owned by the current user, whose parent is the real
 # directory <tmp>/claude-<uid> also owned by that user, is removed.
 # A symlink, another owner's directory, the parent, another slug, a non-ASCII
 # path, and the slug of the active firstmate home, the code root, or the
 # primary checkout are left in place.
-# An unknown, empty, or relative worktree path removes nothing.
+# An empty or relative worktree path removes nothing.
 # A missing folder is silent.
-# A skipped or failed removal is reported and does not change the teardown result.
-# One line reports the freed size when removal succeeds.
+# Guard refusals and failed removals warn without changing the teardown result;
+# an empty worktree path is silent.
+# Successful removal reports the pre-removal folder size in bytes, or unknown
+# when measurement fails.
 # FM_CLAUDE_TEMP_ROOT replaces /tmp for tests and must be an absolute real
 # directory; when it is set and unusable, nothing under /tmp is touched.
 set -eu
