@@ -480,40 +480,65 @@ make_primary_home() {  # <name>
 # One Claude main session under the fake harness. Each turn_end fires the real
 # Stop hook as the tracked asyncRewake registration does, and records its exit
 # status and stderr (the rewake banner Claude delivers on exit 2).
-start_hook_session() {  # <home>
-  local home=$1
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" \
-    PATH="$home/fakebin:$PATH" "$FAKE_CLAUDE" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
-      for seed in "$FM_HOME"/mirror-seed.*; do
-        [ -f "$seed" ] || continue
-        "$FM_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
-      done
-      while [ ! -e "$FM_HOME/session.stop" ] && [ -d "$FM_HOME" ] \
-        && kill -0 "$FM_TEST_SUITE_PID" 2>/dev/null; do
-        if [ -e "$FM_HOME/stop.go" ]; then
-          rm -f "$FM_HOME/stop.go"
-          if [ -e "$FM_HOME/hook.own-group" ]; then
-            # Claude owns the hook as a process group of its own and tears the
-            # whole group down once the hook has exited.
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOME/hook.stdin"
-            set -m
-            "$FM_HOME/bin/fm-claude-stop-autoarm.sh" < "$FM_HOME/hook.stdin" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err" &
-            printf "%s\n" "$!" > "$FM_HOME/hook.pgid"
-            wait "$!"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-            set +m
-          else
-            printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
-              | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2> "$FM_HOME/hook.err"
-            printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-          fi
-        fi
-        sleep 0.1
-      done
-    ' 2>> "$home/claude.err" &
+# <home> [computed]
+# The default exports FM_HOME into the session, which hides a hand-back whose
+# owner never receives that name. "computed" leaves FM_HOME unset and launches
+# the hook through the home's own bin, so the hook and host derive the home
+# from the script path the way a production Stop hook does.
+start_hook_session() {  # <home> [computed]
+  local home=$1 mode=${2:-}
+  if [ "$mode" = computed ]; then
+    env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE \
+      FM_HOOK_HOME="$home" FM_HOOK_COMPUTED_HOME=1 \
+      FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" \
+      PATH="$home/fakebin:$PATH" \
+      "$FAKE_CLAUDE" -c "$FM_HOOK_SESSION_BODY" 2>> "$home/claude.err" &
+  else
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_HOOK_HOME="$home" \
+      FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" \
+      PATH="$home/fakebin:$PATH" \
+      "$FAKE_CLAUDE" -c "$FM_HOOK_SESSION_BODY" 2>> "$home/claude.err" &
+  fi
 }
+
+FM_HOOK_SESSION_BODY='
+run_stop_hook() {
+  if [ "${FM_HOOK_COMPUTED_HOME:-}" = 1 ]; then
+    env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_CONFIG_OVERRIDE \
+      "$FM_HOOK_HOME/bin/fm-claude-stop-autoarm.sh"
+  else
+    "$FM_HOOK_HOME/bin/fm-claude-stop-autoarm.sh"
+  fi
+}
+printf "%s\n" "$$" > "$FM_HOOK_HOME/state/.lock"
+printf "%s\n" "$$" >> "$FM_HOOK_HOME/claude-pids"
+for seed in "$FM_HOOK_HOME"/mirror-seed.*; do
+  [ -f "$seed" ] || continue
+  "$FM_HOOK_HOME/bin/fm-host-mirror.sh" hook claude < "$seed"
+done
+while [ ! -e "$FM_HOOK_HOME/session.stop" ] && [ -d "$FM_HOOK_HOME" ] \
+  && kill -0 "$FM_TEST_SUITE_PID" 2>/dev/null; do
+  if [ -e "$FM_HOOK_HOME/stop.go" ]; then
+    rm -f "$FM_HOOK_HOME/stop.go"
+    if [ -e "$FM_HOOK_HOME/hook.own-group" ]; then
+      # Claude owns the hook as a process group of its own and tears the
+      # whole group down once the hook has exited.
+      printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" > "$FM_HOOK_HOME/hook.stdin"
+      set -m
+      run_stop_hook < "$FM_HOOK_HOME/hook.stdin" > "$FM_HOOK_HOME/hook.out" 2> "$FM_HOOK_HOME/hook.err" &
+      printf "%s\n" "$!" > "$FM_HOOK_HOME/hook.pgid"
+      wait "$!"
+      printf "%s\n" "$?" > "$FM_HOOK_HOME/hook.rc"
+      set +m
+    else
+      printf "{\"session_id\":\"sess-host-hook\",\"stop_hook_active\":false}\n" \
+        | run_stop_hook > "$FM_HOOK_HOME/hook.out" 2> "$FM_HOOK_HOME/hook.err"
+      printf "%s\n" "$?" > "$FM_HOOK_HOME/hook.rc"
+    fi
+  fi
+  sleep 0.1
+done
+'
 
 turn_end() { rm -f "$1/hook.rc"; : > "$1/stop.go"; }
 

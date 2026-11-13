@@ -120,7 +120,12 @@
 # verifies a detached bin/fm-supervision-handoff.sh owner. That owner keeps
 # replacing closed arms until main acknowledges the check, and leaves its
 # verified arm for the next park to take over. Its header owns retry delivery
-# and limits. Without the flag all hand-back paths below are unchanged.
+# and limits. The home computed below is exported before any child starts.
+# A shell assignment is not visible to the branch offer or to that owner,
+# the owner stops immediately when FM_HOME is absent, and the offer's own
+# fallback is the repository that contains its script rather than that home.
+# The launch repeats the home on the owner.
+# Without the flag all hand-back paths below are unchanged.
 #
 # THE LATCH. An opted-in host persists engine health across short-lived
 # parks; docs/supervision-host.md "The broken-session latch" owns the policy.
@@ -205,6 +210,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+# See ACKNOWLEDGED HAND-BACK in the header. Children do not see this assignment.
+export FM_HOME
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 
@@ -761,8 +768,11 @@ acknowledged_handback() {  # [extra output lines]; returns only when disabled
     exit 1
   fi
   out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || exit 1
+  # Repeat the computed home on the owner. See ACKNOWLEDGED HAND-BACK above.
+  [ -z "${FM_STATE_OVERRIDE:-}" ] || export FM_STATE_OVERRIDE
+  [ -z "${FM_CONFIG_OVERRIDE:-}" ] || export FM_CONFIG_OVERRIDE
   set -m
-  FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
+  FM_HOME="$FM_HOME" FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
     nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$GEN" "$predecessor" > "$out" 2>&1 </dev/null &
   pid=$!
   set +m

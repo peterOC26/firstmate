@@ -46,6 +46,66 @@ test_lost_boundary_handoff() { assert_lost_handoff_keeps_watching boundary; }
 test_lost_pass_through_handoff() { assert_lost_handoff_keeps_watching pass-through; }
 
 
+# Production Stop hooks do not export FM_HOME. The host computes it and the
+# acknowledged hand-back owner must still verify a successor, leave that
+# watcher running, and let the next park handle a routine wake.
+test_computed_home_handoff_verifies_successor() {
+  local home
+  home=$(make_primary_home computed-home-handoff)
+  ln -s "$ROOT/.agents" "$home/.agents"
+  printf 'project=demo\nwindow=fm-other\nharness=claude\n' > "$home/state/other.meta"
+  : > "$home/config/supervision-handoff-ack"
+  start_hook_session "$home" computed
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "computed home: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until_deadline 60 hook_exited "$home" || fail "computed home: the decision close never reached the Stop hook: $(cat "$home/state/.supervision-host.log")"
+  assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "computed home: the close was not a main-only pass-through"
+  assert_rewoke_main "$home" "computed home"
+  assert_no_grep 'the acknowledged hand-back successor could not be verified' "$home/hook.err" \
+    "computed home: a derivable home must not fail successor verification: $(cat "$home/hook.err")"
+  assert_re '	handoff	' "$home/state/.supervision-host.log" "computed home: the verified hand-back was not recorded"
+  watcher_live "$home" || fail "computed home: the verified hand-back left no watcher"
+  main_drain "$home" >/dev/null
+  # shellcheck disable=SC2086 # the printed acknowledgement arguments
+  [ -z "$MAIN_ACK" ] || FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/fm-wake-drain.sh" $MAIN_ACK \
+    || fail "computed home: main's acknowledgement failed: $MAIN_ACK"
+  turn_end "$home"
+  wait_until 250 host_owns_the_only_cycle "$home" \
+    || fail "computed home: the next park did not own the verified successor:"$'\n'"$(home_arms "$home")"$'\n'"$(cat "$home/state/.supervision-host.log")"
+  printf 'working [at=%s]: another event\n' "$(date +%s)" >> "$home/state/other.status"
+  wait_until 250 handled_at_least "$home" 1 \
+    || fail "computed home: the routine wake did not stay with the supervision session: $(cat "$home/hook.err" 2>/dev/null; cat "$home/state/.supervision-host.log")"
+  [ ! -s "$home/hook.rc" ] || fail "computed home: the routine wake reached main: $(cat "$home/hook.err")"
+  assert_no_grep 'the acknowledged hand-back successor could not be verified' "$home/hook.err" \
+    "computed home: the routine wake was handed back as an unverified successor"
+  stop_home_processes "$home"
+  pass "host+hook: a hand-back whose home is only computed still verifies its successor, and the next routine wake stays with the session"
+}
+
+
+# A successor that cannot become healthy before the ready timeout is a real
+# verification failure. The close still reaches main with the unverified line.
+test_unverifiable_handoff_still_hands_back() {
+  local home
+  home=$(make_primary_home unverifiable-handoff)
+  : > "$home/config/supervision-handoff-ack"
+  export FM_SUPERVISION_HOST_READY_TIMEOUT=2 FM_TEST_WATCHER_PRE_IDENTITY_DELAY=8
+  start_hook_session "$home" computed
+  unset FM_SUPERVISION_HOST_READY_TIMEOUT FM_TEST_WATCHER_PRE_IDENTITY_DELAY
+  turn_end "$home"
+  wait_until 200 watcher_live "$home" || fail "unverifiable: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until_deadline 60 hook_exited "$home" || fail "unverifiable: the decision close never reached the Stop hook: $(cat "$home/state/.supervision-host.log" 2>/dev/null; cat "$home/hook.err" 2>/dev/null)"
+  assert_rewoke_main "$home" "unverifiable"
+  assert_grep 'the acknowledged hand-back successor could not be verified' "$home/hook.err" \
+    "unverifiable: a successor that never becomes healthy must still hand the close to main: $(cat "$home/hook.err")"
+  assert_re '^signal: .*demo.status' "$home/hook.err" "unverifiable: the rewake must still carry the close"
+  stop_home_processes "$home"
+  pass "host+hook: a successor that cannot be verified still hands the close to main"
+}
+
+
 # A close that turns main-only at its turn hands back through the same opt-in
 # path and must keep its pass-through row too. The hand-back stops the successor
 # this turn confirmed, and the owner replaces that stopped arm within its poll,
@@ -646,6 +706,8 @@ fm_test_run \
   test_returned_driver_is_caught_away \
   test_lost_boundary_handoff \
   test_lost_pass_through_handoff \
+  test_computed_home_handoff_verifies_successor \
+  test_unverifiable_handoff_still_hands_back \
   test_acknowledged_handoff_at_the_turn_keeps_the_pass_through_row \
   test_handoff_retry_respects_the_receiving_pane \
   test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main \
