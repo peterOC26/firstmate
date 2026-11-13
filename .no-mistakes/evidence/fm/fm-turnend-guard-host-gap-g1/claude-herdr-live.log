@@ -1,0 +1,54 @@
+$ bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home
+
+exit=0
+$ bin/fm-herdr-lab.sh provision fm-lab-home-export-g1
+
+exit=0
+$ bin/fm-herdr-lab.sh viewer start fm-lab-home-export-g1
+viewer attached to fm-lab-home-export-g1 (pid 409110)
+
+exit=0
+$ bin/fm-herdr-lab.sh run fm-lab-home-export-g1 workspace create --cwd /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602 --label home-export-validation --env DISABLE_AUTOUPDATER=1 --env FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home
+{"id":"cli:workspace:create","result":{"root_pane":{"agent_status":"unknown","cwd":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602","focused":false,"foreground_cwd":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602","pane_id":"w2:p1","revision":0,"scroll":{"max_offset_from_bottom":0,"offset_from_bottom":0,"viewport_rows":39},"tab_id":"w2:t1","terminal_id":"term_66023fac5243a2","workspace_id":"w2"},"tab":{"agent_status":"unknown","focused":false,"label":"1","number":1,"pane_count":1,"tab_id":"w2:t1","workspace_id":"w2"},"type":"workspace_created","workspace":{"active_tab_id":"w2:t1","agent_status":"unknown","focused":false,"label":"home-export-validation","number":2,"pane_count":1,"tab_count":1,"workspace_id":"w2"}}}
+
+exit=0
+$ bin/fm-herdr-lab.sh run fm-lab-home-export-g1 pane run w2:p1 'env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home DISABLE_AUTOUPDATER=1 claude --model haiku --setting-sources project,local'
+
+exit=0
+$ bin/fm-herdr-lab.sh run fm-lab-home-export-g1 pane read w2:p1 --source recent --lines 120
+env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u
+FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistake
+s/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home DISABLE_AUTOU
+PDATER=1 claude --model haiku --setting-sources project,local
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602$ env -u NO_
+MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OV
+ERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistakes/worktree
+s/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home DISABLE_AUTOUPDATER=1 c
+laude --model haiku --setting-sources project,local
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+ well-known open source project, or work from your team). If not, take a moment to review
+ what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
+
+exit=0
+$ bin/fm-herdr-lab.sh teardown fm-lab-home-export-g1
+
+exit=0
+$ rm -rf /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home
+
+exit=0

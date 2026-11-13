@@ -1,0 +1,27 @@
+env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u
+FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistake
+s/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home DISABLE_AUTOU
+PDATER=1 claude --model haiku --setting-sources project,local
+zabi@purplevoice:~/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602$ env -u NO_
+MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OV
+ERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME=/home/zabi/.no-mistakes/worktree
+s/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602/.test-supervision-live-home DISABLE_AUTOUPDATER=1 c
+laude --model haiku --setting-sources project,local
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79YGCNP14PWKCA68ZJKB602
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+ well-known open source project, or work from your team). If not, take a moment to review
+ what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel
