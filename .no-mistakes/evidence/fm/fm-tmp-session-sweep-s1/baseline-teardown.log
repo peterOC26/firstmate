@@ -1,0 +1,45 @@
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/code-base
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/code-base -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m lab baseline
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home
+[exit 0]
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/project
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/project -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m landed baseline
+[exit 0]
+$ treehouse get --lease --json --lease-holder task-live --no-fetch
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project","lease_id":"7960be73dbf0ad3f2aad12a290f091f0","lease_holder":"task-live","leased_at":"2026-11-13T01:18:34.611491997+01:00"}
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project' to release it.
+[exit 0]
+lease={"path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project", "lease_id": "7960be73dbf0ad3f2aad12a290f091f0", "lease_holder": "task-live", "leased_at": "2026-11-13T01:18:34.611491997+01:00"}
+$ bash -c . "$1/bin/fm-wake-lib.sh"; fm_treehouse_slot_owner_claim "$2" task-live "$3" claim /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/code-base /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/code-base/bin/fm-teardown.sh task-live
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/pool/.treehouse/project-f50fc9/1/project)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/baseline/retired/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+[exit 0]
+OBSERVED exit 0: True
+OBSERVED own removed: False
+OBSERVED other preserved: True
+OBSERVED parent preserved: True
+OBSERVED freed bytes reported: False
+OBSERVED task record retired: True

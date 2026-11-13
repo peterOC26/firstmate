@@ -1,0 +1,93 @@
+[
+  {
+    "name": "Clean up a retired worker: its own temp disappears, another task and the parent remain, and freed bytes are reported",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "missing",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "relative",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "symlink",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "parent-symlink",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "invalid-root",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "long-path",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "protected",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "refused",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "removal-denied",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "mate-success",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "mate-home-denied",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "mate-refused-live",
+    "result": "pass",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  }
+]

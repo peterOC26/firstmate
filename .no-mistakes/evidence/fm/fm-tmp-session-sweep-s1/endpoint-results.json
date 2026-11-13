@@ -1,0 +1,23 @@
+[
+  {
+    "name": "mate-success",
+    "result": "pass",
+    "live": true,
+    "evidence": "endpoint-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "mate-home-denied",
+    "result": "pass",
+    "live": true,
+    "evidence": "endpoint-teardown.log",
+    "reason": ""
+  },
+  {
+    "name": "mate-refused-live",
+    "result": "pass",
+    "live": true,
+    "evidence": "endpoint-teardown.log",
+    "reason": ""
+  }
+]

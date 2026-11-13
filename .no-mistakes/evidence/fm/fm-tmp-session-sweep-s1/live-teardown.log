@@ -1,0 +1,321 @@
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m lab baseline
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home
+[exit 0]
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/project
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/project -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m landed baseline
+[exit 0]
+$ treehouse get --lease --json --lease-holder task-live --no-fetch
+{"path":"/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project","lease_id":"73732a79df7bbcfcf08a30ee000e6d1f","lease_holder":"task-live","leased_at":"2026-11-13T01:17:59.954092956+01:00"}
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project' to release it.
+[exit 0]
+lease={"path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project", "lease_id": "73732a79df7bbcfcf08a30ee000e6d1f", "lease_holder": "task-live", "leased_at": "2026-11-13T01:17:59.954092956+01:00"}
+$ bash -c . "$1/bin/fm-wake-lib.sh"; fm_treehouse_slot_owner_claim "$2" task-live "$3" claim /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/pool/.treehouse/project-220629/1/project)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/retired/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+teardown: removed claude session temp for task-live (114688 bytes)
+[exit 0]
+OBSERVED exit 0: True
+OBSERVED own removed: True
+OBSERVED other preserved: True
+OBSERVED parent preserved: True
+OBSERVED freed bytes reported: True
+OBSERVED task record retired: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/finished-worker)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/missing/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/relative/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/relative/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree relative/wt)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/relative/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/relative/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/relative/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: could not derive the claude session slug for task-live; leaving session temp in place
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/finished-worker)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: left claude session temp for task-live in place: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/symlink/tmp/claude-1000/-home-zabi--no-mistakes-worktrees-7f0ec18181b6-01M79349T4PAQCW9F2AWM82KWT--phase-tmp-live-symlink-finished-worker is a symlink
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/finished-worker)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: left claude session temp for task-live in place: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/parent-symlink/tmp/claude-1000 is not a real directory
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/finished-worker)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/invalid-root/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: FM_CLAUDE_TEMP_ROOT is not absolute; leaving claude session temp for task-live in place
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/long-path/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: could not derive the claude session slug for task-live; leaving session temp in place
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/protected/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/protected/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code_base)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/protected/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/protected/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/protected/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+warning: left claude session temp for task-live in place: /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code_base is the firstmate home or primary checkout
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/home
+[exit 0]
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/finished-worker
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/finished-worker -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m baseline
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: local-only worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/refused/finished-worker has work not yet merged into main and not on any remote.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  uncommitted.txt
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+[exit 1]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/finished-worker)
+Backlog: task-live just finished (this home keeps no markdown backlog at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/home/data/backlog.md). Update /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/home/data/backlog.md - move task-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: lsof is unavailable; cannot resolve the tmux pane process group for task-live
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/tmp/claude-1000/-home-zabi--no-mistakes-worktrees-7f0ec18181b6-01M79349T4PAQCW9F2AWM82KWT--phase-tmp-live-removal-denied-finished-worker/session/output.txt': Permission denied
+warning: could not remove claude session temp for task-live at /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/removal-denied/tmp/claude-1000/-home-zabi--no-mistakes-worktrees-7f0ec18181b6-01M79349T4PAQCW9F2AWM82KWT--phase-tmp-live-removal-denied-finished-worker
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED required warning: True
+OBSERVED temp preserved or absent as expected: True
+OBSERVED unrelated preserved: True
+OBSERVED no false removal line: True
+OBSERVED task record retirement: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-success/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-success/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-success/worker-home)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-success/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: removed claude session temp for task-live (114688 bytes)
+[exit 0]
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/worker-home/state': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/worker-home/.fm-secondmate-home': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/worker-home/config': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/worker-home/data': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-home-denied/worker-home/projects': Permission denied
+[exit 1]
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-refused-live/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-refused-live/home
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/code-base/bin/fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-refused-live/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: secondmate task-live still has in-flight work in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/live/mate-refused-live/worker-home/state.
+Found child.meta. Let that home finish or explicitly discard with --force.
+[exit 1]
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True

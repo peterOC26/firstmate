@@ -1,0 +1,115 @@
+$ git init -q -b main /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/code-base
+[exit 0]
+$ git -C /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/code-base -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m lab baseline
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s -f /dev/null new-session -d -s fm-lab-sweep -n keeper -x 120 -y 40 -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT sleep 300
+[exit 0]
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-success/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-success/home
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s new-window -d -t fm-lab-sweep -n fm-task-live -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-success/worker-home sleep 300
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s display-message -p -t fm-lab-sweep:fm-task-live #{pane_pid}
+3774813
+[exit 0]
+BEFORE: endpoint pid 3774813 exists; session output exists = True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/code-base/bin/fm-teardown.sh task-live
+teardown task-live complete (window fm-lab-sweep:fm-task-live, worktree /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-success/worker-home)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-success/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+teardown: removed claude session temp for task-live (114688 bytes)
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s has-session -t fm-lab-sweep:fm-task-live
+can't find window: fm-task-live
+[exit 1]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s list-windows -t fm-lab-sweep -F #{window_name}
+keeper
+[exit 0]
+AFTER: endpoint window exists = False; original pid exists = False
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED endpoint preserved on early refusal only: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/home
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s new-window -d -t fm-lab-sweep -n fm-task-live -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home sleep 300
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s display-message -p -t fm-lab-sweep:fm-task-live #{pane_pid}
+3778093
+[exit 0]
+BEFORE: endpoint pid 3778093 exists; session output exists = True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/code-base/bin/fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 0s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home/state': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home/.fm-secondmate-home': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home/config': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home/data': Permission denied
+rm: cannot remove '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-home-denied/worker-home/projects': Permission denied
+[exit 1]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s has-session -t fm-lab-sweep:fm-task-live
+can't find window: fm-task-live
+[exit 1]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s list-windows -t fm-lab-sweep -F #{window_name}
+keeper
+[exit 0]
+AFTER: endpoint window exists = False; original pid exists = False
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED endpoint preserved on early refusal only: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/bin/fm-lab-home.sh create /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-refused-live/home
+/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-refused-live/home
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s new-window -d -t fm-lab-sweep -n fm-task-live -c /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-refused-live/worker-home sleep 300
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s display-message -p -t fm-lab-sweep:fm-task-live #{pane_pid}
+3779308
+[exit 0]
+BEFORE: endpoint pid 3779308 exists; session output exists = True
+$ /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/code-base/bin/fm-teardown.sh task-live
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-refused-live/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: secondmate task-live still has in-flight work in /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/mate-refused-live/worker-home/state.
+Found child.meta. Let that home finish or explicitly discard with --force.
+[exit 1]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s has-session -t fm-lab-sweep:fm-task-live
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s list-windows -t fm-lab-sweep -F #{window_name}
+keeper
+fm-task-live
+[exit 0]
+AFTER: endpoint window exists = True; original pid exists = True
+OBSERVED expected exit: True
+OBSERVED home removed only on success: True
+OBSERVED temp removed only on success: True
+OBSERVED endpoint preserved on early refusal only: True
+OBSERVED unrelated preserved: True
+OBSERVED record removed only on success: True
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s kill-window -t fm-lab-sweep:fm-task-live
+[exit 0]
+$ tmux -S /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M79349T4PAQCW9F2AWM82KWT/.phase-tmp/ep/s kill-server
+[exit 0]

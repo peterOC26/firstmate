@@ -1,0 +1,9 @@
+[
+  {
+    "name": "Clean up a retired worker: its own temp disappears, another task and the parent remain, and freed bytes are reported",
+    "result": "fail",
+    "live": true,
+    "evidence": "live-teardown.log",
+    "reason": ""
+  }
+]

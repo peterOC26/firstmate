@@ -1,0 +1,8 @@
+ok - landed teardown removes only this worktree's claude session folder and reports its size
+ok - cleanup preserves the selected firstmate home session folder
+ok - a claude session symlink is left in place and does not block cleanup
+ok - a missing claude session folder does not affect cleanup
+ok - an unknown worktree path removes no claude session folder
+ok - a refused teardown leaves the claude session folder in place
+ok - a failed claude session removal is reported and does not block cleanup
+ok - secondmate temp removal waits for successful home removal
