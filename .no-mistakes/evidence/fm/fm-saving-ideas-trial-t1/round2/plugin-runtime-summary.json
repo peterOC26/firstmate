@@ -1,0 +1,33 @@
+[
+  {
+    "mode": "plain",
+    "mcp_tools": [
+      "mcp__lean-probe__early",
+      "mcp__lean-probe__late"
+    ],
+    "mcp_instruction_servers": [
+      "lean-probe"
+    ],
+    "plugin_skill_visible": true,
+    "completed": true,
+    "runtime_hook_events": []
+  },
+  {
+    "mode": "lean",
+    "mcp_tools": [],
+    "mcp_instruction_servers": [],
+    "plugin_skill_visible": true,
+    "completed": true,
+    "runtime_hook_events": []
+  },
+  {
+    "mode": "lean-allowlisted",
+    "mcp_tools": [],
+    "mcp_instruction_servers": [
+      "lean-probe"
+    ],
+    "plugin_skill_visible": true,
+    "completed": true,
+    "runtime_hook_events": []
+  }
+]

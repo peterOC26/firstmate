@@ -1,0 +1,1 @@
+Verified saved runtime transcripts, reports, process environment, native cost ledger, Stop-hook state, MCP tools, auto-memory loading, and public CLI refusals. All scenario assertions passed.

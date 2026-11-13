@@ -1,0 +1,38 @@
+[
+  {
+    "n": 1,
+    "lean": true,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/1/project",
+    "task": "leanlive-6zhuxfbb-1",
+    "meta_lean": false
+  },
+  {
+    "n": 2,
+    "lean": true,
+    "allowlist": true,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/2/project",
+    "task": "leanlive-6zhuxfbb-2",
+    "meta_lean": false
+  },
+  {
+    "n": 3,
+    "lean": true,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/3/project",
+    "task": "leanlive-6zhuxfbb-3",
+    "meta_lean": false
+  },
+  {
+    "n": 4,
+    "lean": false,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/4/project",
+    "task": "leanlive-6zhuxfbb-4",
+    "meta_lean": false
+  }
+]

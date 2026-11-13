@@ -1,0 +1,30 @@
+[
+  {
+    "lastCost": 0.1066077,
+    "lastTotalInputTokens": 1306,
+    "lastTotalOutputTokens": 1592,
+    "lastTotalCacheCreationInputTokens": 9259,
+    "lastTotalCacheReadInputTokens": 158734,
+    "lastModelUsage": {
+      "claude-haiku-5-5": {
+        "inputTokens": 1294,
+        "outputTokens": 177,
+        "thinkingTokens": 157,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.00021789999999999998
+      },
+      "claude-opus-5-5": {
+        "inputTokens": 12,
+        "outputTokens": 1415,
+        "thinkingTokens": 102,
+        "cacheReadInputTokens": 158734,
+        "cacheCreationInputTokens": 9259,
+        "webSearchRequests": 0,
+        "costUSD": 0.10638979999999999
+      }
+    },
+    "lastSessionId": "ab4167de-d6c4-4dbc-bb4c-8a38edfe941f"
+  }
+]

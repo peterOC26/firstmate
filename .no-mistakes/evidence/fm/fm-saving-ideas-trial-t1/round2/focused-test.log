@@ -1,0 +1,10 @@
+ok - a lean ship or scout launch sets the five-minute cache and the smaller start, and keeps hooks, settings, and the task-channel statement
+ok - secondmate supervision refuses lean launches
+ok - without --claude-lean the launch, the pane exports, and the task record stay free of the lean posture
+ok - --claude-lean on a non-claude harness refuses before a task record exists
+ok - --claude-lean on a raw launch command refuses before a task record exists
+ok - --claude-lean on backend=t3code refuses before the T3 runtime check
+plain: MCP exclusion and retained hooks/skills verified
+lean: MCP exclusion and retained hooks/skills verified
+lean-allowlisted: MCP exclusion and retained hooks/skills verified
+ok - Claude Code 2.1.323 (Claude Code) excludes startup and mid-turn plugin MCP tools only on lean launches, keeping hooks and skills

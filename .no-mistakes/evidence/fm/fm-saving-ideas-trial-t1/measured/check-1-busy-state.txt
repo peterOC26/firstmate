@@ -1,0 +1,1 @@
+v1 gen=g1794566760.1171360.7 seq=3 state=idle source=claude-hook event=stop ts=1794566780

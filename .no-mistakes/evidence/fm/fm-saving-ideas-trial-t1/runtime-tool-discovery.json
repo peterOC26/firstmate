@@ -1,0 +1,331 @@
+[
+  {
+    "check": 1,
+    "runtime_attachments": [
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "addedLines": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [],
+        "failedMcpServers": []
+      },
+      {
+        "type": "instructions",
+        "files": [
+          {
+            "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/1/project/CLAUDE.md",
+            "type": "Project"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "check": 2,
+    "runtime_attachments": [
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "addedLines": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [],
+        "failedMcpServers": []
+      },
+      {
+        "type": "instructions",
+        "files": [
+          {
+            "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/2/project/CLAUDE.md",
+            "type": "Project"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "check": 3,
+    "runtime_attachments": [
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "addedLines": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [],
+        "failedMcpServers": []
+      },
+      {
+        "type": "instructions",
+        "files": [
+          {
+            "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/3/project/CLAUDE.md",
+            "type": "Project"
+          }
+        ]
+      },
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "mcp__easel__chart"
+        ],
+        "addedLines": [
+          "mcp__easel__chart"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [],
+        "failedMcpServers": []
+      },
+      {
+        "type": "mcp_instructions_delta",
+        "addedNames": [
+          "easel"
+        ],
+        "addedBlocks": [
+          "## easel\nTools registered by the cc-plugin-easel plugin through $.tool.register."
+        ],
+        "removedNames": []
+      }
+    ]
+  },
+  {
+    "check": 4,
+    "runtime_attachments": [
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "addedLines": [
+          "ArtifactComments",
+          "ArtifactData",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
+          "DesignSync",
+          "EndConversation",
+          "EnterPlanMode",
+          "EnterWorktree",
+          "ExitPlanMode",
+          "ExitWorktree",
+          "Monitor",
+          "NotebookEdit",
+          "PushNotification",
+          "RemoteTrigger",
+          "SendMessage",
+          "SendToProject",
+          "SendToProjectContext",
+          "TaskStop",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [
+          "claude-artifacts",
+          "validation-server"
+        ],
+        "failedMcpServers": []
+      },
+      {
+        "type": "instructions",
+        "files": [
+          {
+            "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/pool/.treehouse/project-0bb869/4/project/CLAUDE.md",
+            "type": "Project"
+          },
+          {
+            "path": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-6zhuxfbb/memory/MEMORY.md",
+            "type": "AutoMem"
+          }
+        ]
+      },
+      {
+        "type": "deferred_tools_delta",
+        "addedNames": [
+          "mcp__easel__chart",
+          "mcp__validation-server__validation_probe"
+        ],
+        "addedLines": [
+          "mcp__easel__chart",
+          "mcp__validation-server__validation_probe"
+        ],
+        "removedNames": [],
+        "wireHiddenNames": [],
+        "readdedNames": [],
+        "pendingMcpServers": [],
+        "failedMcpServers": []
+      },
+      {
+        "type": "mcp_instructions_delta",
+        "addedNames": [
+          "easel"
+        ],
+        "addedBlocks": [
+          "## easel\nTools registered by the cc-plugin-easel plugin through $.tool.register."
+        ],
+        "removedNames": []
+      }
+    ]
+  }
+]

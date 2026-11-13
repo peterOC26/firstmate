@@ -1,0 +1,38 @@
+[
+  {
+    "n": 1,
+    "lean": true,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-xas6f0qb/pool/.treehouse/project-3c91a7/1/project",
+    "task": "leanlive-xas6f0qb-1",
+    "meta_lean": false
+  },
+  {
+    "n": 2,
+    "lean": true,
+    "allowlist": true,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-xas6f0qb/pool/.treehouse/project-3c91a7/2/project",
+    "task": "leanlive-xas6f0qb-2",
+    "meta_lean": false
+  },
+  {
+    "n": 3,
+    "lean": true,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-xas6f0qb/pool/.treehouse/project-3c91a7/3/project",
+    "task": "leanlive-xas6f0qb-3",
+    "meta_lean": false
+  },
+  {
+    "n": 4,
+    "lean": false,
+    "allowlist": false,
+    "report": true,
+    "worktree": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-xas6f0qb/pool/.treehouse/project-3c91a7/4/project",
+    "task": "leanlive-xas6f0qb-4",
+    "meta_lean": false
+  }
+]

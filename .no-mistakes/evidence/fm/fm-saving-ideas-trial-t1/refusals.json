@@ -1,0 +1,42 @@
+[
+  {
+    "name": "secondmate supervision",
+    "command": "bin/fm-spawn.sh lean-sm /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/secondmate --secondmate --claude-lean",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/home\nerror: --claude-lean does not apply to secondmate supervision sessions\n",
+    "meta_created": false,
+    "pass_": true
+  },
+  {
+    "name": "non-Claude harness",
+    "command": "bin/fm-spawn.sh lean-codex /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/project --scout --harness codex --claude-lean",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/home\nerror: --claude-lean applies only to the claude harness (this launch is codex)\n",
+    "meta_created": false,
+    "pass_": true
+  },
+  {
+    "name": "raw command",
+    "command": "bin/fm-spawn.sh lean-raw /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/project --scout --claude-lean echo unsafe",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/home\nerror: --claude-lean applies to a Firstmate-built claude launch, not a raw launch command\n",
+    "meta_created": false,
+    "pass_": true
+  },
+  {
+    "name": "T3 unsupported backend",
+    "command": "bin/fm-spawn.sh lean-t3 /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/project --scout --backend t3code --claude-lean",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/home\nerror: --claude-lean cannot run on backend=t3code; T3 starts Claude itself and cannot pass --strict-mcp-config. Choose another backend.\n",
+    "meta_created": false,
+    "pass_": true
+  },
+  {
+    "name": "flag value",
+    "command": "bin/fm-spawn.sh lean-value /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/project --scout --claude-lean=1",
+    "exit": 1,
+    "output": "fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-refusals-3q4tscnq/home\nerror: --claude-lean takes no value\n",
+    "meta_created": false,
+    "pass_": true
+  }
+]

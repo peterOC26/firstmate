@@ -1,0 +1,8 @@
+{
+  "pid": 1610083,
+  "FORCE_PROMPT_CACHING_5M": "1",
+  "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+  "strict_mcp": true,
+  "disallow_mcp": true,
+  "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-k6f6ybmx/pool/.treehouse/project-5379fb/2/project"
+}

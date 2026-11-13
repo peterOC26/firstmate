@@ -1,0 +1,179 @@
+{
+  "environment": "Real Claude Code 2.1.323 using the existing OAuth login, isolated config, actual Treehouse worktrees and private 160x50 tmux server. Same fixture and review request throughout; unique report paths/task IDs differ. No model or effort overrides between lean and ordinary launches.",
+  "measurement_notes": "Calls deduplicated by API message ID. Session dollars are the Claude CLI runtime ledger, including automatic permission classifier usage. Dollars/call use only the unchanged main model. These tiny fixture checks measure behavior, not a representative production cost comparison.",
+  "checks": [
+    {
+      "check": 1,
+      "lean": true,
+      "allowlist": false,
+      "main_model": [
+        "claude-opus-5-5"
+      ],
+      "main_model_calls": 5,
+      "first_call_total_input": 31874,
+      "first_call_cache_create": 7739,
+      "first_call_cache_read": 24133,
+      "transcript_totals": {
+        "input_tokens": 12,
+        "output_tokens": 1615,
+        "cache_creation_input_tokens": 11099,
+        "cache_read_input_tokens": 157705,
+        "ephemeral_5m_input_tokens": 11099,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "cli_total_session_dollars": 0.11961300000000002,
+      "cli_main_model_dollars": 0.11938400000000002,
+      "main_model_dollars_per_call": 0.023876800000000004,
+      "cli_main_model_cache_create": 11099,
+      "transcript_matches_cli_cache_create": true,
+      "loaded_mcp_tool_names": [],
+      "native_artifact_tool_names": [
+        "ArtifactComments",
+        "ArtifactData"
+      ],
+      "auto_memory_loaded": false,
+      "project_instructions_loaded": true,
+      "startup_hook_executed": true,
+      "normal_stop_hook": "v1 gen=g1794567607.1578559.2798 seq=3 state=idle source=claude-hook event=stop ts=1794567628",
+      "process": {
+        "pid": 1579709,
+        "FORCE_PROMPT_CACHING_5M": "1",
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "strict_mcp": true,
+        "disallow_mcp": true,
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-k6f6ybmx/pool/.treehouse/project-5379fb/1/project"
+      }
+    },
+    {
+      "check": 2,
+      "lean": true,
+      "allowlist": true,
+      "main_model": [
+        "claude-opus-5-5"
+      ],
+      "main_model_calls": 4,
+      "first_call_total_input": 31879,
+      "first_call_cache_create": 6258,
+      "first_call_cache_read": 25619,
+      "transcript_totals": {
+        "input_tokens": 10,
+        "output_tokens": 1395,
+        "cache_creation_input_tokens": 8921,
+        "cache_read_input_tokens": 124536,
+        "ephemeral_5m_input_tokens": 8921,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "cli_total_session_dollars": 0.0976576,
+      "cli_main_model_dollars": 0.0974522,
+      "main_model_dollars_per_call": 0.02436305,
+      "cli_main_model_cache_create": 8921,
+      "transcript_matches_cli_cache_create": true,
+      "loaded_mcp_tool_names": [],
+      "native_artifact_tool_names": [
+        "ArtifactComments",
+        "ArtifactData"
+      ],
+      "auto_memory_loaded": false,
+      "project_instructions_loaded": true,
+      "startup_hook_executed": true,
+      "normal_stop_hook": "v1 gen=g1794567642.1608362.19097 seq=3 state=idle source=claude-hook event=stop ts=1794567659",
+      "process": {
+        "pid": 1610083,
+        "FORCE_PROMPT_CACHING_5M": "1",
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "strict_mcp": true,
+        "disallow_mcp": true,
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-k6f6ybmx/pool/.treehouse/project-5379fb/2/project"
+      }
+    },
+    {
+      "check": 3,
+      "lean": true,
+      "allowlist": false,
+      "main_model": [
+        "claude-opus-5-5"
+      ],
+      "main_model_calls": 4,
+      "first_call_total_input": 31916,
+      "first_call_cache_create": 7781,
+      "first_call_cache_read": 24133,
+      "transcript_totals": {
+        "input_tokens": 10,
+        "output_tokens": 1516,
+        "cache_creation_input_tokens": 10625,
+        "cache_read_input_tokens": 123346,
+        "ephemeral_5m_input_tokens": 10625,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "cli_total_session_dollars": 0.10835660000000001,
+      "cli_main_model_dollars": 0.1081542,
+      "main_model_dollars_per_call": 0.02703855,
+      "cli_main_model_cache_create": 10625,
+      "transcript_matches_cli_cache_create": true,
+      "loaded_mcp_tool_names": [],
+      "native_artifact_tool_names": [
+        "ArtifactComments",
+        "ArtifactData"
+      ],
+      "auto_memory_loaded": false,
+      "project_instructions_loaded": true,
+      "startup_hook_executed": true,
+      "normal_stop_hook": "v1 gen=g1794567673.1635281.21511 seq=3 state=idle source=claude-hook event=stop ts=1794567692",
+      "process": {
+        "pid": 1636560,
+        "FORCE_PROMPT_CACHING_5M": "1",
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "strict_mcp": true,
+        "disallow_mcp": true,
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-k6f6ybmx/pool/.treehouse/project-5379fb/3/project"
+      }
+    },
+    {
+      "check": 4,
+      "lean": false,
+      "allowlist": false,
+      "main_model": [
+        "claude-opus-5-5"
+      ],
+      "main_model_calls": 4,
+      "first_call_total_input": 32788,
+      "first_call_cache_create": 8778,
+      "first_call_cache_read": 24008,
+      "transcript_totals": {
+        "input_tokens": 10,
+        "output_tokens": 1274,
+        "cache_creation_input_tokens": 11654,
+        "cache_read_input_tokens": 126106,
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 11654
+      },
+      "cli_total_session_dollars": 0.14416479999999998,
+      "cli_main_model_dollars": 0.1439732,
+      "main_model_dollars_per_call": 0.0359933,
+      "cli_main_model_cache_create": 11654,
+      "transcript_matches_cli_cache_create": true,
+      "loaded_mcp_tool_names": [
+        "mcp__easel__chart",
+        "mcp__validation-server__validation_probe"
+      ],
+      "native_artifact_tool_names": [
+        "ArtifactComments",
+        "ArtifactData"
+      ],
+      "auto_memory_loaded": true,
+      "project_instructions_loaded": true,
+      "startup_hook_executed": true,
+      "normal_stop_hook": "v1 gen=g1794567705.1659572.9834 seq=3 state=idle source=claude-hook event=stop ts=1794567722",
+      "process": {
+        "pid": 1663573,
+        "FORCE_PROMPT_CACHING_5M": "unset",
+        "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "unset",
+        "strict_mcp": false,
+        "disallow_mcp": false,
+        "cwd": "/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7A6XKEDE3MQDMAHTFHQPD5J/.lean-live-k6f6ybmx/pool/.treehouse/project-5379fb/4/project"
+      }
+    }
+  ],
+  "lean_mean_cache_create_tokens": 10215,
+  "lean_main_model_dollars_per_call": 0.02499926153846154
+}

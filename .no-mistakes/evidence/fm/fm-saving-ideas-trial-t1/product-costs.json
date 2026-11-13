@@ -1,0 +1,86 @@
+{
+  "fafb1b58-5d9d-43bd-aae8-24423790d8f8": {
+    "lastCost": 0.1079493,
+    "lastTotalInputTokens": 1307,
+    "lastTotalOutputTokens": 1673,
+    "lastTotalCacheCreationInputTokens": 10622,
+    "lastTotalCacheReadInputTokens": 123403,
+    "lastModelUsage": {
+      "claude-haiku-5-5": {
+        "inputTokens": 1297,
+        "outputTokens": 178,
+        "thinkingTokens": 158,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0002187
+      },
+      "claude-opus-5-5": {
+        "inputTokens": 10,
+        "outputTokens": 1495,
+        "thinkingTokens": 118,
+        "cacheReadInputTokens": 123403,
+        "cacheCreationInputTokens": 10622,
+        "webSearchRequests": 0,
+        "costUSD": 0.10773060000000001
+      }
+    },
+    "lastSessionId": "fafb1b58-5d9d-43bd-aae8-24423790d8f8"
+  },
+  "5c40e494-ea86-4329-8ebd-ff7eb62eb9a6": {
+    "lastCost": 0.0988085,
+    "lastTotalInputTokens": 1301,
+    "lastTotalOutputTokens": 1558,
+    "lastTotalCacheCreationInputTokens": 9155,
+    "lastTotalCacheReadInputTokens": 124317,
+    "lastModelUsage": {
+      "claude-haiku-5-5": {
+        "inputTokens": 1291,
+        "outputTokens": 162,
+        "thinkingTokens": 142,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0002101
+      },
+      "claude-opus-5-5": {
+        "inputTokens": 10,
+        "outputTokens": 1396,
+        "thinkingTokens": 143,
+        "cacheReadInputTokens": 124317,
+        "cacheCreationInputTokens": 9155,
+        "webSearchRequests": 0,
+        "costUSD": 0.0985984
+      }
+    },
+    "lastSessionId": "5c40e494-ea86-4329-8ebd-ff7eb62eb9a6"
+  },
+  "8a89b9fb-4d45-41ce-a41f-b09c307dd269": {
+    "lastCost": 0.1555978,
+    "lastTotalInputTokens": 1306,
+    "lastTotalOutputTokens": 1784,
+    "lastTotalCacheCreationInputTokens": 11565,
+    "lastTotalCacheReadInputTokens": 160477,
+    "lastModelUsage": {
+      "claude-haiku-5-5": {
+        "inputTokens": 1294,
+        "outputTokens": 250,
+        "thinkingTokens": 230,
+        "cacheReadInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "webSearchRequests": 0,
+        "costUSD": 0.0002544
+      },
+      "claude-opus-5-5": {
+        "inputTokens": 12,
+        "outputTokens": 1534,
+        "thinkingTokens": 68,
+        "cacheReadInputTokens": 160477,
+        "cacheCreationInputTokens": 11565,
+        "webSearchRequests": 0,
+        "costUSD": 0.15534340000000002
+      }
+    },
+    "lastSessionId": "8a89b9fb-4d45-41ce-a41f-b09c307dd269"
+  }
+}
