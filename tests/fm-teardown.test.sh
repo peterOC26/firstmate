@@ -89,7 +89,6 @@
 #   (ct4) a relative worktree path removes nothing
 #   (ct5) a refused teardown leaves the slug folder in place
 #   (ct6) a failed removal is reported and cleanup still finishes
-#   (ct7) a slug longer than 200 characters removes only the hashed name
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
@@ -6977,47 +6976,8 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
-# Claude's project slug for a worktree path. Independent of bin/fm-teardown.sh:
-# non-alphanumerics become '-', and past 200 characters the suffix is Claude's
-# 32-bit hash in base 36. Args: path
 claude_session_slug() {
-  python3 - "$1" <<'PY'
-import sys
-path = sys.argv[1]
-while len(path) > 1 and path.endswith("/"):
-    path = path[:-1]
-
-def to_int32(n):
-    n %= 4294967296
-    if n >= 2147483648:
-        n -= 4294967296
-    return n
-
-def java_hash(text):
-    value = 0
-    for char in text:
-        shifted = to_int32(value * 32)
-        value = to_int32(shifted - value + ord(char))
-    return value
-
-def base36(number):
-    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
-    if number == 0:
-        return "0"
-    out = ""
-    while number:
-        number, remainder = divmod(number, 36)
-        out = digits[remainder] + out
-    return out
-
-slug = "".join(char if char.isalnum() else "-" for char in path)
-if len(slug) <= 200:
-    print(slug)
-else:
-    hashed = java_hash(path)
-    absolute = 2147483648 if hashed == -2147483648 else abs(hashed)
-    print(slug[:200] + "-" + base36(absolute))
-PY
+  printf '%s' "${1%/}" | LC_ALL=C sed 's/[^A-Za-z0-9]/-/g'
 }
 
 claude_session_dir() { # <fake-tmp> <worktree>
@@ -7111,11 +7071,13 @@ test_teardown_unknown_worktree_removes_no_claude_session() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   root=$case_dir/fake-tmp
-  planted=$(plant_claude_session "$root" "$case_dir/wt")
+  planted=$(plant_claude_session "$root" "relative/wt")
   sed -i 's|^worktree=.*|worktree=relative/wt|' "$case_dir/state/task-x1.meta"
 
   FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
+  assert_grep "could not derive the claude session slug" "$case_dir/stderr" \
+    "claude-temp-unknown: the relative-path guard was not reached: $(cat "$case_dir/stderr")"
   assert_no_grep "removed claude session temp" "$case_dir/stderr" \
     "claude-temp-unknown: teardown reported removing a session folder (rc=$rc)"
   [ -f "$planted/session/keep" ] || fail "claude-temp-unknown: a session folder was removed (rc=$rc)"
@@ -7169,35 +7131,54 @@ SH
   pass "a failed claude session removal is reported and does not block cleanup"
 }
 
-test_teardown_removes_hashed_long_claude_session_slug() {
-  local case_dir root long pad need slug near own rc=0
-  case_dir=$(make_case claude-temp-long)
-  need=211
-  [ "${#case_dir}" -lt $((need - 2)) ] || fail "claude-temp-long: fixture path leaves no room for a 211-character worktree"
-  pad=$(printf 'p%.0s' $(seq 1 $((need - ${#case_dir} - 1))))
-  long=$case_dir/$pad
-  [ "${#long}" -eq 211 ] || fail "claude-temp-long: worktree length is ${#long}, not 211"
-  git -C "$case_dir/project" worktree add -q -b fm/task-long "$long" main
-  write_meta "$case_dir" no-mistakes ship "$long"
-  git -C "$long" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "long slug"
-  git -C "$long" push -q origin fm/task-long
-  git -C "$case_dir/project" fetch -q origin
-  root=$case_dir/fake-tmp
-  slug=$(claude_session_slug "$long")
-  [ "${#slug}" -gt 200 ] || fail "claude-temp-long: slug was not longer than 200: $slug"
-  own=$(plant_claude_session "$root" "$long")
-  near=$root/claude-$(id -u)/${slug:0:200}-notthehash
-  mkdir -p "$near"
-  printf 'keep\n' > "$near/keep"
 
-  FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-
-  expect_code 0 "$rc" "claude-temp-long: teardown should succeed: $(cat "$case_dir/stderr")"
-  assert_grep "removed claude session temp for task-x1" "$case_dir/stderr" \
-    "claude-temp-long: hashed session folder was not reported removed"
-  [ ! -e "$own" ] || fail "claude-temp-long: hashed session folder was not removed"
-  [ -f "$near/keep" ] || fail "claude-temp-long: a same-prefix slug was removed"
-  pass "a worktree path longer than 200 characters removes only its hashed claude session folder"
+test_secondmate_claude_temp_waits_for_home_removal() {
+  local mode case_dir home root own real_rm rc
+  real_rm=$(command -v rm)
+  for mode in success refuse; do
+    rc=0
+    case_dir=$(make_case "claude-mate-$mode")
+    home=$case_dir/secondmate-home
+    mkdir -p "$case_dir/supervisor" "$home/state" "$home/data" "$home/config" "$home/projects"
+    printf 'task-x1\n' > "$home/.fm-secondmate-home"
+    write_meta "$case_dir" local-only secondmate "$home"
+    printf 'home=%s\n' "$home" >> "$case_dir/state/task-x1.meta"
+    root=$case_dir/fake-tmp
+    own=$(plant_claude_session "$root" "$home")
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = kill-window ]; then
+  [ -f "$own/session/keep" ] || exit 1
+  touch "$case_dir/endpoint-stopped"
+fi
+exit 0
+SH
+    cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  if [ "\$arg" = "$home" ]; then
+    [ -f "$own/session/keep" ] || exit 1
+    [ -f "$case_dir/endpoint-stopped" ] || exit 1
+    touch "$case_dir/home-removal-reached"
+    [ "$mode" != refuse ] || exit 1
+  fi
+done
+exec "$real_rm" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/rm" "$case_dir/fakebin/tmux"
+    ROOT="$case_dir/project" FM_HOME="$case_dir/supervisor" FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    assert_present "$case_dir/home-removal-reached" "secondmate temp disappeared before home removal: $(cat "$case_dir/stderr")"
+    if [ "$mode" = success ]; then
+      expect_code 0 "$rc" "secondmate cleanup failed: $(cat "$case_dir/stderr")"
+      assert_absent "$home" "secondmate home survived cleanup"
+      assert_absent "$own" "secondmate temp survived successful home removal"
+    else
+      expect_code 1 "$rc" "secondmate cleanup should refuse failed home removal"
+      assert_present "$home" "refused home removal deleted the home"
+      assert_present "$own/session/keep" "refused home removal deleted session temp"
+    fi
+  done
+  pass "secondmate temp removal waits for successful home removal"
 }
 
 test_teardown_stops_own_browser_bridge_groups
@@ -7210,4 +7191,5 @@ test_teardown_missing_claude_session_is_fine
 test_teardown_unknown_worktree_removes_no_claude_session
 test_teardown_refusal_leaves_claude_session
 test_teardown_claude_session_removal_failure_does_not_block
-test_teardown_removes_hashed_long_claude_session_slug
+
+test_secondmate_claude_temp_waits_for_home_removal

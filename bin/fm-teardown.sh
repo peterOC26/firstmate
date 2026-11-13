@@ -376,10 +376,7 @@
 # outside A-Za-z0-9 replaced by '-'.
 # The path is not symlink-resolved, matching Claude's originalCwd, which is
 # process.cwd() passed through identity normalizers in that build.
-# A slug longer than 200 characters keeps the first 200, a hyphen, and the
-# base-36 absolute value of Claude's 32-bit hash of the same path.
-# That hash starts at 0 and, for each byte, applies ToInt32((ToInt32(h * 32) - h) + byte).
-# ToInt32 keeps the low 32 bits and then subtracts 2^32 when the high bit is set.
+# Slugs longer than 200 characters are left in place.
 # Only a real directory owned by the current user, whose parent is the real
 # directory <tmp>/claude-<uid> also owned by that user, is removed.
 # A symlink, another owner's directory, the parent, another slug, a non-ASCII
@@ -4346,7 +4343,8 @@ if teardown_owns_worktree && [ -d "$WT" ] && [ "$FORCE" != "--force" ]; then
   validate_worktree_teardown_safety || exit 1
 fi
 
-# The worker is stopped and the copy is confirmed landed or discardable.
+# Non-secondmate cleanup follows process reaping and the landed-or-discardable check.
+# Secondmate cleanup follows successful home removal.
 # Removal never changes the teardown result. The slug rule is the header's.
 teardown_claude_temp_strip() {
   local path=$1
@@ -4356,56 +4354,9 @@ teardown_claude_temp_strip() {
   printf '%s\n' "$path"
 }
 
-teardown_claude_to_int32() {
-  local n=$1
-  n=$(( n % 4294967296 ))
-  if [ "$n" -lt 0 ]; then
-    n=$(( n + 4294967296 ))
-  fi
-  if [ "$n" -ge 2147483648 ]; then
-    n=$(( n - 4294967296 ))
-  fi
-  printf '%s\n' "$n"
-}
-
-teardown_claude_java_hash() {
-  local text=$1 byte hash=0 shifted count=0
-  while IFS= read -r byte; do
-    [ -n "$byte" ] || continue
-    case "$byte" in
-      *[!0-9]*) return 1 ;;
-    esac
-    shifted=$(teardown_claude_to_int32 $(( hash * 32 )))
-    hash=$(teardown_claude_to_int32 $(( shifted - hash + byte )))
-    count=$(( count + 1 ))
-  done < <(printf '%s' "$text" | od -An -tu1 -v | tr -s '[:space:]' '\n' | sed '/^$/d')
-  # A short read would publish a different slug and could remove another folder.
-  [ "$count" -eq "${#text}" ] || return 1
-  printf '%s\n' "$hash"
-}
-
-teardown_claude_base36() {
-  local n=$1 digits=0123456789abcdefghijklmnopqrstuvwxyz out="" r
-  if [ "$n" -eq -2147483648 ]; then
-    n=2147483648
-  elif [ "$n" -lt 0 ]; then
-    n=$(( -n ))
-  fi
-  if [ "$n" -eq 0 ]; then
-    printf '0\n'
-    return 0
-  fi
-  while [ "$n" -gt 0 ]; do
-    r=$(( n % 36 ))
-    out="${digits:r:1}$out"
-    n=$(( n / 36 ))
-  done
-  printf '%s\n' "$out"
-}
-
 # Prints the slug, or returns 1 when the path must not select a folder.
 teardown_claude_project_slug() {
-  local path=$1 slug hash suffix
+  local path=$1 slug
   path=$(teardown_claude_temp_strip "$path")
   case "$path" in
     /*) ;;
@@ -4418,16 +4369,8 @@ teardown_claude_project_slug() {
   case "$slug" in
     ''|*[!A-Za-z0-9-]*) return 1 ;;
   esac
-  if [ "${#slug}" -le 200 ]; then
-    printf '%s\n' "$slug"
-    return 0
-  fi
-  hash=$(teardown_claude_java_hash "$path") || return 1
-  suffix=$(teardown_claude_base36 "$hash") || return 1
-  case "$suffix" in
-    ''|*[!0-9a-z]*) return 1 ;;
-  esac
-  printf '%s\n' "${slug:0:200}-${suffix}"
+  [ "${#slug}" -le 200 ] || return 1
+  printf '%s\n' "$slug"
 }
 
 teardown_claude_temp_uid() {
@@ -4527,10 +4470,6 @@ teardown_remove_claude_session_temp() {
   path=${path:-}
   [ -n "$path" ] || return 0
   path=$(teardown_claude_temp_strip "$path")
-  case "$path" in
-    /*) ;;
-    *) return 0 ;;
-  esac
   slug=$(teardown_claude_project_slug "$path") || {
     echo "warning: could not derive the claude session slug for $ID; leaving session temp in place" >&2
     return 0
@@ -4602,7 +4541,7 @@ teardown_remove_claude_session_temp() {
   echo "teardown: removed claude session temp for $ID ($bytes bytes)" >&2
 }
 
-if teardown_owns_worktree; then
+if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_remove_claude_session_temp "$WT"
 fi
 
@@ -4813,7 +4752,9 @@ if [ "$KIND" = secondmate ]; then
   pending_replies_recovery_validate recheck \
     || { echo "error: local pending-reply recovery paths changed; preserving the secondmate home and route" >&2; exit 1; }
   if remove_firstmate_home "$HOME_PATH" "secondmate home" "$ID" "$BACKEND"; then
-    :
+    if teardown_owns_worktree; then
+      teardown_remove_claude_session_temp "$WT"
+    fi
   else
     rc=$?
     handoff_wake_retire_stage_restore \
