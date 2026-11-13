@@ -83,7 +83,7 @@
 #
 # Claude Code session temp under a fake temp root (never the real /tmp/claude-*):
 #   (ct1) landed teardown removes only this worktree's slug folder and reports
-#         the freed size; another slug and the firstmate home slug stay
+#         the freed size; another task slug stays
 #   (ct2) a slug symlink is left in place and does not block cleanup
 #   (ct3) a missing slug folder is fine
 #   (ct4) a relative worktree path removes nothing
@@ -6995,7 +6995,7 @@ plant_claude_session() { # <fake-tmp> <worktree>
 }
 
 test_teardown_removes_own_claude_session_temp() {
-  local case_dir root own other home_dir primary_dir bytes rc=0
+  local case_dir root own other bytes rc=0
   local parent marker
   case_dir=$(make_case claude-temp-own)
   write_meta "$case_dir" no-mistakes ship
@@ -7003,8 +7003,6 @@ test_teardown_removes_own_claude_session_temp() {
   root=$case_dir/fake-tmp
   own=$(plant_claude_session "$root" "$case_dir/wt")
   other=$(plant_claude_session "$root" "$case_dir/other-task")
-  home_dir=$(plant_claude_session "$root" "$ROOT")
-  primary_dir=$(plant_claude_session "$root" "$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir | sed 's|/\.git$||')")
   parent=$(dirname "$own")
   marker=$parent/not-a-session
   printf 'marker\n' > "$marker"
@@ -7017,11 +7015,29 @@ test_teardown_removes_own_claude_session_temp() {
     "$case_dir/stderr" "claude-temp-own: freed size was not reported"
   [ ! -e "$own" ] || fail "claude-temp-own: own session folder was not removed"
   [ -f "$other/session/keep" ] || fail "claude-temp-own: another task's session folder was removed"
-  [ -f "$home_dir/session/keep" ] || fail "claude-temp-own: the firstmate home session folder was removed"
-  [ -f "$primary_dir/session/keep" ] || fail "claude-temp-own: the primary checkout session folder was removed"
   [ -f "$marker" ] || fail "claude-temp-own: a file directly under claude-<uid> was removed"
   [ -d "$parent" ] || fail "claude-temp-own: the claude-<uid> parent was removed"
   pass "landed teardown removes only this worktree's claude session folder and reports its size"
+}
+
+test_teardown_preserves_protected_claude_session() {
+  local case_dir root planted rc=0
+  case_dir=$(make_case claude-temp-protected)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  root=$case_dir/fake-tmp
+  planted=$(plant_claude_session "$root" "$case_dir/wt")
+
+  FM_HOME="$case_dir/wt" FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "claude-temp-protected: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "is the firstmate home or primary checkout" "$case_dir/stderr" \
+    "claude-temp-protected: the protected-path guard was not reached"
+  assert_grep "teardown task-x1 complete" "$case_dir/stdout" "claude-temp-protected: cleanup did not finish"
+  assert_absent "$case_dir/state/task-x1.meta" "claude-temp-protected: cleanup retained the task record"
+  assert_no_grep "removed claude session temp" "$case_dir/stderr" "claude-temp-protected: teardown reported removal"
+  assert_present "$planted/session/keep" "claude-temp-protected: the protected session folder was removed"
+  pass "cleanup preserves the selected firstmate home session folder"
 }
 
 test_teardown_refuses_claude_session_symlink() {
@@ -7071,11 +7087,14 @@ test_teardown_unknown_worktree_removes_no_claude_session() {
   write_meta "$case_dir" no-mistakes ship
   land_shippable_commit "$case_dir"
   root=$case_dir/fake-tmp
-  planted=$(plant_claude_session "$root" "relative/wt")
+  planted=$(plant_claude_session "$root" "$case_dir/wt")
   sed -i 's|^worktree=.*|worktree=relative/wt|' "$case_dir/state/task-x1.meta"
 
   FM_CLAUDE_TEMP_ROOT="$root" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
+  expect_code 0 "$rc" "claude-temp-unknown: teardown should succeed: $(cat "$case_dir/stderr")"
+  assert_grep "teardown task-x1 complete" "$case_dir/stdout" "claude-temp-unknown: cleanup did not finish"
+  assert_absent "$case_dir/state/task-x1.meta" "claude-temp-unknown: cleanup retained the task record"
   assert_grep "could not derive the claude session slug" "$case_dir/stderr" \
     "claude-temp-unknown: the relative-path guard was not reached: $(cat "$case_dir/stderr")"
   assert_no_grep "removed claude session temp" "$case_dir/stderr" \
@@ -7193,3 +7212,5 @@ test_teardown_refusal_leaves_claude_session
 test_teardown_claude_session_removal_failure_does_not_block
 
 test_secondmate_claude_temp_waits_for_home_removal
+
+test_teardown_preserves_protected_claude_session
