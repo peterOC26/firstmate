@@ -83,8 +83,9 @@
 #   backend, kind, project or home, worktree, endpoint - comes from the task's
 #   validated state/<id>.meta, so --backend, --scout, --secondmate, a project
 #   positional, and batch pairs are all refused alongside it; only harness,
-#   model, effort, and a declared Claude account may change,
-#   which is what makes a harness switch one ordinary relaunch. It refuses unless the
+#   model, effort, a declared Claude account, and the per-launch Claude lean
+#   option below may change. This makes a harness switch one ordinary relaunch.
+#   It refuses unless the
 #   recorded endpoint is positively agent-free on a backend with both a
 #   recovery-grade agent-state classifier and replacement-agent support
 #   (tmux or herdr), and clears the previous harness's per-task wiring
@@ -439,9 +440,8 @@
 #   marker FM_TASK_ID that ship and scout panes receive above, plus the
 #   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor also
 #   pins to 1 with a literal assignment so it survives the cleared environment
-#   even on a host that never had it set. A --claude-lean claude launch also
-#   pins FORCE_PROMPT_CACHING_5M=1 on that same boundary for that launch only;
-#   the names above stay the floor for every launch.
+#   even on a host that never had it set.
+#   See Claude lean launch below for its additional environment assignment.
 #   An enabled task trace also retains TRACEPARENT. Explicit Firstmate launch
 #   assignments still apply inside the filtered environment, including the
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
