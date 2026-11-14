@@ -3264,6 +3264,124 @@ SH
   pass "fm-control exit removes the dialog file before it releases the control lock"
 }
 
+# Point one retained pool entry at the lease shape under test.
+# herdr-native, no-lease-id, and destroying drop recorded lease fields.
+# herdr-native and destroying use lease id herdr-<id> held by the task id.
+# elsewhere is leased by another holder. mismatch keeps the recorded fields
+# and changes only the pool lease id. legacy is an unleased copy with no fields.
+reshape_recorded_lease() {  # <case-dir> <id> <mode>
+  local dir=$1 id=$2 mode=$3 wt state
+  wt=$(cd "$dir/wt" && pwd -P)
+  state="$(dirname "$(dirname "$wt")")/treehouse-state.json"
+  if [ "$mode" != mismatch ]; then
+    grep -v '^treehouse_lease_' "$dir/home/state/$id.meta" > "$dir/home/state/$id.meta.stripped"
+    mv "$dir/home/state/$id.meta.stripped" "$dir/home/state/$id.meta"
+  fi
+  case "$mode" in
+    legacy)
+      jq --arg p "$wt" '.worktrees |= map(if .path == $p then del(.leased, .lease_id, .lease_holder, .destroying) else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    no-lease-id)
+      jq --arg p "$wt" --arg holder "$id" '.worktrees |= map(if .path == $p then .leased = true | .lease_holder = $holder | del(.lease_id, .destroying) else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    destroying)
+      jq --arg p "$wt" --arg holder "$id" --arg lease "herdr-$id" '.worktrees |= map(if .path == $p then .leased = true | .lease_id = $lease | .lease_holder = $holder | .destroying = true else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    mismatch)
+      jq --arg p "$wt" '.worktrees |= map(if .path == $p then .lease_id = "not-the-recorded-lease" else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    elsewhere)
+      jq --arg p "$wt" '.worktrees |= map(if .path == $p then .leased = true | .lease_id = "other-lease" | .lease_holder = "other-task" | del(.destroying) else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    herdr-native)
+      jq --arg p "$wt" --arg holder "$id" --arg lease "herdr-$id" '.worktrees |= map(if .path == $p then .leased = true | .lease_id = $lease | .lease_holder = $holder | del(.destroying) else . end)' \
+        "$state" > "$state.tmp"
+      ;;
+    *) fail "unknown lease shape $mode" ;;
+  esac
+  mv "$state.tmp" "$state"
+}
+
+test_unverified_pool_reservation_refuses_before_the_agent_stops() {
+  local dir out rc id shape needle
+  for shape in elsewhere no-lease-id destroying mismatch; do
+    id="rl-res-$shape"
+    dir=$(new_case "reserve-$shape" "$id")
+    add_ship_task "$dir" "$id" claude
+    reshape_recorded_lease "$dir" "$id" "$shape"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/data/$id/brief.md" "$dir/brief-before"
+    : > "$dir/treehouse.log"
+    out=$(FM_FAKE_TREEHOUSE_LOG="$dir/treehouse.log" run_control "$dir" "$id" relaunch --note "refuse $shape"); rc=$?
+    expect_code 1 "$rc" "the $shape reservation must refuse"$'\n'"$out"
+    case "$shape" in
+      mismatch) needle="recorded durable lease cannot be verified" ;;
+      *) needle="recorded copy has no verifiable pool reservation" ;;
+    esac
+    assert_contains "$out" "$needle" "the $shape refusal should name the reservation"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "the $shape refusal must leave the agent running"
+    [ ! -s "$dir/fake/literal" ] || fail "the $shape refusal must send no lifecycle input"
+    cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "the $shape refusal must leave the task record unchanged"
+    cmp -s "$dir/brief-before" "$dir/home/data/$id/brief.md" || fail "the $shape refusal must leave the instructions unchanged"
+    assert_absent "$dir/home/state/$id.control-relaunch" "the $shape refusal must record no relaunch checkpoint"
+    [ ! -s "$dir/treehouse.log" ] || fail "the $shape refusal must not allocate or return a copy"
+  done
+  pass "fm-control relaunch: an unverified pool reservation refuses before the agent stops"
+}
+
+test_verified_herdr_native_lease_is_adopted_and_relaunch_continues() {
+  local dir out rc id=rl-herdr-native wt state
+  dir=$(new_case herdr-native "$id")
+  add_ship_task "$dir" "$id" claude
+  reshape_recorded_lease "$dir" "$id" herdr-native
+  wt=$(cd "$dir/wt" && pwd -P)
+  state="$(dirname "$(dirname "$wt")")/treehouse-state.json"
+  cp "$state" "$dir/pool-before.json"
+  : > "$dir/treehouse.log"
+  out=$(FM_FAKE_TREEHOUSE_LOG="$dir/treehouse.log" run_control "$dir" "$id" relaunch --note "adopt the pool lease"); rc=$?
+  expect_code 0 "$rc" "a verified Herdr-native lease must relaunch"$'\n'"$out"
+  assert_contains "$out" "relaunched $id" "the relaunch should report completion"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the replacement agent should be running"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_id)" = "herdr-$id" ] || fail "relaunch should adopt the pool lease id"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_holder)" = "$id" ] || fail "relaunch should adopt the pool lease holder"
+  [ "$(grep -c '^treehouse_lease_id=' "$dir/home/state/$id.meta")" = 1 ] || fail "relaunch should record the lease id once"
+  [ "$(grep -c '^treehouse_lease_holder=' "$dir/home/state/$id.meta")" = 1 ] || fail "relaunch should record the lease holder once"
+  [ ! -s "$dir/treehouse.log" ] || fail "adopting a lease must not allocate or return a copy"
+  cmp -s "$dir/pool-before.json" "$state" || fail "adopting a lease must leave the pool entry unchanged"
+  : > "$dir/fake/literal"
+  out=$(run_control "$dir" "$id" relaunch --note "keep the adopted lease"); rc=$?
+  expect_code 0 "$rc" "a later relaunch of the adopted lease should succeed"$'\n'"$out"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_id)" = "herdr-$id" ] || fail "a later relaunch should keep the adopted lease id"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_holder)" = "$id" ] || fail "a later relaunch should keep the adopted lease holder"
+
+  id=rl-herdr-spawn
+  dir=$(new_case herdr-spawn "$id")
+  add_ship_task "$dir" "$id" claude
+  reshape_recorded_lease "$dir" "$id" herdr-native
+  printf 'zsh' > "$dir/fake/command"
+  : > "$dir/treehouse.log"
+  out=$(FM_FAKE_TREEHOUSE_LOG="$dir/treehouse.log" run_spawn "$dir" "$id" --relaunch); rc=$?
+  expect_code 0 "$rc" "a direct relaunch should adopt a verified Herdr-native lease"$'\n'"$out"
+  assert_contains "$out" "spawned $id" "the direct relaunch should report the replacement"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_id)" = "herdr-$id" ] || fail "the direct relaunch should adopt the pool lease id"
+  [ "$(meta_field "$dir" "$id" treehouse_lease_holder)" = "$id" ] || fail "the direct relaunch should adopt the pool lease holder"
+  [ ! -s "$dir/treehouse.log" ] || fail "the direct relaunch must not allocate or return a copy"
+
+  id=rl-legacy-unleased
+  dir=$(new_case legacy-unleased "$id")
+  add_ship_task "$dir" "$id" claude
+  reshape_recorded_lease "$dir" "$id" legacy
+  out=$(run_control "$dir" "$id" relaunch --note "legacy copy"); rc=$?
+  expect_code 0 "$rc" "an unleased legacy copy should still relaunch"$'\n'"$out"
+  assert_no_regex '^treehouse_lease_' "$dir/home/state/$id.meta" "an unleased legacy relaunch must not invent a lease identity"
+  pass "fm-control relaunch: a verified Herdr-native pool lease is adopted and an unleased legacy copy stays unleased"
+}
+
 test_relaunch_off_opencode_removes_tracked_wiring
 test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
@@ -3360,3 +3478,5 @@ test_herdr_rebind_failure_from_a_plain_shell_names_the_real_cause
 test_relaunch_reverifies_an_already_in_flight_item_instead_of_rewriting_it
 test_relaunch_moves_a_drifted_item_back_in_flight
 test_away_branch_relaunch_accepts_existing_dispatchable_items
+test_unverified_pool_reservation_refuses_before_the_agent_stops
+test_verified_herdr_native_lease_is_adopted_and_relaunch_continues

@@ -102,6 +102,11 @@
 #              inherits the local copy but none of the conversation; a
 #              secondmate reconciles its own home's records at startup, so its
 #              standing charter is never rewritten.
+#              The Treehouse reservation preflight
+#              (spawn_treehouse_reservation_preflight) runs before the durable
+#              checkpoint is recorded and before the old agent stops, so a
+#              refusal leaves the running agent and the task record unchanged.
+#              bin/fm-wake-lib.sh owns what that preflight accepts.
 #              Records a durable checkpoint and that note, exits the old agent,
 #              then delegates the launch to its single owner,
 #              bin/fm-spawn.sh --relaunch. A failure before publication keeps
@@ -1181,6 +1186,16 @@ safe_checkpoint() {
   fi
 }
 
+# The reservation check lives with the Treehouse lease contract. It runs
+# while the old agent is still up, and before this transaction records
+# anything, so a refusal leaves the running agent and its task record
+# unchanged.
+relaunch_treehouse_reservation_preflight() {
+  # shellcheck disable=SC2034 # spawn_treehouse_reservation_preflight reads these from its caller
+  local RELAUNCH=1 RELAUNCH_META=$META RELAUNCH_WT=$WT
+  spawn_treehouse_reservation_preflight
+}
+
 # record_note: put the required progress note somewhere durable, and - for a
 # ship or scout, whose only record of the interrupted reasoning is the
 # conversation about to be discarded - into the instructions the replacement
@@ -1249,6 +1264,7 @@ do_relaunch() {
     note_line="note=none"
   fi
   safe_checkpoint
+  relaunch_treehouse_reservation_preflight
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
   journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"
