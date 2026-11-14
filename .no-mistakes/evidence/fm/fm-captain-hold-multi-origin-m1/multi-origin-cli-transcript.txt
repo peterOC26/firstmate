@@ -1,0 +1,69 @@
+=== S1: three scouts hold the same call ===
+$ fm-captain-hold.sh hold pv-voice-any-question-q1 --title Voice question --reason captain must answer the voice question --repo sample --origin pv-voice-any-question-consult-fable-c1
+pv-voice-any-question-q1
+[exit 0]
+$ fm-captain-hold.sh hold pv-voice-any-question-q1 --title Voice question --reason captain must answer the voice question --repo sample --origin pv-voice-any-question-consult-astra-c1
+pv-voice-any-question-q1
+[exit 0]
+$ fm-captain-hold.sh hold pv-voice-any-question-q1 --title Voice question --reason captain must answer the voice question --repo sample --origin pv-voice-any-question-consult-grok-c1
+pv-voice-any-question-q1
+[exit 0]
+task:
+  id: pv-voice-any-question-q1
+  title: Voice question
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:Y2FwdGFpbiBtdXN0IGFuc3dlciB0aGUgdm9pY2UgcXVlc3Rpb24="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: sample
+  priority: "-"
+  created: 2026-11-14
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-11-14T13:42:04Z\nCaptain hold origin: pv-voice-any-question-consult-fable-c1\nCaptain hold origin: pv-voice-any-question-consult-astra-c1\nCaptain hold origin: pv-voice-any-question-consult-grok-c1\n\nOrigin: pv-voice-any-question-consult-fable-c1"
+=== S2: repeat hold with grok origin (idempotent) ===
+$ fm-captain-hold.sh hold pv-voice-any-question-q1 --reason captain must answer the voice question --origin pv-voice-any-question-consult-grok-c1
+pv-voice-any-question-q1
+[exit 0]
+1
+Captain hold origin: pv-voice-any-question-consult-fable-c1
+Captain hold origin: pv-voice-any-question-consult-astra-c1
+Captain hold origin: pv-voice-any-question-consult-grok-c1
+=== S3: complete + verify for each origin (fable/astra previously refused) ===
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-fable-c1 pv-voice-any-question-q1
+complete: pv-voice-any-question-consult-fable-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+$ fm-captain-hold.sh verify pv-voice-any-question-consult-fable-c1
+verified: pv-voice-any-question-consult-fable-c1 captain-call inventory
+[exit 0]
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-fable-c1 --none
+complete: pv-voice-any-question-consult-fable-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-astra-c1 pv-voice-any-question-q1
+complete: pv-voice-any-question-consult-astra-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+$ fm-captain-hold.sh verify pv-voice-any-question-consult-astra-c1
+verified: pv-voice-any-question-consult-astra-c1 captain-call inventory
+[exit 0]
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-astra-c1 --none
+complete: pv-voice-any-question-consult-astra-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-grok-c1 pv-voice-any-question-q1
+complete: pv-voice-any-question-consult-grok-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+$ fm-captain-hold.sh verify pv-voice-any-question-consult-grok-c1
+verified: pv-voice-any-question-consult-grok-c1 captain-call inventory
+[exit 0]
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-grok-c1 --none
+complete: pv-voice-any-question-consult-grok-c1 captain-call inventory reviewed (pv-voice-any-question-q1)
+[exit 0]
+=== S4 adversarial: unrelated origin ===
+$ fm-captain-hold.sh complete pv-voice-any-question-consult-other-c1 pv-voice-any-question-q1
+fm-captain-hold: captain-held task pv-voice-any-question-q1 was held for origin pv-voice-any-question-consult-fable-c1, pv-voice-any-question-consult-astra-c1, pv-voice-any-question-consult-grok-c1, not pv-voice-any-question-consult-other-c1; hold a task for pv-voice-any-question-consult-other-c1 or list the right one
+[exit 1]
+0

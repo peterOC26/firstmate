@@ -1,0 +1,4 @@
+  body: "Captain hold set: 2026-11-14T13:42:57Z\nCaptain hold origin: pv-voice-any-question-consult-grok-c1\n\nOrigin: pv-voice-any-question-consult-fable-c1"
+$ [base ac22532] fm-captain-hold.sh complete pv-voice-any-question-consult-fable-c1 pv-voice-any-question-q1
+fm-captain-hold: captain-held task pv-voice-any-question-q1 was held for origin pv-voice-any-question-consult-grok-c1, not pv-voice-any-question-consult-fable-c1; hold a task for pv-voice-any-question-consult-fable-c1 or list the right one
+[exit 1]
