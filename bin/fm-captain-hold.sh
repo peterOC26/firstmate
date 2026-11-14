@@ -903,7 +903,7 @@ write_hold_origin() {  # <task-id> <shown-body> <origin>
       }
     ')
   else
-    rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: /' \
+    rest=$(printf '%s\n' "$body" | sed 1d \
       | awk 'NF || started { started = 1; print }')
     new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
     if [ -n "$rest" ]; then
