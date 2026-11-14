@@ -1947,7 +1947,12 @@ fm_treehouse_pool_slot() {  # <project-dir> <worktree>
 # version passes fm_treehouse_legacy_holds_supported. Get then runs while each
 # such legacy copy is held out of allocation (fm_treehouse_lease_get), regardless
 # of status or live processes, and such a record may still relaunch into its
-# own claimed, unleased copy.
+# own claimed, unleased copy. A record with no lease fields whose pool entry
+# is leased by this task id on the recorded copy, with a readable lease id
+# and holder, is a Herdr-native lease: relaunch adopts that lease id and
+# holder into the task record and continues. Any other unverified reservation
+# still refuses. fm-control runs this relaunch preflight before the old agent
+# stops, so a refusal leaves that agent running and the record unchanged.
 # The claim remains independent positive evidence for records-only cleanup of
 # legacy records whose slot was reassigned. Never use `treehouse status` to
 # inspect ownership: it can heal and mutate the pool state.

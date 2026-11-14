@@ -439,17 +439,44 @@ RECOVERY
   } >&2
 }
 
+# Record a lease the pool already proves. The caller has checked that the
+# meta has no lease fields, so appending these two lines cannot duplicate them.
+fm_treehouse_record_adopt_pool_lease() {  # <meta> <lease-id> <holder>
+  local meta=$1 lease_id=$2 holder=$3 tmp
+  [ -n "$lease_id" ] && [ -n "$holder" ] || return 1
+  case "$lease_id$holder" in
+    *[$'\r\n\t']*) return 1 ;;
+  esac
+  [ -f "$meta" ] && [ ! -L "$meta" ] && [ -w "$meta" ] || return 1
+  tmp="${meta}.lease-adopt.${BASHPID:-$$}"
+  rm -f -- "$tmp" || return 1
+  cp -p -- "$meta" "$tmp" || { rm -f -- "$tmp"; return 1; }
+  printf 'treehouse_lease_id=%s\ntreehouse_lease_holder=%s\n' "$lease_id" "$holder" >> "$tmp" || {
+    rm -f -- "$tmp"
+    return 1
+  }
+  mv -f -- "$tmp" "$meta" || { rm -f -- "$tmp"; return 1; }
+}
+
 # shellcheck disable=SC2153,SC2154
 spawn_treehouse_reservation_preflight() {
+  local adopt=0
   [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] || return 0
   if [ "$RELAUNCH" -eq 1 ]; then
     if ! grep -q '^treehouse_lease_' "$RELAUNCH_META"; then
-      # A record from before durable leases keeps relaunching into its own
-      # claimed copy; fresh-spawn preflight keeps that copy out of allocation.
-      fm_treehouse_legacy_unleased "$RELAUNCH_WT" || {
+      # bin/fm-wake-lib.sh owns which reservations a relaunch may keep.
+      if fm_treehouse_legacy_unleased "$RELAUNCH_WT"; then
+        :
+      elif fm_treehouse_task_holds_pool_lease "$RELAUNCH_WT" "$ID" \
+        && fm_treehouse_lease_read "$RELAUNCH_WT" \
+        && [ "$FM_TREEHOUSE_LEASE_HOLDER" = "$ID" ]; then
+        adopt=1
+        TREEHOUSE_LEASE_ID=$FM_TREEHOUSE_LEASE_ID
+        TREEHOUSE_LEASE_HOLDER=$FM_TREEHOUSE_LEASE_HOLDER
+      else
         echo "REFUSED: task $ID's recorded copy has no verifiable pool reservation; reconcile its ownership before relaunch" >&2
         exit 1
-      }
+      fi
     elif ! fm_treehouse_record_lease "$RELAUNCH_META" ||
       ! fm_treehouse_lease_matches "$RELAUNCH_WT" "$FM_TREEHOUSE_RECORD_LEASE_ID" "$FM_TREEHOUSE_RECORD_LEASE_HOLDER"; then
       echo "REFUSED: task $ID's recorded durable lease cannot be verified; reconcile its ownership before relaunch" >&2
@@ -464,6 +491,12 @@ spawn_treehouse_reservation_preflight() {
       exit 1
     fi
     fm_treehouse_record_exclusive "$STATE" "$RELAUNCH_WT" "$RELAUNCH_META" || exit 1
+    if [ "$adopt" = 1 ]; then
+      fm_treehouse_record_adopt_pool_lease "$RELAUNCH_META" "$TREEHOUSE_LEASE_ID" "$TREEHOUSE_LEASE_HOLDER" || {
+        echo "REFUSED: task $ID's verified pool lease could not be recorded before relaunch" >&2
+        exit 1
+      }
+    fi
   else
     if [ -e "$STATE/$ID.treehouse-acquire" ] || [ -L "$STATE/$ID.treehouse-acquire" ]; then
       echo "REFUSED: task $ID has a retained Treehouse acquisition journal; reconcile $STATE/$ID.treehouse-acquire before retrying" >&2
