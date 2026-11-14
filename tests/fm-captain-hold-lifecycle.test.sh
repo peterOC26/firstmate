@@ -4535,18 +4535,31 @@ SH
       shown=$(tasks_in "$home" show "$id" --full)
       assert_contains "$shown" 'held: yes' "the successful retry did not hold the task"
       assert_contains "$shown" 'Captain hold origin: origin-b' "a successful hold lost its association"
-      assert_not_contains "$shown" 'Captain hold origin: origin-a' "a successful hold retained the old association"
+      if [ "$phase" = new ]; then
+        assert_not_contains "$shown" 'Captain hold origin: origin-a' \
+          "a first hold recorded an origin it was not given"
+      else
+        assert_contains "$shown" 'Captain hold origin: origin-a' \
+          "a successful hold dropped the earlier origin"
+      fi
       assert_equals 1 "$(grep -Fc "needs-decision [key=captain-hold-$id-$occurrence]" "$channel")" \
         "retrying the origin write duplicated the parent decision"
       run_captain "$home" complete origin-b "$id" >/dev/null \
         || fail "a successful hold could not complete B"
       run_captain "$home" verify origin-b >/dev/null || fail "a successful hold could not verify B"
-      if run_captain "$home" complete origin-a "$id" >/dev/null 2> "$home/old-origin.err"; then
-        fail "a successful reassociation still certified A"
+      if [ "$phase" = new ]; then
+        if run_captain "$home" complete origin-a "$id" >/dev/null 2> "$home/old-origin.err"; then
+          fail "a hold that never recorded A still certified A"
+        fi
+      else
+        run_captain "$home" complete origin-a "$id" >/dev/null \
+          || fail "a held call that still records A could not complete A"
+        run_captain "$home" verify origin-a >/dev/null \
+          || fail "a held call that still records A could not verify A"
       fi
     done
   done
-  pass "new, active, and released holds publish origins after backend success with and without deferral"
+  pass "new, active, and released holds publish origins after backend success, keep earlier origins, and work with and without deferral"
 }
 
 test_interrupted_origin_move_does_not_inherit_the_previous_answer() {
@@ -5192,6 +5205,83 @@ EOF
   pass "an answered captain call archived to a user-configured location still satisfies the completion gate"
 }
 
+# Three consult scouts gate one captain call. Each hold --origin must keep
+# every earlier origin, a repeated origin must not add another line, and
+# complete and verify must accept the call for every recorded origin. Until an
+# origin completes against that call, complete --none stays refused while its
+# status decision is open.
+test_one_call_keeps_every_origin_that_held_it() {
+  local home call=pv-voice-any-question-q1 shown body recorded expected count origin
+  local origins=(
+    pv-voice-any-question-consult-fable-c1
+    pv-voice-any-question-consult-astra-c1
+    pv-voice-any-question-consult-grok-c1
+  )
+  home=$(make_home multi-origin-one-call)
+  for origin in "${origins[@]}"; do
+    mkdir -p "$home/data/$origin"
+    tasks_in "$home" add "$origin" "Consult $origin" --kind scout --repo sample --start >/dev/null \
+      || fail "could not create $origin"
+    write_origin_meta "$home" "$origin"
+    printf 'needs-decision [key=voice]: choose the voice answer\n' > "$home/state/$origin.status"
+  done
+  for origin in "${origins[@]}"; do
+    run_captain "$home" hold "$call" --title "Voice question" \
+      --reason "captain must answer the voice question" --repo sample --origin "$origin" >/dev/null \
+      || fail "could not hold $call for $origin"
+  done
+  shown=$(tasks_in "$home" show "$call" --full)
+  body=$(printf '%s\n' "$shown" | sed -n 's/^  body: //p' | jq -r .)
+  recorded=$(printf '%s\n' "$body" | sed -n 's/^Captain hold origin: //p')
+  expected=$(printf '%s\n' "${origins[@]}")
+  assert_equals "$expected" "$recorded" \
+    "the shared call did not keep every origin that held it, in hold order"
+
+  run_captain "$home" hold "$call" --reason "captain must answer the voice question" \
+    --origin "${origins[2]}" >/dev/null \
+    || fail "could not repeat the hold for ${origins[2]}"
+  shown=$(tasks_in "$home" show "$call" --full)
+  body=$(printf '%s\n' "$shown" | sed -n 's/^  body: //p' | jq -r .)
+  count=$(printf '%s\n' "$body" | grep -cFx "Captain hold origin: ${origins[2]}" || true)
+  assert_equals 1 "$count" "repeating ${origins[2]} recorded another origin line"
+  recorded=$(printf '%s\n' "$body" | sed -n 's/^Captain hold origin: //p')
+  assert_equals "$expected" "$recorded" "repeating the last origin changed the recorded set"
+
+  if run_captain "$home" complete "${origins[0]}" --none \
+    > "$home/none-before.out" 2> "$home/none-before.err"; then
+    fail "complete --none succeeded while ${origins[0]} still had an open status decision"
+  fi
+  assert_grep "still has open captain decisions" "$home/none-before.err" \
+    "the pre-completion --none refusal did not name the open decision"
+
+  for origin in "${origins[@]}"; do
+    FM_STATE_OVERRIDE="$home/state" bash -c '
+      . "$1"
+      fm_wake_status_mark_current "$2" "$3"
+    ' _ "$ROOT/bin/fm-wake-lib.sh" "$home/state" "$home/state/$origin.status" \
+      || fail "could not prime the announced decision baseline for $origin"
+    run_captain "$home" complete "$origin" "$call" > "$home/complete.out" 2> "$home/complete.err" \
+      || fail "complete refused $call for recorded origin $origin: $(cat "$home/complete.err")"
+    run_captain "$home" verify "$origin" > "$home/verify.out" 2> "$home/verify.err" \
+      || fail "verify refused $call for recorded origin $origin: $(cat "$home/verify.err")"
+    run_captain "$home" complete "$origin" --none > "$home/none.out" 2> "$home/none.err" \
+      || fail "complete --none stayed refused after $origin reviewed the shared call: $(cat "$home/none.err")"
+  done
+
+  origin=pv-voice-any-question-consult-other-c1
+  tasks_in "$home" add "$origin" "Other consult" --kind scout --repo sample >/dev/null \
+    || fail "could not create the unrelated origin"
+  write_origin_meta "$home" "$origin"
+  if run_captain "$home" complete "$origin" "$call" > "$home/other.out" 2> "$home/other.err"; then
+    fail "complete accepted an origin that never held the call"
+  fi
+  assert_grep "was held for origin ${origins[0]}, ${origins[1]}, ${origins[2]}, not $origin" \
+    "$home/other.err" "the refusal did not name every recorded origin"
+  assert_no_grep "decisions_reviewed=1" "$home/state/$origin.meta" \
+    "the refused completion recorded an inventory attestation"
+  pass "one captain call keeps every origin that held it"
+}
+
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_follow_backend_holds
 test_interrupted_origin_move_does_not_inherit_the_previous_answer
@@ -5199,6 +5289,7 @@ test_historical_self_inventory_has_workable_repair
 test_inventory_compares_backend_identities
 test_origin_is_never_its_own_inventory_entry
 test_complete_refuses_an_entry_held_for_another_origin
+test_one_call_keeps_every_origin_that_held_it
 test_uninventoried_report_decision_refuses_completion
 test_hold_decodes_a_bare_scalar_body_without_the_nonref_default
 test_retained_body_keeps_its_utf8_bytes

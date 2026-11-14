@@ -49,8 +49,11 @@
 # a UTC `Captain hold set:` timestamp in the task body: repeating an active
 # hold preserves the existing timestamp, while re-holding released work starts
 # a new lifecycle. A task already closed is refused rather than reopened.
-# `--origin` also records the origin on a `Captain hold origin:` body line, which
-# `complete` and `verify` check. The reason may hold parentheses and line breaks:
+# `--origin` also records that origin on its own `Captain hold origin:` body line.
+# Every origin that held the task is kept: a later hold appends a line and never
+# replaces an earlier one, and recording the same origin again changes nothing.
+# `complete` and `verify` accept the task when any recorded line names the origin
+# on the command. The reason may hold parentheses and line breaks:
 # tasks-axi refuses them, so `hold` escapes them where it writes the reason and
 # readers decode them (bin/fm-hold-reason-lib.sh owns the encoding).
 # `--until` records the captain's own deferral date through `tasks-axi hold
@@ -147,9 +150,9 @@
 # has no unresolved captain call, and is refused while the origin still has an
 # open keyed status decision. With a non-empty inventory, every listed task is
 # verified durable (docs/captain-hold-lifecycle.md owns the inventory checks),
-# is never the origin itself, and, when `hold --origin` recorded one, was held
-# for this origin; a hold with no recorded origin is accepted on durability
-# alone and named in the output,
+# is never the origin itself, and, when `hold --origin` recorded any origins,
+# was held for this origin among them; a hold with no recorded origin is
+# accepted on durability alone and named in the output,
 # the inventory is unioned idempotently into the metadata, and every still-open
 # keyed status decision is transferred to its durable owner with a
 # `captain-held [key=...]` status close naming the inventory. Later review
@@ -857,11 +860,12 @@ write_hold_set_stamp() {  # <task-id> <shown-body> <timestamp> <preserve-existin
   rm -f -- "$tmp"
 }
 
-# The origin a hold was recorded for lives in the held task's own body, on a
-# line of its own, so `complete` can tell a call held for this origin from one
-# held for another. Omitting --origin leaves any existing association intact.
-body_hold_origin() {  # <decoded-task-body>
-  printf '%s\n' "$1" | sed -n 's/^Captain hold origin: \(.*\)$/\1/p' | head -1
+# Every origin a hold was recorded for lives in the held task's own body, on
+# its own line, in the order the holds were recorded. Omitting --origin leaves
+# those lines intact. `complete` accepts the task when any line names the
+# origin being completed.
+body_hold_origins() {  # <decoded-task-body>
+  printf '%s\n' "$1" | sed -n 's/^Captain hold origin: \(.*\)$/\1/p'
 }
 
 task_identity() {
@@ -882,11 +886,29 @@ write_hold_origin() {  # <task-id> <shown-body> <origin>
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its origin was recorded"
-  rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: /' \
-    | awk 'NF || started { started = 1; print }')
-  new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
-  if [ -n "$rest" ]; then
-    new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
+  # A repeated identical origin is already published. Leave the body untouched.
+  if printf '%s\n' "$body" | grep -Fxq "Captain hold origin: ${origin}"; then
+    return 0
+  fi
+  if printf '%s\n' "$body" | grep -q '^Captain hold origin: '; then
+    # Append after the last recorded origin. Keep every earlier line.
+    new_body=$(printf '%s\n' "$body" | awk -v origin="$origin" '
+      { lines[NR] = $0 }
+      /^Captain hold origin: / { last = NR }
+      END {
+        for (i = 1; i <= NR; i++) {
+          print lines[i]
+          if (i == last) print "Captain hold origin: " origin
+        }
+      }
+    ')
+  else
+    rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: /' \
+      | awk 'NF || started { started = 1; print }')
+    new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
+    if [ -n "$rest" ]; then
+      new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
+    fi
   fi
   tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-origin.XXXXXX") \
     || fail "cannot stage the hold origin"
@@ -1050,6 +1072,7 @@ archived_entry() {  # <origin-or-empty> <entry>; prints the archived id
 # origin was recorded, so completion can disclose the legacy fallback.
 verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origin-state>"
   local origin=$1 entry=$2 resolved resolve_status=0 id how stored origin_state=unrecorded origin_id stored_id resolve_err archived archived_status
+  local stored_origins='' seen=0 matched=0 held_for=''
   # The origin task is never its own captain-call inventory: it is the work the
   # calls were found in, so accepting it would let a refused hold look recorded.
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$entry" = "$origin" ]; then
@@ -1084,18 +1107,29 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   verify_hold_durable "$id"
   id=$(show_field_value "$TASK_SHOW_OUTPUT" id)
   validate_slug backend-task-id "$id"
-  stored=$(body_hold_origin "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")
+  stored_origins=$(body_hold_origins "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")
   origin_id=$origin
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
     origin_id=$(task_identity "$origin") || exit $?
     [ "$id" != "$origin_id" ] || refuse_self_inventory "$origin" "$entry"
   fi
-  if [ -n "$stored" ]; then
+  while IFS= read -r stored; do
+    [ -n "$stored" ] || continue
+    seen=1
     if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ]; then
       stored_id=$(task_identity "$stored") || exit $?
-      if [ "$stored_id" != "$origin_id" ]; then
-        fail "captain-held task $id was held for origin $stored, not $origin; hold a task for $origin or list the right one"
+      if [ "$stored_id" = "$origin_id" ]; then
+        matched=1
+        break
       fi
+      held_for=${held_for:+$held_for, }$stored
+    fi
+  done <<EOF
+$stored_origins
+EOF
+  if [ "$seen" -eq 1 ]; then
+    if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$matched" -eq 0 ]; then
+      fail "captain-held task $id was held for origin $held_for, not $origin; hold a task for $origin or list the right one"
     fi
     origin_state=recorded
   fi
