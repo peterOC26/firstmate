@@ -387,6 +387,34 @@ function spanIsDecisionOwned(
   return false;
 }
 
+// Read-only evidence for the watcher's generation-bound empty recovery
+// settlement. A missing presentation cursor is uncertainty, never proof that
+// an interrupted turn finished. Outcome-store validation stays with its owner.
+export function recoveryStatusSettled(state: string, excludedStatus: string): boolean {
+  try {
+    const cursor = readPresentationCursor(state);
+    if (!cursor) return false;
+    const resolveVerb = process.env.FM_CLASSIFY_RESOLVE_VERB || "resolved";
+    const heldVerb = process.env.FM_CLASSIFY_CAPTAIN_HELD_VERB || "captain-held";
+    const reserved = (process.env.FM_CLASSIFY_RESERVED_KEY_PREFIXES || "pending-reply-").split(/\s+/).filter(Boolean);
+    for (const name of readdirSync(state)) {
+      if (name.startsWith(".") || !name.endsWith(".status")) continue;
+      const file = join(state, name);
+      if (file === excludedStatus) continue;
+      if (!lstatSync(file).isFile()) return false;
+      const version = statusFileVersion(file);
+      const contents = readFileSync(file);
+      const presented = cursor.get(name.slice(0, -7));
+      if (!presented || presented.ident !== statusFileIdentity(file) || presented.offset !== contents.length) return false;
+      if (openDecisions(nonBlankLines(contents.toString("utf8")), resolveVerb, heldVerb, reserved).size > 0) return false;
+      if (version !== statusFileVersion(file)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = false, attendedHost = false): UnreadWakeScope {
   let queue = "";
   try {
@@ -601,21 +629,6 @@ export interface BranchOfferVerdict {
   awayOnly: boolean;
 }
 
-// The offer rule for one actionable close: whether a branch may take it, in
-// either posture. The Pi watcher (fm-primary-pi-watch.ts) and the supervision
-// host off Pi (bin/fm-branch-dispatch.mjs offer) both route through this one
-// owner, so a close reaches main off Pi exactly when it would on Pi.
-//
-// A check-kind close (merge-confirmation polls, Relay mentions,
-// credential/auth failures, and every other legitimately main-only class -
-// docs/pi-supervision-branch.md) is never routed to the branch while attended,
-// even when other currently-unread rows are individually eligible: this
-// watcher cycle's own triggering event stays on main, exactly as before
-// scopeForUnreadWake stopped letting a co-present check row veto the whole
-// scan. That relaxation is what lets an UNRELATED eligible signal/stale row
-// still reach the branch on this cycle; it must never also let a check-kind
-// trigger itself slip past main's delivery.
-//
 // A signal close containing a needs-decision status file, or a stale close for
 // a captain-held task, gets the identical main-only treatment as a check-kind
 // trigger. The cross-reference deliberately includes every unread decision
@@ -627,7 +640,8 @@ export interface BranchOfferVerdict {
 // (scopeForUnreadWake owns the per-row rule).
 export function branchOfferForWake(state: string, message: string, afk: boolean, attendedHost = false): BranchOfferVerdict {
   const heartbeat = /^heartbeat($|:)/.test(message);
-  const isCheckTrigger = /^check:/.test(message);
+  const isRecoveryTrigger = message === "check: rearm-resurface";
+  const isCheckTrigger = /^check:/.test(message) && !(attendedHost && isRecoveryTrigger);
   const scope = scopeForUnreadWake(state, heartbeat, afk, attendedHost && !afk);
   const triggerKeys = /^signal:/.test(message)
     ? message

@@ -300,7 +300,7 @@ test_handling_successor_resurfaces_a_row_appended_during_startup() {
     || fail "handling successor did not close once with the recovery wake: $(cat "$out")"
   grep "$(printf '\tcheck\tinbox:n1\t')" "$state/.wake-queue" >/dev/null \
     || fail "the resurfaced inbox row must stay queued for main"
-  grep -E '^(pending|announced):downtime:' "$state/.watcher-down" >/dev/null \
+  grep -E '^(pending|announced):(downtime|interrupted):' "$state/.watcher-down" >/dev/null \
     || fail "the resurfaced close must leave a deliverable downtime episode: $(cat "$state/.watcher-down")"
   pass "a handling successor resurfaces a row appended during startup"
 }

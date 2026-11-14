@@ -853,7 +853,7 @@ FM_RECOVERY_MARKER_WRITTEN_TOKEN=
 FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
 FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
 
-# Token grammar (one owner): <pending|announced|acked>:<handling|downtime>:<generation>
+# Token grammar (one owner): <pending|announced|acked>:<handling|downtime|interrupted>:<generation>
 # docs/watcher-continuity.md owns the recovery-episode contract, including the
 # once-per-generation announcement rule for unacknowledged downtime.
 fm_recovery_marker_read() {
@@ -863,7 +863,7 @@ fm_recovery_marker_read() {
   # Exactly one newline byte: the first line is terminated and no second is.
   { IFS= read -r line && ! IFS= read -r extra; } < "$marker" || return 1
   case "$line" in
-    pending:handling:*|pending:downtime:*|announced:handling:*|announced:downtime:*|acked:handling:*|acked:downtime:*) ;;
+    pending:handling:*|pending:downtime:*|announced:handling:*|announced:downtime:*|acked:handling:*|acked:downtime:*|pending:interrupted:*|announced:interrupted:*|acked:interrupted:*) ;;
     *) return 1 ;;
   esac
   case "${line##*:}" in
@@ -885,7 +885,7 @@ _fm_recovery_marker_write_locked() {
   # grammar-valid token is still minted and the durable wake row still appends.
   local marker=$1 kind=$2 generation=${3:-} status=${4:-pending} tmp pid epoch token
   FM_RECOVERY_MARKER_WRITTEN_TOKEN=
-  case "$kind" in handling|downtime) ;; *) return 1 ;; esac
+  case "$kind" in handling|downtime|interrupted) ;; *) return 1 ;; esac
   case "$status" in pending|announced|acked) ;; *) return 1 ;; esac
   tmp=$(mktemp "${marker}.tmp.XXXXXX") || return 1
   if [ -z "$generation" ]; then
@@ -944,13 +944,19 @@ _fm_recovery_marker_publish() {
         previous_append_token=$FM_RECOVERY_MARKER_TOKEN
       fi
       case "$FM_RECOVERY_MARKER_TOKEN" in
-        pending:handling:*|pending:downtime:*)
+        pending:downtime:*)
           generation=${FM_RECOVERY_MARKER_TOKEN##*:}
           status=pending
           ;;
-        announced:handling:*)
+        pending:handling:*|announced:handling:*|pending:interrupted:*)
+          kind=interrupted
           generation=${FM_RECOVERY_MARKER_TOKEN##*:}
           status=pending
+          ;;
+        announced:interrupted:*)
+          kind=interrupted
+          generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+          if [ "$source" != append ]; then status=announced; fi
           ;;
         announced:downtime:*)
           if [ "$source" != append ]; then
@@ -1019,7 +1025,7 @@ _fm_recovery_marker_begin_handling() {
   fi
   case "$line" in
     pending:handling:*|announced:handling:*) ;;
-    acked:handling:*|acked:downtime:*)
+    acked:handling:*|acked:downtime:*|acked:interrupted:*)
       # An already-retired episode confirms as a no-op when the caller names
       # its generation: the drain acknowledged it after the successor started
       # but before the delivery confirmation ran. Without a named generation
@@ -1030,14 +1036,14 @@ _fm_recovery_marker_begin_handling() {
         return 1
       fi
       ;;
-    pending:downtime:*)
+    pending:downtime:*|pending:interrupted:*)
       if ! _fm_recovery_marker_write_locked "$marker" handling "$generation"; then
         fm_lock_release "$lock"
         return 1
       fi
       FM_RECOVERY_MARKER_TOKEN="pending:handling:$generation"
       ;;
-    announced:downtime:*)
+    announced:downtime:*|announced:interrupted:*)
       if ! _fm_recovery_marker_write_locked "$marker" handling "$generation" announced; then
         fm_lock_release "$lock"
         return 1
@@ -1047,6 +1053,30 @@ _fm_recovery_marker_begin_handling() {
     *) fm_lock_release "$lock"; return 1 ;;
   esac
   fm_lock_release "$lock"
+}
+
+# Retire only the exact announced downtime generation a watcher just found,
+# with no queued row and positive read-only evidence from the supplied checker.
+# Queue and marker locks fence appends; a later append opens a fresh episode.
+# A failed checker or superseded token leaves recovery entirely untouched.
+fm_recovery_marker_settle_empty() {  # <marker> <announced-token> <checker> [args...]
+  local marker=$1 expected=$2 lock rc=1
+  shift 2
+  case "$expected" in announced:downtime:*) ;; *) return 1 ;; esac
+  lock="${marker}.lock"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  if ! fm_lock_acquire_wait "$lock"; then
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    return 1
+  fi
+  if [ -f "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ] && [ -r "$FM_WAKE_QUEUE" ] \
+    && [ ! -s "$FM_WAKE_QUEUE" ] && fm_recovery_marker_read "$marker" \
+    && [ "$FM_RECOVERY_MARKER_TOKEN" = "$expected" ] && "$@"; then
+    _fm_recovery_marker_write_locked "$marker" downtime "${expected##*:}" acked && rc=0
+  fi
+  fm_lock_release "$lock"
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$rc"
 }
 
 fm_recovery_marker_snapshot() {
@@ -1075,13 +1105,13 @@ _fm_recovery_marker_handling_settled() {
     line=$FM_RECOVERY_MARKER_TOKEN
     case "$line" in
       pending:handling:*|announced:handling:*)
-        if ! _fm_recovery_marker_write_locked "$marker" downtime "${line##*:}"; then
+        if ! _fm_recovery_marker_write_locked "$marker" interrupted "${line##*:}"; then
           fm_lock_release "$lock"
           fm_lock_release "$FM_WAKE_QUEUE_LOCK"
           return 1
         fi
         ;;
-      pending:downtime:*|announced:downtime:*|acked:*) ;;
+      pending:downtime:*|announced:downtime:*|pending:interrupted:*|announced:interrupted:*|acked:*) ;;
     esac
   fi
   fm_lock_release "$lock"
@@ -1138,7 +1168,7 @@ fm_recovery_lock_wait() {  # <lockdir> <bound-seconds>
 }
 
 _fm_recovery_marker_arm_check() {
-  local marker=$1 bound=${2:-} lock line quarantine
+  local marker=$1 bound=${2:-} lock line quarantine kind
   FM_RECOVERY_MARKER_ACTION='none'
   FM_RECOVERY_MARKER_QUEUED=0
   lock="${marker}.lock"
@@ -1183,19 +1213,21 @@ _fm_recovery_marker_arm_check() {
   fi
   line=$FM_RECOVERY_MARKER_TOKEN
   case "$line" in
-    pending:handling:*|announced:handling:*|announced:downtime:*)
+    pending:handling:*|announced:handling:*|announced:downtime:*|announced:interrupted:*)
       FM_RECOVERY_MARKER_ACTION='wait'
       fm_lock_release "$lock"
       fm_lock_release "$FM_WAKE_QUEUE_LOCK"
       return 0
       ;;
-    pending:downtime:*)
-      if ! _fm_recovery_marker_write_locked "$marker" downtime "${line##*:}" announced; then
+    pending:downtime:*|pending:interrupted:*)
+      kind=${line#*:}
+      kind=${kind%%:*}
+      if ! _fm_recovery_marker_write_locked "$marker" "$kind" "${line##*:}" announced; then
         fm_lock_release "$lock"
         fm_lock_release "$FM_WAKE_QUEUE_LOCK"
         return 1
       fi
-      FM_RECOVERY_MARKER_TOKEN="announced:downtime:${line##*:}"
+      FM_RECOVERY_MARKER_TOKEN="announced:$kind:${line##*:}"
       FM_RECOVERY_MARKER_ACTION='recover'
       ;;
     acked:*)
@@ -1231,6 +1263,14 @@ _fm_recovery_marker_reopen_announced() {
     return 0
   fi
   case "$FM_RECOVERY_MARKER_TOKEN" in
+    announced:handling:*|announced:interrupted:*)
+      if [ -s "$FM_WAKE_QUEUE" ] \
+        && ! _fm_recovery_marker_write_locked "$marker" interrupted "${FM_RECOVERY_MARKER_TOKEN##*:}"; then
+        fm_lock_release "$lock"
+        fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+        return 1
+      fi
+      ;;
     announced:*)
       if [ -s "$FM_WAKE_QUEUE" ] \
         && ! _fm_recovery_marker_write_locked "$marker" downtime ""; then
