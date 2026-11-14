@@ -1,0 +1,29 @@
+[20:37:40] == real fm-spawn (herdr backend, claude, real treehouse lease) ==
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-relaunch-lease.HtlmOB/pool/.treehouse/project-def1db/1/project. Run 'treehouse return /tmp/fm-relaunch-lease.HtlmOB/pool/.treehouse/project-def1db/1/project' to release it.
+spawned lease-foreign harness=claude kind=ship mode=local-only yolo=off window=fm-lab-relaunch-foreign-3707091-1441:w2:p2 worktree=/tmp/fm-relaunch-lease.HtlmOB/pool/.treehouse/project-def1db/1/project
+[20:37:45] worktree=/tmp/fm-relaunch-lease.HtlmOB/pool/.treehouse/project-def1db/1/project pane=w2:p2
+[20:37:45] meta lease fields after spawn:
+treehouse_lease_id=84741ccc487b95d40ac6ff19d5ff0fe0
+treehouse_lease_holder=/tmp/fm-relaunch-lease.HtlmOB/home/lease-foreign/a1794685062.3707245.19448
+[20:37:45] pool entry after spawn:
+{"leased":true,"lease_id":"84741ccc487b95d40ac6ff19d5ff0fe0","lease_holder":"/tmp/fm-relaunch-lease.HtlmOB/home/lease-foreign/a1794685062.3707245.19448"}
+[20:37:57] agent on pane before relaunch: claude state=idle
+[20:37:57] fm-ps classification: 
+[20:37:57] == simulate a pre-PR53 Herdr record: strip treehouse_lease_* from the meta ==
+[20:37:57] pool entry before relaunch:
+{"leased":true,"lease_id":"84741ccc487b95d40ac6ff19d5ff0fe0","lease_holder":"/tmp/fm-relaunch-lease.HtlmOB/home/lease-foreign/a1794685062.3707245.19448"}
+[20:37:57] == real fm-control relaunch ==
+REFUSED: task lease-foreign's recorded copy has no verifiable pool reservation; reconcile its ownership before relaunch
+[20:37:57] fm-control exit=1
+[20:38:01] agent on pane after relaunch: claude state=idle (pane w2:p2)
+[20:38:01] meta lease fields after relaunch:
+(none)
+[20:38:01] meta unchanged vs before: yes
+[20:38:01] relaunch checkpoint present: no
+[20:38:01] pool entry after relaunch:
+{"leased":true,"lease_id":"84741ccc487b95d40ac6ff19d5ff0fe0","lease_holder":"/tmp/fm-relaunch-lease.HtlmOB/home/lease-foreign/a1794685062.3707245.19448"}
+[20:38:01] pool entries total: 1
+[20:38:04] teardown

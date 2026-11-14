@@ -1,0 +1,34 @@
+[20:36:53] == real fm-spawn (herdr backend, claude, real treehouse lease) ==
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-relaunch-lease.Kw8XGv/pool/.treehouse/project-66a619/1/project. Run 'treehouse return /tmp/fm-relaunch-lease.Kw8XGv/pool/.treehouse/project-66a619/1/project' to release it.
+spawned lease-adopt harness=claude kind=ship mode=local-only yolo=off window=fm-lab-relaunch-adopt-3696798-11797:w2:p2 worktree=/tmp/fm-relaunch-lease.Kw8XGv/pool/.treehouse/project-66a619/1/project
+[20:36:57] worktree=/tmp/fm-relaunch-lease.Kw8XGv/pool/.treehouse/project-66a619/1/project pane=w2:p2
+[20:36:57] meta lease fields after spawn:
+treehouse_lease_id=569e264219ebb594847822774a48ac0b
+treehouse_lease_holder=/tmp/fm-relaunch-lease.Kw8XGv/home/lease-adopt/a1794685014.3696949.15814
+[20:36:57] pool entry after spawn:
+{"leased":true,"lease_id":"569e264219ebb594847822774a48ac0b","lease_holder":"/tmp/fm-relaunch-lease.Kw8XGv/home/lease-adopt/a1794685014.3696949.15814"}
+[20:37:08] agent on pane before relaunch: claude state=idle
+[20:37:08] fm-ps classification: 
+[20:37:08] == simulate a pre-PR53 Herdr record: strip treehouse_lease_* from the meta ==
+[20:37:08] == pre-PR53 Herdr-native shape: pool lease (real lease_id) held by the task id ==
+[20:37:08] pool entry before relaunch:
+{"leased":true,"lease_id":"569e264219ebb594847822774a48ac0b","lease_holder":"lease-adopt"}
+[20:37:08] == real fm-control relaunch ==
+warning: /tmp/fm-relaunch-lease.Kw8XGv/home/data/lease-adopt/launch-brief.md records no ship branch; defaulting to legacy branch fm/lease-adopt
+warning: /tmp/fm-relaunch-lease.Kw8XGv/home/data/lease-adopt/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lease-adopt ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+relaunched lease-adopt harness=claude from=claude model=default effort=default backend=herdr endpoint=fm-lab-relaunch-adopt-3696798-11797:w2:p2 worktree=/tmp/fm-relaunch-lease.Kw8XGv/pool/.treehouse/project-66a619/1/project
+[20:37:20] fm-control exit=0
+[20:37:26] agent on pane after relaunch: claude state=idle (pane w2:p2)
+[20:37:26] meta lease fields after relaunch:
+treehouse_lease_id=569e264219ebb594847822774a48ac0b
+treehouse_lease_holder=lease-adopt
+[20:37:26] meta unchanged vs before: no
+[20:37:26] relaunch checkpoint present: yes
+[20:37:26] pool entry after relaunch:
+{"leased":true,"lease_id":"569e264219ebb594847822774a48ac0b","lease_holder":"lease-adopt"}
+[20:37:26] pool entries total: 1
+[20:37:30] teardown
