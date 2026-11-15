@@ -1,0 +1,26 @@
+== spawn (real treehouse) ==
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj. Run 'treehouse return /tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj' to release it.
+spawned live1 harness=codex kind=scout window=firstmate:fm-live1 worktree=/tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj
+spawn rc=0
+== task record ==
+worktree=/tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj
+treehouse_lease_id=8544937b4ba5bb5c5b89a9a697b15842
+treehouse_lease_holder=/tmp/fm-live.If4hhX/home/live1/a1794727045.1132392.23649
+== pool state after spawn ==
+{"path":"/tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj","leased":true,"lease_id":"8544937b4ba5bb5c5b89a9a697b15842"}
+== slot claim ==
+task=live1
+home=/tmp/fm-live.If4hhX/home
+== pool state before teardown ==
+== teardown (real) ==
+warning: task live1's leased copy /tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj is gone and no pool entry names that path or carries its lease; leaving the pool untouched and running records-only cleanup.
+teardown live1 complete (window firstmate:fm-live1; leased copy /tmp/fm-live.If4hhX/pool/.treehouse/proj-8175e5/1/proj is gone and no pool entry names it or carries its lease, so the pool was left untouched)
+Backlog: live1 just finished (this home keeps no markdown backlog at /tmp/fm-live.If4hhX/home/data/backlog.md). Update /tmp/fm-live.If4hhX/home/data/backlog.md - move live1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+teardown rc=0
+== after ==
+(no live1 records left)
+pool state unchanged
+slot claim removed
+moved-aside copy intact
+lease=8544937b4ba5bb5c5b89a9a697b15842

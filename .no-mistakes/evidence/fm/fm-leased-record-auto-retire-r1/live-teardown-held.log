@@ -1,0 +1,36 @@
+== spawn (real treehouse) ==
+🌳 Setting up worktree...
+🌳 Leased worktree at /tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj. Run 'treehouse return /tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj' to release it.
+spawned live1 harness=codex kind=scout window=firstmate:fm-live1 worktree=/tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj
+spawn rc=0
+== task record ==
+worktree=/tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj
+treehouse_lease_id=fc82d6c956082f95a705f2fe463b2575
+treehouse_lease_holder=/tmp/fm-live.StMftt/home/live1/a1794727050.1135310.31742
+== pool state after spawn ==
+{"path":"/tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj","leased":true,"lease_id":"fc82d6c956082f95a705f2fe463b2575"}
+== slot claim ==
+task=live1
+home=/tmp/fm-live.StMftt/home
+== pool state before teardown ==
+{"path":"/tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj","leased":true,"lease_id":"fc82d6c956082f95a705f2fe463b2575"}
+== teardown (real) ==
+REFUSED: leased task copy is unavailable; retaining its lease and records
+Manual recovery: pause allocations and cleanup for this project; retain the task metadata, acquisition journal, pool state, and slot claim.
+meta=/tmp/fm-live.StMftt/home/state/live1.meta
+worktree=/tmp/fm-live.StMftt/pool/.treehouse/proj-c763ce/1/proj
+Read project=, treehouse_lease_id=, and treehouse_lease_holder= from "$meta"; compare them with the acquisition journal and the pool treehouse-state.json. Do not use treehouse status.
+Restore the original copy at "$worktree" from backup, including its Git metadata and unlanded work; do not create an empty replacement or overwrite another task's copy.
+Verify that pool state still holds the exact recorded lease ID and holder and that .fm-slot-owner names this task and home. Do not fabricate ownership evidence.
+If the original copy or matching ownership cannot be restored, keep the records and lease and obtain operator reconciliation; do not delete the metadata, journal, or claim or return another lease.
+After restoring and verifying the original copy, retry guarded teardown:
+  FM_HOME=/tmp/fm-live.StMftt/home bash {run-worktree}/bin/fm-teardown.sh live1
+teardown rc=1
+== after ==
+live1.git-hooks
+live1.meta
+live1.treehouse-acquire
+pool state unchanged
+slot claim still present
+moved-aside copy intact
+lease=fc82d6c956082f95a705f2fe463b2575
