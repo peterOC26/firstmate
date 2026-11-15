@@ -288,15 +288,30 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
 
 # Stop <pid> at a moment it holds no state lock but the watch lock, so a
 # successor never waits on a lock the stopped holder cannot release.
+# The pid is recorded in an owner directory before that directory is linked
+# as the lock, and a child finishes the link. A published-lock scan alone
+# stops the holder in that window; the child then publishes a lock this pid
+# can no longer release, and the successor waits out its startup bound.
 stop_outside_state_locks() {  # <pid> <state>
-  local pid=$1 state=$2 i=0 lock held
+  local pid=$1 state=$2 i=0 lock held owner_pid
   while [ "$i" -lt 100 ]; do
     kill -STOP "$pid" 2>/dev/null || return 1
     held=0
     for lock in "$state"/.*.lock "$state"/.*.lock.steal "$state"/*.lock; do
+      [ -e "$lock" ] || [ -L "$lock" ] || continue
       [ "$lock" != "$state/.watch.lock" ] || continue
       [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$pid" ] || { held=1; break; }
     done
+    if [ "$held" -eq 0 ]; then
+      for lock in "$state"/.*/pid "$state"/*/pid; do
+        [ -f "$lock" ] || continue
+        case "$lock" in
+          "$state/.watch.lock/pid"|"$state/.watch.lock.owner."*) continue ;;
+        esac
+        owner_pid=$(cat "$lock" 2>/dev/null || true)
+        [ "$owner_pid" != "$pid" ] || { held=1; break; }
+      done
+    fi
     [ "$held" -eq 1 ] || return 0
     kill -CONT "$pid" 2>/dev/null || true
     sleep 0.05

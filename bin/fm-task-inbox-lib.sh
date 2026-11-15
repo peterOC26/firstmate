@@ -407,8 +407,9 @@ fm_task_inbox_doorbell_line() {  # <record-path>
 # positively identify (that classifier is advisory here by design).
 # A pending composer holding exactly our own doorbell line is a previous ring
 # whose Enter never landed, so on an agent not reported busy it is submitted
-# rather than skipped; skipping it would block every later ring. On both paths
-# a lost first Enter gets one confirmed retry.
+# rather than skipped; skipping it would block every later ring.
+# Trailing Codex footer rows still count as that hold; fm_task_inbox_composer_holds owns the comparison.
+# On both paths a lost first Enter gets one confirmed retry.
 fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
   local backend=$1 target=$2 rec=$3 label=${4:-} line cstate verdict
   case "$(fm_backend_agent_state "$backend" "$target" 2>/dev/null || true)" in
@@ -444,10 +445,22 @@ fm_task_inbox_ring() {  # <backend> <target> <record-path> [expected-label]
 }
 
 # Whether the composer's content, ignoring line wrapping, is exactly <line>.
+# Blank trailing rows and Codex footer rows are dropped before that comparison,
+# so a stuck doorbell under an idle Codex footer still matches. Any other
+# trailing row stays in the capture and keeps the match exact.
 fm_task_inbox_composer_holds() {  # <backend> <target> <line> [expected-label]
-  local cap held
+  local cap held tail
   fm_backend_source "$1" || return 1
   cap=$(fm_backend_capture "$1" "$2" "$FM_COMPOSER_CAPTURE_LINES" "${4:-}" 2>/dev/null) || return 1
+  while [ -n "$cap" ]; do
+    tail=$(printf '%s' "${cap##*$'\n'}" | fm_composer_strip_ansi)
+    fm_composer_normalize_trim_var tail
+    if [ -n "$tail" ] && ! _fm_composer_row_is_codex_footer "$tail"; then break; fi
+    case "$cap" in
+      *$'\n'*) cap=${cap%$'\n'*} ;;
+      *) cap='' ;;
+    esac
+  done
   held=$(fm_composer_extract_selected_content styled=0 "$cap") || return 1
   [ -n "$held" ] && [ "$(printf '%s' "$held" | tr -d '[:space:]')" = "$(printf '%s' "$3" | tr -d '[:space:]')" ]
 }
