@@ -464,6 +464,7 @@ This replaces the no-mistakes skill's advice to enrich \`--intent\` with decisio
 Do not hand-edit, commit, or fix findings yourself while a run is active - the pipeline applies every fix.
 
 $drive_block
+Never rewrite the shared no-mistakes config (config.yaml, agent:, or agent_args_override) to choose a reviewer. A reviewer pin arrives as flags on the \`no-mistakes axi run\` that starts a run; omit those flags when reattaching.
 A killed or timed-out call is never evidence the daemon died: the daemon accepts your response immediately and runs the round in the background, so the call was only ever waiting for a read while the run kept working.
 Reattach and keep going rather than reporting the pipeline blocked; rule 7 owns the checks that decide when a pipeline block is real.
 
