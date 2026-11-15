@@ -732,7 +732,7 @@ FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT='^[[:space:]]*⚠[[:space:]]*[0-9]+[[:space:
 # survive ghost stripping. The rule, applied by shape rather than style:
 #   - a row whose non-whitespace content is entirely braille cells is screen
 #     furniture; it never counts as wrapped typed content and it bounds a bare
-#     composer's wrap region exactly as the status rows above do;
+#     composer's wrap region exactly as omp's status row does;
 #   - braille cells behind the glyph row's content are stripped before that
 #     row's emptiness decision when NOTHING else follows the glyph;
 #   - a row that mixes braille with any other non-whitespace text stays typed

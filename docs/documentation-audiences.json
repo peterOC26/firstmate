@@ -692,6 +692,10 @@
     {
       "path": "tests/fixtures/fm-afk-blocker-dwell/SOURCES.txt",
       "audience": "maintainer-verification"
+    },
+    {
+      "path": "tests/fixtures/codex-idle-footer-2026-11-15.txt",
+      "audience": "maintainer-verification"
     }
   ]
 }
