@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Contract: parsed .no-mistakes.yaml must leave commands.test absent or empty.
+# Contract: commit subjects on this branch, read through git, must not greet.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -23,4 +24,26 @@ puts (val.nil? || val == false || val == "") ? "" : val.inspect
   pass "no-mistakes does not configure commands.test"
 }
 
+# Recorded commit subjects are the pipeline's observable output. The oracle
+# is the chat-address rule: a subject that greets is the failure. Commits
+# already on origin/main stay out of the range, including older subjects.
+test_branch_commit_subjects_do_not_greet() {
+  local base subjects subject lower
+  base=$(git -C "$ROOT" rev-parse --verify --quiet origin/main) \
+    || fail "origin/main is required to list this branch's commit subjects"
+  subjects=$(git -C "$ROOT" log --format=%s "${base}..HEAD") \
+    || fail "failed to read commit subjects from ${base}..HEAD"
+  while IFS= read -r subject; do
+    [ -n "$subject" ] || continue
+    lower=$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')
+    case $lower in
+      *"aye, aye, captain"*|*"aye aye, captain"*|*"captain,"*)
+        fail "commit subject greets: $subject"
+        ;;
+    esac
+  done <<< "$subjects"
+  pass "commit subjects on this branch do not greet"
+}
+
 test_nm_has_no_deterministic_test_command
+test_branch_commit_subjects_do_not_greet
