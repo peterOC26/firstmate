@@ -1,0 +1,3 @@
+before: ls: cannot access '/tmp/fm-lab.GSd8xO/nostate/state': No such file or directory
+autoarm exit=0 output above (none expected)
+after: /tmp/fm-lab.GSd8xO/nostate/state

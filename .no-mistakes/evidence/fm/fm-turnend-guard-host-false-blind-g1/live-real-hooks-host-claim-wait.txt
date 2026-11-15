@@ -1,0 +1,60 @@
+# host enabled check: on
+=== HEAD (fix) host-on, short window 0ms, run 1: guard exit=0 elapsed=706ms
+--- guard output:
+<none>
+--- epoch ledger: epoch=1 owner_pid=3345819 outcome=arming updated_at=1794735548
+--- starting marker at guard exit: 3345819
+--- continuation budget file: absent
+--- starting marker after auto-arm exit: absent
+=== HEAD (fix) host-on, short window 0ms, run 2: guard exit=0 elapsed=869ms
+--- guard output:
+<none>
+--- epoch ledger: epoch=1 owner_pid=3346977 outcome=arming updated_at=1794735549
+--- starting marker at guard exit: 3346977
+--- continuation budget file: absent
+--- starting marker after auto-arm exit: absent
+=== HEAD (fix) host-on, default short window 800ms: guard exit=0 elapsed=713ms
+--- guard output:
+<none>
+--- epoch ledger: epoch=1 owner_pid=3348092 outcome=arming updated_at=1794735551
+--- starting marker at guard exit: 3348092
+--- continuation budget file: absent
+--- starting marker after auto-arm exit: absent
+=== BASE 6d7e171 host-on, short window 0ms, run 1: guard exit=2 elapsed=715ms
+--- guard output:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 400s ago).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- epoch ledger: epoch=1 owner_pid=3348831 outcome=arming updated_at=1794735552
+--- starting marker at guard exit: absent
+--- continuation budget file: session=sess-lab
+count=1
+epoch=
+--- starting marker after auto-arm exit: absent
+=== BASE 6d7e171 host-on, short window 0ms, run 2: guard exit=2 elapsed=721ms
+--- guard output:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 400s ago).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- epoch ledger: epoch=1 owner_pid=3349856 outcome=arming updated_at=1794735553
+--- starting marker at guard exit: absent
+--- continuation budget file: absent
+--- starting marker after auto-arm exit: absent
+=== HEAD (fix) host OPTED OUT, short window 0ms: guard exit=2 elapsed=731ms
+--- guard output:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 400s ago).
+●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- epoch ledger: epoch=1 owner_pid=3350733 outcome=arming updated_at=1794735554
+--- starting marker at guard exit: 3350733
+--- continuation budget file: absent
+--- starting marker after auto-arm exit: absent
