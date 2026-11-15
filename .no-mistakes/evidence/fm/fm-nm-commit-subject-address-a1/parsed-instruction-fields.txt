@@ -1,0 +1,4 @@
+document.instructions last line: The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
+ci.instructions last line: The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
+test.instructions last line: The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
+review keys: nil

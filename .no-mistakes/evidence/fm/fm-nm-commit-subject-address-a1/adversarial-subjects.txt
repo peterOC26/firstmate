@@ -1,0 +1,30 @@
+### subject: no-mistakes(review): Aye, aye, captain.
+ok - no-mistakes does not configure commands.test
+not ok - commit subject greets: no-mistakes(review): Aye, aye, captain.
+exit=1
+
+### subject: Aye aye, captain - fix lint
+ok - no-mistakes does not configure commands.test
+not ok - commit subject greets: Aye aye, captain - fix lint
+exit=1
+
+### subject: no-mistakes(ci): captain, fixed the shard
+ok - no-mistakes does not configure commands.test
+not ok - commit subject greets: no-mistakes(ci): captain, fixed the shard
+exit=1
+
+### subject: no-mistakes(document): CAPTAIN, docs updated
+ok - no-mistakes does not configure commands.test
+not ok - commit subject greets: no-mistakes(document): CAPTAIN, docs updated
+exit=1
+
+### subject: fix: keep captain-held task parked
+ok - no-mistakes does not configure commands.test
+ok - commit subjects on this branch do not greet
+exit=0
+
+### subject: docs: describe the captain decision flow
+ok - no-mistakes does not configure commands.test
+ok - commit subjects on this branch do not greet
+exit=0
+
