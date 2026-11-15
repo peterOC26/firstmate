@@ -259,13 +259,12 @@ The helper's header owns the records, retry interval, process cleanup, and trans
 
 The first delivery remains the Stop hook's exit-2 feedback.
 A later retry does not depend on that hook or on another Stop firing.
-The detached owner writes a durable operational-input record and submits its watcher doorbell through the existing tmux submit primitive.
-It uses only the inherited pane, proves that pane's process contains the pinned session owner, and requires an idle agent with an empty composer.
+The detached owner writes a durable operational-input record and submits its watcher doorbell through the inherited pane's submit primitive.
 Busy, unreadable, foreign, and partially typed panes defer delivery without changing the queued check.
 The default retry interval is five minutes, and successful submission still does not acknowledge the hand-back.
 
-Automatic retries currently reach Claude only through that verified tmux pane.
-A primary outside tmux, an unavailable pane, or a blocked composer keeps its watcher and queued work but needs another normal turn or a human message.
+Automatic retries reach Claude only through an inherited pane qualified by `bin/fm-supervision-handoff.sh`'s header.
+A primary without one, an unavailable pane, or a blocked composer keeps its watcher and queued work but needs another normal turn or a human message.
 A failed watcher restart or a terminated retry owner is not a guarantee of continued supervision.
 The portable tests prove the process hand-off and transport guards, not a real Claude session accepting the retried input.
 No new live-harness verification is claimed.

@@ -9,6 +9,17 @@
 # HEAD-continuity guard; see docs/architecture.md "No-mistakes gate authority boundary."
 disable_project_settings: true
 
+# Commit-subject boundary. no-mistakes stores the agent summary field as the
+# commit subject and writes that commit without repository hooks.
+# Document, test, and CI prompts copy the matching instruction field below, so
+# each of those fields ends with the same sentence forbidding a greeting there.
+# Review fix prompts also store their summary field as the commit subject, but
+# no repository field is copied into them (review.path_instructions reach the
+# reviewer, not the fixer, and commit.fix_message only wraps the summary), so
+# no file in this repository can keep a greeting out of a review-fix subject.
+# tests/fm-nm-test-contract.test.sh reads this branch's commit subjects
+# through git and fails when one greets.
+
 # Trusted documentation placement policy for the Document step.
 # The audience inventory and coding guideline own the detail; keep this as a
 # pointer so gate instructions cannot become a second prose policy.
@@ -21,6 +32,7 @@ document:
     For changed prose, verify audience, authoritative owner, current relevance,
     evidence destination, and unique safety facts, then review the complete
     branch diff again after every documentation or lint fix.
+    The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
 
 # Pin lint to the same owner CI invokes instead of leaving it to no-mistakes'
 # default handling, which does not invoke the repository's canonical lint gate.
@@ -35,6 +47,12 @@ document:
 commands:
   lint: 'bin/fm-lint.sh && bash tests/fm-pi-primary-types.test.sh'
 
+# CI repair prompt. The pipeline copies this into the same prompt that asks
+# for the summary field stored as the commit subject.
+ci:
+  instructions: |
+    The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
+
 # Publish each run's test evidence to the orphan no-mistakes/evidence branch linked from the PR.
 # The evidence is not committed to the feature or default branch.
 test:
@@ -47,5 +65,6 @@ test:
     Do not mutate the operator primary checkout, real fleet FM_HOME state, or production credentials (never sign in, sign out, re-login, or edit credential stores), and keep git changes otherwise inside the run worktree. A captain-opted-in live check may use the machine's normal Claude login; Claude's own session and transcript files under the home directory are expected and are not credential mutations. An empty isolated CLAUDE_CONFIG_DIR is not evidence that the normal login is unavailable.
     Read docs/herdr-backend.md and the bin/fm-herdr-lab.sh header as the owners of Herdr lab mechanics rather than reproducing that manual here.
     Ship or scout briefs that will drive Herdr lifecycle still require --herdr-lab at scaffold time; these Test-agent instructions are not a substitute for that brief flag.
+    The summary field is the git commit subject, not a chat message, so it must not greet or address anyone.
   evidence:
     store_in_repo: true

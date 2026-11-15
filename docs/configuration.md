@@ -653,7 +653,9 @@ When the worktree identity is missing, empty, or ambiguous, the refusal also exp
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.
 
-For a leased task whose copy directory is missing, direct and descendant teardown retain the lease and records and print these manual recovery steps:
+For a leased task whose copy directory is missing, direct and descendant teardown retire the task record without changing pool state when [the shared ownership contract](../bin/fm-wake-lib.sh) can prove that no pool entry names that path and none carries the recorded lease id.
+That contract owns the proof, including when pool state is too incomplete to trust.
+Otherwise they retain the lease and records and print these manual recovery steps:
 
 1. Pause allocations and cleanup for the project; retain the task metadata, acquisition journal, pool state, and slot claim.
 2. Set `meta` to the task's metadata path and `worktree` to its recorded copy path.
