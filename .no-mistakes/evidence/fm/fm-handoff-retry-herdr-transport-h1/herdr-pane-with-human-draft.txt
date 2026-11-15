@@ -1,0 +1,8 @@
+  20 seconds. That may be the behaviour this test is meant to show. If it isn't, the retry needs a fix.
+✻ Sautéed for 9s · done 2:05 AM
+                                          ✘ Auto-update failed: no write permission to npm prefix · Run claude doctor
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ human draft do not overwrite
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⚠ Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker · restart with CLAUDE_CODE_FORCE_SESSION_P…
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
