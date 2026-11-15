@@ -774,7 +774,7 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   # renders (status cells joined by ` · `, `N% context left`, `Context N%
   # used`, `? for shortcuts`, and `⚠ N warning(s)` / `⚠ N ·` / `⚠ N`).
   local status old hint ctx warn compact count shared one tokens path
-  local screen styled plain out wrapped
+  local screen styled plain out wrapped glyph tail
   status='gpt-5.4 medium · main · 46% context left'
   old='  gpt-6-astra high fast · ~/Projects/purser · Launch Purser desk brief'
   hint='? for shortcuts'
@@ -789,7 +789,11 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
 
   # Non-vacuousness: each footer row is real edge-free text. A structural edge
   # would already bound the wrap, and this case would not prove the footer rule.
-  for out in "$status" "$old" "$hint" "$ctx" "$warn" "$compact" "$count" "$shared" "$one" "$tokens" "$path"; do
+  for out in "$status" "$old" "$hint" "$ctx" "$warn" "$compact" "$count" "$shared" "$one" "$tokens" "$path" \
+    "? for shortcuts                    100% context left" \
+    "? for shortcuts                    Context 12% used" \
+    "? for shortcuts                    12k tokens" \
+    "? for shortcuts                    ⚠ 1 warning · f2 to view"; do
     fm_composer_row_has_edge "$out" \
       && fail "fixture drift: a codex footer row must carry no structural edge: $out"
   done
@@ -803,7 +807,7 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   # Plain captures of that glyph stay empty, never pending. An unstyled
   # placeholder that styling would have stripped still defers, below.
   assert_screen "codex status footer on a plain capture" empty "$CAPS_PLAIN" "$screen"
-  assert_screen "codex cursor on the status footer" unknown "$CAPS_TMUX" "$screen" 3
+  assert_screen "codex cursor on the status footer" pending "$CAPS_TMUX" "$screen" 3
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$screen")
   [ -z "$out" ] || fail "the status footer leaked into composer text: '$out'"
 
@@ -813,7 +817,11 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   assert_screen "codex dim placeholder above a status footer on tmux" empty "$CAPS_TMUX" "$styled" 1
   assert_screen "unstyled codex placeholder above a status footer" unknown "$CAPS_PLAIN" "$plain"
 
-  for out in "$old" "$hint" "$ctx" "$warn" "$compact" "$count" "$shared" "$one" "$tokens" "$path"; do
+  for out in "$old" "$hint" "$ctx" "$warn" "$compact" "$count" "$shared" "$one" "$tokens" "$path" \
+    "? for shortcuts                    100% context left" \
+    "? for shortcuts                    Context 12% used" \
+    "? for shortcuts                    12k tokens" \
+    "? for shortcuts                    ⚠ 1 warning · f2 to view"; do
     screen=$'transcript line\n\n›\n'"$out"
     assert_screen "codex footer '$out' on herdr" empty "$CAPS_STYLED" "$screen"
   done
@@ -821,6 +829,25 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   assert_screen "codex status line then warning row on herdr" empty "$CAPS_STYLED" "$screen"
   screen=$'transcript line\n\n›\n'"$warn"
   assert_screen "codex warning footer on tmux (cursor on the glyph)" empty "$CAPS_TMUX" "$screen" 2
+
+  plain=$(cat "$ROOT/tests/fixtures/codex-idle-footer-2026-11-15.txt")
+  assert_screen "reported plain Codex capture retains styling uncertainty" unknown "$CAPS_PLAIN" "$plain"
+  styled=${plain/Ask Codex to do anything/${ESC}[2mAsk Codex to do anything${ESC}[0m}
+  assert_screen "reported Codex layout with reconstructed dim placeholder" empty "$CAPS_STYLED" "$styled"
+  assert_screen "reported Codex layout with reconstructed styling on zellij" empty "$CAPS_STYLED_NOID" "$styled"
+  assert_screen "reported Codex layout with reconstructed styling on tmux" empty "$CAPS_TMUX" "$styled" 0
+  out=$(fm_composer_extract_selected_content "$CAPS_STYLED" "$styled")
+  [ -z "$out" ] || fail "reported idle layout leaked into extracted content: '$out'"
+  assert_screen "bright placeholder words are a draft" pending "$CAPS_STYLED" "$plain"
+
+  for glyph in '›' '❯' '⟩'; do
+    for tail in '/home/zabi/project/src/main.rs' '~/notes/todo.md' '12k tokens'; do
+      screen=$'transcript\n\n'"$glyph please review the change in"$'\n'"$tail"
+      assert_screen "cursor on $glyph draft wrap $tail" pending "$CAPS_TMUX" "$screen" 3
+      assert_screen "cursor below $glyph draft wrap $tail" pending "$CAPS_TMUX" "$screen"$'\nthen run tests' 4
+      assert_screen "cursorless $glyph draft above $tail" pending "$CAPS_STYLED" "$screen"
+    done
+  done
 
   # A real wrap above the same footer stays pending, and so does text on the
   # glyph row. The footer is a boundary under an empty glyph, not a reason to

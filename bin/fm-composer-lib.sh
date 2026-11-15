@@ -722,7 +722,7 @@ FM_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
 # does a one-separator row with none of those cells ("5.2 credits · ~$0.21",
 # "? for shortcuts · taste on"). Consulted only as the boundary BELOW a bare
 # composer, never on the composer row itself.
-FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT='^[[:space:]]*⚠[[:space:]]*[0-9]+[[:space:]]*$|⚠[[:space:]]*[0-9]+([[:space:]]+warnings?([[:space:]]|$)|[[:space:]]*·)|^[[:space:]]*\? for shortcuts[[:space:]]*$|(^[[:space:]]*| · )[0-9]+% context left([[:space:]]*$| · )|(^[[:space:]]*| · )Context [0-9]+% (left|used)([[:space:]]*$| · )|(^[[:space:]]*| · )[0-9]+[kKmM] tokens([[:space:]]*$| · )|(^[[:space:]]*| · )~/[^[:space:]]+([[:space:]]*$| · )|(^[[:space:]]*| · )/[A-Za-z0-9._][^[:space:]]*([[:space:]]*$| · )'
+FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT='^[[:space:]]*⚠[[:space:]]*[0-9]+[[:space:]]*$|⚠[[:space:]]*[0-9]+([[:space:]]+warnings?([[:space:]]|$)|[[:space:]]*·)|^[[:space:]]*\? for shortcuts[[:space:]]*$|(^[[:space:]]*| · |[[:space:]]{2,})[0-9]+% context left([[:space:]]*$| · )|(^[[:space:]]*| · |[[:space:]]{2,})Context [0-9]+% (left|used)([[:space:]]*$| · )|(^[[:space:]]*| · |[[:space:]]{2,})[0-9]+[kKmM] tokens([[:space:]]*$| · )|(^[[:space:]]*| · )~/[^[:space:]]+([[:space:]]*$| · )|(^[[:space:]]*| · )/[A-Za-z0-9._][^[:space:]]*([[:space:]]*$| · )'
 # Braille-pattern cells (U+2800..U+28FF) are animation furniture: codex-cli
 # 0.154.0 draws an idle "starfield" of them on the row above its `›` prompt
 # row, on the `›` row itself after the dim `Ask Codex to do anything`
@@ -1712,7 +1712,6 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
     if fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
-    if _fm_composer_row_is_codex_footer "$trimmed"; then return 1; fi
     if fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
     row=$((row + 1))
   done
