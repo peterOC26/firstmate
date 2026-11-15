@@ -1684,6 +1684,30 @@ SH
   pass "fm-turnend-guard --claude: terminal owner boundary excludes a concurrent start without deadlock"
 }
 
+test_hook_claude_mode_allows_rewake_as_starter_exits() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-starter-exit")
+  : > "$dir/state/task1.meta"
+  printf '987654321\n' > "$dir/state/.claude-autoarm-starting"
+  cat >> "$dir/bin/fm-wake-lib.sh" << 'SH'
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/fm_pid_alive_before_exit/')"
+fm_pid_alive() {
+  if [ "$1" = 987654321 ]; then
+    printf 'epoch=3 owner_pid=987654321 outcome=rewake updated_at=%s\n' "$(date +%s)" > "$STATE/.claude-autoarm-epoch"
+    rm -f "$STATE/.claude-autoarm-starting"
+    return 1
+  fi
+  fm_pid_alive_before_exit "$@"
+}
+SH
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
+  expect_code 0 "$status" "a rewake published as the starter exits must allow the stop"
+  [ -z "$out" ] || fail "starter-exit recovery produced output: $out"
+  assert_absent "$dir/state/.claude-autoarm-starting" "starter exit boundary was not exercised"
+  assert_absent "$dir/state/.turnend-claude-blocks" "starter-exit recovery consumed a continuation"
+  pass "fm-turnend-guard --claude: rechecks recovery when the starter exits"
+}
+
 test_hook_claude_mode_allows_on_fresh_rewake_epoch() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-epoch")
@@ -2386,6 +2410,277 @@ test_hook_claude_mode_allow_resets_budget() {
   pass "fm-turnend-guard --claude: positive watcher recovery resets failure episode state"
 }
 
+# A process whose command is the Stop auto-arm. The guard treats that command,
+# named by state/.claude-autoarm-starting, as an in-flight host re-arm.
+install_named_autoarm_stub() {
+  local dir=$1
+  cat > "$dir/bin/fm-claude-stop-autoarm.sh" << 'SH'
+#!/usr/bin/env bash
+set -u
+marker="$FM_HOME/state/.claude-autoarm-starting"
+mkdir -p "$FM_HOME/state"
+printf '%s\n' "$$" > "$marker"
+if [ "${FM_STUB_EXIT_AFTER_MARKER:-0}" = 1 ]; then
+  exit 0
+fi
+sleep "${FM_STUB_SLEEP:-0}"
+if [ "${FM_STUB_CLAIM:-0}" = 1 ]; then
+  identity=$(FM_STATE_OVERRIDE="$FM_HOME/state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$FM_HOME/bin/fm-wake-lib.sh" "$$") || exit 1
+  printf 'epoch=7 owner_pid=%s outcome=arming updated_at=%s\n%s\n' "$$" "$(date +%s)" "$identity" > "$FM_HOME/state/.claude-autoarm-epoch"
+fi
+sleep "${FM_STUB_HOLD:-30}"
+SH
+  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh"
+}
+
+# Arguments: dir, seconds before the optional claim, 1 to publish a claim, 1 to
+# exit as soon as the marker exists. The pid is NAMED_AUTOARM_PID. Do not call
+# this inside a command substitution: bash waits for that subshell's children.
+start_named_autoarm_stub() {
+  local dir=$1 sleep_s=$2 claim=$3 exit_after=$4 home
+  home=$(cd "$dir" && pwd)
+  FM_HOME="$home" FM_STUB_SLEEP="$sleep_s" FM_STUB_CLAIM="$claim" FM_STUB_EXIT_AFTER_MARKER="$exit_after" \
+    bash "$dir/bin/fm-claude-stop-autoarm.sh" &
+  NAMED_AUTOARM_PID=$!
+}
+
+stop_named_autoarm_stub() {
+  local pid=$1
+  [ -n "$pid" ] || return 0
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+}
+
+claude_epoch_outcome() {
+  sed -n '1s/^.*outcome=\([a-z][a-z-]*\) .*$/\1/p' "$1/state/.claude-autoarm-epoch" 2>/dev/null || true
+}
+
+elapsed_ms_since() {
+  awk -v s="$1" -v e="$EPOCHREALTIME" 'BEGIN { printf "%d", (e - s) * 1000 }'
+}
+
+# After a host hand-back there is no watcher, and the same Stop's auto-arm
+# publishes its open claim only after it finishes pre-claim work. That lands
+# after the 800ms window. The guard must allow once the claim is open.
+test_hook_claude_mode_waits_past_short_window_for_host_autoarm() {
+  local dir stub out status outcome owner
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-wait")
+  : > "$dir/state/task1.meta"
+  : > "$dir/state/.last-watcher-beat"
+  fm_touch_epoch $(( $(date +%s) - 400 )) "$dir/state/.last-watcher-beat"
+  printf '%s\n' "$$" > "$dir/state/.lock"
+  install_named_autoarm_stub "$dir"
+  start_named_autoarm_stub "$dir" 3 1 0
+  stub=$NAMED_AUTOARM_PID
+  out=$(run_hook_claude "$dir" true); status=$?
+  outcome=$(claude_epoch_outcome "$dir")
+  owner=$(sed -n '1s/^epoch=[0-9][0-9]* owner_pid=\([0-9][0-9]*\) .*/\1/p' "$dir/state/.claude-autoarm-epoch" 2>/dev/null || true)
+  stop_named_autoarm_stub "$stub"
+  if [ "$status" -ne 0 ]; then
+    fail "--claude must allow a supervision-host auto-arm whose claim arrives after the short window (exit $status, outcome=${outcome:-none}): $out"
+  fi
+  [ -z "$out" ] || fail "--claude host-start allow produced output: $out"
+  [ "$outcome" = arming ] || fail "--claude allowed before the late host claim was published (outcome=${outcome:-none})"
+  [ "$owner" = "$stub" ] || fail "--claude host-start allow did not observe the live auto-arm claim (owner=${owner:-none})"
+  pass "fm-turnend-guard --claude: a live supervision-host auto-arm still starting past the short window owns recovery"
+}
+
+# The longer host wait is only for a live matching starter on a host-enabled
+# home. Anything else keeps the short window and the repair banner.
+test_hook_claude_mode_host_autoarm_gap_still_blocks() {
+  local dir stub out status outcome start ms sleep_pid
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-absent")
+  : > "$dir/state/task1.meta"
+  start=$EPOCHREALTIME
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=5000 run_hook_claude "$dir" true); status=$?
+  ms=$(elapsed_ms_since "$start")
+  expect_code 2 "$status" "a host-enabled home with no starting auto-arm must still re-block"
+  assert_contains "$out" "TURN WOULD END BLIND" "missing host starter must keep the blind-turn banner"
+  assert_contains "$out" "Stop-owned auto-arm did not claim" "missing host starter must say the auto-arm did not claim"
+  [ "$ms" -lt 2000 ] || fail "a missing host starter waited ${ms}ms instead of the short window"
+
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-dead")
+  : > "$dir/state/task1.meta"
+  install_named_autoarm_stub "$dir"
+  start_named_autoarm_stub "$dir" 0 0 1
+  stub=$NAMED_AUTOARM_PID
+  wait "$stub" 2>/dev/null || true
+  [ -s "$dir/state/.claude-autoarm-starting" ] || fail "the exited starter left no marker to ignore"
+  start=$EPOCHREALTIME
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=5000 run_hook_claude "$dir" true); status=$?
+  ms=$(elapsed_ms_since "$start")
+  expect_code 2 "$status" "a dead auto-arm starter must still re-block"
+  assert_contains "$out" "did not claim" "a dead starter must say the auto-arm did not claim"
+  [ "$ms" -lt 2000 ] || fail "a dead starter extended the wait to ${ms}ms"
+
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-reused")
+  : > "$dir/state/task1.meta"
+  sleep 30 &
+  sleep_pid=$!
+  printf '%s\n' "$sleep_pid" > "$dir/state/.claude-autoarm-starting"
+  start=$EPOCHREALTIME
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=5000 run_hook_claude "$dir" true); status=$?
+  ms=$(elapsed_ms_since "$start")
+  kill "$sleep_pid" 2>/dev/null || true
+  wait "$sleep_pid" 2>/dev/null || true
+  expect_code 2 "$status" "a reused pid in the starting marker must still re-block"
+  assert_contains "$out" "did not claim" "a reused starter pid must say the auto-arm did not claim"
+  [ "$ms" -lt 2000 ] || fail "a reused starter pid extended the wait to ${ms}ms"
+
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-off")
+  : > "$dir/state/task1.meta"
+  printf '%s\n' "$$" > "$dir/state/.lock"
+  mkdir -p "$dir/config"
+  : > "$dir/config/supervision-host-off"
+  install_named_autoarm_stub "$dir"
+  start_named_autoarm_stub "$dir" 4 1 0
+  stub=$NAMED_AUTOARM_PID
+  start=$EPOCHREALTIME
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=15000 run_hook_claude "$dir" true); status=$?
+  ms=$(elapsed_ms_since "$start")
+  outcome=$(claude_epoch_outcome "$dir")
+  stop_named_autoarm_stub "$stub"
+  expect_code 2 "$status" "a home that opted out of the supervision host must keep the short window"
+  assert_contains "$out" "did not claim" "a host-off starter must say the auto-arm did not claim"
+  [ "$outcome" != arming ] || fail "a host-off home waited for the late claim"
+  [ "$ms" -lt 2000 ] || fail "a host-off starter extended the wait to ${ms}ms"
+
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-host-start-bound")
+  : > "$dir/state/task1.meta"
+  printf '%s\n' "$$" > "$dir/state/.lock"
+  install_named_autoarm_stub "$dir"
+  start_named_autoarm_stub "$dir" 8 1 0
+  stub=$NAMED_AUTOARM_PID
+  start=$EPOCHREALTIME
+  out=$(
+    # shellcheck disable=SC2329 # exported below so the guard child slows each claim-wait pass.
+    sleep() {
+      if [ "$1" = 0.1 ]; then
+        command sleep 0.5
+      else
+        command sleep "$@"
+      fi
+    }
+    export -f sleep
+    FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=1000 run_hook_claude "$dir" true
+  ); status=$?
+  ms=$(elapsed_ms_since "$start")
+  outcome=$(claude_epoch_outcome "$dir")
+  stop_named_autoarm_stub "$stub"
+  expect_code 2 "$status" "a claim that arrives after the host starting bound must still re-block"
+  assert_contains "$out" "TURN WOULD END BLIND" "a past-bound host starter must keep the blind-turn banner"
+  assert_contains "$out" "did not claim" "a past-bound host starter must say the auto-arm did not claim"
+  [ "$outcome" != arming ] || fail "the guard waited past its host starting bound for the claim"
+  [ "$ms" -lt 4000 ] || fail "the host starting bound did not stop the wait (${ms}ms)"
+  pass "fm-turnend-guard --claude: only a live matching supervision-host starter extends the claim wait"
+}
+
+# The real auto-arm has to publish the marker before its claim, and its exit
+# must drop that marker only when the file still names its own pid.
+test_hook_claude_mode_autoarm_publishes_starting_marker_before_claim() {
+  local dir home auto_pid i marker_pid outcome
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-starting-marker")
+  home=$(cd "$dir" && pwd)
+  : > "$dir/state/task1.meta"
+  install_integrated_autoarm "$dir"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$dir/bin/fm-watch-arm.sh"
+  chmod +x "$dir/bin/fm-watch-arm.sh"
+  cat >> "$dir/bin/fm-wake-lib.sh" << 'SH'
+eval "$(declare -f fm_autoarm_claim_next | sed '1s/fm_autoarm_claim_next/fm_autoarm_claim_next_real/')"
+fm_autoarm_claim_next() {
+  if [ "${FM_TEST_CLAIM_DELAY_SEC:-0}" != 0 ]; then
+    : > "$STATE/.claim-delay-entered"
+    sleep "$FM_TEST_CLAIM_DELAY_SEC"
+  fi
+  fm_autoarm_claim_next_real "$@"
+}
+SH
+  # shellcheck disable=SC2016 # the fake harness expands FM_HOME inside its child shell.
+  printf '{"session_id":"sess-claude-mode","stop_hook_active":false}\n' \
+    | FM_HOME="$home" FM_TEST_CLAIM_DELAY_SEC=1 FM_CLAUDE_AUTOARM_ATTEMPTS=1 "$dir/fake-claude" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
+      ' >"$dir/auto.out" 2>&1 &
+  auto_pid=$!
+  i=0
+  while [ "$i" -lt 100 ]; do
+    [ -f "$dir/state/.claim-delay-entered" ] && break
+    sleep 0.05
+    i=$((i + 1))
+  done
+  marker_pid=$(sed -n '1p' "$dir/state/.claude-autoarm-starting" 2>/dev/null || true)
+  outcome=$(claude_epoch_outcome "$dir")
+  if [ ! -f "$dir/state/.claim-delay-entered" ]; then
+    kill "$auto_pid" 2>/dev/null || true
+    wait "$auto_pid" 2>/dev/null || true
+    fail "auto-arm never reached its claim: $(cat "$dir/auto.out" 2>/dev/null)"
+  fi
+  if [ -z "$marker_pid" ] || [ "$outcome" = arming ]; then
+    kill "$auto_pid" 2>/dev/null || true
+    wait "$auto_pid" 2>/dev/null || true
+    fail "starting marker must exist before the claim (marker=${marker_pid:-none}, outcome=${outcome:-none})"
+  fi
+  kill -0 "$marker_pid" 2>/dev/null || {
+    kill "$auto_pid" 2>/dev/null || true
+    wait "$auto_pid" 2>/dev/null || true
+    fail "starting marker did not name a live auto-arm (pid $marker_pid)"
+  }
+  i=0
+  while [ "$i" -lt 100 ]; do
+    kill -0 "$auto_pid" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  kill "$auto_pid" 2>/dev/null || true
+  wait "$auto_pid" 2>/dev/null || true
+  [ ! -e "$dir/state/.claude-autoarm-starting" ] || fail "auto-arm left its own starting marker behind: $(cat "$dir/state/.claude-autoarm-starting")"
+
+  rm -f "$dir/state/.claim-delay-entered" "$dir/state/.claude-autoarm-epoch" "$dir/state/.claude-autoarm-failure-notified"
+  # shellcheck disable=SC2016 # the fake harness expands FM_HOME inside its child shell.
+  printf '{"session_id":"sess-claude-mode","stop_hook_active":false}\n' \
+    | FM_HOME="$home" FM_TEST_CLAIM_DELAY_SEC=1 FM_CLAUDE_AUTOARM_ATTEMPTS=1 "$dir/fake-claude" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
+      ' >"$dir/auto-replace.out" 2>&1 &
+  auto_pid=$!
+  i=0
+  while [ "$i" -lt 100 ]; do
+    [ -f "$dir/state/.claim-delay-entered" ] && break
+    sleep 0.05
+    i=$((i + 1))
+  done
+  if [ ! -f "$dir/state/.claim-delay-entered" ]; then
+    kill "$auto_pid" 2>/dev/null || true
+    wait "$auto_pid" 2>/dev/null || true
+    fail "replacement auto-arm never reached its claim: $(cat "$dir/auto-replace.out" 2>/dev/null)"
+  fi
+  printf '1\n' > "$dir/state/.claude-autoarm-starting"
+  i=0
+  while [ "$i" -lt 100 ]; do
+    kill -0 "$auto_pid" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  kill "$auto_pid" 2>/dev/null || true
+  wait "$auto_pid" 2>/dev/null || true
+  marker_pid=$(sed -n '1p' "$dir/state/.claude-autoarm-starting" 2>/dev/null || true)
+  [ "$marker_pid" = 1 ] || fail "auto-arm removed a starting marker that another firing had replaced (marker=${marker_pid:-none})"
+  pass "fm-claude-stop-autoarm: publishes its starting marker before the claim and drops only its own"
+}
+
+test_autoarm_leaves_missing_state_absent() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/autoarm-missing-state")
+  install_integrated_autoarm "$dir"
+  printf 'exit 0\n' > "$dir/bin/fm-primary-scope-lib.sh"
+  rm -rf "$dir/state"
+  out=$(run_integrated_autoarm_unowned "$dir"); status=$?
+  expect_code 0 "$status" "auto-arm must reach the first library boundary quietly"
+  [ -z "$out" ] || fail "auto-arm without state produced output: $out"
+  assert_absent "$dir/state" "early marker publication created a missing state directory"
+  pass "fm-claude-stop-autoarm: early marker publication leaves missing state absent"
+}
+
 test_hook_claude_mode_waits_for_late_claim() {
   local dir helper out status holder
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-wait")
@@ -2724,6 +3019,7 @@ test_hook_claude_mode_reblocks_x_mode_without_tasks
 test_hook_claude_mode_allows_when_autoarm_owner_alive
 test_hook_claude_mode_repeated_failed_to_arming_interleavings_reach_fail_open
 test_hook_claude_mode_terminal_boundary_excludes_starting_owner
+test_hook_claude_mode_allows_rewake_as_starter_exits
 test_hook_claude_mode_allows_on_fresh_rewake_epoch
 test_hook_claude_mode_blocks_on_abandoned_autoarm_claim
 test_hook_claude_mode_blocks_on_pid_reused_arming_claim
@@ -2747,6 +3043,10 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch
 test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open
 test_hook_claude_mode_allow_resets_budget
 test_hook_claude_mode_waits_for_late_claim
+test_hook_claude_mode_waits_past_short_window_for_host_autoarm
+test_hook_claude_mode_host_autoarm_gap_still_blocks
+test_hook_claude_mode_autoarm_publishes_starting_marker_before_claim
+test_autoarm_leaves_missing_state_absent
 test_hook_claude_mode_secondmate_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock

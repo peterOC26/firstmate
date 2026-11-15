@@ -113,7 +113,11 @@
 # watcher recovery generation, so the synchronous Stop guard
 # (bin/fm-turnend-guard.sh --claude) can allow a stop whose recovery this hook
 # already owns, instead of forcing a duplicate continuation for the same event
-# epoch. The failure marker
+# epoch. Before this hook sources anything else it publishes its pid in
+# state/.claude-autoarm-starting and removes that file on exit when the file
+# still names this pid, so the synchronous guard can see a firing that has not
+# reached its claim yet. bin/fm-turnend-guard.sh --claude owns that wait.
+# The failure marker
 # state/.claude-autoarm-failure-notified deduplicates the last-resort notice,
 # and state/.claude-autoarm-failure-alarmed bounds the attended fail-open and
 # suppresses any later automatic continuation in that unresolved episode.
@@ -171,6 +175,30 @@ case "$AUTOARM_ATTEMPTS" in
   1|2|3) : ;;
   *) AUTOARM_ATTEMPTS=2 ;;
 esac
+
+STARTING_MARKER="$STATE/.claude-autoarm-starting"
+
+publish_starting_marker() {
+  local tmp
+  [ -d "$STATE" ] || return 0
+  tmp="$STARTING_MARKER.tmp.$$"
+  if printf '%s\n' "$$" 2>/dev/null > "$tmp"; then
+    mv -f "$tmp" "$STARTING_MARKER" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  fi
+}
+
+# shellcheck disable=SC2329 # Invoked by the EXIT trap below.
+release_starting_marker() {
+  local recorded
+  [ -f "$STARTING_MARKER" ] || return 0
+  IFS= read -r recorded 2>/dev/null < "$STARTING_MARKER" || recorded=
+  if [ "$recorded" = "$$" ]; then
+    rm -f "$STARTING_MARKER" 2>/dev/null || true
+  fi
+}
+
+publish_starting_marker
+trap release_starting_marker EXIT
 
 # shellcheck source=bin/fm-primary-scope-lib.sh
 . "$SCRIPT_DIR/fm-primary-scope-lib.sh"

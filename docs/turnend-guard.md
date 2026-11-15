@@ -327,6 +327,8 @@ Under the default one-shot behavior, that re-opened the 2026-07-21 blind window.
 Before the Claude cooperative budget can re-block a Stop, the guard checks for a live foreign session-lock owner and takes the same safe diagnostic exit described under "Guard predicates" ([foreign session-lock owner](#foreign-session-lock-owner)).
 
 The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 800 milliseconds).
+On a home that runs the supervision host, that wait continues while the Stop-owned auto-arm is still starting.
+`bin/fm-turnend-guard.sh` owns that extended wait.
 It allows the stop when any of these holds:
 
 - The watcher is healthy.
@@ -599,6 +601,7 @@ That warning uses `bin/fm-supervision-instructions.sh --repair-line`, so it alwa
 - `FM_HOME` and `FM_STATE_OVERRIDE` precedence.
 - The live-lock and fresh-beacon guard predicate.
 - The cooperative `--claude` open-generation claim wait.
+- A supervision-host auto-arm whose starting marker is published before the claim, so the guard keeps waiting past the short window, and the absent, dead, reused-pid, host-off, and past-bound cases that still block.
 - Monotonic failed-epoch progression.
 - Bounded attended fail-open.
 - Auto-arm-owned exhaustion alarms while the guard steps aside for open claims, including ordinary failures, pending and announced lost host hand-backs, and interruptions.

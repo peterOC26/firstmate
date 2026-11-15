@@ -78,7 +78,16 @@
 #      (state/.claude-autoarm-epoch) for this event epoch - either proof allows
 #      without consuming a continuation, so one event epoch yields exactly one recovery turn;
 #      the first fresh exhausted-failure epoch preserves the bounded progression,
-#      while later fresh failed epochs consume it instead of resetting it;
+#      while later fresh failed epochs consume it instead of resetting it.
+#      On a home that runs the supervision host, that wait continues while
+#      state/.claude-autoarm-starting names a live process whose command is
+#      fm-claude-stop-autoarm.sh, until one of those proofs appears, that
+#      process exits, or FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS (default 15000)
+#      elapses. The auto-arm publishes the marker before it sources libraries
+#      and drops it on exit only when the file still names its own pid. No
+#      marker inside the short window, a dead or reused pid, a starter that
+#      exits without a claim, and a home that opted out of the host all keep
+#      the short wait and this banner;
 #   4. only when neither materializes is the auto-arm genuinely absent: re-block
 #      with the repair banner, bounded to FM_CLAUDE_TURNEND_BLOCK_BUDGET
 #      (default 3) consecutive blocks per session - safely below Claude Code's
@@ -102,9 +111,11 @@ CLAUDE_MODE=0
 CURSOR_MODE=0
 AGY_MODE=0
 SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-800}
+HOST_CLAIM_WAIT_MS=${FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS:-15000}
 EPOCH_FRESH=${FM_CLAUDE_AUTOARM_EPOCH_FRESH:-15}
 BLOCK_BUDGET=${FM_CLAUDE_TURNEND_BLOCK_BUDGET:-3}
 case "$SYNC_WAIT_MS" in ''|*[!0-9]*) SYNC_WAIT_MS=800 ;; esac
+case "$HOST_CLAIM_WAIT_MS" in ''|*[!0-9]*) HOST_CLAIM_WAIT_MS=15000 ;; esac
 case "$EPOCH_FRESH" in ''|*[!0-9]*|0) EPOCH_FRESH=15 ;; esac
 case "$BLOCK_BUDGET" in ''|*[!0-9]*|0) BLOCK_BUDGET=3 ;; esac
 
@@ -335,7 +346,9 @@ fi
 # --- --claude cooperative path -----------------------------------------------
 # The Stop-owned auto-arm fires on the same Stop event. Give it a brief bounded
 # window to prove it owns recovery for this event epoch before consuming one of
-# Claude's bounded continuations.
+# Claude's bounded continuations. On a supervision-host home the window stays
+# open while that auto-arm's starting marker names a live matching process;
+# the loop-guard comment above owns the bound.
 #
 # Budget accounting, under the budget lock. Sets COUNT (the session's
 # consumed continuations, including this one) and BUDGET_INITIALIZED_FAILURE.
@@ -544,23 +557,51 @@ failure_episode_verified() {
   esac
 }
 
-i=0
-while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
-  if autoarm_owns_recovery; then
-    if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
-      fm_failure_episode_reset "$STATE" || exit 2
-    fi
-    exit 0
-  fi
-  sleep 0.1
-  i=$((i + 1))
-done
-if autoarm_owns_recovery; then
+allow_autoarm_recovery() {
   if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     fm_failure_episode_reset "$STATE" || exit 2
   fi
   exit 0
+}
+
+# True while the marker names a live Stop auto-arm. A dead pid, a reused pid,
+# or any other command is not an in-flight arm and must not extend the wait.
+host_arm_pending() {
+  local pid
+  [ -f "$STATE/.claude-autoarm-starting" ] || return 1
+  [ ! -L "$STATE/.claude-autoarm-starting" ] || return 1
+  IFS= read -r pid 2>/dev/null < "$STATE/.claude-autoarm-starting" || return 1
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  fm_pid_alive "$pid" || return 1
+  fm_proc_info "$pid" || return 1
+  case "$FM_PROC_COMM$FM_PROC_ARGS" in
+    *fm-claude-stop-autoarm.sh*) return 0 ;;
+  esac
+  return 1
+}
+
+i=0
+sync_ticks=$((SYNC_WAIT_MS / 100))
+host_extend=0
+if bash "$SCRIPT_DIR/fm-supervision-engine-lib.sh" enabled "$CONFIG" claude >/dev/null 2>&1; then
+  host_extend=1
 fi
+host_deadline=$((SECONDS + (HOST_CLAIM_WAIT_MS + 999) / 1000))
+while :; do
+  if autoarm_owns_recovery; then
+    allow_autoarm_recovery
+  fi
+  if [ "$i" -ge "$sync_ticks" ]; then
+    if [ "$host_extend" -ne 1 ] || [ "$SECONDS" -ge "$host_deadline" ] || ! host_arm_pending; then
+      break
+    fi
+  fi
+  sleep 0.1
+  i=$((i + 1))
+done
+autoarm_owns_recovery && allow_autoarm_recovery
 
 # The auto-arm genuinely failed to establish: consume the bounded re-block
 # budget before considering the verified one-time attended fail-open.
