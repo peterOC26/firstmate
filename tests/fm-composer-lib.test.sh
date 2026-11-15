@@ -841,6 +841,7 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   assert_screen "bright placeholder words are a draft" pending "$CAPS_STYLED" "$plain"
 
   for glyph in '›' '❯' '⟩'; do
+    # shellcheck disable=SC2088  # literal Codex path cell; the quoted tilde must not expand
     for tail in '/home/zabi/project/src/main.rs' '~/notes/todo.md' '12k tokens' '⚠ 4 warnings · /warnings to view'; do
       screen=$'transcript\n\n'"$glyph please review the change in"$'\n'"$tail"
       assert_screen "cursor on $glyph draft wrap $tail" pending "$CAPS_TMUX" "$screen" 3
