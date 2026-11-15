@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=/dev/null
 . "$ROOT/bin/fm-task-inbox-lib.sh"
+# shellcheck source=/dev/null
 . "$ROOT/bin/fm-composer-lib.sh"
 
 expected_doorbell=': Firstmate instruction waiting: read the steering inbox'
