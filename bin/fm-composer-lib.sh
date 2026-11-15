@@ -77,9 +77,10 @@
 #                A bare composer's WRAP region (typed input continuing on the
 #                rows beneath the glyph row) is bounded by blank rows, by
 #                structural edges, and by the FURNITURE rows a harness draws
-#                directly below its composer - omp's status row and
-#                braille-only animation rows (declared once below, next to
-#                the idle placeholders) - none of which is ever typed input.
+#                directly below its composer - omp's status row,
+#                braille-only animation rows, and Codex's status, hint, and
+#                warning footer (declared once below, next to the idle
+#                placeholders) - none of which is ever typed input.
 #   left-bar   - opencode: rows prefixed by a heavy left bar `┃` with no
 #                closing border, holding the idle hint, blank rows, and a
 #                mode/model footer line.
@@ -165,6 +166,15 @@
 # next to the idle placeholders below), and only
 # where a bare composer's furniture can sit: behind the glyph row's content
 # and on the rows that bound its wrap region.
+# When that starfield row is absent, Codex still draws the footer flush under
+# the glyph: a status line whose cells are joined by " · " in theme colours
+# (not dim), and a hint row carrying "? for shortcuts", a context cell such
+# as "46% context left", or a warning notice ("⚠ N warning(s)", "⚠ N ·",
+# or "⚠ N") whose accent sits above the ghost ceiling. Those rows survive
+# ghost stripping. They bound the wrap the same way a braille row does, and
+# only as that boundary: a middle dot is not enough, the row has to be a
+# Codex path, context, token, hint, or warning cell, and the rule is never
+# applied to the glyph row itself.
 #
 # UNICODE WHITESPACE (issue #1988; open PRs #1995/#2047 target the same
 # defect and #1995's naming is adopted here so the implementations converge):
@@ -694,6 +704,25 @@ FM_COMPOSER_OMP_STATUS_RE_DEFAULT='^[[:space:]]*(π|󰵗)[[:space:]]+·[[:space:
 # Consulted only as the dead-shell exception below, never as composer content,
 # so the same string typed between the separator pair still reads pending.
 FM_COMPOSER_PI_STATUS_RE_DEFAULT='^\$[0-9]+(\.[0-9]+)?([[:space:]]|$)'
+# Codex draws a status line, and under it a shortcut hint and an optional
+# warning notice, directly BELOW its borderless `›` composer. The status line
+# joins cells with " · " in theme colours, not dim (codex-cli 0.167 status
+# line; the 0.154 footer `gpt-6-astra high fast · ~/Projects/purser · …` is
+# the same shape). The hint row is "? for shortcuts", "N% context left" or
+# "Context N% used"/"Nk tokens", and a warning notice on the trailing edge:
+# "⚠ N warning(s)", compact "⚠ N ·", or count-only "⚠ N". None of that is
+# dim, so ghost stripping leaves it, and with no braille starfield row
+# between the glyph and the footer the wrap region used to walk into it.
+# An idle pane then read `pending`, and both the steering ring and the
+# watcher re-ring skipped it. A row is this footer when it carries a warning
+# notice, a whole-row "? for shortcuts" hint, a context or token cell Codex
+# draws ("46% context left", "Context 12% used", "12k tokens"), or a path
+# cell ("~/Projects/purser", "/repo") bounded as its own cell. A middle dot
+# is not enough: "fix · tests" and "pi · e · phi" stay typed input, and so
+# does a one-separator row with none of those cells ("5.2 credits · ~$0.21",
+# "? for shortcuts · taste on"). Consulted only as the boundary BELOW a bare
+# composer, never on the composer row itself.
+FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT='^[[:space:]]*⚠[[:space:]]*[0-9]+[[:space:]]*$|⚠[[:space:]]*[0-9]+([[:space:]]+warnings?([[:space:]]|$)|[[:space:]]*·)|^[[:space:]]*\? for shortcuts[[:space:]]*$|(^[[:space:]]*| · )[0-9]+% context left([[:space:]]*$| · )|(^[[:space:]]*| · )Context [0-9]+% (left|used)([[:space:]]*$| · )|(^[[:space:]]*| · )[0-9]+[kKmM] tokens([[:space:]]*$| · )|(^[[:space:]]*| · )~/[^[:space:]]+([[:space:]]*$| · )|(^[[:space:]]*| · )/[A-Za-z0-9._][^[:space:]]*([[:space:]]*$| · )'
 # Braille-pattern cells (U+2800..U+28FF) are animation furniture: codex-cli
 # 0.154.0 draws an idle "starfield" of them on the row above its `›` prompt
 # row, on the `›` row itself after the dim `Ask Codex to do anything`
@@ -1610,6 +1639,14 @@ _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
 }
 
+# _fm_composer_row_is_codex_footer: 0 when the trimmed row is Codex's status
+# line or the hint/warning row under its composer
+# (FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT above). Furniture below a bare
+# composer; it bounds the wrap region exactly as an edge does.
+_fm_composer_row_is_codex_footer() {  # <trimmed-row>
+  fm_composer_idle_matches "$1" "${FM_COMPOSER_CODEX_FOOTER_RE:-$FM_COMPOSER_CODEX_FOOTER_RE_DEFAULT}" sensitive
+}
+
 # _fm_composer_row_is_pi_status: 0 when the trimmed row is Pi's dollar-first
 # footer stats row (FM_COMPOSER_PI_STATUS_RE_DEFAULT above). Furniture below
 # the separated pair; a `$` cost cell must not count as a dead-shell prompt.
@@ -1661,9 +1698,9 @@ _fm_composer_bare_row_strip_furniture_var() {  # <varname>
 }
 
 # _fm_composer_wrap_region_ok: 0 when every row STRICTLY BELOW <glyph-row>
-# through <cursor-row> is non-blank and carries no structural edge - the
-# contiguity proof that those rows are the bare composer's wrapped input
-# rather than unrelated screen content.
+# through <cursor-row> is non-blank and carries no structural edge and no
+# composer-footer furniture - the contiguity proof that those rows are the
+# bare composer's wrapped input rather than unrelated screen content.
 _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
   local plain=$1 g=$2 cy=$3 row line trimmed glyph
   row=$((g + 1))
@@ -1675,6 +1712,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <cursor-row>
     if fm_composer_row_has_edge "$trimmed"; then return 1; fi
     if _fm_composer_row_is_omp_status "$trimmed"; then return 1; fi
     if _fm_composer_row_is_braille_furniture "$trimmed"; then return 1; fi
+    if _fm_composer_row_is_codex_footer "$trimmed"; then return 1; fi
     if fm_composer_leading_shell_glyph_var glyph "$trimmed"; then return 1; fi
     row=$((row + 1))
   done
@@ -2189,6 +2227,7 @@ _fm_composer_select_cursorless() {  # <plain-screen> <screen> <styled>
       fm_composer_row_has_edge "$trimmed" && break
       _fm_composer_row_is_omp_status "$trimmed" && break
       _fm_composer_row_is_braille_furniture "$trimmed" && break
+      _fm_composer_row_is_codex_footer "$trimmed" && break
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done

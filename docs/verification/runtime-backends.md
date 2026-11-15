@@ -1275,6 +1275,17 @@ tests/fm-composer-codex-idle-live-e2e.test.sh
 The verification machine runs its fleet on Herdr and has no tmux installed, so on 2026-09-15 that guard reported `skip: live: tmux absent` there, and the Herdr capture above is this entry's live evidence.
 The guard also notes whether the starfield and the placeholder were actually drawn during its read, because codex need not animate them under every model or mode; a refresh on a tmux host should record that note beside the verdict rather than assume the starfield was exercised.
 
+### 2026-11-15 codex idle status and warning footer with no starfield between
+
+An idle Codex `›` reads `pending` when the status line or the hint row sits on the next row and no braille starfield bounds the wrap.
+The status line joins its cells with ` · ` and is drawn in theme colours, not dim, so ghost stripping leaves it intact.
+The hint row carries `? for shortcuts`, a context cell such as `46% context left` or `Context 12% used`, or a warning notice (`⚠ N warning(s)`, compact `⚠ N ·`, or count-only `⚠ N`) whose accent sits above the ghost ceiling.
+`fm_task_inbox_ring` skips on exactly that `pending` verdict, so the first ring and the watcher re-ring both type nothing.
+Those rows are now a wrap boundary, the way omp's status row and a braille-only row already are, and the idle pane reads `empty` on a styled cursorless read and with the cursor on the glyph row.
+A typed wrap line above the same footer stays `pending`, prose with middle dots such as `fix · tests` or `pi · e · phi` is not a status line, and a footer row with no glyph above it stays `unknown`.
+The evidence is the Codex TUI source for those rows plus the classifier fixtures in `test_matrix_codex_idle_footer_bounds_bare_composer`.
+No live Herdr pane was driven for this entry.
+
 ### 2026-09-18 OpenCode 1.18.31 idle cwd:branch furniture through tmux
 
 Verified on 2026-09-18 on macOS arm64 (Darwin 25.5.0) against OpenCode 1.18.31 running as eight idle firstmate tmux workers in this home (the fm-deck-* panes of tmux session 0, 272x70), read through the tmux adapter's real styled capture and cursor row.
@@ -2219,6 +2230,7 @@ Real captures verified these active distinctions:
 - On a real Herdr 0.9.5 pane running kiro-cli 2.35.1, the idle composer reads `empty` when the caller names `kiro` and `pending` otherwise, so the harness must be named for every kiro composer read; [Kiro CLI adapter verification](kiro.md#2026-10-29-re-verification-on-kiro-cli-2351) owns the run.
 - A bare shell prompt has no safe agent-composer container and is unknown.
 - Codex 0.154's idle braille starfield rows are composer furniture, with the dated Herdr evidence and refresh command in [Composer classification matrix](#composer-classification-matrix).
+- An idle Codex composer whose status, shortcut, or warning footer sits directly under `›` reads empty, with the fixture evidence in [Composer classification matrix](#composer-classification-matrix).
 
 `tests/fm-composer-ghost.test.sh`, `tests/fm-composer-lib.test.sh`, and the Herdr composer cases pin the exact captured ANSI bytes.
 The U+2063 operational and routed-request separators were exercised through a real Pi-on-Herdr path; the byte-exact active regression is:
