@@ -1684,6 +1684,30 @@ SH
   pass "fm-turnend-guard --claude: terminal owner boundary excludes a concurrent start without deadlock"
 }
 
+test_hook_claude_mode_allows_rewake_as_starter_exits() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-starter-exit")
+  : > "$dir/state/task1.meta"
+  printf '987654321\n' > "$dir/state/.claude-autoarm-starting"
+  cat >> "$dir/bin/fm-wake-lib.sh" << 'SH'
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/fm_pid_alive_before_exit/')"
+fm_pid_alive() {
+  if [ "$1" = 987654321 ]; then
+    printf 'epoch=3 owner_pid=987654321 outcome=rewake updated_at=%s\n' "$(date +%s)" > "$STATE/.claude-autoarm-epoch"
+    rm -f "$STATE/.claude-autoarm-starting"
+    return 1
+  fi
+  fm_pid_alive_before_exit "$@"
+}
+SH
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=0 run_hook_claude "$dir" true); status=$?
+  expect_code 0 "$status" "a rewake published as the starter exits must allow the stop"
+  [ -z "$out" ] || fail "starter-exit recovery produced output: $out"
+  assert_absent "$dir/state/.claude-autoarm-starting" "starter exit boundary was not exercised"
+  assert_absent "$dir/state/.turnend-claude-blocks" "starter-exit recovery consumed a continuation"
+  pass "fm-turnend-guard --claude: rechecks recovery when the starter exits"
+}
+
 test_hook_claude_mode_allows_on_fresh_rewake_epoch() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-epoch")
@@ -2993,6 +3017,7 @@ test_hook_claude_mode_reblocks_x_mode_without_tasks
 test_hook_claude_mode_allows_when_autoarm_owner_alive
 test_hook_claude_mode_repeated_failed_to_arming_interleavings_reach_fail_open
 test_hook_claude_mode_terminal_boundary_excludes_starting_owner
+test_hook_claude_mode_allows_rewake_as_starter_exits
 test_hook_claude_mode_allows_on_fresh_rewake_epoch
 test_hook_claude_mode_blocks_on_abandoned_autoarm_claim
 test_hook_claude_mode_blocks_on_pid_reused_arming_claim

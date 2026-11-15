@@ -601,6 +601,7 @@ while :; do
   sleep 0.1
   i=$((i + 1))
 done
+autoarm_owns_recovery && allow_autoarm_recovery
 
 # The auto-arm genuinely failed to establish: consume the bounded re-block
 # budget before considering the verified one-time attended fail-open.
