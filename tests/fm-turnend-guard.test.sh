@@ -2553,6 +2553,7 @@ test_hook_claude_mode_host_autoarm_gap_still_blocks() {
   stub=$NAMED_AUTOARM_PID
   start=$EPOCHREALTIME
   out=$(
+    # shellcheck disable=SC2329 # exported below so the guard child slows each claim-wait pass.
     sleep() {
       if [ "$1" = 0.1 ]; then
         command sleep 0.5
