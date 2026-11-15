@@ -91,6 +91,124 @@ test_missing_leased_copy_recovery_messages() {
   pass "missing leased copies retain records and print recovery steps for direct and descendant teardown"
 }
 
+# Drop the pool entry for a path without invoking Treehouse.
+drop_pool_entry() {
+  jq --arg p "$1" '.worktrees |= map(select(.path != $p))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+  mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+}
+
+run_guarded_teardown() { # <home> <id> <outfile>
+  : > "$CASE_DIR/treehouse.log"
+  : > "$CASE_DIR/mutations"
+  FM_HOME="$1" FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_PANE_PATH="$POOL/1/project" \
+    FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-teardown.sh" "$2" --force > "$3" 2>&1
+}
+
+test_missing_leased_copy_retires_when_pool_names_neither_path_nor_lease() {
+  local shape out rc task_home run_home task_id lease_id claim
+  for shape in direct child slot-removed other-claim; do
+    make_case "retire-missing-$shape"
+    out=$(spawn_task retained 1); rc=$?
+    expect_code 0 "$rc" "setup spawn failed: $out"
+    task_home=$HOME_DIR
+    run_home=$HOME_DIR
+    task_id=retained
+    if [ "$shape" = child ]; then
+      run_home="$CASE_DIR/parent"
+      mkdir -p "$run_home/state" "$run_home/data" "$run_home/config"
+      printf 'mate\n' > "$task_home/.fm-secondmate-home"
+      fm_write_meta "$run_home/state/mate.meta" \
+        "window=firstmate:fm-mate" "endpoint_task_id=mate" "spawn_gen=fixture" \
+        "worktree=$task_home" "home=$task_home" "project=$task_home" \
+        "kind=secondmate" "mode=secondmate" "harness=echo"
+      task_id=mate
+    fi
+    claim="$POOL/1/.fm-slot-owner"
+    assert_present "$claim" "setup lost the slot claim"
+    if [ "$shape" = other-claim ]; then
+      mkdir -p "$CASE_DIR/other-home"
+      printf 'task=successor\nhome=%s\n' "$CASE_DIR/other-home" > "$claim"
+      cp "$claim" "$CASE_DIR/prior-claim"
+    fi
+    if [ "$shape" = slot-removed ]; then
+      rm -rf "$POOL/1"
+    else
+      mv "$POOL/1/project" "$CASE_DIR/saved-copy"
+    fi
+    drop_pool_entry "$POOL/1/project"
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    run_guarded_teardown "$run_home" "$task_id" "$CASE_DIR/cleanup"; rc=$?
+    expect_code 0 "$rc" "$shape missing leased copy stayed stranded: $(cat "$CASE_DIR/cleanup")"
+    assert_grep 'no pool entry names that path or carries its lease' "$CASE_DIR/cleanup" \
+      "$shape cleanup did not name the unheld missing copy: $(cat "$CASE_DIR/cleanup")"
+    assert_absent "$task_home/state/retained.meta" "$shape cleanup left the task record"
+    assert_absent "$task_home/state/retained.treehouse-acquire" "$shape cleanup left the acquisition journal"
+    cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape cleanup changed pool state"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape cleanup invoked Treehouse: $(cat "$CASE_DIR/treehouse.log")"
+    if [ "$shape" = other-claim ]; then
+      cmp -s "$CASE_DIR/prior-claim" "$claim" || fail "cleanup removed another task's slot claim"
+    elif [ "$shape" != slot-removed ]; then
+      assert_absent "$claim" "$shape cleanup left its own slot claim"
+      assert_present "$CASE_DIR/saved-copy" "$shape cleanup removed the preserved copy"
+    fi
+    if [ "$shape" = direct ]; then
+      assert_grep 'no pool entry names it or carries its lease' "$CASE_DIR/cleanup" \
+        "direct cleanup completion did not name the untouched pool"
+    fi
+  done
+
+  for shape in path-stays lease-moved symlinked-pool malformed-pool; do
+    make_case "keep-missing-$shape"
+    out=$(spawn_task retained 1); rc=$?
+    expect_code 0 "$rc" "setup spawn failed: $out"
+    lease_id=$(awk -F= '$1 == "treehouse_lease_id" { print substr($0, index($0, "=") + 1); exit }' \
+      "$HOME_DIR/state/retained.meta")
+    [ -n "$lease_id" ] || fail "setup lost the lease id"
+    mv "$POOL/1/project" "$CASE_DIR/saved-copy"
+    cp "$HOME_DIR/state/retained.meta" "$CASE_DIR/prior.meta"
+    case "$shape" in
+      path-stays)
+        jq --arg p "$POOL/1/project" \
+          '.worktrees |= map(if .path == $p then del(.leased, .lease_id, .lease_holder) else . end)' \
+          "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+        mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+        ;;
+      lease-moved)
+        jq --arg p "$POOL/1/project" --arg other "$POOL/2/project" --arg id "$lease_id" \
+          '.worktrees |= (map(select(.path != $p)) | map(if .path == $other then . + {leased:true, lease_id:$id, lease_holder:"moved"} else . end))' \
+          "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+        mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+        ;;
+      symlinked-pool)
+        drop_pool_entry "$POOL/1/project"
+        mv "$POOL/treehouse-state.json" "$CASE_DIR/pool.json"
+        ln -s "$CASE_DIR/pool.json" "$POOL/treehouse-state.json"
+        ;;
+      malformed-pool)
+        printf '{\n' > "$POOL/treehouse-state.json"
+        ;;
+    esac
+    cp -a "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    run_guarded_teardown "$HOME_DIR" retained "$CASE_DIR/refusal"; rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape missing copy was retired: $(cat "$CASE_DIR/refusal")"
+    assert_grep 'Manual recovery: pause allocations and cleanup' "$CASE_DIR/refusal" \
+      "$shape refusal omitted recovery steps: $(cat "$CASE_DIR/refusal")"
+    assert_grep 'leased task copy is unavailable' "$CASE_DIR/refusal" \
+      "$shape refusal did not keep the lease: $(cat "$CASE_DIR/refusal")"
+    cmp -s "$CASE_DIR/prior.meta" "$HOME_DIR/state/retained.meta" || fail "$shape refusal changed metadata"
+    assert_present "$HOME_DIR/state/retained.treehouse-acquire" "$shape refusal removed the journal"
+    if [ "$shape" = symlinked-pool ]; then
+      [ -L "$POOL/treehouse-state.json" ] || fail "refusal replaced the symlinked pool state"
+    else
+      cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape refusal changed pool state"
+    fi
+    [ ! -s "$CASE_DIR/treehouse.log" ] && [ ! -s "$CASE_DIR/mutations" ] || fail "$shape refusal mutated the pool or endpoint"
+    assert_present "$CASE_DIR/saved-copy" "$shape refusal removed the preserved copy"
+  done
+  pass "a missing leased copy retires only when no pool entry names its path or carries its lease"
+}
+
 test_unrecognized_leased_copy_refuses_publication() {
   local out rc
   make_case unrecognized-copy
@@ -779,6 +897,7 @@ test_acquisition_journals_are_project_scoped
 
 test_legacy_unclaimed_ship_preserves_unlanded_work
 
+test_missing_leased_copy_retires_when_pool_names_neither_path_nor_lease
 test_missing_leased_copy_recovery_messages
 test_unrecognized_leased_copy_refuses_publication
 test_empty_record_fields_name_no_copy
