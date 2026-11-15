@@ -28,15 +28,16 @@ puts (val.nil? || val == false || val == "") ? "" : val.inspect
 # is the chat-address rule: a subject that greets is the failure. Commits
 # already on origin/main stay out of the range, including older subjects.
 test_branch_commit_subjects_do_not_greet() {
-  local base subjects subject
+  local base subjects subject lower
   base=$(git -C "$ROOT" rev-parse --verify --quiet origin/main) \
     || fail "origin/main is required to list this branch's commit subjects"
   subjects=$(git -C "$ROOT" log --format=%s "${base}..HEAD") \
     || fail "failed to read commit subjects from ${base}..HEAD"
   while IFS= read -r subject; do
     [ -n "$subject" ] || continue
-    case $subject in
-      *"Aye, aye, captain"*|*"Captain,"*)
+    lower=$(printf '%s' "$subject" | tr '[:upper:]' '[:lower:]')
+    case $lower in
+      *"aye, aye, captain"*|*"aye aye, captain"*|*"captain,"*)
         fail "commit subject greets: $subject"
         ;;
     esac
