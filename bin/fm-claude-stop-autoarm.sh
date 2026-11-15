@@ -203,7 +203,7 @@ starting_lock_acquire() {
       return 0
     fi
     holder=
-    IFS= read -r holder < "$STARTING_LOCK/pid" 2>/dev/null || true
+    IFS= read -r holder 2>/dev/null < "$STARTING_LOCK/pid" || true
     if [ "$holder" = "$$" ]; then
       STARTING_LOCK_HELD=1
       return 0
@@ -234,7 +234,7 @@ starting_lock_release() {
 
 publish_starting_marker() {
   local tmp
-  mkdir -p "$STATE" 2>/dev/null || return 0
+  [ -d "$STATE" ] || return 0
   tmp="$STARTING_MARKER.tmp.$$"
   starting_lock_acquire || true
   if printf '%s\n' "$$" > "$tmp" 2>/dev/null; then
@@ -248,7 +248,7 @@ release_starting_marker() {
   local recorded
   [ -f "$STARTING_MARKER" ] || return 0
   starting_lock_acquire || return 0
-  IFS= read -r recorded < "$STARTING_MARKER" || recorded=
+  IFS= read -r recorded 2>/dev/null < "$STARTING_MARKER" || recorded=
   if [ "$recorded" = "$$" ]; then
     rm -f "$STARTING_MARKER" 2>/dev/null || true
   fi

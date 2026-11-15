@@ -570,7 +570,7 @@ host_arm_pending() {
   local pid
   [ -f "$STATE/.claude-autoarm-starting" ] || return 1
   [ ! -L "$STATE/.claude-autoarm-starting" ] || return 1
-  IFS= read -r pid < "$STATE/.claude-autoarm-starting" || return 1
+  IFS= read -r pid 2>/dev/null < "$STATE/.claude-autoarm-starting" || return 1
   case "$pid" in
     ''|*[!0-9]*) return 1 ;;
   esac

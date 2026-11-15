@@ -2632,6 +2632,19 @@ SH
   pass "fm-claude-stop-autoarm: publishes its starting marker before the claim and drops only its own"
 }
 
+test_autoarm_leaves_missing_state_absent() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/autoarm-missing-state")
+  install_integrated_autoarm "$dir"
+  printf 'exit 0\n' > "$dir/bin/fm-primary-scope-lib.sh"
+  rm -rf "$dir/state"
+  out=$(run_integrated_autoarm_unowned "$dir"); status=$?
+  expect_code 0 "$status" "auto-arm must reach the first library boundary quietly"
+  [ -z "$out" ] || fail "auto-arm without state produced output: $out"
+  assert_absent "$dir/state" "early marker publication created a missing state directory"
+  pass "fm-claude-stop-autoarm: early marker publication leaves missing state absent"
+}
+
 test_hook_claude_mode_waits_for_late_claim() {
   local dir helper out status holder
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-wait")
@@ -2996,6 +3009,7 @@ test_hook_claude_mode_waits_for_late_claim
 test_hook_claude_mode_waits_past_short_window_for_host_autoarm
 test_hook_claude_mode_host_autoarm_gap_still_blocks
 test_hook_claude_mode_autoarm_publishes_starting_marker_before_claim
+test_autoarm_leaves_missing_state_absent
 test_hook_claude_mode_secondmate_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock
