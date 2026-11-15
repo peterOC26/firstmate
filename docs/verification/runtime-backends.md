@@ -1281,7 +1281,7 @@ An idle Codex `›` reads `pending` when the status line or the hint row sits on
 The status line joins its cells with ` · ` and is drawn in theme colours, not dim, so ghost stripping leaves it intact.
 The hint row carries `? for shortcuts`, a context cell such as `46% context left` or `Context 12% used`, or a warning notice (`⚠ N warning(s)`, compact `⚠ N ·`, or count-only `⚠ N`) whose accent sits above the ghost ceiling.
 `fm_task_inbox_ring` skips on exactly that `pending` verdict, so the first ring and the watcher re-ring both type nothing.
-Those rows are now a cursorless wrap boundary, and the idle pane reads `empty` on a styled cursorless read and with the cursor on the glyph row.
+Those rows are now a cursorless wrap boundary only when the glyph row is empty after ghost and furniture stripping, and the idle pane reads `empty` on a styled cursorless read and with the cursor on the glyph row.
 A typed wrap line above the same footer stays `pending`, prose with middle dots such as `fix · tests` or `pi · e · phi` is not a status line, and a footer row with no glyph above it stays `unknown`.
 The evidence is the Codex TUI source for those rows plus the classifier fixtures in `test_matrix_codex_idle_footer_bounds_bare_composer`.
 The supplied 2026-11-15 Herdr `fm-peek` plain-text capture (Codex GPT-6.1-Sol) is preserved in `tests/fixtures/codex-idle-footer-2026-11-15.txt`.
@@ -1290,6 +1290,7 @@ The plain capture remains `unknown`: its bytes cannot distinguish the placeholde
 Reconstructing the placeholder’s previously verified dim styling makes this layout read `empty`; this reconstruction is a classifier regression, not live ANSI evidence.
 Right-aligned context and token cells separated from the shortcut hint by multiple spaces also bound cursorless selection.
 Cursor-confirmed path-only and token-only draft wraps remain `pending`.
+Non-empty glyph rows retain path, token, and warning continuation rows in extracted content so delivery payload proofs receive the complete draft.
 No live Herdr pane was driven for this entry; a byte-exact ANSI capture remains a follow-up.
 
 ### 2026-09-18 OpenCode 1.18.31 idle cwd:branch furniture through tmux

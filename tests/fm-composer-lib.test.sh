@@ -774,7 +774,7 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   # renders (status cells joined by ` · `, `N% context left`, `Context N%
   # used`, `? for shortcuts`, and `⚠ N warning(s)` / `⚠ N ·` / `⚠ N`).
   local status old hint ctx warn compact count shared one tokens path
-  local screen styled plain out wrapped glyph tail
+  local screen styled plain out wrapped glyph tail caps
   status='gpt-5.4 medium · main · 46% context left'
   old='  gpt-6-astra high fast · ~/Projects/purser · Launch Purser desk brief'
   hint='? for shortcuts'
@@ -841,11 +841,19 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   assert_screen "bright placeholder words are a draft" pending "$CAPS_STYLED" "$plain"
 
   for glyph in '›' '❯' '⟩'; do
-    for tail in '/home/zabi/project/src/main.rs' '~/notes/todo.md' '12k tokens'; do
+    for tail in '/home/zabi/project/src/main.rs' '~/notes/todo.md' '12k tokens' '⚠ 4 warnings · /warnings to view'; do
       screen=$'transcript\n\n'"$glyph please review the change in"$'\n'"$tail"
       assert_screen "cursor on $glyph draft wrap $tail" pending "$CAPS_TMUX" "$screen" 3
       assert_screen "cursor below $glyph draft wrap $tail" pending "$CAPS_TMUX" "$screen"$'\nthen run tests' 4
       assert_screen "cursorless $glyph draft above $tail" pending "$CAPS_STYLED" "$screen"
+      for caps in "$CAPS_STYLED" "$CAPS_STYLED_NOID" "$CAPS_PLAIN"; do
+        out=$(fm_composer_extract_selected_content "$caps" "$screen")
+        [ "$out" = "please review the change in $tail" ] \
+          || fail "draft readback truncated $glyph continuation '$tail': '$out'"
+        out=$(fm_composer_extract_selected_content "$caps" $'────────────────────\n'"$glyph please review the change in"$'\n'"$tail"$'\n────────────────────')
+        [ "$out" = "please review the change in $tail" ] \
+          || fail "ruled draft readback truncated $glyph continuation '$tail': '$out'"
+      done
     done
   done
 
@@ -856,8 +864,8 @@ test_matrix_codex_idle_footer_bounds_bare_composer() {
   assert_screen "wrapped typed input above the codex status footer" pending "$CAPS_STYLED" "$wrapped"
   assert_screen "wrapped typed input above the codex status footer on tmux" pending "$CAPS_TMUX" "$wrapped" 3
   out=$(fm_composer_extract_selected_content "$CAPS_STYLED" $'transcript line\n\n› fix the login\n'"$warn")
-  [ "$out" = 'fix the login' ] \
-    || fail "typed codex text must be extracted without the warning footer, got '$out'"
+  [ "$out" = "fix the login $warn" ] \
+    || fail "typed codex text must retain its warning continuation, got '$out'"
   assert_screen "warning words on the codex glyph row stay pending" pending \
     "$CAPS_STYLED" $'transcript line\n\n› check the ⚠ 4 warnings\n'"$warn"
   assert_screen "one middle dot under an empty codex glyph stays pending" pending \

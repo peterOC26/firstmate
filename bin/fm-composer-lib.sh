@@ -2136,7 +2136,7 @@ _fm_composer_bare_rule_sandwich() {  # <plain-screen> <row>
 }
 
 _fm_composer_select_cursorless() {  # <plain-screen> <screen> <styled>
-  local plain=$1 screen=$2 styled=$3 generic=-1 next boundary raw trimmed glyph bare footer=0
+  local plain=$1 screen=$2 styled=$3 generic=-1 next boundary raw trimmed glyph bare footer=0 glyph_content
   FM_COMPOSER_SELECTED_KIND=
   FM_COMPOSER_SELECTED_FIRST=-1
   FM_COMPOSER_SELECTED_LAST=-1
@@ -2205,6 +2205,13 @@ _fm_composer_select_cursorless() {  # <plain-screen> <screen> <styled>
     return 1
   fi
   if [ "$FM_COMPOSER_SELECTED_KIND" = bare ]; then
+    raw=$(_fm_composer_screen_row "$FM_COMPOSER_SELECTED_FIRST" "$screen")
+    glyph_content=$(_fm_composer_row_content "$raw" "$styled")
+    _fm_composer_bare_row_strip_furniture_var glyph_content
+    if fm_composer_leading_agent_glyph_var glyph "$glyph_content"; then
+      glyph_content=${glyph_content#*"$glyph"}
+    fi
+    fm_composer_normalize_trim_var glyph_content
     next=$((FM_COMPOSER_SELECTED_LAST + 1))
     # In the kiro scope a hinted idle placeholder is the whole composer, so the
     # row below it (kiro's `/copy to clipboard` footer) is never wrapped input.
@@ -2226,7 +2233,7 @@ _fm_composer_select_cursorless() {  # <plain-screen> <screen> <styled>
       fm_composer_row_has_edge "$trimmed" && break
       _fm_composer_row_is_omp_status "$trimmed" && break
       _fm_composer_row_is_braille_furniture "$trimmed" && break
-      _fm_composer_row_is_codex_footer "$trimmed" && break
+      [ -z "$glyph_content" ] && _fm_composer_row_is_codex_footer "$trimmed" && break
       FM_COMPOSER_SELECTED_LAST=$next
       next=$((next + 1))
     done
