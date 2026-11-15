@@ -167,7 +167,9 @@
 # attempt. A re-run after an earlier run already released the lease cleans
 # up records only. Legacy claimed copies can return only with verified
 # unleased pool state. The shared ownership/lease contract is owned by
-# bin/fm-wake-lib.sh.
+# bin/fm-wake-lib.sh. A leased copy that is provably absent follows that
+# contract's missing-copy retirement rule; otherwise teardown retains the
+# lease and records and prints manual recovery steps.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
 # before cleanup. Its current working directory is only incidental process
@@ -3048,6 +3050,23 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
       expected_home=$(dirname "$(dirname "$meta")")
     fi
   fi
+  FM_TREEHOUSE_MISSING_COPY_RETIRED=
+  if [ -n "$meta" ] && [ ! -d "$worktree" ] && grep -q '^treehouse_lease_' "$meta"; then
+    if fm_treehouse_record_lease "$meta"; then
+      if fm_treehouse_missing_copy_lease_unheld "$worktree" "$FM_TREEHOUSE_RECORD_LEASE_ID"; then
+        echo "warning: task $record_id's leased copy $worktree is gone and no pool entry names that path or carries its lease; leaving the pool untouched and running records-only cleanup." >&2
+        if ! fm_treehouse_missing_copy_release_own_claim "$worktree" "$record_id" "$expected_home"; then
+          echo "REFUSED: could not remove task $record_id's own slot claim beside $worktree; retaining its records" >&2
+          return 1
+        fi
+        FM_TREEHOUSE_MISSING_COPY_RETIRED=1
+        return "$TEARDOWN_SLOT_REASSIGNED_RC"
+      fi
+      echo "REFUSED: leased task copy is unavailable; retaining its lease and records" >&2
+      teardown_missing_copy_recovery_steps "$meta" "$worktree" "$record_id"
+      return 1
+    fi
+  fi
   fm_treehouse_slot_owner_state "$worktree" "$record_id" "$expected_home"
   if [ -n "$meta" ] && grep -q '^treehouse_lease_' "$meta"; then
     fm_treehouse_record_lease "$meta" || {
@@ -3104,16 +3123,21 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta]
 # legacy-unclaimed path still runs the read-only landed-work gate.
 TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_LEGACY_UNCLAIMED=0
+TEARDOWN_MISSING_LEASE_RETIRED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
 require_owned_task_worktree_slot() {
   local slot rc=0
   if grep -q '^treehouse_lease_' "$META"; then
-    slot=$(canonical_existing_dir "$WT") || {
-      echo "REFUSED: leased task copy is unavailable; retaining its lease and records" >&2
-      teardown_missing_copy_recovery_steps "$META" "$WT" "$ID"
-      return 1
-    }
+    if [ -d "$WT" ]; then
+      slot=$(canonical_existing_dir "$WT") || {
+        echo "REFUSED: leased task copy is unavailable; retaining its lease and records" >&2
+        teardown_missing_copy_recovery_steps "$META" "$WT" "$ID"
+        return 1
+      }
+    else
+      slot=$WT
+    fi
   else
     slot=$(teardown_live_slot_path) || return 0
   fi
@@ -3122,6 +3146,9 @@ require_owned_task_worktree_slot() {
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
       TEARDOWN_SLOT_REASSIGNED=1
+      if [ "${FM_TREEHOUSE_MISSING_COPY_RETIRED:-}" = 1 ]; then
+        TEARDOWN_MISSING_LEASE_RETIRED=1
+      fi
       if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && ! grep -q '^treehouse_lease_' "$META"; then
         TEARDOWN_LEGACY_UNCLAIMED=1
       fi
@@ -4904,6 +4931,8 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT)"
+elif [ "$TEARDOWN_MISSING_LEASE_RETIRED" = 1 ]; then
+  echo "teardown $ID complete (window ${T:-none}; leased copy $WT is gone and no pool entry names it or carries its lease, so the pool was left untouched)"
 elif [ -z "$TEARDOWN_SLOT_REASSIGNED_TO" ]; then
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT was already released, so it was left untouched)"
 else

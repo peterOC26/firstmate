@@ -114,6 +114,121 @@ fm_treehouse_lease_matches() {  # <worktree> <lease-id> <holder>
   [ "$FM_TREEHOUSE_LEASE_ID" = "$2" ] && [ "$FM_TREEHOUSE_LEASE_HOLDER" = "$3" ]
 }
 
+# Absolute lexical form of a path that may not exist. Rejects relative paths
+# and any component that would escape the root. Prints one path.
+fm_treehouse_lexical_absolute() {  # <path>
+  local input=$1 rest part joined=''
+  case "$input" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  case "$input" in
+    ''|*$'\r'*|*$'\n'*|*$'\t'*|*\\*) return 1 ;;
+  esac
+  rest=${input#/}
+  while [ -n "$rest" ]; do
+    part=${rest%%/*}
+    case "$rest" in
+      */*) rest=${rest#*/} ;;
+      *) rest='' ;;
+    esac
+    case "$part" in
+      ''|.) ;;
+      ..)
+        case "$joined" in
+          ''|/) return 1 ;;
+          /*/*) joined=${joined%/*} ;;
+          /*) joined=/ ;;
+        esac
+        ;;
+      *) joined="$joined/$part" ;;
+    esac
+  done
+  [ -n "$joined" ] || joined=/
+  printf '%s\n' "$joined"
+}
+
+# Physical path of the longest existing ancestor, with any missing suffix
+# appended lexically. Fails when that ancestor cannot be searched.
+fm_treehouse_anchor_path() {  # <path>
+  local path=$1 prefix suffix='' base
+  path=$(fm_treehouse_lexical_absolute "$1") || return 1
+  if [ -d "$path" ]; then
+    (CDPATH='' cd -- "$path" && pwd -P) || return 1
+    return 0
+  fi
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    return 1
+  fi
+  prefix=$path
+  while :; do
+    prefix=$(dirname -- "$prefix")
+    if [ -d "$prefix" ] && [ -x "$prefix" ]; then
+      base=$(CDPATH='' cd -- "$prefix" && pwd -P) || return 1
+      suffix=${path#"$prefix"}
+      suffix=${suffix#/}
+      if [ -n "$suffix" ]; then
+        fm_treehouse_lexical_absolute "$base/$suffix"
+      else
+        printf '%s\n' "$base"
+      fi
+      return 0
+    fi
+    if [ -e "$prefix" ] || [ -L "$prefix" ]; then
+      return 1
+    fi
+    [ "$prefix" != / ] || return 1
+  done
+}
+
+# True when a searchable ancestor proves this path is not present.
+fm_treehouse_copy_provably_absent() {  # <worktree>
+  local path
+  path=$(fm_treehouse_lexical_absolute "$1") || return 1
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    return 1
+  fi
+  fm_treehouse_anchor_path "$path" >/dev/null
+}
+
+# Ownership-contract proof that a missing copy's lease is gone. True only when
+# the copy is provably absent and readable pool JSON has no entry naming that
+# path and no entry carrying the lease id. Never runs a Treehouse command.
+fm_treehouse_missing_copy_lease_unheld() {  # <worktree> <lease-id>
+  local worktree=$1 lease_id=$2 lexical pool state snapshot recorded_anchor
+  local lines entry_path entry_lease entry_anchor
+  [ -n "$lease_id" ] || return 1
+  case "$lease_id" in
+    *$'\r'*|*$'\n'*|*$'\t'*) return 1 ;;
+  esac
+  fm_treehouse_copy_provably_absent "$worktree" || return 1
+  lexical=$(fm_treehouse_lexical_absolute "$worktree") || return 1
+  pool=$(dirname -- "$(dirname -- "$lexical")")
+  state="$pool/treehouse-state.json"
+  [ -f "$state" ] && [ ! -L "$state" ] && [ -r "$state" ] || return 1
+  recorded_anchor=$(fm_treehouse_anchor_path "$worktree") || return 1
+  snapshot=$(cat "$state") || return 1
+  lines=$(printf '%s\n' "$snapshot" | jq -r '
+    def text: type == "string" and (test("[\\r\\n\\t\\\\]") | not);
+    if (.worktrees | type) != "array" then error("worktrees") else
+      .worktrees[] |
+      [
+        (if (.path | type) == "string" and (.path | length) > 0 and (.path | text) then .path else error("path") end),
+        (if .lease_id == null then ""
+         elif (.lease_id | type) == "string" and (.lease_id | text) then .lease_id
+         else error("lease_id") end)
+      ] | @tsv
+    end
+  ' 2>/dev/null) || return 1
+  while IFS=$'\t' read -r entry_path entry_lease || [ -n "${entry_path:-}" ]; do
+    [ -n "${entry_path:-}" ] || continue
+    [ "${entry_lease:-}" != "$lease_id" ] || return 1
+    entry_anchor=$(fm_treehouse_anchor_path "$entry_path") || return 1
+    [ "$entry_anchor" != "$recorded_anchor" ] || return 1
+  done <<< "$lines"
+  return 0
+}
+
 # Missing fields mean legacy, never permission to infer a lease. Duplicate
 # fields and unsafe records refuse even when their final values agree.
 # shellcheck disable=SC2034 # Outputs for spawn and teardown.

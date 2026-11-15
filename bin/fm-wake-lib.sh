@@ -1956,15 +1956,25 @@ fm_treehouse_pool_slot() {  # <project-dir> <worktree>
 # The claim remains independent positive evidence for records-only cleanup of
 # legacy records whose slot was reassigned. Never use `treehouse status` to
 # inspect ownership: it can heal and mutate the pool state.
+# A leased record whose copy is provably absent retires records-only when
+# readable pool state shows no entry naming that path and no entry carrying
+# its lease id. Missing, unreadable, symlinked, or malformed pool state is
+# not that proof. Teardown then leaves the pool untouched, drops only this
+# task's own slot claim when one is still present, and removes the task
+# record. Anything short of that proof keeps the record, the lease, and the
+# acquisition journal.
 #
 # The claim lives at <pool>/<slot>/.fm-slot-owner - a sibling of the repo
 # checkout rather than a file inside it - so claiming a slot can never dirty the
 # copy teardown's landed-work checks inspect, and a returned slot carries no
 # untracked leftover from it.
-fm_treehouse_slot_owner_marker() {  # <worktree>
-  local worktree=$1 slot
-  slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || return 1
-  printf '%s/.fm-slot-owner\n' "$(dirname "$slot")"
+fm_treehouse_slot_owner_marker() {  # <worktree> [missing]
+  local worktree=$1 mode=${2:-} slot
+  slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || {
+    [ "$mode" = missing ] || return 1
+    slot=$(fm_treehouse_lexical_absolute "$worktree") || return 1
+  }
+  printf '%s/.fm-slot-owner\n' "$(dirname -- "$slot")"
 }
 
 # Claim an unclaimed pool slot under the project lock. Existing claims are
@@ -1992,13 +2002,15 @@ fm_treehouse_slot_owner_claim() {  # <worktree> <task-id> <home>
 # FM_TREEHOUSE_SLOT_OWNER_ID and FM_TREEHOUSE_SLOT_OWNER_HOME carry the recorded
 # claimant as evidence. Lifecycle callers supply the expected home as a third
 # argument, so the same task slug in a different home is not ownership.
-fm_treehouse_slot_owner_state() {  # <worktree> <task-id> [expected-home]
+# Pass missing as the fourth argument to read a claim beside a copy that is
+# already gone; without it, a missing copy stays unsafe.
+fm_treehouse_slot_owner_state() {  # <worktree> <task-id> [expected-home] [missing]
   local worktree=$1 id=$2 marker line owner_id='' owner_home='' ids=0 home_fields=0
-  local expected_home=${3:-} claim_home
+  local expected_home=${3:-} claim_home missing=${4:-}
   FM_TREEHOUSE_SLOT_OWNER=unsafe
   FM_TREEHOUSE_SLOT_OWNER_ID=
   FM_TREEHOUSE_SLOT_OWNER_HOME=
-  marker=$(fm_treehouse_slot_owner_marker "$worktree") || return 0
+  marker=$(fm_treehouse_slot_owner_marker "$worktree" "$missing") || return 0
   if [ ! -e "$marker" ] && [ ! -L "$marker" ]; then
     FM_TREEHOUSE_SLOT_OWNER=absent
     return 0
@@ -2038,6 +2050,21 @@ fm_treehouse_slot_owner_release() {  # <worktree> <task-id>
   [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
   marker=$(fm_treehouse_slot_owner_marker "$worktree") || return 0
   rm -f "$marker" 2>/dev/null || true
+}
+
+# Drop this task's claim beside a copy that is already gone. Never removes
+# another task's claim. An absent or unreadable claim stays where it is.
+fm_treehouse_missing_copy_release_own_claim() {  # <worktree> <task-id> <expected-home>
+  local worktree=$1 id=$2 home=$3 marker
+  [ -n "$id" ] || return 1
+  fm_treehouse_slot_owner_state "$worktree" "$id" "$home" missing
+  [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || return 0
+  marker=$(fm_treehouse_slot_owner_marker "$worktree" missing) || return 1
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
+  rm -f -- "$marker" || return 1
+  if [ -e "$marker" ] || [ -L "$marker" ]; then
+    return 1
+  fi
 }
 
 
