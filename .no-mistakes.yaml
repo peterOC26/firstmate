@@ -13,9 +13,10 @@ disable_project_settings: true
 # commit subject and writes that commit without repository hooks.
 # Document, test, and CI prompts copy the matching instruction field below, so
 # each of those fields ends with the same sentence forbidding a greeting there.
-# Review fix prompts have no repository instruction field; they rely on
-# disable_project_settings plus the chat-address boundary in AGENTS.md.
-# tests/fm-nm-test-contract.test.sh owns the regression.
+# Review fix prompts also store their summary field as the commit subject, but
+# no repository field is copied into them (review.path_instructions reach the
+# reviewer, not the fixer, and commit.fix_message only wraps the summary), so
+# no file in this repository can keep a greeting out of a review-fix subject.
 
 # Trusted documentation placement policy for the Document step.
 # The audience inventory and coding guideline own the detail; keep this as a
