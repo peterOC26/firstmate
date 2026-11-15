@@ -697,7 +697,7 @@ test_away_turn_without_a_report_hands_the_wake_to_main() {
   watcher_live "$home" && fail "the host left its successor cycle running when it handed the wake to main"
   token=$(cat "$home/state/.watcher-down")
   case "$token" in
-    pending:downtime:*|announced:downtime:*) ;;
+    pending:downtime:*|announced:downtime:*|pending:interrupted:*|announced:interrupted:*) ;;
     *) fail "a handback must leave the recovery marker in downtime for the owner's rewake, got: $token" ;;
   esac
   assert_absent "$home/state/.supervision-host-engine" "a turn that did not handle its wake must not keep its conversation"
@@ -821,7 +821,8 @@ test_outcome_after_the_return_survives_a_host_killed_at_the_turn_end() {
   start_host "$home"
   wait_until_deadline 60 host_exited "$home" || fail "return-first: the next host did not resurface the queued outcome"
   assert_re '^check: rearm-resurface$' "$home/host.out" "the next host's first cycle must resurface the queue"
-  assert_re '	pass-through	attended	main-only	check: rearm-resurface' "$home/state/.supervision-host.log" "the attended resurface must reach main"
+  assert_re '[[:space:]](pass-through|to-main)[[:space:]]' "$home/state/.supervision-host.log" "the recovery must hand the pending outcome to main"
+  assert_grep 'supervision-host-return:1' "$home/state/.wake-queue" "recovery must not consume the main-owned outcome notice"
   drained=$(FM_HOME="$home" "$ROOT/bin/fm-wake-drain.sh" 2>&1)
   assert_contains "$drained" "supervision-host outcome 1 for demo [routine] was recorded after the captain returned" \
     "main's drain must present the outcome the killed host never handed off"
@@ -1057,7 +1058,43 @@ test_away_inbox_note_at_the_park_bound_is_the_return() {
 }
 
 
+test_empty_settled_recovery_uses_no_engine_turn() {
+  local home
+  home=$(make_home empty-settled-recovery attended)
+  : > "$home/state/.wake-queue"
+  : > "$home/state/.status-presentation-cursor"
+  printf 'finished startup probe\n' > "$home/state/.startup-network.status"
+  FM_HOME="$home" bash -c '. "$1"; fm_recovery_marker_publish "$STATE/.watcher-down" downtime' _ "$ROOT/bin/fm-wake-lib.sh"
+  start_host "$home"
+  wait_until 150 grep -qs '^acked:downtime:' "$home/state/.watcher-down" \
+    || fail "empty recovery did not settle: $(cat "$home/host.out")"
+  wait_until 150 watcher_live "$home" || fail "empty recovery left no live watcher"
+  [ ! -e "$home/engine-call.1" ] || fail "empty recovery spent an engine turn"
+  [ ! -s "$home/host.rc" ] || fail "empty recovery woke main: $(cat "$home/host.out")"
+  stop_home_processes "$home"
+  pass "host: positively settled empty recovery stays off both model conversations"
+}
+
+test_attended_recovery_handles_original_rows_without_waking_main() {
+  local home
+  home=$(make_home attended-recovery attended)
+  append_status "$home" 'interrupted before delivery'
+  append_wake "$home/state" signal demo.status "signal: $home/state/demo.status"
+  start_host "$home"
+  wait_until 250 handled_at_least "$home" 1 \
+    || fail "recovery: original rows did not reach the engine: $(cat "$home/host.out"; cat "$home/state/.supervision-host.log")"
+  assert_grep 'FIRSTMATE SUPERVISION WAKE: check: rearm-resurface' "$home/engine-call.1" "the recovery close must retain its identity"
+  ! awk -F '\t' '$2 == 1 { found=1 } END { exit !found }' "$home/state/.wake-queue" \
+    || fail "the branch did not acknowledge original row 1: $(cat "$home/state/.wake-queue")"
+  [ ! -s "$home/host.rc" ] || fail "routine recovery woke main: $(cat "$home/host.out")"
+  wait_until 150 watcher_live "$home" || fail "recovery left no successor: $(cat "$home/host.out"; cat "$home/state/.supervision-host.log")"
+  stop_home_processes "$home"
+  pass "host: attended recovery handles eligible original rows and preserves a live successor"
+}
+
 fm_test_run \
+  test_empty_settled_recovery_uses_no_engine_turn \
+  test_attended_recovery_handles_original_rows_without_waking_main \
   test_park_exit_probe_uses_half_second_child_sleeps \
   test_attended_routine_wake_is_handled_on_the_engine_and_stays_off_main \
   test_host_stopped_right_after_a_handled_wake_exits_and_frees_the_queue \

@@ -1055,7 +1055,7 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
   grep "$(printf '\tsignal\tduring-handling.status\t')" "$state/.wake-queue" >/dev/null \
     || fail "handling-window watcher did not durably append its wake"
 
-  [ "$(cat "$state/.watcher-down" 2>/dev/null || true)" = "pending:downtime:$generation" ] \
+  [ "$(cat "$state/.watcher-down" 2>/dev/null || true)" = "pending:interrupted:$generation" ] \
     || fail "repeated publications during handling replaced the outstanding recovery generation"
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation" 2> "$dir/ack.err" \

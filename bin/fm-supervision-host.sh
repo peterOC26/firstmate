@@ -49,14 +49,14 @@
 #     lock holder can be identified, the session is not cooling down after
 #     engine errors, and the Pi branch's offer rule
 #     (bin/fm-branch-dispatch.mjs offer) says the branch may take this close,
-#     so main-only classes (check triggers, decision-owned triggers, a scan
+#     so main-only classes (non-recovery check triggers, decision-owned triggers, a scan
 #     that is unsafe or holds nothing for the branch), and a queued unsurfaced
 #     captain inbox note, stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
 #     drops the handoff. It confirms no handling handoff and republishes the
-#     recovery marker as downtime, even over handling an earlier engine turn
-#     left, so the re-arm owner delivers the close to main; a failed publish
+#     recovery marker under docs/watcher-continuity.md "Generation reuse",
+#     so the re-arm owner delivers the close to main; a failed publish
 #     prints a watcher FAILED line instead of the close. The host records that successor's arm before relinquishing it
 #     (detach_successor owns the persistence check and failure path). The
 #     session's next park without --restart requests a take-over of its cycle
@@ -542,7 +542,7 @@ boundary_reached() {
   park_elapsed
   # The verified Codex async owner has no short hook deadline. Its quiet
   # checkpoint keeps the same watcher alive; stopping it would create a real
-  # downtime generation and force an otherwise empty model turn.
+  # downtime generation that needs recovery unless empty settlement proves safe.
   if [ "$PRIMARY" = codex ] && [ "${FM_CODEX_MODEL_FREE_PARK:-0}" = 1 ] \
     && [ "$PARK_ELAPSED" -ge "$PARK_SECONDS" ]; then
     log_line "quiet-boundary\tafter ${PARK_ELAPSED}s; watcher retained"
@@ -896,8 +896,8 @@ detach_successor() {
   SUCCESSOR_PID=
 }
 
-# Main receives this close only on downtime, even when a preceding engine
-# turn left handling behind (autoarm_commit in bin/fm-claude-stop-autoarm.sh)
+# Main's close needs a deliverable recovery marker, preserving handling history
+# under docs/watcher-continuity.md "Generation reuse".
 # Return 1 on successor failure, 2 on an undeliverable recovery marker
 leave_successor_for_main() {
   if ! ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID"; then
@@ -1414,11 +1414,8 @@ while :; do
     # The successor this turn already started and confirmed stays up. Retiring
     # it is what left no watcher after a close that became main-only.
     detach_successor
-    # Main handles this close after all, so hand back the downtime the handoff
-    # above consumed: the re-arm owner delivers the close only while the
-    # recovery marker reads downtime (leave_successor_for_main). It is handed
-    # back as already announced, so the successor left running does not
-    # resurface the episode this very close delivers.
+    # Main handles this close after all. Apply the generation reuse contract
+    # in docs/watcher-continuity.md, retaining the confirmed handling history.
     if [ -n "$SUCCESSOR_GENERATION" ] \
       && ! fm_recovery_marker_handback "$STATE/.watcher-down" >/dev/null 2>&1; then
       log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"

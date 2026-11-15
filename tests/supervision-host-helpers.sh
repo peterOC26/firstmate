@@ -614,7 +614,7 @@ SH
   [ "$(engine_calls "$home")" -eq 1 ] || fail "the engine took the main-only close"
   if [ "$mode" = restore ]; then
     assert_rewoke_main "$home" "inherited handling"
-    assert_re '^(pending|announced):downtime:' "$home/state/.watcher-down" \
+    assert_re '^(pending|announced):(downtime|interrupted):' "$home/state/.watcher-down" \
       "the inherited episode must become deliverable downtime"
     watcher_live "$home" || fail "the repaired hand-back must keep its successor alive"
   else
@@ -777,14 +777,9 @@ no_home_arms() { [ -z "$(home_arms "$1")" ]; }
 mode_of() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
 
 
-# Park again after a host was stopped mid-park: the new cycle's first close is
-# the watcher's downtime resurface, which main drains before the next park.
-# That close can end the park before its cycle is ever seen live, so this
-# waits for the exit itself.
-# The resurface pass-through leaves its successor running. Stop that watcher
-# and acknowledge the downtime its exit records, so the next park starts a
-# watcher it owns. Attaching instead would not observe the exit until the
-# beacon went stale, and this fixture's turn budget would already be gone.
+# A pass-through can leave a successor running. Stop that watcher and
+# acknowledge the downtime its exit records so the next fixture park owns
+# its cycle. Attaching would wait for the old beacon instead of the new turn.
 quiet_pass_through_successor() {  # <home>
   local home=$1 pid i gen
   pid=$(cat "$home/state/.watch.lock/pid" 2>/dev/null || true)
@@ -809,10 +804,9 @@ quiet_pass_through_successor() {  # <home>
 
 
 park_after_stop() {  # <home>
-  rm -f "$1/host.rc"
-  : > "$1/park.go"
-  wait_until_deadline 60 host_exited "$1" || fail "the watcher's downtime resurface did not reach main: $(cat "$1/host.out")"
-  assert_re '^check: rearm-resurface' "$1/host.out" "fixture: the first close after the watcher stopped was not its resurface"
+  # These dialog tests start the next turn with their explicit status append.
+  # Drain the interrupted turn before parking: routine recovery now belongs
+  # to the engine and must not consume one of the test's numbered turns.
   main_drain_and_ack "$1"
   quiet_pass_through_successor "$1"
   park_again "$1"

@@ -98,6 +98,7 @@ What is never offered, or falls back to main:
 
 - While attended, a check-kind triggering close is never offered, even when other rows are eligible.
   Check-kind closes are merge-confirmation polls, Relay mentions, credential/auth failures, and every other legitimately main-only class.
+  Only the host may offer attended `check: rearm-resurface` recovery closes to the branch, using original eligible task rows and leaving synthetic check rows on main.
 - When a triggering close has no acceptor (extension absent, branch broken), it keeps today's wake-to-main path.
 - Watcher-failure alarms always go to main, because only main can repair the watcher cycle.
 
@@ -120,7 +121,8 @@ The row is excluded when one of those lines is a decision, blocked, or captain-h
 A resolution that closes nothing, key-less beside only keyed decisions or keyed for a key never open, stays routine.
 A key-less line otherwise falls back to its verb; an unrelated open decision alone leaves a routine span eligible, while a mixed span goes wholly to main.
 The status-presentation cursor bounds that span, and a missing or unmatched cursor falls back to the whole log.
-Single-task crewmate signals keep their existing Pi payload and attended-host whole-log rules, except that the TypeScript decision fold now ignores bare transition words without a colon or complete key token, matching `bin/fm-classify-lib.sh` on both crewmate and second-mate logs.
+Single-task crewmate signals use whole-log decision checks for attended-host wakes; Pi wakes retain their per-row payload rules.
+The TypeScript decision fold ignores bare transition words without a colon or complete key token, matching `bin/fm-classify-lib.sh` on both crewmate and second-mate logs.
 
 For a stale row, `scopeForUnreadWake` folds the mapped task's status log.
 It excludes the row when any `needs-decision` remains open or the current meaningful declaration is `captain-held`.

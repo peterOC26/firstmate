@@ -6,9 +6,14 @@
 // It reimplements nothing: .pi/extensions/lib/fm-branch-dispatch.ts stays the
 // single owner of which queued rows the branch may claim and of the wake text,
 // and this file only prints that module's answers in a shape a shell can read.
-// The Pi branch extension and this entry therefore apply identical rules.
+// docs/pi-supervision-branch.md "Wake dispatch" owns the host-specific offer exception.
 //
 // Usage:
+//   fm-branch-dispatch.mjs recovery-settled
+//     Exit 0 only when all presentation-tracked status bytes were presented,
+//     no decision is open, and the outcome owner reports no unread or
+//     unprocessed outcome.
+//     Read-only; the watcher owns queue/marker locks and generation retirement.
 //   fm-branch-dispatch.mjs scope [--heartbeat] [--afk]
 //     Print scopeForUnreadWake's verdict for this home's wake queue, one
 //     key=value line each:
@@ -37,10 +42,11 @@
 //     tail's fixed unavailable notice instead.
 //
 // The state directory is FM_STATE_OVERRIDE, else $FM_HOME/state, else the
-// repository's own state/. Exit 0 on success, 2 on invalid use, 3 when a
-// wake-prompt --mirror-file cannot be read.
+// repository's own state/. Exit 0 on success, 1 when recovery-settled lacks proof,
+// 2 on invalid use, 3 when wake-prompt --mirror-file cannot be read.
 
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -49,7 +55,7 @@ const dispatch = await import(pathToFileURL(path.join(root, ".pi", "extensions",
 
 function usage() {
   process.stderr.write(
-    "usage: fm-branch-dispatch.mjs scope [--heartbeat] [--afk] | offer [--afk] | wake-prompt --report <surface> [--mirror-file <path>] [--away [--readback-file <path>]]\n",
+    "usage: fm-branch-dispatch.mjs recovery-settled | scope [--heartbeat] [--afk] | offer [--afk] | wake-prompt --report <surface> [--mirror-file <path>] [--away [--readback-file <path>]]\n",
   );
   process.exit(2);
 }
@@ -82,7 +88,22 @@ function readOptional(file) {
 
 const [command, ...args] = process.argv.slice(2);
 
-if (command === "scope") {
+if (command === "recovery-settled") {
+  if (args.length) usage();
+  try {
+    const excludedStatus = execFileSync("bash", ["-c", 'source "$1"; status_scan_parent_channel_exclude "$2"',
+      "_", path.join(root, "bin", "fm-classify-lib.sh"), stateDir()], {
+      encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!dispatch.recoveryStatusSettled(stateDir(), excludedStatus)) process.exit(1);
+    const pending = execFileSync("bash", [path.join(root, "bin", "fm-branch-outcome.sh"), "present"], {
+      encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"],
+    });
+    process.exit(pending.trim() ? 1 : 0);
+  } catch {
+    process.exit(1);
+  }
+} else if (command === "scope") {
   let heartbeat = false;
   let afk = false;
   for (const arg of args) {
