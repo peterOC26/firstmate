@@ -2635,6 +2635,7 @@ SH
   [ ! -e "$dir/state/.claude-autoarm-starting" ] || fail "auto-arm left its own starting marker behind: $(cat "$dir/state/.claude-autoarm-starting")"
 
   rm -f "$dir/state/.claim-delay-entered" "$dir/state/.claude-autoarm-epoch" "$dir/state/.claude-autoarm-failure-notified"
+  # shellcheck disable=SC2016 # the fake harness expands FM_HOME inside its child shell.
   printf '{"session_id":"sess-claude-mode","stop_hook_active":false}\n' \
     | FM_HOME="$home" FM_TEST_CLAIM_DELAY_SEC=1 FM_CLAUDE_AUTOARM_ATTEMPTS=1 "$dir/fake-claude" -c '
         printf "%s\n" "$$" > "$FM_HOME/state/.lock"
