@@ -1,0 +1,6 @@
+ring_classify=empty
+guard_classify=empty
+ring_agent=alive
+guard_agent=alive
+ring_native=codex/working
+guard_native=codex/working

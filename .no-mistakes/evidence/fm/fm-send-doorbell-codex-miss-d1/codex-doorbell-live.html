@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Live Codex doorbell on isolated Herdr</title>
+<style>
+  body { font-family: ui-sans-serif, system-ui, sans-serif; background: #111; color: #eee; margin: 24px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  p { color: #bbb; max-width: 860px; }
+  pre { background: #1b1b1b; color: #d6d6d6; border: 1px solid #333; padding: 12px 16px; overflow: auto; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.35; }
+  .ok { color: #9dcc6a; }
+</style>
+</head>
+<body>
+<h1>Live Codex 0.167 on an isolated Herdr lab</h1>
+<p>Codex was launched with the fleet flags <code>codex --dangerously-bypass-approvals-and-sandbox --disable hooks</code> in session <code>fm-lab-doorbell-1593525-30348</code>. Startup choosers were dismissed without persisting settings (option 1, then Escape on the update dialog). The default Herdr session was not used.</p>
+
+<h2>1. Idle composer classified empty</h2>
+<p class="ok">fm_backend_herdr_composer_state returned empty. The real footer is the status row plus the combined shortcut/warning row, with no braille starfield between them.</p>
+<pre>› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+  ← for agents · ? for shortcuts                                                              ⚠ 1 warning · f2 to view</pre>
+
+<h2>2. Half-typed draft was not submitted</h2>
+<p class="ok">fm-send printed “doorbell skipped (composer visibly holds pending text)”. The draft was still in the composer afterward. Native status stayed done.</p>
+<pre>› DRAFTKEEP-7f0ec please do not submit this half typed note
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+                                                                                               ⚠ 1 warning · f2 to view</pre>
+
+<h2>3. fm-send typed and submitted the doorbell</h2>
+<p class="ok">No skip notice. The line left the composer and Codex showed Working. The composer returned to the idle placeholder.</p>
+<pre>› : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'codex-ring.inbox' steering inbox, read and act
+  on each in numeric order, then mv each into its handled/.
+
+• Working (0s • esc to interrupt)
+
+› Ask Codex to do anything
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+  ← for agents · ? for shortcuts                                                              ⚠ 1 warning · f2 to view</pre>
+
+<h2>4. Stuck doorbell above the footer was submitted</h2>
+<p>Before the ring, the doorbell sat in the composer with the status and warning rows still underneath. The hold check matched. fm-send did not skip; it pressed Enter.</p>
+<pre>BEFORE
+› : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'codex-guard.inbox' steering inbox, read and act
+  on each in numeric order, then mv each into its handled/.
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+                                                                                               ⚠ 1 warning · f2 to view
+
+AFTER
+› : Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'codex-guard.inbox' steering inbox, read and act
+  on each in numeric order, then mv each into its handled/.
+
+• Working (0s • esc to interrupt)
+
+› Ask Codex to do anything</pre>
+</body>
+</html>

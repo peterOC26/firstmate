@@ -1,0 +1,40 @@
+╭─────────────────────────────────────────────────╮
+│ ✨ Update available! 0.167.0 -> 0.169.0         │
+│ Run npm install -g @openai/codex to update.     │
+│                                                 │
+│ See full release notes:                         │
+│ https://github.com/openai/codex/releases/latest │
+╰─────────────────────────────────────────────────╯
+
+
+  >_ OpenAI Codex (v0.167.0)
+     ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+  permissions: YOLO mode
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+› DRAFTKEEP-7f0ec please do not submit this half typed note
+
+  GPT-6.1-Sol default · ~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R
+                                                                                               ⚠ 1 warning · f2 to view

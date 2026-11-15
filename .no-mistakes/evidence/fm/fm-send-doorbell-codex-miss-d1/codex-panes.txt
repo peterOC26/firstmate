@@ -1,0 +1,3 @@
+ring=w1:p1
+guard=w2:p1
+session=fm-lab-doorbell-1593525-30348

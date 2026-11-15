@@ -1,0 +1,9 @@
+holds_rc=0
+stuck_before=pending
+rering_rc=0
+submitted=1
+native=codex/working
+classify=empty
+--- stderr ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XORi7c
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.

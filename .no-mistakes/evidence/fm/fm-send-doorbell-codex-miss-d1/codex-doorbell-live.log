@@ -1,0 +1,75 @@
+13:01:32 start codex=codex-cli 0.167.0 herdr=herdr 0.9.0
+13:01:32 session fm-lab-doorbell-1593525-30348
+13:01:32 lab home /tmp/fm-lab.XORi7c
+13:01:32 launch fm-codex-ring pane=w1:p1
+13:01:32 launch fm-codex-guard pane=w2:p1
+13:01:32 panes ring=w1:p1 guard=w2:p1
+13:01:32 wait i=0 ring classify=unknown state=dead native= | guard classify=unknown state=dead native=
+13:01:32 --- ring tail ---
+zabi@hp-dev:~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R$ export FM_TASK_INBOX=/tmp/fm-lab.XORi7c/s
+tate/codex-ring.inbox; exec codex --dangerously-bypass-approvals-and-sandbox --disable hooks
+13:01:32 --- guard tail ---
+zabi@hp-dev:~/.no-mistakes/worktrees/7f0ec18181b6/01M7FHVY0R2386SBZWADADSQ3R$ export FM_TASK_INBOX=/tmp/fm-lab.XORi7c/st
+ate/codex-guard.inbox; exec codex --dangerously-bypass-approvals-and-sandbox --disable hooks
+13:01:34 wait i=1 ring classify=pending state=unreadable native=codex/unknown | guard classify=pending state=unreadable native=codex/unknown
+13:01:34 selecting run-without-daemon on w1:p1
+13:01:34 selecting run-without-daemon on w2:p1
+13:01:35 wait i=2 ring classify=pending state=unreadable native=codex/unknown | guard classify=pending state=unreadable native=codex/unknown
+13:01:35 skipping update dialog on w1:p1 with escape
+13:01:35 skipping update dialog on w2:p1 with escape
+13:01:37 wait i=3 ring classify=empty state=alive native=codex/working | guard classify=empty state=alive native=codex/working
+13:01:37 idle results ring=empty guard=empty
+ring_classify=empty
+guard_classify=empty
+ring_agent=alive
+guard_agent=alive
+ring_native=codex/working
+guard_native=codex/working
+13:01:37 typing draft
+13:01:42 draft summary:
+before=pending
+native_before=codex/done
+send_rc=0
+after=pending
+native_after=codex/done
+--- stderr ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XORi7c
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair a missing or failed watcher cycle with the Pi tool fm_watch_arm_pi, or restart Pi with -e {run-worktree}/.pi/extensions/fm-primary-turnend-guard.ts -e {run-worktree}/.pi/extensions/fm-primary-pi-watch.ts if the extensions are not loaded.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /tmp/fm-lab.XORi7c/state/codex-guard.inbox/001.msg and the watcher will re-ring
+13:01:42 clearing draft
+13:01:43 cleared classify=empty
+13:01:43 clean fm-send
+13:01:45 clean ring send_rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XORi7c
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+13:01:45 ring poll i=0 native=codex/working classify=empty
+send_rc=0
+landed=1
+native=codex/working
+classify=empty
+acted=no
+handled=no
+--- stderr ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XORi7c
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+13:01:45 guard before stuck classify=empty native=codex/done
+13:01:45 stuck line length=175
+13:01:47 holds_rc=0 stuck_before=pending
+13:01:49 rering poll i=0 native=codex/working classify=empty
+holds_rc=0
+stuck_before=pending
+rering_rc=0
+submitted=1
+native=codex/working
+classify=empty
+--- stderr ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.XORi7c
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+13:01:49 driver done
+13:01:49 cleanup session=fm-lab-doorbell-1593525-30348 lab=/tmp/fm-lab.XORi7c
