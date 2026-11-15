@@ -113,7 +113,11 @@
 # watcher recovery generation, so the synchronous Stop guard
 # (bin/fm-turnend-guard.sh --claude) can allow a stop whose recovery this hook
 # already owns, instead of forcing a duplicate continuation for the same event
-# epoch. The failure marker
+# epoch. Before this hook sources anything else it publishes its pid in
+# state/.claude-autoarm-starting and removes that file on exit when the file
+# still names this pid, so the synchronous guard can see a firing that has not
+# reached its claim yet. bin/fm-turnend-guard.sh --claude owns that wait.
+# The failure marker
 # state/.claude-autoarm-failure-notified deduplicates the last-resort notice,
 # and state/.claude-autoarm-failure-alarmed bounds the attended fail-open and
 # suppresses any later automatic continuation in that unresolved episode.
@@ -171,6 +175,88 @@ case "$AUTOARM_ATTEMPTS" in
   1|2|3) : ;;
   *) AUTOARM_ATTEMPTS=2 ;;
 esac
+
+# Published before any library is sourced. The guard header owns the wait this
+# marker extends. The directory lock stops one firing's exit from unlinking a
+# later firing's marker, including an exit that interrupts this publish.
+STARTING_MARKER="$STATE/.claude-autoarm-starting"
+STARTING_LOCK="$STATE/.claude-autoarm-starting.lock"
+STARTING_LOCK_HELD=0
+
+starting_lock_remove() {
+  if [ -L "$STARTING_LOCK" ]; then
+    rm -f "$STARTING_LOCK" 2>/dev/null || true
+  elif [ -d "$STARTING_LOCK" ]; then
+    rm -rf "$STARTING_LOCK" 2>/dev/null || true
+  fi
+}
+
+starting_lock_acquire() {
+  local i=0 holder
+  if [ "$STARTING_LOCK_HELD" -eq 1 ]; then
+    return 0
+  fi
+  while [ "$i" -lt 50 ]; do
+    if mkdir "$STARTING_LOCK" 2>/dev/null; then
+      printf '%s\n' "$$" > "$STARTING_LOCK/pid" 2>/dev/null || true
+      STARTING_LOCK_HELD=1
+      return 0
+    fi
+    holder=
+    IFS= read -r holder < "$STARTING_LOCK/pid" 2>/dev/null || true
+    if [ "$holder" = "$$" ]; then
+      STARTING_LOCK_HELD=1
+      return 0
+    fi
+    case "$holder" in
+      ''|*[!0-9]*)
+        if [ "$i" -ge 5 ] && [ ! -f "$STARTING_LOCK/pid" ]; then
+          starting_lock_remove
+        fi
+        ;;
+      *)
+        if ! kill -0 "$holder" 2>/dev/null; then
+          starting_lock_remove
+        fi
+        ;;
+    esac
+    i=$((i + 1))
+    sleep 0.01
+  done
+  return 1
+}
+
+starting_lock_release() {
+  [ "$STARTING_LOCK_HELD" -eq 1 ] || return 0
+  starting_lock_remove
+  STARTING_LOCK_HELD=0
+}
+
+publish_starting_marker() {
+  local tmp
+  mkdir -p "$STATE" 2>/dev/null || return 0
+  tmp="$STARTING_MARKER.tmp.$$"
+  starting_lock_acquire || true
+  if printf '%s\n' "$$" > "$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$STARTING_MARKER" 2>/dev/null || rm -f "$tmp" 2>/dev/null || true
+  fi
+  starting_lock_release
+}
+
+# shellcheck disable=SC2329 # Invoked by the EXIT trap below.
+release_starting_marker() {
+  local recorded
+  [ -f "$STARTING_MARKER" ] || return 0
+  starting_lock_acquire || return 0
+  IFS= read -r recorded < "$STARTING_MARKER" || recorded=
+  if [ "$recorded" = "$$" ]; then
+    rm -f "$STARTING_MARKER" 2>/dev/null || true
+  fi
+  starting_lock_release
+}
+
+publish_starting_marker
+trap release_starting_marker EXIT
 
 # shellcheck source=bin/fm-primary-scope-lib.sh
 . "$SCRIPT_DIR/fm-primary-scope-lib.sh"

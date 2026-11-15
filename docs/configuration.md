@@ -3478,6 +3478,7 @@ FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PID
 FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=800   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression
+FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=15000   # milliseconds the --claude guard keeps waiting past FM_CLAUDE_AUTOARM_SYNC_WAIT_MS while a live supervision-host auto-arm has published state/.claude-autoarm-starting; bin/fm-turnend-guard.sh owns the rule
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
 FM_ARM_CONFIRM_TIMEOUT=300   # fresh-child confirmation backstop in seconds; default max(FM_GUARD_GRACE, 10), or max(FM_GUARD_GRACE, 30) on Git Bash/MSYS; positive overrides may be shorter; expiry still waits for safe interruption (docs/watcher-continuity.md "Startup interruption window")
