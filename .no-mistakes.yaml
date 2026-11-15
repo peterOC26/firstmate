@@ -17,6 +17,8 @@ disable_project_settings: true
 # no repository field is copied into them (review.path_instructions reach the
 # reviewer, not the fixer, and commit.fix_message only wraps the summary), so
 # no file in this repository can keep a greeting out of a review-fix subject.
+# tests/fm-nm-test-contract.test.sh reads this branch's commit subjects
+# through git and fails when one greets.
 
 # Trusted documentation placement policy for the Document step.
 # The audience inventory and coding guideline own the detail; keep this as a
