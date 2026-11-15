@@ -1,0 +1,17 @@
+### A: real branch .no-mistakes.yaml + commands.test so ci-workflow can complete
+  ✓  CI workflow generated
+        /tmp/tmp.cnCTjgU5Ix/.github/workflows/ci.yml
+
+  Commit and push this file to enable GitHub checks:
+  git add .github/workflows/ci.yml && git commit -m 'ci: register workflow'
+exit=0
+### B: ci.instructions given wrong type (list) to prove the ci section is typed-parsed
+ci-workflow: commands.test not configured in .no-mistakes.yaml
+exit=1
+### C: unknown key under ci
+  ✓  CI workflow generated
+        /tmp/tmp.cnCTjgU5Ix/.github/workflows/ci.yml
+
+  Commit and push this file to enable GitHub checks:
+  git add .github/workflows/ci.yml && git commit -m 'ci: register workflow'
+exit=0
