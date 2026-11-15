@@ -2528,7 +2528,17 @@ test_hook_claude_mode_host_autoarm_gap_still_blocks() {
   start_named_autoarm_stub "$dir" 8 1 0
   stub=$NAMED_AUTOARM_PID
   start=$EPOCHREALTIME
-  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=1000 run_hook_claude "$dir" true); status=$?
+  out=$(
+    sleep() {
+      if [ "$1" = 0.1 ]; then
+        command sleep 0.5
+      else
+        command sleep "$@"
+      fi
+    }
+    export -f sleep
+    FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 FM_CLAUDE_AUTOARM_HOST_CLAIM_WAIT_MS=1000 run_hook_claude "$dir" true
+  ); status=$?
   ms=$(elapsed_ms_since "$start")
   outcome=$(claude_epoch_outcome "$dir")
   stop_named_autoarm_stub "$stub"

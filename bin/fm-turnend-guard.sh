@@ -584,20 +584,17 @@ host_arm_pending() {
 
 i=0
 sync_ticks=$((SYNC_WAIT_MS / 100))
-host_ticks=$((HOST_CLAIM_WAIT_MS / 100))
-if [ "$host_ticks" -lt "$sync_ticks" ]; then
-  host_ticks=$sync_ticks
-fi
 host_extend=0
 if bash "$SCRIPT_DIR/fm-supervision-engine-lib.sh" enabled "$CONFIG" claude >/dev/null 2>&1; then
   host_extend=1
 fi
+host_deadline=$((SECONDS + (HOST_CLAIM_WAIT_MS + 999) / 1000))
 while :; do
   if autoarm_owns_recovery; then
     allow_autoarm_recovery
   fi
   if [ "$i" -ge "$sync_ticks" ]; then
-    if [ "$host_extend" -ne 1 ] || [ "$i" -ge "$host_ticks" ] || ! host_arm_pending; then
+    if [ "$host_extend" -ne 1 ] || [ "$SECONDS" -ge "$host_deadline" ] || ! host_arm_pending; then
       break
     fi
   fi
