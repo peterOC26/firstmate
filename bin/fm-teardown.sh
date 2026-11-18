@@ -635,7 +635,7 @@ teardown_journal_refuse() {  # <journal> <reason>
 
 # The script header owns when an aborted spawn's journal may release its lease.
 teardown_journal_release_locked() {  # <journal> <project>
-  local journal=$1 project=$2 wt lease_id holder home dirty pids unlanded branch
+  local journal=$1 project=$2 wt lease_id holder home dirty pids unlanded branch remote_refs
   local -a landed_refs=(--exclude='no-mistakes/*' --remotes)
   [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] ||
     teardown_journal_refuse "$journal" "task $ID gained a record; run teardown again" || return
@@ -677,13 +677,20 @@ teardown_journal_release_locked() {  # <journal> <project>
     dirty=$(printf '%s\n' "$dirty" | grep -vE "$TEARDOWN_GENERATED_UNTRACKED_RE" || true)
     [ -z "$dirty" ] ||
       teardown_journal_refuse "$journal" "$wt has uncommitted changes" || return
-    for branch in main master; do
-      ! git -C "$wt" show-ref --verify --quiet "refs/heads/$branch" || landed_refs+=("refs/heads/$branch")
-    done
+    remote_refs=$(git -C "$wt" for-each-ref --format='%(refname)' refs/remotes/ 2>/dev/null) ||
+      teardown_journal_refuse "$journal" "cannot inspect $wt for remote-tracking refs" || return
+    if [ -z "$remote_refs" ]; then
+      for branch in main master; do
+        if git -C "$wt" show-ref --verify --quiet "refs/heads/$branch"; then
+          landed_refs+=("refs/heads/$branch")
+          break
+        fi
+      done
+    fi
     unlanded=$(git -C "$wt" rev-list -n 1 HEAD --not "${landed_refs[@]}" -- 2>/dev/null) ||
       teardown_journal_refuse "$journal" "cannot inspect $wt for unlanded commits" || return
     [ -z "$unlanded" ] ||
-      teardown_journal_refuse "$journal" "$wt holds commits on no remote and not in local main or master" || return
+      teardown_journal_refuse "$journal" "$wt holds commits on no remote or eligible local default branch" || return
     (cd "$project" && treehouse return --force "$wt" --if-lease-id "$lease_id" --if-lease-holder "$holder") ||
       teardown_journal_refuse "$journal" "treehouse return of $wt failed" || return
     if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then
@@ -696,7 +703,12 @@ teardown_journal_release_locked() {  # <journal> <project>
   elif [ -d "$wt" ] && fm_treehouse_lease_released "$wt" "$lease_id"; then
     fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
-      mine) fm_treehouse_slot_owner_release "$wt" "$ID" ;;
+      mine)
+        fm_treehouse_slot_owner_release "$wt" "$ID"
+        fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
+        [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] ||
+          teardown_journal_refuse "$journal" "returned $wt but could not drop its slot claim" || return
+        ;;
       absent|other) ;;
       *) teardown_journal_refuse "$journal" "cannot read the slot claim on $wt" || return ;;
     esac

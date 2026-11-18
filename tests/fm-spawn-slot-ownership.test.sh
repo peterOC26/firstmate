@@ -925,7 +925,7 @@ test_aborted_spawn_journal_releases_through_teardown() {
   out=$(spawn_task aborted 2); rc=$?
   expect_code 0 "$rc" "the same id could not spawn after release: $out"
 
-  for shape in dirty unlanded in-use other-claim other-record spawn-running; do
+  for shape in dirty unlanded remote-main gate-main local-master in-use other-claim other-record spawn-running; do
     make_case "journal-only-keep-$shape"
     out=$(abort_spawn_after_lease aborted 1); rc=$?
     [ "$rc" -ne 0 ] || fail "$shape setup spawn did not abort: $out"
@@ -935,6 +935,22 @@ test_aborted_spawn_journal_releases_through_teardown() {
         reason='has uncommitted changes'
         ;;
       unlanded)
+        git -C "$POOL/1/project" -c user.name=t -c user.email=t@example.invalid \
+          commit -q --allow-empty -m 'unlanded'
+        reason='holds commits on no remote'
+        ;;
+      remote-main|gate-main|local-master)
+        if [ "$shape" = local-master ]; then
+          git -C "$POOL/1/project" checkout -qb master
+        else
+          if [ "$shape" = remote-main ]; then
+            git -C "$PROJECT" update-ref refs/remotes/origin/main HEAD
+          else
+            git -C "$PROJECT" update-ref refs/remotes/no-mistakes/main HEAD
+          fi
+          git -C "$PROJECT" checkout -q --detach
+          git -C "$POOL/1/project" checkout -q main
+        fi
         git -C "$POOL/1/project" -c user.name=t -c user.email=t@example.invalid \
           commit -q --allow-empty -m 'unlanded'
         reason='holds commits on no remote'
@@ -981,11 +997,11 @@ test_aborted_spawn_journal_releases_through_teardown() {
     [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape refusal invoked Treehouse: $(cat "$CASE_DIR/treehouse.log")"
     case "$shape" in
       dirty) assert_present "$POOL/1/project/work-in-progress" "dirty refusal discarded work" ;;
-      unlanded) assert_grep unlanded <(git -C "$POOL/1/project" log -1 --format=%s) "unlanded refusal moved HEAD" ;;
+      unlanded|remote-main|gate-main|local-master) assert_grep unlanded <(git -C "$POOL/1/project" log -1 --format=%s) "unlanded refusal moved HEAD" ;;
     esac
   done
 
-  for shape in released missing-copy; do
+  for shape in released missing-copy released-claim-failure; do
     make_case "journal-only-records-$shape"
     out=$(abort_spawn_after_lease aborted 1); rc=$?
     [ "$rc" -ne 0 ] || fail "$shape setup spawn did not abort: $out"
@@ -995,6 +1011,24 @@ test_aborted_spawn_journal_releases_through_teardown() {
     else
       jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
       mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+    fi
+    if [ "$shape" = released-claim-failure ]; then
+      cat > "$FAKEBIN/rm" <<'SH'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in */.fm-slot-owner) exit 1 ;; esac
+done
+exec /bin/rm "$@"
+SH
+      chmod +x "$FAKEBIN/rm"
+      cp "$POOL/1/.fm-slot-owner" "$CASE_DIR/prior-claim"
+      journal_only_teardown aborted "$CASE_DIR/refusal"; rc=$?
+      [ "$rc" -ne 0 ] || fail "failed claim removal discarded the journal"
+      assert_grep 'could not drop its slot claim' "$CASE_DIR/refusal" "claim failure was not diagnosed"
+      cmp -s "$CASE_DIR/prior-claim" "$POOL/1/.fm-slot-owner" || fail "claim failure changed ownership"
+      assert_present "$HOME_DIR/state/aborted.treehouse-acquire/identity" "claim failure lost recovery journal"
+      [ ! -s "$CASE_DIR/treehouse.log" ] || fail "claim failure returned an already released lease"
+      /bin/rm "$FAKEBIN/rm"
     fi
     cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
     journal_only_teardown aborted "$CASE_DIR/records"; rc=$?
