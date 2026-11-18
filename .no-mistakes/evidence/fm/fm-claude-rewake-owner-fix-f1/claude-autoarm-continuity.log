@@ -1,0 +1,4 @@
+1..2
+ok - auto-arm: an attached cycle's end starts a handling successor named after the closed arm before the rewake
+ok - auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it
+FM_TEST_COMPLETE

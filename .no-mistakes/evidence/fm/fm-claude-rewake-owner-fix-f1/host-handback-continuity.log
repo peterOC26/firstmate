@@ -1,0 +1,5 @@
+1..3
+ok - host: the park ends itself with a boundary wake and a verified successor
+ok - host: default hand-back replaces closed successors until main handles
+ok - host: both hand-back modes record a failed replacement independently
+FM_TEST_COMPLETE

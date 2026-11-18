@@ -1,0 +1,4 @@
+1..2
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: an engine turn whose result is incomplete hands its wake to main
+FM_TEST_COMPLETE
