@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Merge a task's PR or MR after recording pr= and any available pr_head= through
-# bin/fm-pr-check.sh, so teardown can verify landed work after squash merges.
+# Merge a task's PR or MR, recording the PR identity and available head for live tasks.
+# For a GitHub PR whose task was cleaned up, use attended --closed-task.
+# The live-task record lets teardown verify landed work after squash merges.
 # The full canonical URL is parsed by bin/fm-pr-lib.sh. A GitHub pull request is
 # addressed through gh by the derived owner and repository on the derived host,
 # exported as GH_HOST for the whole run, which is github.com or a GitHub
@@ -198,9 +199,9 @@
 # still enqueue, and killing this shell can orphan a forge child after stale-lock
 # recovery. docs/architecture.md owns those away-merge limits, while
 # docs/captain-hold-lifecycle.md owns the separate merge-to-cleanup residual.
-# A failed forge command releases the lock after it returns. A successful one
-# retains the lock until the accepted merge authority is persisted against the
-# still-matching task metadata.
+# A failed forge command releases the lock after it returns. A successful merge
+# for a recorded task retains the lock until accepted merge authority is
+# persisted against the still-matching task metadata.
 #
 # An attended --closed-task merges a GitHub pull request whose task record
 # cleanup already removed, after the captain approved that merge. It requires
