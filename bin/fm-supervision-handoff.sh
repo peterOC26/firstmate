@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+# fm-supervision-handoff.sh <token> <predecessor-pid> [ack|handling] owns and
+# replaces watchers until acknowledgement (ack) or a handling receipt (handling),
+# session loss, ownership transfer, or daemon-owned away; ack stops on any .afk.
 # .supervision-handoff-owner records this process's pid and identity. The next
 # host stops it before taking over the arm recorded in .supervision-host-left.
-# Ack and TERM both leave that verified arm for the next park, not a second arm.
+# Ack, a handling receipt, and TERM leave that verified arm for the next park, not a second arm.
 #
 # Automatic delivery uses one inherited endpoint, never a guessed pane. An
 # inherited TMUX_PANE is tried first. Otherwise an inherited Herdr pane
@@ -29,6 +32,7 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-operational-input.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+. "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
 fm_backend_source tmux || exit 1
 MODE=${3:-ack}
 case "$MODE" in ack|handling) ;; *) exit 2 ;; esac
@@ -97,7 +101,8 @@ handoff_pending() {
 }
 
 owner_active() {
-  session_owned && { [ "$MODE" = handling ] || [ ! -e "$STATE/.afk" ]; } \
+  session_owned && { [ ! -e "$STATE/.afk" ] \
+    || { [ "$MODE" = handling ] && fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; }; } \
     && [ "$(cut -f1 "$OWNER" 2>/dev/null)" = "$$" ]
 }
 
@@ -208,9 +213,20 @@ while owner_active; do
   ARM_RECORDED=0
   set +m
   deadline=$((SECONDS + ${FM_SUPERVISION_HOST_READY_TIMEOUT:-25}))
+  closed=0
   while ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME" \
     || ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$OUT"; do
-    if ! fm_pid_alive "$ARM" || [ "$SECONDS" -ge "$deadline" ]; then
+    if ! fm_pid_alive "$ARM"; then
+      if wait "$ARM" 2>/dev/null \
+        && grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$OUT" \
+        && grep -Eq '^(signal:|stale:|check:|heartbeat($|:))' "$OUT" \
+        && ! grep -q '^watcher: FAILED' "$OUT"; then
+        closed=1
+        break
+      fi
+      exit 1
+    fi
+    if grep -q '^watcher: FAILED' "$OUT" || [ "$SECONDS" -ge "$deadline" ]; then
       grep '^watcher: FAILED' "$OUT" || true
       kill -TERM "$ARM" 2>/dev/null || true
       wait "$ARM" 2>/dev/null || true
@@ -218,28 +234,30 @@ while owner_active; do
     fi
     sleep 0.2
   done
-  owner_active || exit 0
-  identity=$(fm_pid_identity "$ARM") || exit 1
-  tmp=$(mktemp "$LEFT.XXXXXX") || exit 1
-  if ! printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" || ! mv -f "$tmp" "$LEFT" \
-    || [ ! -f "$LEFT" ] || [ -L "$LEFT" ] \
-    || [ "$(cat "$LEFT")" != "$ARM"$'\t'"$identity" ]; then
-    rm -f "$tmp" "$LEFT/${tmp##*/}" 2>/dev/null || true
-    exit 1
-  fi
-  ARM_RECORDED=1
-  if [ "$READY_PRINTED" -eq 0 ]; then
-    grep -E -m1 '^watcher: (started|attached) pid=[0-9]+' "$OUT"
-    READY_PRINTED=1
-  fi
-  while fm_pid_alive "$ARM"; do
-    handoff_pending && owner_active || exit 0
-    if [ "$SECONDS" -ge "$NEXT_RETRY" ]; then
-      retry_delivery
-      NEXT_RETRY=$((SECONDS + RETRY))
+  if [ "$closed" -eq 0 ]; then
+    owner_active || exit 0
+    identity=$(fm_pid_identity "$ARM") || exit 1
+    tmp=$(mktemp "$LEFT.XXXXXX") || exit 1
+    if ! printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" || ! mv -f "$tmp" "$LEFT" \
+      || [ ! -f "$LEFT" ] || [ -L "$LEFT" ] \
+      || [ "$(cat "$LEFT")" != "$ARM"$'\t'"$identity" ]; then
+      rm -f "$tmp" "$LEFT/${tmp##*/}" 2>/dev/null || true
+      exit 1
     fi
-    sleep 1
-  done
+    ARM_RECORDED=1
+    if [ "$READY_PRINTED" -eq 0 ]; then
+      grep -E -m1 '^watcher: (started|attached) pid=[0-9]+' "$OUT"
+      READY_PRINTED=1
+    fi
+    while fm_pid_alive "$ARM"; do
+      handoff_pending && owner_active || exit 0
+      if [ "$SECONDS" -ge "$NEXT_RETRY" ]; then
+        retry_delivery
+        NEXT_RETRY=$((SECONDS + RETRY))
+      fi
+      sleep 1
+    done
+  fi
   wait "$ARM" 2>/dev/null || true
   PREDECESSOR=$ARM
   ARM=

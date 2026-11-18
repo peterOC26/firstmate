@@ -252,15 +252,6 @@ if ! fm_session_lock_owned_by_self "$STATE"; then
   RECOVER_SESSION_LOCK=1
 fi
 
-# True when this Claude home runs the supervision host and the posture record
-# is away, not quiet. The host is the away session there. A leftover state/.afk
-# must not leave it unarmed. Quiet mode and a daemon-owned away stay inert.
-away_host_is_actor() {
-  fm_supervision_host_enabled "$CONFIG" claude || return 1
-  [ -e "$STATE/.afk-contract" ] && [ ! -L "$STATE/.afk-contract" ] || return 1
-  [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-contract.sh" mode 2>/dev/null || true)" != quiet ]
-}
-
 # A /clear re-keys the session id inside the same process. Ancestry still owns
 # the lock, but this hook does not otherwise call fm-lock.sh, so the sidecar
 # keeps the previous id. Refresh it before arming. A failed refresh still arms,
@@ -277,7 +268,7 @@ refresh_stale_lock_session() {
 # --- AFK: the away daemon owns the watcher and triage; never rewake ----------
 # The supervision host is the away session on a home that runs it, so the
 # daemon flag does not apply there while the posture record is away.
-if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
+if [ -e "$STATE/.afk" ] && ! fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; then
   exit 0
 fi
 
@@ -653,7 +644,7 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   # AFK may have appeared mid-cycle: the daemon owns triage now, so suppress
   # every subsequent classification and handoff. A host that is itself the
   # away session still delivers its hand-back.
-  if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
+  if [ -e "$STATE/.afk" ] && ! fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; then
     autoarm_record afk
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0

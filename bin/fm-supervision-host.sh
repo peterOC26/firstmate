@@ -118,8 +118,9 @@
 # With that opt-in, every main hand-back first queues a token-bound check and
 # verifies a detached bin/fm-supervision-handoff.sh owner. That owner keeps
 # replacing closed arms until main acknowledges the check, and leaves its
-# verified arm for the next park to take over. Its header owns retry delivery
-# and limits. The home computed below is exported before any child starts.
+# verified arm for the next park to take over. docs/watcher-continuity.md and
+# docs/configuration.md cover retry delivery and limits.
+# The home computed below is exported before any child starts.
 # A shell assignment is not visible to the branch offer or to that owner,
 # the owner stops immediately when FM_HOME is absent, and the offer's own
 # fallback is the repository that contains its script rather than that home.

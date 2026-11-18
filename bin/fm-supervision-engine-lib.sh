@@ -76,6 +76,12 @@ fm_supervision_host_enabled() {
   [ "${2-$(fm_supervision_host_primary)}" = claude ]
 }
 
+fm_supervision_away_host_is_actor() {
+  fm_supervision_host_enabled "$1" claude || return 1
+  [ -e "$2/.afk-contract" ] && [ ! -L "$2/.afk-contract" ] || return 1
+  [ "$(FM_STATE_OVERRIDE="$2" "$(dirname "${BASH_SOURCE[0]}")/fm-afk-contract.sh" mode 2>/dev/null || true)" != quiet ]
+}
+
 fm_supervision_engine_verified() {  # <engine>
   case " $FM_SUPERVISION_ENGINES_VERIFIED " in
     *" ${1:-} "*) return 0 ;;
