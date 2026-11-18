@@ -296,33 +296,55 @@ test_park_boundary_ends_the_park_before_the_hook_timeout() {
 # the second turn instead of silently passing at a wall-clock boundary.
 
 test_default_handback_replaces_closes_until_main_handles() {
-  local home first owner generation
-  home=$(make_home boundary-continuity attended)
-  FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HANDOFF_RETRY_SECONDS=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+  local home first owner generation posture
+  for posture in attended away; do
+    home=$(make_home "boundary-continuity-$posture" "$posture")
+    [ "$posture" != away ] || : > "$home/state/.afk"
+    FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HANDOFF_RETRY_SECONDS=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+      FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+    wait_until 150 watcher_live "$home" || fail "continuity: no initial watcher"
+    echo 60 > "$home/park-clock"
+    wait_until 150 host_exited "$home" || fail "continuity: no boundary hand-back"
+    assert_absent "$home/state/.watcher-down.continuity-failed" "handling owner must not fall back for an away marker"
+    first=$(cut -f1 "$home/state/.supervision-host-left")
+    owner=$(cut -f1 "$home/state/.supervision-handoff-owner")
+    kill -0 "$owner" || fail "continuity: no detached owner"
+    append_status "$home" 'arrived after hand-back'
+    wait_until 200 sh -c '[ "$(cut -f1 "$1/state/.supervision-host-left")" != "$2" ]' _ "$home" "$first" \
+      || fail "continuity: a successor close stranded supervision: $(cat "$home/state/.supervision-handoff.log" "$home/host.out" 2>/dev/null)"
+    wait_until 150 watcher_live "$home" || fail "continuity: replacement watcher not live"
+    wait_until 100 test -s "$home/state/.supervision-handoff.log" || fail "continuity: missing bounded retry"
+    generation=$(sed 's/.*://' "$home/state/.watcher-down")
+    FM_HOME="$home" bash -c '. "$1"; FM_SUPERVISION_ACTOR=branch fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
+      || fail "continuity: branch handling failed"
+    kill -0 "$owner" || fail "continuity: branch handling retired main continuity"
+    FM_HOME="$home" bash -c '. "$1"; fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
+      || fail "continuity: main handling failed"
+    wait_until 100 sh -c '[ ! -e "$1" ]' _ "$home/state/.supervision-handoff-owner" \
+      || fail "continuity: handling receipt did not retire the owner"
+    [ "$(cat "$home/state/.watcher-down.handling")" = "$generation" ] || fail "continuity: receipt names the wrong generation"
+    watcher_live "$home" || fail "continuity: receipt retirement stopped the verified watcher"
+    stop_home_processes "$home"
+  done
+  pass "host: attended and away hand-backs replace cycles until main handles"
+}
+
+test_ack_owner_still_stands_down_for_away_marker() {
+  local home
+  home=$(make_home ack-away-marker attended)
+  : > "$home/config/supervision-handoff-ack"
+  FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
     FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
-  wait_until 150 watcher_live "$home" || fail "continuity: no initial watcher"
+  wait_until 150 watcher_live "$home" || fail "ack marker: no initial watcher"
   echo 60 > "$home/park-clock"
-  wait_until 150 host_exited "$home" || fail "continuity: no boundary hand-back"
-  first=$(cut -f1 "$home/state/.supervision-host-left")
-  owner=$(cut -f1 "$home/state/.supervision-handoff-owner")
-  kill -0 "$owner" || fail "continuity: no detached owner"
-  append_status "$home" 'arrived after hand-back'
-  wait_until 200 sh -c '[ "$(cut -f1 "$1/state/.supervision-host-left")" != "$2" ]' _ "$home" "$first" \
-    || fail "continuity: a successor close stranded supervision: $(cat "$home/state/.supervision-handoff.log" "$home/host.out" 2>/dev/null)"
-  wait_until 150 watcher_live "$home" || fail "continuity: replacement watcher not live"
-  wait_until 100 test -s "$home/state/.supervision-handoff.log" || fail "continuity: missing bounded retry"
-  generation=$(sed 's/.*://' "$home/state/.watcher-down")
-  FM_HOME="$home" bash -c '. "$1"; FM_SUPERVISION_ACTOR=branch fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
-    || fail "continuity: branch handling failed"
-  kill -0 "$owner" || fail "continuity: branch handling retired main continuity"
-  FM_HOME="$home" bash -c '. "$1"; fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
-    || fail "continuity: main handling failed"
+  wait_until 150 host_exited "$home" || fail "ack marker: no hand-back"
+  assert_present "$home/state/.supervision-handoff-owner" "ack marker: no owner"
+  : > "$home/state/.afk"
   wait_until 100 sh -c '[ ! -e "$1" ]' _ "$home/state/.supervision-handoff-owner" \
-    || fail "continuity: handling receipt did not retire the owner"
-  [ "$(cat "$home/state/.watcher-down.handling")" = "$generation" ] || fail "continuity: receipt names the wrong generation"
-  watcher_live "$home" || fail "continuity: receipt retirement stopped the verified watcher"
+    || fail "ack marker: owner ignored the away marker"
+  watcher_live "$home" || fail "ack marker: retiring owner stopped its watcher"
   stop_home_processes "$home"
-  pass "host: default hand-back replaces closed successors until main handles"
+  pass "host: acknowledgement owner still stands down for an away marker"
 }
 
 test_handback_replacement_failure_records_continuity() {
@@ -725,6 +747,7 @@ test_superseded_host_leaves_the_owner_untouched() {
 
 fm_test_run \
   test_default_handback_replaces_closes_until_main_handles \
+  test_ack_owner_still_stands_down_for_away_marker \
   test_handback_replacement_failure_records_continuity \
   test_latch_trips_after_two_engine_errors_then_probes_and_recovers \
   test_latch_keeps_attended_closes_on_main_and_skips_unopted_homes \

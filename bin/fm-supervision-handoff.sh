@@ -97,7 +97,7 @@ handoff_pending() {
 }
 
 owner_active() {
-  session_owned && [ ! -e "$STATE/.afk" ] \
+  session_owned && { [ "$MODE" = handling ] || [ ! -e "$STATE/.afk" ]; } \
     && [ "$(cut -f1 "$OWNER" 2>/dev/null)" = "$$" ]
 }
 

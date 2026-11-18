@@ -582,7 +582,8 @@ start_handling_successor() {  # <closed-arm-pid>
     case $- in *m*) monitor_was_on=1 ;; esac
     set -m 2>/dev/null || true
     if [ "$mode" = owner ]; then
-      FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
+      FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+        FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
         nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$recovery" "$1" handling >"$out" 2>&1 </dev/null &
     else
       FM_GUARD_GRACE="$GRACE" FM_WATCH_PREDECESSOR_ARM_PID="$1" \

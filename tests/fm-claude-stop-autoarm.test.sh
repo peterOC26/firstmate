@@ -87,6 +87,7 @@ write_arm_fixture() {
   # fails while state/successor-fail exists.
   cat > "$dir/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
+FM_HOME=${FM_HOME:-$FM_ROOT_OVERRIDE}
 if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
   printf 'arm=%s predecessor=%s\n' "$$" "$FM_WATCH_PREDECESSOR_ARM_PID" >> "$FM_HOME/state/successor-ran"
   if [ -e "$FM_HOME/state/successor-fail" ]; then
@@ -573,52 +574,56 @@ test_attached_cycle_end_starts_handling_successor() {
 }
 
 test_hostoff_owner_replaces_closed_cycle_until_handling() {
-  local dir session first second owner i
-  dir=$(make_primary_dir "$TMP_ROOT/owner-replacement")
-  : > "$dir/state/task.meta"
-  write_arm_fixture "$dir" actionable
-  printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
-    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
-    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-    "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2>&1
-    printf "%s\n" "$?" > "$FM_HOME/hook.rc"
-    while [ ! -e "$FM_HOME/release" ]; do sleep 0.1; done
-  ' &
-  session=$!
-  for i in $(seq 1 200); do
-    [ ! -s "$dir/hook.rc" ] || break
-    sleep 0.1
+  local dir session first second owner i home_source
+  for home_source in explicit root-only; do
+    dir=$(make_primary_dir "$TMP_ROOT/owner-replacement-$home_source")
+    : > "$dir/state/task.meta"
+    write_arm_fixture "$dir" actionable
+    printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
+      | FM_HOME="$dir" FM_ROOT_OVERRIDE="$dir" "$FAKE_CLAUDE" -c '
+      [ "$1" != root-only ] || unset FM_HOME
+      printf "%s\n" "$$" > "$FM_ROOT_OVERRIDE/state/.lock"
+      "$FM_ROOT_OVERRIDE/bin/fm-claude-stop-autoarm.sh" > "$FM_ROOT_OVERRIDE/hook.out" 2>&1
+      printf "%s\n" "$?" > "$FM_ROOT_OVERRIDE/hook.rc"
+      while [ ! -e "$FM_ROOT_OVERRIDE/release" ]; do sleep 0.1; done
+    ' _ "$home_source" &
+    session=$!
+    for i in $(seq 1 200); do
+      [ ! -s "$dir/hook.rc" ] || break
+      sleep 0.1
+    done
+    expect_code 2 "$(cat "$dir/hook.rc")" "first Stop must request handling"
+    assert_absent "$dir/state/.watcher-down.continuity-failed" "resolved home must start the owner without fallback"
+    first=$(cat "$dir/state/.watch.lock/pid")
+    owner=$(cut -f1 "$dir/state/.supervision-handoff-owner")
+    assert_absent "$dir/state/.watcher-down.handling" "replacement case must suppress handling"
+    touch "$dir/state/close-successor-$first"
+    second=$first
+    for i in $(seq 1 200); do
+      second=$(cat "$dir/state/.watch.lock/pid" 2>/dev/null)
+      if [ -n "$second" ] && [ "$second" != "$first" ] \
+        && [ "$(cut -f1 "$dir/state/.supervision-host-left" 2>/dev/null)" = "$second" ]; then
+        break
+      fi
+      sleep 0.1
+    done
+    [ -n "$second" ] && [ "$second" != "$first" ] || fail "no replacement after second decision"
+    [ "$(cut -f1 "$dir/state/.supervision-host-left")" = "$second" ] \
+      || fail "replacement arm was not recorded for takeover"
+    kill -0 "$second" || fail "replacement watcher is not live"
+    kill -0 "$owner" || fail "owner exited before handling"
+    [ "$(wc -l < "$dir/state/arm-ran")" -eq 1 ] || fail "replacement needed another Stop"
+    FM_HOME="$dir" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_recovery_marker_begin_handling "$1/state/.watcher-down"' _ "$dir"     || fail "main could not begin handling"
+    for i in $(seq 1 100); do
+      [ -e "$dir/state/.supervision-handoff-owner" ] || break
+      sleep 0.1
+    done
+    [ ! -e "$dir/state/.supervision-handoff-owner" ] || fail "owner remained after handling"
+    kill -0 "$second" || fail "handling stopped the replacement watcher"
+    touch "$dir/release"
+    wait "$session"
   done
-  expect_code 2 "$(cat "$dir/hook.rc")" "first Stop must request handling"
-  first=$(cat "$dir/state/.watch.lock/pid")
-  owner=$(cut -f1 "$dir/state/.supervision-handoff-owner")
-  assert_absent "$dir/state/.watcher-down.handling" "replacement case must suppress handling"
-  touch "$dir/state/close-successor-$first"
-  second=$first
-  for i in $(seq 1 200); do
-    second=$(cat "$dir/state/.watch.lock/pid" 2>/dev/null)
-    if [ -n "$second" ] && [ "$second" != "$first" ] \
-      && [ "$(cut -f1 "$dir/state/.supervision-host-left" 2>/dev/null)" = "$second" ]; then
-      break
-    fi
-    sleep 0.1
-  done
-  [ -n "$second" ] && [ "$second" != "$first" ] || fail "no replacement after second decision"
-  [ "$(cut -f1 "$dir/state/.supervision-host-left")" = "$second" ] \
-    || fail "replacement arm was not recorded for takeover"
-  kill -0 "$second" || fail "replacement watcher is not live"
-  kill -0 "$owner" || fail "owner exited before handling"
-  [ "$(wc -l < "$dir/state/arm-ran")" -eq 1 ] || fail "replacement needed another Stop"
-  FM_HOME="$dir" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_recovery_marker_begin_handling "$1/state/.watcher-down"' _ "$dir"     || fail "main could not begin handling"
-  for i in $(seq 1 100); do
-    [ -e "$dir/state/.supervision-handoff-owner" ] || break
-    sleep 0.1
-  done
-  [ ! -e "$dir/state/.supervision-handoff-owner" ] || fail "owner remained after handling"
-  kill -0 "$second" || fail "handling stopped the replacement watcher"
-  touch "$dir/release"
-  wait "$session"
-  pass "auto-arm: owner replaces a second close without Stop and releases on handling"
+  pass "auto-arm: explicit and default homes replace closes until handling"
 }
 
 test_hostoff_owner_failure_leaves_one_shot_successor() {

@@ -487,9 +487,6 @@ test_autoarm_long_handling_turn_stays_silent() {
   pass "fm-guard stale banner: auto-arm long handling turn with a healthy rewake stays silent"
 }
 
-# Drive the long-turn signals apart on the same stale beacon. Losing any one
-# healthy-generation signal must restore the banner; the stale beacon alone
-# is not enough to stay quiet, and adding a failure marker is not either.
 test_autoarm_handling_receipt_survives_append() {
   local dir home out pid
   dir=$(make_guard_case autoarm-handling-append)
@@ -516,6 +513,9 @@ test_autoarm_handling_receipt_survives_append() {
   pass "fm-guard: generation-bound handling survives an in-turn append"
 }
 
+# Drive the long-turn signals apart on the same stale beacon. Losing any one
+# healthy-generation signal must restore the banner; the stale beacon alone
+# is not enough to stay quiet, and adding a failure marker is not either.
 test_autoarm_long_turn_requires_every_healthy_signal() {
   local dir home out pid replacement_pid='' case_name
   for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon never-drained never-drained-announced branch-only continuity-failed; do
