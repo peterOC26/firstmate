@@ -1825,6 +1825,126 @@ test_missing_meta_refuses_before_merge() {
   pass "fm-pr-merge refuses before merging when task meta is missing"
 }
 
+# A PR can outlive its task: the captain approves the merge after cleanup has
+# already removed the task record. --closed-task is that one attended path, and
+# it keeps every live guard while recording nothing for a task that is gone.
+make_closed_task_case() {
+  local case_dir
+  case_dir=$(make_case "$1")
+  rm -f "$case_dir/state/task-x1.meta"
+  add_gh_mocks "$case_dir" "$2"
+  : > "$case_dir/gh-axi.log"
+  printf '%s\n' "$case_dir"
+}
+
+test_closed_task_merges_a_pr_that_outlived_its_task() {
+  local case_dir rc head url
+  head=c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1
+  url=https://github.com/example/repo/pull/239
+  case_dir=$(make_closed_task_case closed-task-merge "$head")
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" --closed-task --expected-head "$head" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 0 "$rc" "closed-task-merge: a green PR whose task record is gone should merge: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 239 example/repo --squash
+  assert_grep "verified: $url is merged" "$case_dir/stdout" \
+    "closed-task-merge: the landed merge was not verified"
+  assert_grep "merge landed: task-x1 $url" "$case_dir/state/.wake-queue" \
+    "closed-task-merge: the landed merge was not reported for supervision"
+  assert_absent "$case_dir/state/task-x1.meta" \
+    "closed-task-merge: a task record was recreated for a closed task"
+  assert_absent "$case_dir/state/task-x1.check.sh" \
+    "closed-task-merge: a merge poll was armed for a closed task"
+  assert_absent "$case_dir/state/task-x1.merge-authority" \
+    "closed-task-merge: merge authority was persisted for a closed task"
+  assert_absent "$case_dir/state/task-x1.pr-poll-merge-notified" \
+    "closed-task-merge: a merge marker was left behind for a closed task"
+  pass "fm-pr-merge --closed-task merges a green PR whose task record is gone"
+}
+
+test_closed_task_keeps_every_guard() {
+  local case_dir rc head other url name
+  head=c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2
+  other=c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3
+  url=https://github.com/example/repo/pull/240
+
+  closed_task_refused() {  # <name> <expected-rc> <stderr-pattern> <args>...
+    local name=$1 want=$2 pattern=$3
+    shift 3
+    set +e
+    run_pr_merge "$case_dir" task-x1 "$@" > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+    expect_code "$want" "$rc" "$name: the merge should be refused: $(cat "$case_dir/stderr")"
+    assert_grep "$pattern" "$case_dir/stderr" "$name: refusal did not explain itself"
+    assert_no_grep 'pr merge' "$case_dir/gh.log" "$name: gh pr merge ran"
+  }
+
+  case_dir=$(make_closed_task_case closed-task-no-head "$head")
+  closed_task_refused closed-task-no-head 2 '--closed-task requires --expected-head' \
+    "$url" --closed-task
+
+  case_dir=$(make_closed_task_case closed-task-head-mismatch "$head")
+  closed_task_refused closed-task-head-mismatch 1 "not the expected head $other" \
+    "$url" --closed-task --expected-head "$other"
+
+  case_dir=$(make_closed_task_case closed-task-red "$head")
+  write_github_red_json "$case_dir" "$head" lint
+  closed_task_refused closed-task-red 1 'lint' \
+    "$url" --closed-task --expected-head "$head"
+
+  case_dir=$(make_case closed-task-record-present)
+  add_gh_mocks "$case_dir" "$head"
+  closed_task_refused closed-task-record-present 1 'still has a task record' \
+    "$url" --closed-task --expected-head "$head"
+
+  for name in --attended-override --update-branch; do
+    case_dir=$(make_closed_task_case "closed-task-with$name" "$head")
+    closed_task_refused "closed-task-with$name" 2 '--closed-task refuses' \
+      "$url" --closed-task "$name" --expected-head "$head"
+  done
+
+  case_dir=$(make_closed_task_case closed-task-away "$head")
+  write_away_record "$case_dir" --words 'merge task-x1 when green'
+  closed_task_refused closed-task-away 2 '--closed-task is attended-only' \
+    "$url" --closed-task --expected-head "$head"
+
+  case_dir=$(make_closed_task_case closed-task-queue "$head")
+  printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
+  closed_task_refused closed-task-queue 2 'no task record would track a queued merge' \
+    "$url" --closed-task --expected-head "$head"
+
+  case_dir=$(make_closed_task_case closed-task-held "$head")
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-tasks-axi.sh" add task-x1 "Held merge" --kind ship --repo example \
+    > "$case_dir/hold-add.out" 2> "$case_dir/hold-add.err" \
+    || fail "closed-task-held: could not add the task: $(cat "$case_dir/hold-add.err")"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-captain-hold.sh" hold task-x1 --reason "captain merge approval pending" \
+    > "$case_dir/hold.out" 2> "$case_dir/hold.err" \
+    || fail "closed-task-held: could not hold the task: $(cat "$case_dir/hold.err")"
+  closed_task_refused closed-task-held 1 'still held for the captain' \
+    "$url" --closed-task --expected-head "$head"
+
+  case_dir=$(make_gitlab_case closed-task-gitlab)
+  rm -f "$case_dir/state/task-x1.meta"
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$MR_URL" --closed-task --expected-head "$MR_HEAD" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 2 "$rc" "closed-task-gitlab: --closed-task should be refused off GitHub"
+  assert_grep '--closed-task applies only to GitHub' "$case_dir/stderr" \
+    "closed-task-gitlab: refusal did not name GitHub"
+  assert_no_grep 'mr merge' "$case_dir/glab.log" "closed-task-gitlab: glab mr merge ran"
+
+  case_dir=$(make_closed_task_case closed-task-missing-meta-hint "$head")
+  closed_task_refused closed-task-missing-meta-hint 1 'task metadata is unavailable' "$url"
+  pass "fm-pr-merge --closed-task keeps the head pin, green, attended, queue, hold, and record guards"
+}
+
 test_malformed_url_refuses_before_merge() {
   local case_dir rc
   case_dir=$(make_case malformed-url)
@@ -3579,6 +3699,8 @@ test_github_queued_outcome_is_verified
 test_github_queue_required_refusal_names_retry_flags
 test_extra_merge_args_forwarded
 test_missing_meta_refuses_before_merge
+test_closed_task_merges_a_pr_that_outlived_its_task
+test_closed_task_keeps_every_guard
 test_malformed_url_refuses_before_merge
 test_help_prints_usage_and_exits_zero
 test_rejects_unsafe_url_segments_before_recording

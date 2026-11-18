@@ -14,7 +14,7 @@
 #
 # Usage:
 #   fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--update-branch]
-#     [--expected-head <full-sha>]
+#     [--expected-head <full-sha>] [--closed-task]
 #     [--allow-red <check>] [--allow-missing <check>] [--allow-no-pipeline]
 #     [-- <forge merge flags>]
 #   fm-pr-merge.sh -h | --help
@@ -202,6 +202,17 @@
 # retains the lock until the accepted merge authority is persisted against the
 # still-matching task metadata.
 #
+# An attended --closed-task merges a GitHub pull request whose task record
+# cleanup already removed, after the captain approved that merge. It requires
+# --expected-head naming the head the captain approved and refuses while the task
+# record still exists, while the away-posture record exists, with
+# --attended-override or --update-branch, on any other forge, and when the base
+# branch's merge-queue state does not prove an immediate merge, because no task
+# record remains to track an asynchronous merge or record an updated head. Every
+# live pre-merge condition and the captain-hold check still apply; nothing is
+# recorded against the gone task, and a landed merge is still reported for
+# supervision.
+#
 # Extra args must not include --repo or -R in any form, including a bundled
 # short-option cluster such as -yR, because the repository comes only from the
 # URL, nor --sha or --match-head-commit. The head match is the live read, or
@@ -218,7 +229,7 @@
 # explicit captain instruction and never skips the live green check, the
 # away-record read, or a captain hold.
 #
-# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--update-branch] [--expected-head <full-sha>] [--allow-red <check-name>] [--allow-missing <check-name>] [--allow-no-pipeline] [-- <extra forge merge args>]
+# Usage: fm-pr-merge.sh <task-id> <pr-url> [--attended-override] [--update-branch] [--expected-head <full-sha>] [--closed-task] [--allow-red <check-name>] [--allow-missing <check-name>] [--allow-no-pipeline] [-- <extra forge merge args>]
 #
 # On GitLab, this script confirms the MR is actually merged before reporting it;
 # an auto-merge-queued or unconfirmed request leaves the poll armed and records
@@ -298,6 +309,7 @@ shift 2
 ATTENDED_OVERRIDE=false
 UPDATE_BRANCH=false
 ALLOW_NO_PIPELINE=false
+CLOSED_TASK=false
 ALLOW_RED=()
 ALLOW_MISSING=()
 EXPECTED_HEAD=
@@ -343,6 +355,14 @@ while [ "$#" -gt 0 ]; do
       ALLOW_NO_PIPELINE=true
       shift
       ;;
+    --closed-task)
+      CLOSED_TASK=true
+      shift
+      ;;
+    --closed-task=*)
+      echo "error: --closed-task takes no value" >&2
+      exit 2
+      ;;
     --allow-no-pipeline=*)
       echo "error: --allow-no-pipeline takes no value" >&2
       exit 2
@@ -376,6 +396,20 @@ fi
 if [ -n "$EXPECTED_HEAD" ] && ! fm_pr_head_valid "$EXPECTED_HEAD"; then
   echo "error: --expected-head requires a full lowercase commit sha" >&2
   exit 2
+fi
+if [ "$CLOSED_TASK" = true ]; then
+  if [ "$PROVIDER" != github ]; then
+    echo "error: --closed-task applies only to GitHub" >&2
+    exit 2
+  fi
+  if [ -z "$EXPECTED_HEAD" ]; then
+    echo "error: --closed-task requires --expected-head naming the head the captain approved" >&2
+    exit 2
+  fi
+  if [ "$ATTENDED_OVERRIDE" = true ] || [ "$UPDATE_BRANCH" = true ]; then
+    echo "error: --closed-task refuses --attended-override and --update-branch: no task record remains to track an asynchronous merge or record an updated head" >&2
+    exit 2
+  fi
 fi
 # --allow-red names one check run to waive, which only GitHub's per-check
 # reading can match. GitLab and Forgejo each collapse their checks into a
@@ -562,15 +596,25 @@ META="$STATE/$ID.meta"
 . "$SCRIPT_DIR/fm-lease-lib.sh"
 fm_lease_forbid_branch "PR merge (fm-pr-merge)" --away-relocated
 
-if [ ! -f "$META" ] || [ -L "$META" ]; then
-  echo "error: task metadata is unavailable" >&2
-  exit 1
+refuse_closed_task_record_present() {
+  [ -e "$META" ] || [ -L "$META" ] || return 0
+  echo "error: --closed-task refused: task $ID still has a task record; merge it without --closed-task" >&2
+  return 1
+}
+
+if [ "$CLOSED_TASK" = true ]; then
+  refuse_closed_task_record_present || exit 1
+else
+  if [ ! -f "$META" ] || [ -L "$META" ]; then
+    echo "error: task metadata is unavailable; a captain-approved merge of a PR whose task was already cleaned up uses --closed-task" >&2
+    exit 1
+  fi
+  if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+    echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
+    exit 1
+  fi
+  MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 fi
-if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
-  echo "error: PR merge refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
-  exit 1
-fi
-MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
@@ -582,11 +626,12 @@ merge_control_cleanup() {
 trap merge_control_cleanup EXIT
 MERGE_CONTROL_LOCK="$STATE/.control-$ID.lock"
 fm_lock_acquire_wait "$MERGE_CONTROL_LOCK"
-if ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
+if [ "$CLOSED_TASK" = true ]; then
+  refuse_closed_task_record_present || exit 1
+elif ! fm_backlog_meta_spawn_gen_optional "$META" "$STATE"; then
   echo "error: task $ID changed while waiting to merge; refusing: $FM_BACKLOG_TRANSITION_ERROR" >&2
   exit 1
-fi
-if [ "$FM_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
+elif [ "$FM_BACKLOG_META_SPAWN_GEN" != "$MERGE_EXPECTED_SPAWN_GEN" ]; then
   echo "error: task $ID changed incarnation while waiting to merge; refusing" >&2
   exit 1
 fi
@@ -1663,10 +1708,15 @@ require_current_away_authority() {
     echo "error: --allow-no-pipeline is attended-only; while the away-posture record exists a GitLab merge requires a successful head pipeline" >&2
     return 2
   fi
+  if [ "$FM_PR_AWAY_POSTURE" = true ] && [ "$CLOSED_TASK" = true ]; then
+    echo "error: --closed-task is attended-only; it needs the captain's explicit approval of that merge" >&2
+    return 2
+  fi
 }
 
 persist_accepted_merge_authority() {
   local status=0
+  [ "$CLOSED_TASK" = false ] || return 0
   MERGE_META_LOCK=$(fm_meta_lock_path "$META") || return 1
   fm_lock_acquire_wait "$MERGE_META_LOCK" || return 1
   fm_merge_authority_persist "$STATE" "$ID" "$META" \
@@ -1701,6 +1751,14 @@ refuse_github_queue_while_away() {
   github_read_queue_method
   [ "$FM_PR_GITHUB_QUEUE_STATUS" = none ] && return 0
   echo "error: GitHub merge refused while away because the base branch's merge-queue state does not prove an immediate merge; nothing was handed to the forge" >&2
+  return 2
+}
+
+refuse_github_queue_without_task_record() {
+  [ "$CLOSED_TASK" = true ] || return 0
+  github_read_queue_method
+  [ "$FM_PR_GITHUB_QUEUE_STATUS" = none ] && return 0
+  echo "error: --closed-task merge refused because the base branch's merge-queue state does not prove an immediate merge, and no task record would track a queued merge; nothing was handed to the forge" >&2
   return 2
 }
 
@@ -1874,8 +1932,10 @@ forgejo_confirm_merged() {
 away_status=0
 require_current_away_authority || away_status=$?
 [ "$away_status" -eq 0 ] || exit "$away_status"
-require_recorded_pr_identity || exit 1
-record_pr_metadata || exit 1
+if [ "$CLOSED_TASK" = false ]; then
+  require_recorded_pr_identity || exit 1
+  record_pr_metadata || exit 1
+fi
 require_released_captain_hold || exit 1
 
 # Accepted confused-agent-grade limitation, as in bin/fm-lease-lib.sh, not an
@@ -1926,6 +1986,7 @@ case "$PROVIDER" in
     require_current_away_authority || away_status=$?
     [ "$away_status" -eq 0 ] || exit "$away_status"
     refuse_github_queue_while_away || exit 2
+    refuse_github_queue_without_task_record || exit 2
     if [ "$FM_PR_GITHUB_BEHIND" = true ]; then
       if [ "$UPDATE_BRANCH" != true ]; then
         echo "error: $URL is behind its base; updating its source branch requires explicit --update-branch consent on this authorized merge request (the update remains if new checks prevent merging)" >&2
@@ -2077,3 +2138,7 @@ case "$outcome_rc" in
     printf 'actionable: merged %s but could not record the outcome for supervision\n' "$URL" >&2
     ;;
 esac
+# No merge poll exists for a closed task, so its dedup marker would only linger.
+if [ "$CLOSED_TASK" = true ] && [ "$outcome_rc" -eq 0 ]; then
+  fm_pr_poll_merge_notified_remove "$STATE" "$ID" || true
+fi
