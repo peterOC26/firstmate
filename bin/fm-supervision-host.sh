@@ -765,6 +765,7 @@ continuation_handback() {
   fi
   if ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null \
     || ! fm_recovery_marker_snapshot "$STATE/.watcher-down"; then
+    log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"
     emit "$@" 'supervision-host: the hand-back recovery generation could not be recorded'
     exit 1
   fi

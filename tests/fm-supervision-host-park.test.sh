@@ -520,6 +520,10 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   # Pass-through can leave a successor watcher running. Retire that cycle so
   # the orphan-arm fixture below owns the watcher we later ask --restart to replace.
   FM_HOME="$home" "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null || fail "stream: could not stop the prior cycle"
+  # Stopping the hand-back's continuation watcher opens a downtime episode;
+  # main handles it so the orphan arm's watcher has nothing to resurface.
+  main_drain_and_ack "$home"
+  [ "$(marker_kind "$home")" != downtime ] || fail "fixture: main did not take the stop's downtime episode"
 
   # A watcher a dead arm left behind, holding this home's watcher lock.
   FM_HOME="$home" PATH="$home/fakebin:$PATH" perl -e 'setpgrp(0, 0); exec @ARGV' "$ROOT/bin/fm-watch-arm.sh" \

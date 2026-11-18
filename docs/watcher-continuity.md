@@ -187,7 +187,7 @@ So that successor is the one deliberate detached launch in the continuity path:
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
-The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits.
+The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits; once handling of a generation it followed has begun, a later episode never revives it.
 Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
 `FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval; [the environment-variable reference](configuration.md#environment-variables) owns its default.
 When the requested turn never starts, the owner retries through the existing [guarded hand-back transport](supervision-host.md#reaching-a-lost-claude-continuation) at that interval.

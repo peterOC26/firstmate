@@ -907,10 +907,13 @@ start_session() {  # <home>
 }
 
 
+park_started() { [ -e "$1/host.out" ] && watcher_live "$1"; }
+# A hand-back's continuation owner leaves a watcher live between parks, so a
+# live watcher alone does not prove this park started.
 park_again() {  # <home>
-  rm -f "$1/host.rc"
+  rm -f "$1/host.rc" "$1/host.out"
   : > "$1/park.go"
-  wait_until 150 watcher_live "$1" \
+  wait_until 150 park_started "$1" \
     || fail "the next park never started a watcher cycle: $(cat "$1/host.out"; tail -n 5 "$1/state/.supervision-host.log" 2>/dev/null)"
 }
 

@@ -85,6 +85,8 @@ session_owned() {
 
 handoff_pending() {
   if [ "$MODE" = handling ]; then
+    # Main's turn end re-arms once handling starts, so a later episode never revives this owner.
+    fm_recovery_handling_observed "$STATE/.watcher-down" "$TOKEN" && return 1
     if fm_recovery_marker_read "$STATE/.watcher-down"; then
       TOKEN=${FM_RECOVERY_MARKER_TOKEN##*:}
     fi
