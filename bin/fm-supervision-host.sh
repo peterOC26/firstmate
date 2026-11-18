@@ -99,10 +99,7 @@
 # the BRANCH OUTCOMES section (bin/fm-wake-drain.sh) presents every
 # unprocessed captain outcome until main acknowledges it. Otherwise the host
 # parks on the successor.
-# Every other outcome exits with the close's own reason line plus one
-# "supervision-host:" line saying why main has this wake, after stopping the
-# successor cycle so main's next turn end starts from the same state as
-# without the host. Whenever the captain returned during an away engine turn
+# Whenever the captain returned during an away engine turn
 # that recorded visible outcomes, handled or not, the return brief was rendered
 # before they existed, so the host exits with the close, one "supervision-host:"
 # line naming them, and one line per visible outcome, for main to relay. The
@@ -569,7 +566,7 @@ boundary_exit() {
   park_elapsed
   log_line "boundary	after ${PARK_ELAPSED}s"
   away_unsurfaced_inbox_return
-  acknowledged_handback \
+  continuation_handback \
     'supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn' \
     "$AWAY_INBOX_RETURN_LINE"
   retire_arm "$ARM_PID" "$ARM_OUT"
@@ -733,7 +730,7 @@ retire_successor() {
 # Hand the close to main: stop the successor cycle, print the close, why, and
 # any further "supervision-host:" lines, and exit.
 exit_to_main() {  # <why> [further lines]
-  acknowledged_handback "supervision-host: $1" "${2:-}"
+  continuation_handback "supervision-host: $1" "${2:-}"
   local lines=${2:-} rc=0
   retire_successor
   if [ -n "$SUCCESSOR_GENERATION" ] \
@@ -748,33 +745,42 @@ exit_to_main() {  # <why> [further lines]
   exit "$rc"
 }
 
-# The opt-in path never changes the default hand-back paths. It must verify
-# protection before emitting the close, not assume a detached process started.
-acknowledged_handback() {  # [extra output lines]; returns only when disabled
-  [ "$PRIMARY" = claude ] && [ -e "$CONFIG/supervision-handoff-ack" ] || return 1
+continuation_handback() {
+  [ "$PRIMARY" = claude ] || return 1
   host_still_owner || stand_down "this session no longer owns supervision"
-  local predecessor=${SUCCESSOR_PID:-${ARM_PID:-${CLOSED_ARM_PID:-$HOST_PID}}} pid out deadline tmp
+  local predecessor=${SUCCESSOR_PID:-${ARM_PID:-${CLOSED_ARM_PID:-$HOST_PID}}} pid out deadline tmp token=$GEN mode=handling
   retire_arm "$ARM_PID" "$ARM_OUT"
   ARM_PID=''
   ARM_OUT=''
   retire_successor
-  tmp=$(mktemp "$STATE/.supervision-handoff-pending.XXXXXX") || exit 1
-  printf '%s\n' "$GEN" > "$tmp" && mv -f "$tmp" "$STATE/.supervision-handoff-pending" || exit 1
-  if ! fm_wake_append check "supervision-handoff:$GEN" \
-    "check: supervision-handoff - the host handed supervision to main; drain, handle, and acknowledge this hand-back" \
-    || ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null; then
-    emit "$@" 'supervision-host: the acknowledged hand-back could not be recorded'
+  if [ -e "$CONFIG/supervision-handoff-ack" ]; then
+    mode=ack
+    tmp=$(mktemp "$STATE/.supervision-handoff-pending.XXXXXX") || exit 1
+    printf '%s\n' "$GEN" > "$tmp" && mv -f "$tmp" "$STATE/.supervision-handoff-pending" || exit 1
+    if ! fm_wake_append check "supervision-handoff:$GEN" \
+      "check: supervision-handoff - the host handed supervision to main; drain, handle, and acknowledge this hand-back"; then
+      emit "$@" 'supervision-host: the acknowledged hand-back could not be recorded'
+      exit 1
+    fi
+  fi
+  if ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null \
+    || ! fm_recovery_marker_snapshot "$STATE/.watcher-down"; then
+    emit "$@" 'supervision-host: the hand-back recovery generation could not be recorded'
     exit 1
   fi
-  out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || exit 1
+  [ "$mode" = ack ] || token=${FM_RECOVERY_MARKER_TOKEN##*:}
+  out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || {
+    fm_recovery_continuity_failed "$STATE/.watcher-down" || true
+    exit 1
+  }
   set -m
   FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
-    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$GEN" "$predecessor" > "$out" 2>&1 </dev/null &
+    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$token" "$predecessor" "$mode" > "$out" 2>&1 </dev/null &
   pid=$!
   set +m
   record_process handoff "$pid"
   deadline=$((SECONDS + READY_TIMEOUT))
-  while fm_pid_alive "$pid" && [ "$SECONDS" -lt "$deadline" ]; do
+  while [ "$SECONDS" -lt "$deadline" ]; do
     if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" \
       && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
       disown "$pid" 2>/dev/null || true
@@ -784,9 +790,11 @@ acknowledged_handback() {  # [extra output lines]; returns only when disabled
       emit "$@"
       exit 0
     fi
+    fm_pid_alive "$pid" || break
     sleep 0.2
   done
   kill -TERM "$pid" 2>/dev/null || true
+  fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   rm -f "$out"
   emit "$@" 'supervision-host: the acknowledged hand-back successor could not be verified'
   exit 1
@@ -1304,7 +1312,7 @@ hand_back_away_inbox_note() {
   [ -n "$inbox_ids" ] || inbox_ids=$carried
   [ -n "$inbox_ids" ] || return 1
   log_line "pass-through	away	main-only (captain inbox note${inbox_ids} queued)	$reason_line"
-  acknowledged_handback "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
+  continuation_handback "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   leave_successor_for_main || true
   emit "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   exit 0
@@ -1358,7 +1366,7 @@ while :; do
   if ! fm_afk_contract_away_present "$STATE"; then
     if ! attended_acceptor "$(printf '%s\n' "$REASON" | head -n 1)"; then
       log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-      acknowledged_handback
+      continuation_handback
       case "$ATTENDED_WHY" in
         main-only*)
           leave_successor_for_main
@@ -1411,7 +1419,7 @@ while :; do
   HANDLE_RC=$?
   if [ "$HANDLE_RC" -eq 2 ]; then
     log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-    acknowledged_handback
+    continuation_handback
     # The successor this turn already started and confirmed stays up. Retiring
     # it is what left no watcher after a close that became main-only.
     detach_successor

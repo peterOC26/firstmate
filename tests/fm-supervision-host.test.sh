@@ -141,7 +141,7 @@ test_attended_captain_outcome_reaches_main_through_branch_outcomes() {
   assert_grep 'MAIN processes it from its next drain' "$home/engine-report.log" "an attended captain report must say main processes it"
   assert_no_grep 'demo.status' "$home/state/.wake-queue" "the handled wake must stay acknowledged"
   assert_no_grep 'supervision-host-return' "$home/state/.wake-queue" "an attended captain report must queue no return wake"
-  watcher_live "$home" && fail "the host left its successor cycle running when it woke main"
+  wait_until 150 watcher_live "$home" || fail "the host left no successor when it woke main"
 
   drained=$(FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" 2>&1' "$ROOT/bin/fm-wake-drain.sh")
   assert_contains "$drained" "BRANCH OUTCOMES (captain outcomes the supervision session recorded for you" "main's drain must present the captain outcome"
@@ -694,7 +694,7 @@ test_away_turn_without_a_report_hands_the_wake_to_main() {
   assert_re '^signal: .*demo.status' "$home/host.out" "the handed-back close must carry the reason line"
   assert_re '^supervision-host: .*recorded no outcome for its wake; this wake is yours$' "$home/host.out" "the handback must say why"
   assert_grep 'demo.status' "$home/state/.wake-queue" "the unhandled wake must stay durable for main"
-  watcher_live "$home" && fail "the host left its successor cycle running when it handed the wake to main"
+  wait_until 150 watcher_live "$home" || fail "the host left no successor when it handed the wake to main"
   token=$(cat "$home/state/.watcher-down")
   case "$token" in
     pending:downtime:*|announced:downtime:*) ;;
@@ -721,7 +721,7 @@ test_return_during_an_engine_turn_hands_its_outcomes_to_main() {
     "the handoff must carry the turn's outcome for main to relay"
   assert_re '	handled	turn=' "$home/state/.supervision-host.log" "the turn itself was handled"
   assert_no_grep 'demo.status' "$home/state/.wake-queue" "the handled wake must stay acknowledged"
-  watcher_live "$home" && fail "the host left its successor cycle running when it handed the outcome to main"
+  wait_until 150 watcher_live "$home" || fail "the host left no successor when it handed the outcome to main"
   pass "host: a captain return during an engine turn hands that turn's outcomes to main"
 }
 
@@ -875,7 +875,7 @@ test_report_without_acknowledgement_hands_the_wake_to_main() {
   assert_grep 'demo.status' "$home/state/.wake-queue" "the unacknowledged wake must stay durable for main"
   assert_re '	failed	turn=.*	unacked=[0-9]' "$home/state/.supervision-host.log" "the ledger must record the turn as failed"
   assert_absent "$home/state/.supervision-host-engine" "a turn that did not handle its wake must not keep its conversation"
-  watcher_live "$home" && fail "the host left its successor cycle running when it handed the wake to main"
+  wait_until 150 watcher_live "$home" || fail "the host left no successor when it handed the wake to main"
   pass "host: a turn that reports but leaves its granted rows queued hands the wake to main"
 }
 

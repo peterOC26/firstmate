@@ -283,6 +283,9 @@ start_host() {  # <home> [park options...]
       done
       "$0" park "$@" > "$FM_HOME/host.out" 2>&1
       printf "%s\n" "$?" > "$FM_HOME/host.rc"
+      if [ "${FM_TEST_HOST_SESSION_HOLD:-0}" = 1 ]; then
+        while [ ! -e "$FM_HOME/session.stop" ]; do sleep 0.1; done
+      fi
     ' "$HOST" "$@" 2>> "$home/claude.err" &
 }
 

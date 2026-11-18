@@ -53,21 +53,6 @@
 #     records the failure durably without waking an idle primary. Nothing
 #     shortens a quiet park, because no-change heartbeats are absorbed without
 #     closing the arm.
-#   - Handling successor: Pi, omp, and OpenCode start the next arm before they
-#     deliver an actionable wake, so the fleet stays covered while the model
-#     handles it. After an actionable close, including an attached peer cycle
-#     that ended, this hook starts one successor bin/fm-watch-arm.sh with the
-#     closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID, the same handoff the
-#     Pi extension passes for its closed arm child, so the arm starts a
-#     handling-successor watcher and links the lifecycle ledger. A child of
-#     this hook cannot outlive the exit-2 rewake, so the successor is launched
-#     the one way a process survives a Claude hook: nohup, stdio detached, in
-#     its own process group (the shape bin/fm-startup-network.sh uses;
-#     docs/verification/supervision.md records the survival check). The hook
-#     waits for the successor's one status line, adds one banner line when no
-#     live watcher was confirmed, and never withholds the wake for it; the
-#     next Stop's foreground arm attaches to that live cycle. The supervision
-#     host owns its own successors, so its path is unchanged.
 #   - Supervision host: a home that runs it (by default on this Claude
 #     primary; docs/configuration.md "Supervision host" owns the gate and its
 #     opt-out) runs bin/fm-supervision-host.sh in the arm's place, bound
@@ -582,29 +567,35 @@ run_arm() {  # <output file, or empty for none>
 # SUCCESSOR_FAILURE to the banner line for an unconfirmed successor.
 SUCCESSOR_FAILURE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid deadline budget line monitor_was_on=0
+  local out pid deadline budget line recovery monitor_was_on=0
+  SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher; continuity failed.'
   budget=${FM_ARM_SUCCESSOR_CONFIRM_TIMEOUT:-30}
   case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
     SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
   fi
+  fm_recovery_marker_snapshot "$STATE/.watcher-down" || { rm -f "$out"; return 1; }
+  recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
   case $- in *m*) monitor_was_on=1 ;; esac
   set -m 2>/dev/null || true
-  FM_WATCH_PREDECESSOR_ARM_PID=$1 FM_GUARD_GRACE="$GRACE" \
-    nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
+  FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
+    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$recovery" "$1" handling >"$out" 2>&1 </dev/null &
   pid=$!
   [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
   deadline=$(( $(date +%s) + budget + 2 ))
   while :; do
     if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
+      SUCCESSOR_FAILURE=
       rm -f "$out" 2>/dev/null || true
       return 0
     fi
     grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
+    fm_pid_alive "$pid" || break
     [ "$(date +%s)" -ge "$deadline" ] && break
     sleep 0.2
   done
+  kill -TERM "$pid" 2>/dev/null || true
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)
   rm -f "$out" 2>/dev/null || true
   [ -z "$line" ] || line=" ($line)"
@@ -730,9 +721,9 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0
   fi
-  # The host owns its own successors and stops its cycle before handing back.
   if [ "$HOST_MODE" -eq 0 ]; then
-    start_handling_successor "$CLOSED_ARM_PID" || true
+    start_handling_successor "$CLOSED_ARM_PID" \
+      || fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   fi
   {
     printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'

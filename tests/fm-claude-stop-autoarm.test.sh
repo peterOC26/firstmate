@@ -26,24 +26,7 @@ export FAKE_CLAUDE
 install_autoarm_scripts() {
   local dir=$1
   mkdir -p "$dir/bin"
-  cp "$ROOT/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-stop-autoarm.sh"
-  cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
-  cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
-  cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
-  cp "$ROOT/bin/fm-treehouse-slot-lib.sh" "$dir/bin/fm-treehouse-slot-lib.sh"
-  cp "$ROOT/bin/fm-wake-surface-lib.sh" "$dir/bin/fm-wake-surface-lib.sh"
-  cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
-  cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
-  cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
-  cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
-  cp "$ROOT/bin/fm-lock.sh" "$dir/bin/fm-lock.sh"
-  cp "$ROOT/bin/fm-lease-lib.sh" "$dir/bin/fm-lease-lib.sh"
-  cp "$ROOT/bin/fm-afk-contract.sh" "$dir/bin/fm-afk-contract.sh"
-  cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/fm-classify-lib.sh"
-  cp "$ROOT/bin/fm-classify-close-lib.sh" "$dir/bin/fm-classify-close-lib.sh"
-  cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
-  cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
-  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh" "$dir/bin/fm-afk-contract.sh"
+  cp -R "$ROOT/bin/." "$dir/bin/"
 }
 
 # A Claude home runs the supervision host unless config/supervision-host-off
@@ -110,8 +93,21 @@ if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
     printf 'watcher: FAILED - no live watcher with a fresh beacon\n'
     exit 1
   fi
+  . "$FM_HOME/bin/fm-wake-lib.sh"
+  if [ ! -e "$FM_HOME/state/.watch.lock" ]; then
+    mkdir -p "$FM_HOME/state/.watch.lock"
+    printf '%s\n' "$$" > "$FM_HOME/state/.watch.lock/pid"
+    printf '%s\n' "$FM_HOME" > "$FM_HOME/state/.watch.lock/fm-home"
+    printf '%s\n' "$FM_HOME/bin/fm-watch.sh" > "$FM_HOME/state/.watch.lock/watcher-path"
+    fm_pid_identity "$$" > "$FM_HOME/state/.watch.lock/pid-identity"
+  fi
+  touch "$FM_HOME/state/.last-watcher-beat"
   printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
-  while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
+  if [ -e "$FM_HOME/state/successor-park" ]; then
+    while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
+  else
+    while kill -0 "$(cat "$FM_HOME/state/.lock")" 2>/dev/null; do sleep 0.1; done
+  fi
   exit 0
 fi
 echo "$$" >> "$FM_HOME/state/arm-ran"
@@ -581,6 +577,8 @@ test_unconfirmed_handling_successor_still_rewakes() {
   assert_contains "$out" "did not confirm a live watcher" "the rewake must say this turn runs uncovered"
   assert_contains "$out" "watcher: FAILED - no live watcher with a fresh beacon" "the rewake must carry the successor's own failure line"
   [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 1 ] || fail "the failed successor must not be retried inside the rewake path"
+  [ "$(cat "$dir/state/.watcher-down.continuity-failed")" = fixture-generation ] \
+    || fail "failed continuity must be recorded independently of the rewake"
   pass "auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it"
 }
 
@@ -2362,6 +2360,11 @@ test_clear_rekey_stale_sidecar_starts_the_away_host() {
   unset CLAUDE_PID || true
   pass "auto-arm: a /clear re-key with a stale sidecar starts the away host and re-anchors the sidecar"
 }
+
+if [ "$#" -gt 0 ]; then
+  fm_test_run "$@"
+  exit
+fi
 
 test_inert_in_child_worktree
 test_inert_without_session_lock

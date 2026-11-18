@@ -170,10 +170,10 @@ When restoration does not succeed, the model is never left blind.
 
 ### Claude handling successor
 
-Claude's Stop hook also starts one handling successor before notification.
+Claude's Stop hook starts a detached continuation owner before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
-1. Launches `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
+1. Launches `bin/fm-supervision-handoff.sh` in handling mode, which starts `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
 2. Waits for that arm's one status line.
 3. Only then exits 2 with the wake.
 
@@ -187,7 +187,12 @@ So that successor is the one deliberate detached launch in the continuity path:
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
 The next Stop's foreground arm attaches to that live cycle.
+The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits.
+Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
+`FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval, defaulting to 300 seconds.
+It uses the existing [guarded hand-back retry](supervision-host.md#reaching-a-lost-claude-continuation) at a bounded cadence when the requested turn never starts.
 A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
+Failed startup or replacement independently records the recovery generation in `state/.watcher-down.continuity-failed`, so committing a rewake does not claim successful continuity.
 The next Stop then re-arms as before.
 
 ### Durable queue and turn-end backstop
@@ -226,6 +231,10 @@ In its `--claude` mode it cooperates with the auto-arm.
 ## Recovery episode acknowledgement
 
 A recovery episode is one generation of the `state/.watcher-down` marker.
+Main beginning a drain atomically records that generation in `state/.watcher-down.handling` under the marker lock.
+The receipt survives marker republication by in-turn appends and is valid only for its recorded generation.
+Branch drains and successor-delivery confirmations do not establish that main started its requested turn.
+The Claude continuation owner and mid-turn health check consume this same receipt; neither an exit-2 rewake nor terminal submission proves handling.
 It is retired only by the generation-bound acknowledgement the drain prints as `WAKE_ACK_REQUIRED`.
 The away return brief treats a still-open handling episode as a wake in progress, not watcher downtime; an open downtime episode remains a gap.
 

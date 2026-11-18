@@ -1005,7 +1005,7 @@ _fm_wake_append_recovery_restore_locked() {
 }
 
 _fm_recovery_marker_begin_handling() {
-  local marker=$1 expected_generation=${2:-} lock line generation
+  local marker=$1 expected_generation=${2:-} lock line generation tmp
   lock="${marker}.lock"
   fm_lock_acquire_wait "$lock" || return 1
   if ! fm_recovery_marker_read "$marker"; then
@@ -1047,7 +1047,33 @@ _fm_recovery_marker_begin_handling() {
       ;;
     *) fm_lock_release "$lock"; return 1 ;;
   esac
+  if [ -z "$expected_generation" ] && [ "${FM_SUPERVISION_ACTOR:-main}" = main ]; then
+    if [ -d "${marker}.handling" ] || ! tmp=$(mktemp "${marker}.handling.XXXXXX") \
+      || ! printf '%s\n' "$generation" > "$tmp" \
+      || ! _fm_atomic_replace "$tmp" "${marker}.handling"; then
+      [ -z "${tmp:-}" ] || rm -f "$tmp"
+      fm_lock_release "$lock"
+      return 1
+    fi
+  fi
   fm_lock_release "$lock"
+}
+
+fm_recovery_handling_observed() {
+  [ -n "${2:-}" ] && [ "$(cat "${1}.handling" 2>/dev/null)" = "$2" ]
+}
+
+fm_recovery_continuity_failed() {
+  local marker=$1 generation tmp
+  fm_recovery_marker_snapshot "$marker" || return 1
+  generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+  [ -n "$generation" ] || return 1
+  [ ! -d "${marker}.continuity-failed" ] || return 1
+  tmp=$(mktemp "${marker}.continuity-failed.XXXXXX") || return 1
+  if ! printf '%s\n' "$generation" > "$tmp" || ! _fm_atomic_replace "$tmp" "${marker}.continuity-failed"; then
+    rm -f "$tmp"
+    return 1
+  fi
 }
 
 fm_recovery_marker_snapshot() {
@@ -2342,9 +2368,8 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
   epoch_mtime=$(fm_path_mtime "$state/.claude-autoarm-epoch") || return 1
   beacon_mtime=$(fm_path_mtime "$state/.last-watcher-beat") || return 1
   [ "$epoch_mtime" -ge "$beacon_mtime" ] || return 1
-  case "$FM_RECOVERY_MARKER_TOKEN" in
-    *:handling:*) return 0 ;;
-  esac
+  fm_recovery_handling_observed "$state/.watcher-down" "$recovery" && return 0
+  [ "$(cat "$state/.watcher-down.continuity-failed" 2>/dev/null)" != "$recovery" ] || return 1
   [ "$(fm_path_age "$state/.claude-autoarm-epoch")" -lt "$grace" ]
 }
 
