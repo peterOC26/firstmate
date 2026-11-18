@@ -190,11 +190,11 @@ fm_test_launch_unframe() {  # <launch>
 FM_TEST_LAUNCH_HOME_ENV_CLEAR='export FM_WAKE_QUEUE= FM_WAKE_QUEUE_LOCK= FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE=; '
 
 # The command a pane runs after the launch's Git configuration prefix and its
-# leading export and unset statements, for suites that split it into arguments.
+# leading export statements, for suites that split it into arguments.
 fm_test_launch_command() {  # <launch>
   local command=$1 end=' || return 1 2>/dev/null || exit 1; '
   case "$command" in *"$end"*) command=${command#*"$end"} ;; esac
-  while [[ "$command" == export\ *\;* || "$command" == unset\ *\;* ]]; do
+  while [[ "$command" == export\ *\;* ]]; do
     command=${command#*; }
   done
   printf '%s' "$command"
