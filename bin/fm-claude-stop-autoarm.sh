@@ -574,7 +574,7 @@ start_handling_successor() {  # <closed-arm-pid>
     SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
   fi
-  fm_recovery_marker_snapshot "$STATE/.watcher-down" || { rm -f "$out"; return 1; }
+  fm_recovery_marker_snapshot "$STATE/.watcher-down" || true
   recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
   local mode
   for mode in owner fallback; do

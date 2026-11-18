@@ -103,9 +103,9 @@
 # that recorded visible outcomes, handled or not, the return brief was rendered
 # before they existed, so the host exits with the close, one "supervision-host:"
 # line naming them, and one line per visible outcome, for main to relay. The
-# default host injects nothing and has no delivery path of its own; the owner's
-# existing wake path delivers it, unless ACKNOWLEDGED HAND-BACK below adds
-# retries through its detached owner. The default fallback is
+# host returns it through the primary's existing wake path. Every Claude
+# hand-back starts a detached handling-mode continuation owner, which replaces
+# closed cycles and retries delivery until main begins handling. The fallback is
 # always to exit with the close's own reason line. That handoff is only a
 # prompt: each non-silent outcome recorded after the return is already a
 # durable queued wake
@@ -121,7 +121,8 @@
 # A shell assignment is not visible to the branch offer or to that owner,
 # the owner stops immediately when FM_HOME is absent, and the offer's own
 # fallback is the repository that contains its script rather than that home.
-# Without the flag all hand-back paths below are unchanged.
+# Without the flag Claude uses handling-mode ownership rather than waiting
+# for acknowledgement; other primaries retain their existing hand-back paths.
 #
 # THE LATCH. An opted-in host persists engine health across short-lived
 # parks; docs/supervision-host.md "The broken-session latch" owns the policy.
@@ -131,8 +132,9 @@
 # stop hook carries the same tracked 28800-second registration, and a host
 # that handles its own wakes is not shortened by them, so the host ends its
 # own park before that timeout: after FM_SUPERVISION_HOST_PARK_SECONDS (default
-# 27000, under the tracked 28800-second registration) it stops this home's
-# watcher and exits with one "supervision-host: cycle boundary" line, which the
+# 27000, under the tracked 28800-second registration) Claude hands watcher
+# coverage to its continuation owner; other primaries stop this home's watcher.
+# It exits with one "supervision-host: cycle boundary" line, which the
 # owner delivers as an ordinary wake; main drains, acknowledges, and ends its
 # turn, and that turn end starts the next park. The verified Codex asynchronous owner sets
 # FM_CODEX_MODEL_FREE_PARK=1: its boundary resets the quiet timer while keeping
@@ -770,33 +772,31 @@ continuation_handback() {
     exit 1
   fi
   [ "$mode" = ack ] || token=${FM_RECOVERY_MARKER_TOKEN##*:}
-  out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || {
-    fm_recovery_continuity_failed "$STATE/.watcher-down" || true
-    exit 1
-  }
-  set -m
-  FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
-    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$token" "$predecessor" "$mode" > "$out" 2>&1 </dev/null &
-  pid=$!
-  set +m
-  record_process handoff "$pid"
-  deadline=$((SECONDS + READY_TIMEOUT))
-  while [ "$SECONDS" -lt "$deadline" ]; do
-    if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" \
-      && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
-      disown "$pid" 2>/dev/null || true
-      forget_process "$pid"
-      rm -f "$out"
-      log_line "handoff	$GEN"
-      emit "$@"
-      exit 0
-    fi
-    fm_pid_alive "$pid" || break
-    sleep 0.2
-  done
-  kill -TERM "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  forget_process "$pid"
+  if out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX"); then
+    set -m
+    FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
+      nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$token" "$predecessor" "$mode" > "$out" 2>&1 </dev/null &
+    pid=$!
+    set +m
+    record_process handoff "$pid"
+    deadline=$((SECONDS + READY_TIMEOUT))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" \
+        && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
+        disown "$pid" 2>/dev/null || true
+        forget_process "$pid"
+        rm -f "$out"
+        log_line "handoff	$GEN"
+        emit "$@"
+        exit 0
+      fi
+      fm_pid_alive "$pid" || break
+      sleep 0.2
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    forget_process "$pid"
+  fi
   fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   rm -f "$out"
   if leave_successor_for_main; then

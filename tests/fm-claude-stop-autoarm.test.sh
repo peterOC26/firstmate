@@ -638,6 +638,36 @@ test_hostoff_owner_failure_leaves_one_shot_successor() {
   pass "auto-arm: owner startup failure retains one-shot watcher coverage"
 }
 
+test_snapshot_failure_leaves_one_shot_successor() {
+  local dir out status successor
+  dir=$(make_primary_dir "$TMP_ROOT/snapshot-fallback")
+  : > "$dir/state/task.meta"
+  : > "$dir/state/successor-park"
+  write_arm_fixture "$dir" actionable
+  cat >> "$dir/bin/fm-wake-lib.sh" <<'SH'
+eval "$(declare -f fm_recovery_marker_snapshot | sed '1s/fm_recovery_marker_snapshot/fixture_marker_snapshot/')"
+fm_recovery_marker_snapshot() {
+  if [ ! -e "$FM_HOME/snapshot-refused" ] \
+    && compgen -G "$FM_HOME/state/.claude-autoarm-successor.*" >/dev/null; then
+    : > "$FM_HOME/snapshot-refused"
+    FM_RECOVERY_MARKER_TOKEN=
+    return 1
+  fi
+  fixture_marker_snapshot "$@"
+}
+SH
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "owner failure must still deliver the close"
+  assert_present "$dir/snapshot-refused" "fixture did not refuse the owner snapshot"
+  assert_contains "$out" "stale: fixture-win actionable" "snapshot failure dropped the close"
+  successor=$(cat "$dir/state/.watch.lock/pid")
+  kill -0 "$successor" || fail "owner failure left no fallback watcher"
+  [ "$(cat "$dir/state/.watcher-down.continuity-failed")" = fixture-generation ]     || fail "owner failure did not record failed continuity"
+  assert_contains "$out" 'one-shot handling successor is watching' "fallback must report degraded ownership"
+  rm -f "$dir/state/successor-park"
+  pass "auto-arm: snapshot failure retains one-shot coverage and the close"
+}
+
 test_unconfirmed_handling_successor_still_rewakes() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/successor-unconfirmed")
@@ -2448,6 +2478,7 @@ test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
 test_hostoff_owner_replaces_closed_cycle_until_handling
 test_hostoff_owner_failure_leaves_one_shot_successor
+test_snapshot_failure_leaves_one_shot_successor
 test_unconfirmed_handling_successor_still_rewakes
 test_failed_close_rewakes_with_failure_banner
 test_failed_cycles_notify_once_and_keep_retrying

@@ -283,6 +283,35 @@ test_main_only_pass_through_leaves_the_successor_watcher_running() {
 # is truncated), so no main-session key exists: the close reaches main without
 # mirror feed or an engine turn, and the unverified successor is reported.
 
+test_handoff_output_failure_preserves_close_and_successor() {
+  local home real_mktemp token
+  home=$(make_home handoff-output-failure away)
+  echo fail > "$home/stub-mode"
+  real_mktemp=$(command -v mktemp)
+  cat > "$home/fakebin/mktemp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  */.supervision-handoff-start.*) : > "$FM_HOME/output-refused"; exit 1 ;;
+esac
+SH
+  printf 'exec %q "$@"\n' "$real_mktemp" >> "$home/fakebin/mktemp"
+  chmod +x "$home/fakebin/mktemp"
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "output failure: no initial watcher"
+  append_status "$home" 'first wake'
+  wait_until_deadline 60 host_exited "$home" || fail "output failure: no hand-back"
+  assert_present "$home/output-refused" "fixture did not refuse the handoff output file"
+  expect_code 0 "$(cat "$home/host.rc")" "verified fallback must preserve successful exit"
+  assert_re '^signal: .*demo.status' "$home/host.out" "output failure dropped the close"
+  assert_grep 'the engine turn failed' "$home/host.out" "output failure dropped the hand-back reason"
+  watcher_live "$home" || fail "output failure left no fallback watcher"
+  token=$(cat "$home/state/.watcher-down")
+  [ "$(cat "$home/state/.watcher-down.continuity-failed")" = "${token##*:}" ] \
+    || fail "output failure did not record failed continuity"
+  stop_home_processes "$home"
+  pass "host: output-file failure preserves the close and fallback watcher"
+}
+
 test_attended_close_with_unidentified_main_session_passes_to_main() {
   local home token generation
   home=$(make_home attended-unidentified attended)
@@ -1117,6 +1146,7 @@ fm_test_run \
   test_attended_main_only_close_passes_straight_to_main \
   test_off_written_while_parked_passes_the_next_attended_close_to_main \
   test_main_only_pass_through_leaves_the_successor_watcher_running \
+  test_handoff_output_failure_preserves_close_and_successor \
   test_attended_close_with_unidentified_main_session_passes_to_main \
   test_close_accepted_away_that_turns_attended_passes_to_main \
   test_attended_close_that_turns_main_only_before_its_turn_passes_to_main \

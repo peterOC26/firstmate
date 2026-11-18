@@ -584,7 +584,8 @@ OpenCode support targets persistent TUI sessions rather than headless `opencode 
 The other harnesses rely on these mechanisms:
 
 - Claude normally depends on the Stop `asyncRewake` rewake.
-  The host's opt-in [acknowledged hand-back](supervision-host.md#acknowledged-hand-back) adds guarded tmux retries when that continuation is lost.
+  Its default [handling continuation owner](#claude-handling-successor) replaces closed watcher cycles and retries through the guarded hand-back transport when that continuation is lost.
+  The host's opt-in [acknowledged hand-back](supervision-host.md#acknowledged-hand-back) keeps that owner active until acknowledgement instead of handling.
 - Cursor depends on its awaited stop-hook park.
 - Grok retains native background-completion notifications.
 - Codex retains bounded foreground checkpoints unless the home opts in to its [native Stop park](supervision-protocols/codex.md).
