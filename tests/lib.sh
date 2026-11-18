@@ -187,7 +187,7 @@ fm_test_launch_unframe() {  # <launch>
 
 # The statement every launch opens with to drop the supervising home's paths.
 # shellcheck disable=SC2034
-FM_TEST_LAUNCH_HOME_ENV_UNSET='unset FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_SNAPSHOT_CACHE_DIR FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE; '
+FM_TEST_LAUNCH_HOME_ENV_CLEAR='export FM_WAKE_QUEUE= FM_WAKE_QUEUE_LOCK= FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE=; '
 
 # The command a pane runs after the launch's Git configuration prefix and its
 # leading export and unset statements, for suites that split it into arguments.

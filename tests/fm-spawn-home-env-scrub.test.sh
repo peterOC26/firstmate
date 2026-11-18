@@ -15,12 +15,13 @@ TMP_ROOT=$(fm_test_tmproot fm-spawn-home-env-scrub)
 SUPERVISOR="$TMP_ROOT/supervisor"
 mkdir -p "$SUPERVISOR/state"
 
-SCRUBBED='FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_SNAPSHOT_CACHE_DIR FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE'
+SCRUBBED='FM_WAKE_QUEUE FM_WAKE_QUEUE_LOCK FM_ROOT_OVERRIDE FM_STATE_OVERRIDE'
+PRESERVED='FM_DATA_OVERRIDE FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_SNAPSHOT_CACHE_DIR FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE'
 
 install_probe() {  # <fakebin>
   cat > "$1/codex" <<SH
 #!/bin/sh
-for name in $SCRUBBED FM_HOME FM_TASK_INBOX; do
+for name in $SCRUBBED $PRESERVED FM_HOME FM_TASK_INBOX; do
   eval "printf '%s=%s\n' \"\$name\" \"\\\${\$name:-unset}\""
 done
 SH
@@ -40,7 +41,7 @@ run_in_supervisor_pane() {  # <fakebin> <launch> [preamble]
     FM_SNAPSHOT_CACHE_DIR="$SUPERVISOR/data/cache" \
     FM_CREW_STATE_META_OVERRIDE="$SUPERVISOR/state/other.meta" \
     FM_CREW_STATE_STATUS_OVERRIDE="$SUPERVISOR/state/other.status" \
-    /bin/sh -c "${3:-}
+    "$4" -c "${3:-}
 $2"
 }
 
@@ -54,7 +55,7 @@ assert_scrubbed() {  # <seen> <label> <want-home> <want-inbox>
 }
 
 spawn_and_probe() {  # <kind> <allowlist absent|enabled>
-  local kind=$1 setting=$2 dir home proj wt fakebin id out status sm want_home seen
+  local kind=$1 setting=$2 dir home proj wt fakebin id out status sm want_home seen pane_shell pair name value
   id="scrub-$kind-$setting-a1"
   dir="$TMP_ROOT/$kind-$setting"
   home="$dir/home"
@@ -89,10 +90,29 @@ spawn_and_probe() {  # <kind> <allowlist absent|enabled>
   # so only the ambient launch can show that it survives.
   [ "$setting" = absent ] || want_home='unset'
   install_probe "$fakebin"
-  seen=$(run_in_supervisor_pane "$fakebin" "$(cat "$dir/launch.log")" "$(grep '^export ' "$dir/pane.log")") \
-    || fail "$kind, allowlist $setting: the emitted launch failed to run"
-  assert_scrubbed "$seen" "$kind, allowlist $setting" "$want_home" \
-    "$(cd "$home/state" && pwd -P)/$id.inbox"
+  for pane_shell in /bin/sh fish; do
+    if ! command -v "$pane_shell" >/dev/null 2>&1; then
+      printf 'skip: %s is not installed; pane scrub not exercised in that shell\n' "$pane_shell"
+      continue
+    fi
+    seen=$(run_in_supervisor_pane "$fakebin" "$(cat "$dir/launch.log")" "$(grep '^export ' "$dir/pane.log")" "$pane_shell" 2>"$dir/probe.stderr") \
+      || fail "$kind, allowlist $setting, $pane_shell: the emitted launch failed to run"
+    assert_not_contains "$(cat "$dir/probe.stderr")" "Unknown command" "$pane_shell: launch used an unsupported command"
+    assert_scrubbed "$seen" "$kind, allowlist $setting, $pane_shell" "$want_home" \
+      "$(cd "$home/state" && pwd -P)/$id.inbox"
+    for pair in FM_DATA_OVERRIDE=data FM_PROJECTS_OVERRIDE=projects FM_CONFIG_OVERRIDE=config FM_SNAPSHOT_CACHE_DIR=data/cache FM_CREW_STATE_META_OVERRIDE=state/other.meta FM_CREW_STATE_STATUS_OVERRIDE=state/other.status; do
+      name=${pair%%=*}
+      value="$SUPERVISOR/${pair#*=}"
+      if [ "$setting" = enabled ]; then
+        value=unset
+      elif [ "$kind" = secondmate ]; then
+        case "$name" in
+          FM_DATA_OVERRIDE | FM_PROJECTS_OVERRIDE | FM_CONFIG_OVERRIDE) value=unset ;;
+        esac
+      fi
+      assert_contains "$seen" "$name=$value" "$kind, allowlist $setting, $pane_shell: unrelated override changed"
+    done
+  done
 }
 
 test_ship_launch_drops_supervisor_paths() {
