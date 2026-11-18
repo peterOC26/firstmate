@@ -1,0 +1,317 @@
+Preparing a real local Treehouse pool with the installed Treehouse CLI.
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project. Run 'treehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project' to release it.
+{
+  "path": "{run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project",
+  "lease_id": "7f9971e9213b038a114e10c34fad0636",
+  "lease_holder": "live-warmup",
+  "leased_at": "2026-11-18T15:39:24.510955955+01:00"
+}
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+
+Scenario 1: spawn abort, retained-journal retry refusal, guarded teardown, and same-ID retry.
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-s
+pawn.sh aborted {run-worktree}
+TG9C8MW5T/.fm-live-journal.kb5Wh0/project --scout --backend tmux --base-branch a
+bsent --harness codex 2>&1; rc=$?; printf "\n__spawn_first_exit=%s\n" "$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9
+C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project. Run 'tr
+eehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/
+.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project' to release it.
+fatal: couldn't find remote ref refs/heads/absent
+error: could not fetch 'origin/absent' for pooled worktree '~/.no-mista
+kes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/po
+ol/.treehouse/project-be405b/1/project'; refusing to launch from a potentially s
+tale base
+warning: retaining Treehouse lease recovery journal /tmp/fm-lab.pClUbV/state/abo
+rted.treehouse-acquire; reconcile this acquisition before retrying task aborted
+Guarded release (bin/fm-teardown.sh's header owns when it returns the lease); if
+ it refuses, follow the manual recovery below:
+  FM_HOME=/tmp/fm-lab.pClUbV bash {worktrees}
+/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-teardown.sh aborted
+Manual recovery: pause allocations and cleanup for this project; inspect the jou
+rnal, retained task records, pool treehouse-state.json, and slot claim before re
+leasing anything.
+journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify
+ them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treeh
+ouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired
+case from pool treehouse-state.json, then remove only this journal by hand and s
+top:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any loca
+l home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "
+$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is c
+onfirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+warning: retaining task aborted's slot claim on ~/.no-mistakes/worktree
+s/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehous
+e/project-be405b/1/project; reconcile its ownership using the acquisition journa
+l before reuse
+
+__spawn_first_exit=1
+bash-5.2$
+After abort: journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire worktree={run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project lease_id=8e063ce4320996d6534098a36f98411a claim={run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/.fm-slot-owner
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-s
+pawn.sh aborted {run-worktree}
+TG9C8MW5T/.fm-live-journal.kb5Wh0/project --scout --backend tmux --base-branch a
+bsent --harness codex 2>&1; rc=$?; printf "\n__spawn_retry_blocked_exit=%s\n" "$
+rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+REFUSED: task aborted has a retained Treehouse acquisition journal; reconcile /t
+mp/fm-lab.pClUbV/state/aborted.treehouse-acquire before retrying
+Guarded release (bin/fm-teardown.sh's header owns when it returns the lease); if
+ it refuses, follow the manual recovery below:
+  FM_HOME=/tmp/fm-lab.pClUbV bash {worktrees}
+/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-teardown.sh aborted
+Manual recovery: pause allocations and cleanup for this project; inspect the jou
+rnal, retained task records, pool treehouse-state.json, and slot claim before re
+leasing anything.
+journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify
+ them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treeh
+ouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired
+case from pool treehouse-state.json, then remove only this journal by hand and s
+top:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any loca
+l home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "
+$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is c
+onfirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+
+__spawn_retry_blocked_exit=1
+bash-5.2$
+
+Scenario 2: --force refuses an aborted slot while a shell still works inside it.
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-t
+eardown.sh aborted --force 2>&1; rc=$?; printf "\n__teardown_active_exit=%s\n" "
+$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+REFUSED: processes are working in {worktrees}
+/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be40
+5b/1/project: 3188275; keeping task aborted's acquisition journal, lease, and sl
+ot claim
+Manual recovery: pause allocations and cleanup for this project; inspect the jou
+rnal, retained task records, pool treehouse-state.json, and slot claim before re
+leasing anything.
+journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify
+ them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treeh
+ouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired
+case from pool treehouse-state.json, then remove only this journal by hand and s
+top:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any loca
+l home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "
+$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is c
+onfirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+
+__teardown_active_exit=1
+bash-5.2$
+Private lab windows before closing the aborted shell:
+@0|bash|bash|{run-worktree}
+@1|fm-aborted|bash|{run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project
+Closed only the verified task shell @1 at {run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project.
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-t
+eardown.sh aborted  2>&1; rc=$?; printf "\n__teardown_first_exit=%s\n" "$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown: aborted's aborted spawn returned its leased copy ~/.no-mistak
+es/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/poo
+l/.treehouse/project-be405b/1/project
+
+__teardown_first_exit=0
+bash-5.2$
+After guarded teardown: lease released; claim and journal absent.
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-s
+pawn.sh aborted {run-worktree}
+TG9C8MW5T/.fm-live-journal.kb5Wh0/project --scout --backend tmux --base-branch a
+bsent --harness codex 2>&1; rc=$?; printf "\n__spawn_same_id_after_release_exit=
+%s\n" "$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9
+C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project. Run 'tr
+eehouse return ~/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/
+.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project' to release it.
+fatal: couldn't find remote ref refs/heads/absent
+error: could not fetch 'origin/absent' for pooled worktree '~/.no-mista
+kes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/po
+ol/.treehouse/project-be405b/1/project'; refusing to launch from a potentially s
+tale base
+warning: retaining Treehouse lease recovery journal /tmp/fm-lab.pClUbV/state/abo
+rted.treehouse-acquire; reconcile this acquisition before retrying task aborted
+Guarded release (bin/fm-teardown.sh's header owns when it returns the lease); if
+ it refuses, follow the manual recovery below:
+  FM_HOME=/tmp/fm-lab.pClUbV bash {worktrees}
+/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-teardown.sh aborted
+Manual recovery: pause allocations and cleanup for this project; inspect the jou
+rnal, retained task records, pool treehouse-state.json, and slot claim before re
+leasing anything.
+journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify
+ them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treeh
+ouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired
+case from pool treehouse-state.json, then remove only this journal by hand and s
+top:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any loca
+l home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "
+$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is c
+onfirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+warning: retaining task aborted's slot claim on ~/.no-mistakes/worktree
+s/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool/.treehous
+e/project-be405b/1/project; reconcile its ownership using the acquisition journa
+l before reuse
+
+__spawn_same_id_after_release_exit=1
+bash-5.2$
+Private lab windows before closing the aborted shell:
+@0|bash|bash|{run-worktree}
+@2|fm-aborted|bash|{run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project
+Closed only the verified task shell @2 at {run-worktree}/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project.
+Same-ID retry passed reservation and acquired a new lease before its expected absent-branch abort.
+
+Scenario 3: --force cannot return a remote-backed slot holding a local-only commit.
+Switched to a new branch 'master'
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-t
+eardown.sh aborted --force 2>&1; rc=$?; printf "\n__teardown_adversarial_exit=%s
+\n" "$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+REFUSED: {run-worktree}
+5T/.fm-live-journal.kb5Wh0/pool/.treehouse/project-be405b/1/project holds commit
+s on no remote or eligible local default branch; keeping task aborted's acquisit
+ion journal, lease, and slot claim
+Manual recovery: pause allocations and cleanup for this project; inspect the jou
+rnal, retained task records, pool treehouse-state.json, and slot claim before re
+leasing anything.
+journal=/tmp/fm-lab.pClUbV/state/aborted.treehouse-acquire
+Read project= and treehouse_lease_holder= from "$journal/identity".
+Set worktree, lease_id, and lease_holder from "$journal/allocation.json"; verify
+ them against that identity and the pool state.
+If allocation.json is incomplete, locate the exact holder from identity in treeh
+ouse-state.json and recover its path and lease_id; do not guess the holder.
+If no pool entry carries the recorded lease holder, confirm this never-acquired
+case from pool treehouse-state.json, then remove only this journal by hand and s
+top:
+  rm -rf -- "$journal"
+Preserve any unlanded work and reconcile any retained task record first.
+For a conflicting claim, confirm it is orphaned: no live task record in any loca
+l home names the claim's task and home.
+Stop if another task owns the claim or lease or orphan status is uncertain.
+With worktree, lease_id, and lease_holder set to those verified values, run:
+  treehouse return --if-lease-id "$lease_id" --if-lease-holder "$lease_holder" "
+$worktree"
+Only after return succeeds, and the slot claim belongs to this acquisition, is c
+onfirmed orphaned, or is absent, remove the claim and journal by hand:
+  rm -f -- "$(dirname "$worktree")/.fm-slot-owner"
+  rm -rf -- "$journal"
+Keep the journal and claim if return fails or ownership is uncertain.
+
+__teardown_adversarial_exit=1
+bash-5.2$
+Refusal preserved commit=0dfadf59f2cfcc713abed3fcadcee77a8a4f2fcb, lease state, slot claim, and acquisition journal despite --force.
+bash-5.2$ cd {run-worktree}
+C8MW5T; FM_HOME=/tmp/fm-lab.pClUbV TREEHOUSE_ROOT=~/.no-mistakes/worktr
+ees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/pool bash /h
+ome/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/bin/fm-t
+eardown.sh aborted  2>&1; rc=$?; printf "\n__teardown_final_exit=%s\n" "$rc"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab
+.pClUbV
+A new version of treehouse is available: v2.3.0 → v3.1.8
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown: aborted's aborted spawn returned its leased copy ~/.no-mistak
+es/worktrees/7f0ec18181b6/01M7QFD3FCEYNN69CTG9C8MW5T/.fm-live-journal.kb5Wh0/poo
+l/.treehouse/project-be405b/1/project
+
+__teardown_final_exit=0
+bash-5.2$
+Final fixture cleanup: no acquisition journal, no slot claim, and the Treehouse lease is released.
+
+Isolated live validation completed; the disposable project, marked lab home, pool, and private tmux server are removed by the exit trap.
