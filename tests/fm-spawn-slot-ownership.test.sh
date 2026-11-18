@@ -880,6 +880,133 @@ test_separate_clones_share_the_origin_pool_reservation() {
   pass "separate clones sharing an origin honor legacy references and keep lease claims and cleanup scoped to one copy"
 }
 
+# A spawn that refuses after it leased and claimed its copy publishes no record.
+abort_spawn_after_lease() {  # <id> <slot>
+  fm_test_spawn_brief "$HOME_DIR" "$1"
+  printf '%s\nBase branch: missing\n' \
+    'You are in a disposable git worktree of project, at a detached HEAD on a clean copy of its base branch.' \
+    >> "$HOME_DIR/data/$1/brief.md"
+  FM_MUTATION_LOG="$CASE_DIR/mutations" FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" \
+    FM_FAKE_TREEHOUSE_POOL="$POOL" \
+    fm_test_run_spawn "$HOME_DIR" "$POOL/$2/project" "$FAKEBIN" \
+    "$1" "$PROJECT" --scout --base-branch missing
+}
+
+journal_only_teardown() {  # <id> <outfile> [args]
+  local id=$1 outfile=$2
+  shift 2
+  : > "$CASE_DIR/treehouse.log"
+  FM_HOME="$HOME_DIR" FM_MUTATION_LOG="$CASE_DIR/mutations" \
+    FM_FAKE_TREEHOUSE_LOG="$CASE_DIR/treehouse.log" PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-teardown.sh" "$id" "$@" > "$outfile" 2>&1
+}
+
+test_aborted_spawn_journal_releases_through_teardown() {
+  local out rc shape holder reason pid=
+  make_case journal-only-release
+  out=$(abort_spawn_after_lease aborted 1); rc=$?
+  [ "$rc" -ne 0 ] || fail "setup spawn did not abort: $out"
+  assert_absent "$HOME_DIR/state/aborted.meta" "setup abort published a record"
+  assert_present "$HOME_DIR/state/aborted.treehouse-acquire/allocation.json" "setup abort lost its journal"
+  assert_grep 'task=aborted' "$POOL/1/.fm-slot-owner" "setup abort lost its claim"
+  holder=$(jq -r .lease_holder "$HOME_DIR/state/aborted.treehouse-acquire/allocation.json")
+  out=$(spawn_task aborted 2); rc=$?
+  [ "$rc" -ne 0 ] || fail "a retained journal did not block a same-id retry"
+  assert_contains "$out" "bin/fm-teardown.sh aborted" "the refusal did not name the guarded release: $out"
+  journal_only_teardown aborted "$CASE_DIR/release"; rc=$?
+  expect_code 0 "$rc" "a journal-only teardown did not release the aborted spawn: $(cat "$CASE_DIR/release")"
+  grep -Fq -- "--if-lease-holder $holder" "$CASE_DIR/treehouse.log" ||
+    fail "release was not conditioned on the recorded lease: $(cat "$CASE_DIR/treehouse.log")"
+  jq -e --arg p "$POOL/1/project" '.worktrees[] | select(.path == $p) | .leased != true' \
+    "$POOL/treehouse-state.json" >/dev/null || fail "the aborted spawn's lease stayed held"
+  assert_absent "$POOL/1/.fm-slot-owner" "release left the slot claim"
+  assert_absent "$HOME_DIR/state/aborted.treehouse-acquire" "release left the journal"
+  : > "$FAKEBIN/.spawn-window"
+  out=$(spawn_task aborted 2); rc=$?
+  expect_code 0 "$rc" "the same id could not spawn after release: $out"
+
+  for shape in dirty unlanded in-use other-claim other-record spawn-running; do
+    make_case "journal-only-keep-$shape"
+    out=$(abort_spawn_after_lease aborted 1); rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape setup spawn did not abort: $out"
+    case "$shape" in
+      dirty)
+        printf 'unfinished\n' > "$POOL/1/project/work-in-progress"
+        reason='has uncommitted changes'
+        ;;
+      unlanded)
+        git -C "$POOL/1/project" -c user.name=t -c user.email=t@example.invalid \
+          commit -q --allow-empty -m 'unlanded'
+        reason='holds commits on no remote'
+        ;;
+      in-use)
+        (cd "$POOL/1/project" && exec /bin/sleep 30) &
+        pid=$!
+        reason='processes are working in'
+        ;;
+      other-claim)
+        printf 'task=successor\nhome=%s\n' "$HOME_DIR" > "$POOL/1/.fm-slot-owner"
+        reason='is not task aborted'
+        ;;
+      other-record)
+        fm_write_meta "$HOME_DIR/state/other.meta" "worktree=$POOL/1/project" "project=$PROJECT" "kind=scout"
+        reason='is still named by task record'
+        ;;
+      spawn-running)
+        FM_HOME="$HOME_DIR" bash -c '
+          . "$1/bin/fm-wake-lib.sh"
+          fm_lock_try_acquire "$FM_HOME/state/.spawn-aborted.lock" || exit 1
+          : > "$FM_HOME/state/.held"
+          exec /bin/sleep 30
+        ' _ "$ROOT" >/dev/null 2>&1 &
+        pid=$!
+        for _ in $(seq 100); do
+          [ ! -e "$HOME_DIR/state/.held" ] || break
+          /bin/sleep 0.1
+        done
+        assert_present "$HOME_DIR/state/.held" "setup could not hold the spawn lock"
+        reason='a spawn of task aborted is still running'
+        ;;
+    esac
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    cp "$POOL/1/.fm-slot-owner" "$CASE_DIR/prior-claim"
+    journal_only_teardown aborted "$CASE_DIR/refusal" --force; rc=$?
+    [ -z "$pid" ] || { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; pid=; }
+    [ "$rc" -ne 0 ] || fail "$shape journal-only teardown released the lease: $(cat "$CASE_DIR/refusal")"
+    grep -q "^REFUSED: .*$reason" "$CASE_DIR/refusal" ||
+      fail "$shape refusal was not named: $(cat "$CASE_DIR/refusal")"
+    cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape refusal changed pool state"
+    cmp -s "$CASE_DIR/prior-claim" "$POOL/1/.fm-slot-owner" || fail "$shape refusal changed the slot claim"
+    assert_present "$HOME_DIR/state/aborted.treehouse-acquire/identity" "$shape refusal removed the journal"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape refusal invoked Treehouse: $(cat "$CASE_DIR/treehouse.log")"
+    case "$shape" in
+      dirty) assert_present "$POOL/1/project/work-in-progress" "dirty refusal discarded work" ;;
+      unlanded) assert_grep unlanded <(git -C "$POOL/1/project" log -1 --format=%s) "unlanded refusal moved HEAD" ;;
+    esac
+  done
+
+  for shape in released missing-copy; do
+    make_case "journal-only-records-$shape"
+    out=$(abort_spawn_after_lease aborted 1); rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape setup spawn did not abort: $out"
+    if [ "$shape" = missing-copy ]; then
+      mv "$POOL/1/project" "$CASE_DIR/saved-copy"
+      drop_pool_entry "$POOL/1/project"
+    else
+      jq '.worktrees |= map(del(.leased, .lease_id, .lease_holder))' "$POOL/treehouse-state.json" > "$POOL/state.tmp"
+      mv "$POOL/state.tmp" "$POOL/treehouse-state.json"
+    fi
+    cp "$POOL/treehouse-state.json" "$CASE_DIR/prior-pool.json"
+    journal_only_teardown aborted "$CASE_DIR/records"; rc=$?
+    expect_code 0 "$rc" "$shape journal stayed stranded: $(cat "$CASE_DIR/records")"
+    cmp -s "$CASE_DIR/prior-pool.json" "$POOL/treehouse-state.json" || fail "$shape cleanup changed pool state"
+    [ ! -s "$CASE_DIR/treehouse.log" ] || fail "$shape cleanup invoked Treehouse"
+    assert_absent "$POOL/1/.fm-slot-owner" "$shape cleanup left its own claim"
+    assert_absent "$HOME_DIR/state/aborted.treehouse-acquire" "$shape cleanup left the journal"
+  done
+  pass "an aborted spawn's journal releases through teardown only for a clean, landed, unused, unclaimed copy"
+}
+
 test_reservation_survives_worker_exit_and_releases_at_cleanup
 test_legacy_records_hold_their_copies_during_fresh_get
 test_legacy_held_pool_exhaustion_allocates_nothing
@@ -906,3 +1033,4 @@ test_manual_recovery_for_unacquired_and_orphaned_slots
 test_record_scans_name_missing_state_directories
 
 test_record_scan_refusal_causes
+test_aborted_spawn_journal_releases_through_teardown
