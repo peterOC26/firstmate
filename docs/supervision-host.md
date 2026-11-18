@@ -115,13 +115,16 @@ The host then passes the next close to main before starting another engine turn,
 On that main-only pass-through the host leaves a successor watcher cycle running, then prints the close unchanged.
 That successor, like one a turn hands back at its start (see [Away](#away)), runs in a process group of its own, so the harness tearing down the hook's group after the rewake does not stop it.
 The host republishes the recovery marker as downtime, even when an earlier engine turn left it reading handling, because the re-arm owner delivers a close to main only while that marker reads downtime.
-If that publish fails, the host prints a `watcher: FAILED` line instead of the close and exits nonzero, so the arm owner reports a failure rather than a hand-back it could not deliver.
+If that publish fails, Claude receives the close plus `supervision-host: the hand-back recovery generation could not be recorded`; other primaries receive a `watcher: FAILED` line instead of the close.
+Both paths exit nonzero.
 The [Claude continuation owner](watcher-continuity.md#claude-handling-successor) keeps replacing closed cycles until main begins handling the recovery generation; other primaries leave a one-shot successor, whose next close can leave supervision down if main's continuation is lost.
 The opt-in [acknowledged hand-back](#acknowledged-hand-back) keeps the Claude owner active until main acknowledges.
 The session's next park without `--restart` requests a take-over to restore a single host-owned arm; the [host header](../bin/fm-supervision-host.sh) owns successor persistence and cleanup, and the [arm header](../bin/fm-watch-arm.sh) owns take-over eligibility and fallback.
 OpenCode and omp still launch the host with `--restart`, which takes precedence over recorded take-over and lacks its acknowledgement-preserving handover; changing that first-cycle path remains a follow-up.
 For the host-off Claude Stop hook's continuation owner, see [Claude handling successor](watcher-continuity.md#claude-handling-successor).
-It also passes the close through unchanged, with no added line, when any of these holds (`fm_supervision_host_attended_ready` in `bin/fm-supervision-engine-lib.sh` owns the list):
+If the Claude continuation owner cannot start, the host records failed continuity and falls back to a one-shot successor; a verified fallback preserves the successful hand-back exit.
+If neither can be verified, the host adds a successor failure line and exits nonzero.
+With a verified successor, it also passes the close through unchanged, with no added line, when any of these holds (`fm_supervision_host_attended_ready` in `bin/fm-supervision-engine-lib.sh` owns the list):
 
 - The home names no usable engine.
 - A tool its turns need is missing: the engine executable, node, jq, or one of perl, timeout, or gtimeout to bound the turn.
@@ -279,7 +282,8 @@ An away hand-back may also carry the [inbox-note return signal](#away).
 Before handing it back, the host republishes downtime and, on Claude, verifies the detached continuation owner.
 Other primaries stop their successor cycle before returning.
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
-If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
+If that publication fails, Claude receives `supervision-host: the hand-back recovery generation could not be recorded`; other primaries receive `supervision-host: watcher downtime could not be restored`.
+The host exits nonzero.
 On Claude, a Stop hook whose rewake is refused while the recovery marker is still `pending:handling` or `announced:handling` and no watcher is live preserves the host's actionable output on any resulting rewake.
 After an actionable host close, a rewake refused while this generation still owns the epoch and the marker is still `pending:downtime` or `announced:downtime` uses the durable failure path even if the session lock changed during the park.
 The [Claude failure progression](turnend-guard.md#failure-progression-and-block-budget) owns its notice, retry, and attended-alarm decisions; every other refused rewake stays silent as before.

@@ -106,7 +106,14 @@ if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
   if [ -e "$FM_HOME/state/successor-park" ]; then
     while [ -e "$FM_HOME/state/successor-park" ]; do sleep 0.05; done
   else
-    while kill -0 "$(cat "$FM_HOME/state/.lock")" 2>/dev/null; do sleep 0.1; done
+    while kill -0 "$(cat "$FM_HOME/state/.lock")" 2>/dev/null; do
+      if [ -e "$FM_HOME/state/close-successor-$$" ]; then
+        rm -rf "$FM_HOME/state/.watch.lock"
+        printf 'signal: second decision requires handling\n'
+        exit 0
+      fi
+      sleep 0.1
+    done
   fi
   exit 0
 fi
@@ -565,6 +572,65 @@ test_attached_cycle_end_starts_handling_successor() {
   pass "auto-arm: an attached cycle's end starts a handling successor named after the closed arm before the rewake"
 }
 
+test_hostoff_owner_replaces_closed_cycle_until_handling() {
+  local dir session first second owner i
+  dir=$(make_primary_dir "$TMP_ROOT/owner-replacement")
+  : > "$dir/state/task.meta"
+  write_arm_fixture "$dir" actionable
+  FM_HOME="$dir" "$FAKE_CLAUDE" -c '
+    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    printf '{"session_id":"sess-autoarm","stop_hook_active":false}\n' | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2>&1
+    printf "%s\n" "$?" > "$FM_HOME/hook.rc"
+    while [ ! -e "$FM_HOME/release" ]; do sleep 0.1; done
+  ' &
+  session=$!
+  for i in $(seq 1 200); do
+    [ ! -s "$dir/hook.rc" ] || break
+    sleep 0.1
+  done
+  expect_code 2 "$(cat "$dir/hook.rc")" "first Stop must request handling"
+  first=$(cat "$dir/state/.watch.lock/pid")
+  owner=$(cut -f1 "$dir/state/.supervision-handoff-owner")
+  touch "$dir/state/close-successor-$first"
+  second=$first
+  for i in $(seq 1 200); do
+    second=$(cat "$dir/state/.watch.lock/pid" 2>/dev/null)
+    [ -z "$second" ] || [ "$second" = "$first" ] || break
+    sleep 0.1
+  done
+  [ -n "$second" ] && [ "$second" != "$first" ] || fail "no replacement after second decision"
+  kill -0 "$second" || fail "replacement watcher is not live"
+  kill -0 "$owner" || fail "owner exited before handling"
+  [ "$(wc -l < "$dir/state/arm-ran")" -eq 1 ] || fail "replacement needed another Stop"
+  FM_HOME="$dir" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_recovery_marker_begin_handling "$1/state/.watcher-down"' _ "$dir"     || fail "main could not begin handling"
+  for i in $(seq 1 100); do
+    [ -e "$dir/state/.supervision-handoff-owner" ] || break
+    sleep 0.1
+  done
+  [ ! -e "$dir/state/.supervision-handoff-owner" ] || fail "owner remained after handling"
+  kill -0 "$second" || fail "handling stopped the replacement watcher"
+  touch "$dir/release"
+  wait "$session"
+  pass "auto-arm: owner replaces a second close without Stop and releases on handling"
+}
+
+test_hostoff_owner_failure_leaves_one_shot_successor() {
+  local dir out status successor
+  dir=$(make_primary_dir "$TMP_ROOT/owner-fallback")
+  : > "$dir/state/task.meta"
+  : > "$dir/state/successor-park"
+  write_arm_fixture "$dir" actionable
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$dir/bin/fm-supervision-handoff.sh"
+  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+  expect_code 2 "$status" "owner failure must still deliver the close"
+  successor=$(cat "$dir/state/.watch.lock/pid")
+  kill -0 "$successor" || fail "owner failure left no fallback watcher"
+  [ "$(cat "$dir/state/.watcher-down.continuity-failed")" = fixture-generation ]     || fail "owner failure did not record failed continuity"
+  assert_contains "$out" 'one-shot handling successor is watching' "fallback must report degraded ownership"
+  rm -f "$dir/state/successor-park"
+  pass "auto-arm: owner startup failure retains one-shot watcher coverage"
+}
+
 test_unconfirmed_handling_successor_still_rewakes() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/successor-unconfirmed")
@@ -576,7 +642,7 @@ test_unconfirmed_handling_successor_still_rewakes() {
   assert_contains "$out" "signal: task.status done: fixture peer cycle ended" "rewake must still carry the delivered reason"
   assert_contains "$out" "did not confirm a live watcher" "the rewake must say this turn runs uncovered"
   assert_contains "$out" "watcher: FAILED - no live watcher with a fresh beacon" "the rewake must carry the successor's own failure line"
-  [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 1 ] || fail "the failed successor must not be retried inside the rewake path"
+  [ "$(wc -l < "$dir/state/successor-ran" | tr -d ' ')" -eq 2 ] || fail "owner failure must try exactly one fallback successor"
   [ "$(cat "$dir/state/.watcher-down.continuity-failed")" = fixture-generation ] \
     || fail "failed continuity must be recorded independently of the rewake"
   pass "auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it"
@@ -2362,11 +2428,6 @@ test_clear_rekey_stale_sidecar_starts_the_away_host() {
   pass "auto-arm: a /clear re-key with a stale sidecar starts the away host and re-anchors the sidecar"
 }
 
-if [ "$#" -gt 0 ]; then
-  fm_test_run "$@"
-  exit
-fi
-
 test_inert_in_child_worktree
 test_inert_without_session_lock
 test_reclaims_stale_session_lock_before_arming
@@ -2378,6 +2439,8 @@ test_inert_when_fleet_idle
 test_actionable_close_rewakes_with_reason
 test_actionable_close_with_live_successor_rewakes_once
 test_attached_cycle_end_starts_handling_successor
+test_hostoff_owner_replaces_closed_cycle_until_handling
+test_hostoff_owner_failure_leaves_one_shot_successor
 test_unconfirmed_handling_successor_still_rewakes
 test_failed_close_rewakes_with_failure_banner
 test_failed_cycles_notify_once_and_keep_retrying

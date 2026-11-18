@@ -723,11 +723,6 @@ test_superseded_host_leaves_the_owner_untouched() {
   pass "host: a host under a superseded auto-arm generation stands down without touching the owner"
 }
 
-if [ "$#" -gt 0 ]; then
-  fm_test_run "$@"
-  exit
-fi
-
 fm_test_run \
   test_default_handback_replaces_closes_until_main_handles \
   test_handback_replacement_failure_records_continuity \

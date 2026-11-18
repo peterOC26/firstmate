@@ -577,25 +577,40 @@ start_handling_successor() {  # <closed-arm-pid>
   fi
   fm_recovery_marker_snapshot "$STATE/.watcher-down" || { rm -f "$out"; return 1; }
   recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
-  case $- in *m*) monitor_was_on=1 ;; esac
-  set -m 2>/dev/null || true
-  FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
-    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$recovery" "$1" handling >"$out" 2>&1 </dev/null &
-  pid=$!
-  [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
-  deadline=$(( $(date +%s) + budget + 2 ))
-  while :; do
-    if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
-      SUCCESSOR_FAILURE=
-      rm -f "$out" 2>/dev/null || true
-      return 0
+  local mode
+  for mode in owner fallback; do
+    : > "$out"
+    case $- in *m*) monitor_was_on=1 ;; esac
+    set -m 2>/dev/null || true
+    if [ "$mode" = owner ]; then
+      FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
+        nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$recovery" "$1" handling >"$out" 2>&1 </dev/null &
+    else
+      FM_GUARD_GRACE="$GRACE" FM_WATCH_PREDECESSOR_ARM_PID="$1" \
+        nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
     fi
-    grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
-    fm_pid_alive "$pid" || break
-    [ "$(date +%s)" -ge "$deadline" ] && break
-    sleep 0.2
+    pid=$!
+    [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
+    deadline=$(( $(date +%s) + budget + 2 ))
+    while :; do
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
+        if [ "$mode" = owner ]; then
+          SUCCESSOR_FAILURE=
+        else
+          SUCCESSOR_FAILURE='The continuation owner failed; a one-shot handling successor is watching.'
+        fi
+        rm -f "$out" 2>/dev/null || true
+        return 0
+      fi
+      grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
+      fm_pid_alive "$pid" || break
+      [ "$(date +%s)" -ge "$deadline" ] && break
+      sleep 0.2
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   done
-  kill -TERM "$pid" 2>/dev/null || true
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)
   rm -f "$out" 2>/dev/null || true
   [ -z "$line" ] || line=" ($line)"

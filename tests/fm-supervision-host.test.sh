@@ -300,10 +300,9 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
   wait_until 150 watcher_live "$home" || fail "unidentified: the host never started a watcher cycle: $(cat "$home/host.out")"
   append_status "$home" 'step one'
   wait_until_deadline 60 host_exited "$home" || fail "unidentified: the close did not reach main: $(cat "$home/state/.supervision-host.log")"
-  expect_code 1 "$(cat "$home/host.rc")" "an unidentified main session must report its unverified successor"
+  expect_code 0 "$(cat "$home/host.rc")" "an unidentified main session must retain a successor"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must carry the watcher's reason line"
-  assert_re '^supervision-host: .*successor could not be verified$' "$home/host.out" \
-    "the failed hand-back must name its unverified successor"
+  watcher_live "$home" || fail "unidentified: fallback left no watcher"
   [ "$(engine_calls "$home")" -eq 0 ] || fail "unidentified: the engine ran without a main-session key"
   assert_grep 'demo.status' "$home/state/.wake-queue" "the wake must stay queued for main"
   token=$(cat "$home/state/.watcher-down")
@@ -312,7 +311,7 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
     || fail "unidentified: the failed successor did not record its recovery generation"
   assert_re '	pass-through	attended	the main session could not be identified	signal:' "$home/state/.supervision-host.log" \
     "the ledger must record why the close went to main"
-  pass "host: an unidentified main session receives the close and its unverified successor failure"
+  pass "host: an unidentified main session retains a fallback watcher"
 }
 
 
@@ -927,6 +926,28 @@ queue_host_inbox_note() {  # <home>
   python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$1/note.json"
 }
 
+test_failed_away_turn_surfaces_midturn_inbox_return() {
+  local home id marker
+  home=$(make_home away-failed-inbox away)
+  echo held-fail > "$home/stub-mode"
+  mkfifo "$home/stub-release"
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "failed inbox: no watcher"
+  append_status "$home" 'first wake'
+  wait_until 250 test -s "$home/engine-drain.1" || fail "failed inbox: engine did not start"
+  id=$(queue_host_inbox_note "$home")
+  printf 'continue\n' > "$home/stub-release"
+  wait_until 250 host_exited "$home" || fail "failed inbox: no hand-back"
+  expect_code 0 "$(cat "$home/host.rc")" "failed inbox: successor failed"
+  assert_grep 'the captain sent a note and away mode should end' "$home/host.out" "failed turn lost captain return"
+  assert_grep 'the engine turn failed' "$home/host.out" "fixture did not take failure hand-back"
+  marker="$home/state/.seen-inbox-$(printf 'inbox:%s' "$id" | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+  [ -f "$marker" ] || fail "failed inbox: return was not marked surfaced"
+  assert_grep "inbox:$id" "$home/state/.wake-queue" "failed inbox: note is not queued for main"
+  stop_home_processes "$home"
+  pass "host: failed away turn preserves a mid-turn captain return"
+}
+
 test_away_inbox_note_is_handed_back_so_main_can_end_away_mode() {
   local home id drained
   home=$(make_home away-inbox away)
@@ -1115,6 +1136,7 @@ fm_test_run \
   test_report_without_acknowledgement_hands_the_wake_to_main \
   test_return_during_a_failed_turn_still_hands_its_outcomes_to_main \
   test_incomplete_engine_result_hands_the_wake_to_main \
+  test_failed_away_turn_surfaces_midturn_inbox_return \
   test_away_inbox_note_is_handed_back_so_main_can_end_away_mode \
   test_acknowledged_away_inbox_note_stays_owned_until_main_acknowledges \
   test_away_wake_without_an_inbox_note_stays_on_the_engine \

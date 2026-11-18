@@ -857,11 +857,6 @@ test_inbox_note_queued_after_successor_closed_reaches_main_before_next_turn() {
   pass "host: an inbox note queued after successor close reaches main before any second engine turn"
 }
 
-if [ "$#" -gt 0 ]; then
-  fm_test_run "$@"
-  exit
-fi
-
 fm_test_run \
   test_main_only_close_after_handled_turn_restores_inherited_handling \
   test_main_only_close_after_handled_turn_delivers_restore_failure \

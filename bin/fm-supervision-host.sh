@@ -730,7 +730,9 @@ retire_successor() {
 # Hand the close to main: stop the successor cycle, print the close, why, and
 # any further "supervision-host:" lines, and exit.
 exit_to_main() {  # <why> [further lines]
-  continuation_handback "supervision-host: $1" "${2:-}"
+  away_unsurfaced_inbox_return
+  log_line "to-main	$1"
+  continuation_handback "supervision-host: $1" "${2:-}" "$AWAY_INBOX_RETURN_LINE"
   local lines=${2:-} rc=0
   retire_successor
   if [ -n "$SUCCESSOR_GENERATION" ] \
@@ -739,8 +741,6 @@ exit_to_main() {  # <why> [further lines]
     lines=${lines:+$lines$'\n'}"supervision-host: watcher downtime could not be restored for the main hand-back"
     rc=1
   fi
-  log_line "to-main	$1"
-  away_unsurfaced_inbox_return
   emit "supervision-host: $1" "$lines" "$AWAY_INBOX_RETURN_LINE"
   exit "$rc"
 }
@@ -795,8 +795,14 @@ continuation_handback() {
     sleep 0.2
   done
   kill -TERM "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  forget_process "$pid"
   fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   rm -f "$out"
+  if leave_successor_for_main; then
+    emit "$@"
+    exit 0
+  fi
   emit "$@" 'supervision-host: the acknowledged hand-back successor could not be verified'
   exit 1
 }
