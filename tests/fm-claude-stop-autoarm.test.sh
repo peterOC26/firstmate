@@ -577,9 +577,10 @@ test_hostoff_owner_replaces_closed_cycle_until_handling() {
   dir=$(make_primary_dir "$TMP_ROOT/owner-replacement")
   : > "$dir/state/task.meta"
   write_arm_fixture "$dir" actionable
-  FM_HOME="$dir" "$FAKE_CLAUDE" -c '
+  printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
+    | FM_HOME="$dir" "$FAKE_CLAUDE" -c '
     printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-    printf '{"session_id":"sess-autoarm","stop_hook_active":false}\n' | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2>&1
+    "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$FM_HOME/hook.out" 2>&1
     printf "%s\n" "$?" > "$FM_HOME/hook.rc"
     while [ ! -e "$FM_HOME/release" ]; do sleep 0.1; done
   ' &
@@ -591,14 +592,20 @@ test_hostoff_owner_replaces_closed_cycle_until_handling() {
   expect_code 2 "$(cat "$dir/hook.rc")" "first Stop must request handling"
   first=$(cat "$dir/state/.watch.lock/pid")
   owner=$(cut -f1 "$dir/state/.supervision-handoff-owner")
+  assert_absent "$dir/state/.watcher-down.handling" "replacement case must suppress handling"
   touch "$dir/state/close-successor-$first"
   second=$first
   for i in $(seq 1 200); do
     second=$(cat "$dir/state/.watch.lock/pid" 2>/dev/null)
-    [ -z "$second" ] || [ "$second" = "$first" ] || break
+    if [ -n "$second" ] && [ "$second" != "$first" ] \
+      && [ "$(cut -f1 "$dir/state/.supervision-host-left" 2>/dev/null)" = "$second" ]; then
+      break
+    fi
     sleep 0.1
   done
   [ -n "$second" ] && [ "$second" != "$first" ] || fail "no replacement after second decision"
+  [ "$(cut -f1 "$dir/state/.supervision-host-left")" = "$second" ] \
+    || fail "replacement arm was not recorded for takeover"
   kill -0 "$second" || fail "replacement watcher is not live"
   kill -0 "$owner" || fail "owner exited before handling"
   [ "$(wc -l < "$dir/state/arm-ran")" -eq 1 ] || fail "replacement needed another Stop"

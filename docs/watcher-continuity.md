@@ -174,7 +174,7 @@ With the supervision host off, Claude's Stop hook starts a detached continuation
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
 1. Launches `bin/fm-supervision-handoff.sh` in handling mode, which starts `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
-2. Waits for that arm's one status line.
+2. Waits for readiness; if owner startup fails, records failed continuity and tries a direct one-shot `bin/fm-watch-arm.sh` successor.
 3. Only then exits 2 with the wake.
 
 A child of the hook cannot outlive its exit-2 rewake.
@@ -191,7 +191,9 @@ The owner replaces closed cycles until main begins handling the current recovery
 Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
 `FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval; [the environment-variable reference](configuration.md#environment-variables) owns its default.
 When the requested turn never starts, the owner retries through the existing [guarded hand-back transport](supervision-host.md#reaching-a-lost-claude-continuation) at that interval.
-A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
+If the fallback confirms a live watcher, the rewake banner adds `The continuation owner failed; a one-shot handling successor is watching.`
+That fallback covers one cycle without replacing later closes.
+If neither launch confirms a live watcher, the banner reports the unconfirmed successor; neither failure withholds the wake.
 Failed startup or replacement independently records the recovery generation in `state/.watcher-down.continuity-failed`, so committing a rewake does not claim successful continuity.
 The next Stop then re-arms as before.
 

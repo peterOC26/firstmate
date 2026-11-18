@@ -556,15 +556,14 @@ run_arm() {  # <output file, or empty for none>
 }
 
 # --- handling successor --------------------------------------------------------
-# Start the next arm before the rewake delivers the wake, as the Pi, omp, and
-# OpenCode adapters do from their child-close handlers, so a watcher covers the
-# handling turn instead of the home waiting uncovered for the next Stop. The
-# successor receives the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID; it
-# must outlive this hook's exit, so it is detached three ways: nohup, stdio
-# away from the hook's pipes, and its own process group. Its one status line
-# is awaited within its own short successor budget plus slack - deliberately
-# not the arm's fresh-child backstop, which may run far longer. Sets
-# SUCCESSOR_FAILURE to the banner line for an unconfirmed successor.
+# Start a continuation owner before delivering the rewake. It starts the next
+# arm with the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID and replaces
+# closed cycles until main begins handling the recovery generation. If owner
+# startup fails, record failed continuity and try one direct one-shot arm.
+# Both launches use nohup, detached stdio, and their own process group to
+# survive the hook's exit. Each awaits readiness within the successor budget
+# plus slack. SUCCESSOR_FAILURE carries the fallback or unconfirmed-start
+# banner line; neither failure withholds the wake.
 SUCCESSOR_FAILURE=
 start_handling_successor() {  # <closed-arm-pid>
   local out pid deadline budget line recovery monitor_was_on=0
