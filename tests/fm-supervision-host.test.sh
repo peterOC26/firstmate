@@ -279,10 +279,6 @@ test_main_only_pass_through_leaves_the_successor_watcher_running() {
 }
 
 
-# The session-lock holder's process identity cannot be read (its proc entry
-# is truncated), so no main-session key exists: the close reaches main without
-# mirror feed or an engine turn, and the unverified successor is reported.
-
 test_handoff_output_failure_preserves_close_and_successor() {
   local home real_mktemp token
   home=$(make_home handoff-output-failure away)
@@ -312,6 +308,9 @@ SH
   pass "host: output-file failure preserves the close and fallback watcher"
 }
 
+# The session-lock holder's process identity cannot be read (its proc entry
+# is truncated), so no main-session key exists: the close reaches main without
+# mirror feed or an engine turn, and a one-shot successor retains watcher coverage.
 test_attended_close_with_unidentified_main_session_passes_to_main() {
   local home token generation
   home=$(make_home attended-unidentified attended)

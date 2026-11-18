@@ -104,8 +104,10 @@
 # before they existed, so the host exits with the close, one "supervision-host:"
 # line naming them, and one line per visible outcome, for main to relay. The
 # host returns it through the primary's existing wake path. Every Claude
-# hand-back starts a detached handling-mode continuation owner, which replaces
-# closed cycles and retries delivery until main begins handling. The fallback is
+# hand-back starts a detached continuation owner: handling mode by default,
+# or ack mode under ACKNOWLEDGED HAND-BACK below. It replaces closed cycles
+# and retries delivery until main begins handling or acknowledges, respectively.
+# The fallback is
 # always to exit with the close's own reason line. That handoff is only a
 # prompt: each non-silent outcome recorded after the return is already a
 # durable queued wake
