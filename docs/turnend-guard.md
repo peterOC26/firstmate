@@ -130,8 +130,8 @@ A stale beacon is still healthy while `fm_autoarm_midturn_healthy` in `bin/fm-wa
 That proof requires all of these:
 
 - The rewake is bound to the current recovery generation and live session-lock owner.
-- No later watcher beacon or exhausted-failure marker supersedes it.
-- A drain has begun handling that recovery generation, or the rewake is still younger than grace.
+- No later watcher beacon or failure marker, including a recorded continuity failure, supersedes it.
+- Main's drain has begun handling that recovery generation, or the rewake is still younger than grace.
 
 A rewake only requests the handling turn, so one without a generation-bound handling receipt past grace is a continuation that never started and alarms.
 

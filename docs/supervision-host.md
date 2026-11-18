@@ -112,12 +112,12 @@ The host asks the Pi branch's offer rule (`branchOfferForWake`, through `bin/fm-
 Under that rule, check triggers, decision-owned signal or stale triggers, and scans that are unsafe or hold nothing for the branch stay main's, as on Pi.
 A captain inbox note queued during an attended engine turn waits for that turn to finish without interrupting it; the existing `FM_SUPERVISION_HOST_TURN_TIMEOUT` [engine-turn bound](configuration.md#environment-variables) still applies.
 The host then passes the next close to main before starting another engine turn, even if the successor already closed for an unrelated wake before the note arrived.
-On that main-only pass-through the host starts the successor watcher cycle and leaves it running, then prints the close unchanged.
+On that main-only pass-through the host leaves a successor watcher cycle running, then prints the close unchanged.
 That successor, like one a turn hands back at its start (see [Away](#away)), runs in a process group of its own, so the harness tearing down the hook's group after the rewake does not stop it.
-The host confirms no handling handoff and republishes the watcher's recovery marker as downtime, even when an earlier engine turn left it reading handling, because the re-arm owner delivers a close to main only while that marker reads downtime.
+The host republishes the recovery marker as downtime, even when an earlier engine turn left it reading handling, because the re-arm owner delivers a close to main only while that marker reads downtime.
 If that publish fails, the host prints a `watcher: FAILED` line instead of the close and exits nonzero, so the arm owner reports a failure rather than a hand-back it could not deliver.
-The default successor is one-shot, so a lost main continuation can still leave supervision down after that successor's next close.
-The opt-in [acknowledged hand-back](#acknowledged-hand-back) keeps replacing those closed cycles until main acknowledges.
+The [Claude continuation owner](watcher-continuity.md#claude-handling-successor) keeps replacing closed cycles until main begins handling the recovery generation; other primaries leave a one-shot successor, whose next close can leave supervision down if main's continuation is lost.
+The opt-in [acknowledged hand-back](#acknowledged-hand-back) keeps the Claude owner active until main acknowledges.
 The session's next park without `--restart` requests a take-over to restore a single host-owned arm; the [host header](../bin/fm-supervision-host.sh) owns successor persistence and cleanup, and the [arm header](../bin/fm-watch-arm.sh) owns take-over eligibility and fallback.
 OpenCode and omp still launch the host with `--restart`, which takes precedence over recorded take-over and lacks its acknowledgement-preserving handover; changing that first-cycle path remains a follow-up.
 For the host-off Claude Stop hook's continuation owner, see [Claude handling successor](watcher-continuity.md#claude-handling-successor).
@@ -254,15 +254,16 @@ Before emitting the close, the host queues a token-bound check and verifies a de
 Only main's sequence-bound `bin/fm-wake-drain.sh` acknowledgement of that specific check confirms receipt, not a drain, hook exit, or successful terminal submission.
 The acknowledgement leaves a verified watcher running.
 The next park stops the retry owner before taking over its recorded arm, retaining exactly one watcher.
-The helper's header owns process cleanup and transport guards; the [continuity contract](watcher-continuity.md#claude-handling-successor) owns invocation and retry cadence.
+The helper's header owns process cleanup and transport guards; the [continuity contract](watcher-continuity.md#claude-handling-successor) owns invocation, and the [environment-variable reference](configuration.md#environment-variables) owns retry timing.
 
-### Reaching a lost Claude continuation
+## Reaching a lost Claude continuation
 
+Both the default handling-mode owner and the acknowledgement-mode owner use this transport while their main-side completion receipt is absent.
 The first delivery remains the Stop hook's exit-2 feedback.
 A later retry does not depend on that hook or on another Stop firing.
 The detached owner writes a durable operational-input record and submits its watcher doorbell through the inherited pane's submit primitive.
-Busy, unreadable, foreign, and partially typed panes defer delivery without changing the queued check.
-The default retry interval is five minutes, and successful submission still does not acknowledge the hand-back.
+Busy, unreadable, foreign, and partially typed panes defer delivery without consuming the queued work.
+Successful submission still does not acknowledge the hand-back.
 
 Automatic retries reach Claude only through an inherited pane qualified by `bin/fm-supervision-handoff.sh`'s header.
 A primary without one, an unavailable pane, or a blocked composer keeps its watcher and queued work but needs another normal turn or a human message.
@@ -360,8 +361,8 @@ The host checks the boundary on every loop pass, so closes that are already wait
 It also starts no engine turn that could still be running at the boundary (the turn bound plus the engine grace).
 It judges this when the close arrives and again just before the turn starts.
 When it declines such a turn, that close reaches main ahead of the boundary line instead, and its wake stays durable in the queue.
-The default path depends on main receiving that continuation.
-Acknowledged hand-back protects the boundary when the continuation is lost.
+The [Claude continuation owner](watcher-continuity.md#claude-handling-successor) preserves supervision until main begins handling the boundary wake; other primaries' default paths depend on main receiving their continuation.
+The [acknowledged hand-back](#acknowledged-hand-back) keeps Claude's owner active through the drain acknowledgement.
 
 ### Codex native park and checkpoint bound
 

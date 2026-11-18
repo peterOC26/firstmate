@@ -170,7 +170,7 @@ When restoration does not succeed, the model is never left blind.
 
 ### Claude handling successor
 
-Claude's Stop hook starts a detached continuation owner before notification.
+With the supervision host off, Claude's Stop hook starts a detached continuation owner before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
 1. Launches `bin/fm-supervision-handoff.sh` in handling mode, which starts `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
@@ -189,8 +189,8 @@ This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervisi
 The next Stop's foreground arm attaches to that live cycle.
 The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits.
 Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
-`FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval, defaulting to 300 seconds.
-It uses the existing [guarded hand-back retry](supervision-host.md#reaching-a-lost-claude-continuation) at a bounded cadence when the requested turn never starts.
+`FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval; [the environment-variable reference](configuration.md#environment-variables) owns its default.
+When the requested turn never starts, the owner retries through the existing [guarded hand-back transport](supervision-host.md#reaching-a-lost-claude-continuation) at that interval.
 A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
 Failed startup or replacement independently records the recovery generation in `state/.watcher-down.continuity-failed`, so committing a rewake does not claim successful continuity.
 The next Stop then re-arms as before.
@@ -223,7 +223,7 @@ When the host instead hands the accepted close back to main and leaves that succ
 - Grok retains its tracked background-task notification protocol.
 
 No adapter starts a replacement with a fire-and-forget shell `&` from a model command.
-The Claude hook's detached handling successor is launched by the hook itself, which waits for the successor's status line before it exits.
+For the Claude hook-owned detached launch, see [Claude handling successor](#claude-handling-successor).
 
 The turn-end guard remains the final backstop rather than the normal continuity mechanism.
 In its `--claude` mode it cooperates with the auto-arm.
