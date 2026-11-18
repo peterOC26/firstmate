@@ -493,7 +493,8 @@ fm_afk_mode() {
 # because the watcher only runs between turns. A stale beacon is still healthy
 # while fm_autoarm_midturn_healthy proves a Claude auto-arm generation
 # explains the gap (a rewake bound to the current recovery generation and
-# live session lock), because turn-end re-arms.
+# live session lock whose handling turn began or is still inside grace),
+# because turn-end re-arms.
 # Without that proof a stale or absent beacon is a genuine lapse.
 # extension: a live identity-matched watcher is the ordinary healthy state, but a
 # genuinely unheld lock is also healthy while the beacon is fresh AND a live Pi
@@ -2321,11 +2322,12 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 # changed or dead session lock, a moved recovery generation, or an absent/later
 # beacon all fail it, so a genuine lapse stays loud. Cursor autoarm homes have no
 # Claude epoch ledger and fail this, keeping their existing fresh-beacon-only
-# pull-guard contract. The rewake and beacon may both be older than grace: a
-# legitimate handling turn can outrun grace, which is the false alarm this
-# exists to stop.
+# pull-guard contract. The rewake and beacon may both be older than grace once
+# a drain has moved the recovery marker to handling: a legitimate handling turn
+# can outrun grace, which is the false alarm this exists to stop. A rewake only
+# requests that turn, so one still on downtime past grace never started.
 fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
-  local state=$1 lock_pid recovery epoch_mtime beacon_mtime
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock_pid recovery epoch_mtime beacon_mtime
   [ -e "$state/.claude-autoarm-failure-notified" ] && return 1
   [ -e "$state/.claude-autoarm-failure-alarmed" ] && return 1
   fm_autoarm_ledger_read "$state" || return 1
@@ -2339,7 +2341,11 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
   [ -n "$FM_AUTOARM_RECOVERY" ] && [ "$FM_AUTOARM_RECOVERY" = "$recovery" ] || return 1
   epoch_mtime=$(fm_path_mtime "$state/.claude-autoarm-epoch") || return 1
   beacon_mtime=$(fm_path_mtime "$state/.last-watcher-beat") || return 1
-  [ "$epoch_mtime" -ge "$beacon_mtime" ]
+  [ "$epoch_mtime" -ge "$beacon_mtime" ] || return 1
+  case "$FM_RECOVERY_MARKER_TOKEN" in
+    *:handling:*) return 0 ;;
+  esac
+  [ "$(fm_path_age "$state/.claude-autoarm-epoch")" -lt "$grace" ]
 }
 
 # Match an interrupted episode to the current lock's process identity AND

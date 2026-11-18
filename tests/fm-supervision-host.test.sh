@@ -946,6 +946,29 @@ test_away_inbox_note_is_handed_back_so_main_can_end_away_mode() {
   pass "host: an away inbox note is handed back so main can end away mode, and the engine does not take it"
 }
 
+# With acknowledged hand-backs on, the away return is a hand-back like any
+# other: it must stay owned until main acknowledges it, not rest on one cycle.
+test_acknowledged_away_inbox_note_stays_owned_until_main_acknowledges() {
+  local home id
+  home=$(make_home away-inbox-ack away)
+  : > "$home/config/supervision-handoff-ack"
+  start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "ack away inbox: no initial watcher"
+  append_status "$home" 'first routine wake'
+  wait_until 250 handled_at_least "$home" 1 || fail "ack away inbox: the prior wake never completed: $(cat "$home/state/.supervision-host.log" 2>/dev/null)"
+  id=$(queue_host_inbox_note "$home")
+  wait_until 250 host_exited "$home" || fail "ack away inbox: note never reached main: $(cat "$home/host.out" 2>/dev/null)"
+  expect_code 0 "$(cat "$home/host.rc")" "ack away inbox: host failed: $(cat "$home/host.out")"
+  assert_grep "the captain sent a note and away mode should end" "$home/host.out" "ack away inbox: return line missing"
+  [ -f "$home/state/.supervision-handoff-pending" ] || fail "ack away inbox: the return was not handed back for acknowledgement"
+  assert_re '	handoff	' "$home/state/.supervision-host.log" "ack away inbox: no verified hand-back owner"
+  assert_grep 'supervision-handoff' "$home/state/.wake-queue" "ack away inbox: the hand-back is not acknowledgeable"
+  assert_grep "inbox:$id" "$home/state/.wake-queue" "ack away inbox: the note left the queue"
+  watcher_live "$home" || fail "ack away inbox: no live watcher for main"
+  stop_home_processes "$home"
+  pass "host: an acknowledged away inbox-note return stays owned until main acknowledges it"
+}
+
 test_away_wake_without_an_inbox_note_stays_on_the_engine() {
   local home
   home=$(make_home away-no-note away)
@@ -1088,6 +1111,7 @@ fm_test_run \
   test_return_during_a_failed_turn_still_hands_its_outcomes_to_main \
   test_incomplete_engine_result_hands_the_wake_to_main \
   test_away_inbox_note_is_handed_back_so_main_can_end_away_mode \
+  test_acknowledged_away_inbox_note_stays_owned_until_main_acknowledges \
   test_away_wake_without_an_inbox_note_stays_on_the_engine \
   test_quiet_inbox_note_stays_an_attended_handback \
   test_away_inbox_note_beside_a_closed_successor_reaches_main \

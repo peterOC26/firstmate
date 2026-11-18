@@ -491,7 +491,7 @@ test_autoarm_long_handling_turn_stays_silent() {
 # is not enough to stay quiet, and adding a failure marker is not either.
 test_autoarm_long_turn_requires_every_healthy_signal() {
   local dir home out pid replacement_pid='' case_name
-  for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon; do
+  for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon never-drained never-drained-announced; do
     dir=$(make_guard_case "autoarm-long-turn-$case_name")
     home=$(case_home "$dir")
     sleep 60 &
@@ -531,6 +531,12 @@ test_autoarm_long_turn_requires_every_healthy_signal() {
       later-beacon)
         touch -t 202101010000 "$home/state/.last-watcher-beat"
         ;;
+      never-drained)
+        printf 'pending:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+        ;;
+      never-drained-announced)
+        printf 'announced:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+        ;;
     esac
     out=$(run_guard_case_autoarm "$dir")
     [ -z "$pid" ] || kill "$pid" 2>/dev/null || true
@@ -544,6 +550,26 @@ test_autoarm_long_turn_requires_every_healthy_signal() {
       "a genuine auto-arm lapse with $case_name must still name the stale beacon"
   done
   pass "fm-guard stale banner: every auto-arm long-turn healthy signal is load-bearing"
+}
+
+# A rewake younger than grace whose handling turn has not drained yet is still
+# starting, so its downtime marker alone must not alarm.
+test_autoarm_recent_undrained_rewake_stays_silent() {
+  local dir home out pid
+  dir=$(make_guard_case autoarm-recent-undrained)
+  home=$(case_home "$dir")
+  sleep 60 &
+  pid=$!
+  record_aged_rewake_epoch "$home" "$pid"
+  record_session_lock_pid "$home" "$pid"
+  printf 'pending:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+  touch "$home/state/.claude-autoarm-epoch"
+  out=$(run_guard_case_autoarm "$dir")
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  [ -z "$out" ] \
+    || fail "a rewake still inside grace must not alarm before its turn drains, got: $out"
+  pass "fm-guard stale banner: an undrained auto-arm rewake inside grace stays silent"
 }
 
 # An open arming claim is between-turn startup, not evidence that the current
@@ -1016,6 +1042,7 @@ test_autoarm_stale_beacon_alarms_with_correct_reason
 test_autoarm_stale_episode_is_stable
 test_autoarm_long_handling_turn_stays_silent
 test_autoarm_long_turn_requires_every_healthy_signal
+test_autoarm_recent_undrained_rewake_stays_silent
 test_autoarm_open_claim_does_not_explain_stale_beacon
 test_autoarm_long_turn_does_not_silence_other_models
 test_persistent_no_watcher_banner_names_missing_process

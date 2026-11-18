@@ -1304,6 +1304,7 @@ hand_back_away_inbox_note() {
   [ -n "$inbox_ids" ] || inbox_ids=$carried
   [ -n "$inbox_ids" ] || return 1
   log_line "pass-through	away	main-only (captain inbox note${inbox_ids} queued)	$reason_line"
+  acknowledged_handback "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   leave_successor_for_main || true
   emit "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   exit 0
