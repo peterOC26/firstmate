@@ -231,9 +231,7 @@ SH
     gated-actionable)
       # Cycle whose watcher closes only when the test releases it, so a second
       # session can fire its Stop while the cycle is still under way.
-      cat > "$dir/bin/fm-watch-arm.sh" <<'SH'
-#!/usr/bin/env bash
-echo "$$" >> "$FM_HOME/state/arm-ran"
+      cat >> "$dir/bin/fm-watch-arm.sh" <<'SH'
 while [ ! -e "$FM_HOME/state/arm-release" ]; do sleep 0.02; done
 printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
 touch "$FM_HOME/state/.last-watcher-beat"
@@ -1670,11 +1668,9 @@ test_orphaned_claim_from_dead_session_is_superseded_by_replacement() {
   expect_code 2 "$status" "the replacement session's first Stop must supersede the dead session's orphaned claim and rewake, not defer to it"
   assert_contains "$out" "firstmate watcher wake" "the replacement's rewake must carry the wake banner"
   assert_contains "$out" "signal: $dir/state/tfmut-116.turn-ended" "the replacement's rewake must carry the cycle's reason line"
-  # Three arms: the orphan's foreground arm, the replacement's foreground arm,
-  # and the handling successor the hook starts after its actionable close
-  # (bin/fm-claude-stop-autoarm.sh owns that contract); the superseded orphan
-  # starts none.
-  [ "$(wc -l < "$dir/state/arm-ran")" -eq 3 ] || fail "expected the orphan's arm, the replacement's arm, and the replacement's handling successor: $(cat "$dir/state/arm-ran")"
+  [ "$(wc -l < "$dir/state/arm-ran")" -eq 2 ] || fail "expected one foreground arm per session: $(cat "$dir/state/arm-ran")"
+  [ "$(wc -l < "$dir/state/successor-ran" 2>/dev/null)" -eq 1 ] \
+    || fail "expected one handling successor, from the replacement only: $(cat "$dir/state/successor-ran" 2>/dev/null)"
   [ "$(epoch_outcome "$dir")" = rewake ] || fail "the ledger must record the replacement's rewake, got: $(cat "$dir/state/.claude-autoarm-epoch")"
   [ "$(epoch_field "$dir" owner_pid)" != "$orphan_pid" ] || fail "the orphaned hook still owns the ledger"
   [ "$(epoch_field "$dir" session_pid)" = "$lock_pid" ] || fail "the rewake must bind the replacement session's lock pid"
