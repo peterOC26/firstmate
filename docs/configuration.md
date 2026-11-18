@@ -614,9 +614,11 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 - Every new task records `endpoint_task_id=` as the cleanup binding between the metadata filename and its opaque runtime endpoint.
 
 - Treehouse-backed ships and scouts additionally record `treehouse_lease_id=` and `treehouse_lease_holder=` for the durable acquisition; [the shared ownership contract](../bin/fm-wake-lib.sh) owns their lifetime, legacy-record preflight, and identity rules.
-  [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release and records-only reconciliation.
+  [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release, records-only reconciliation, and guarded recovery from a journal without a task record.
   These fields do not apply to Orca or replace the existing secondmate home-seed lease contract.
-  For an aborted acquisition, follow the manual recovery instructions printed by spawn or a refused same-task retry; `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns that procedure.
+  When an aborted acquisition leaves no task record, satisfy any backend-specific cleanup requirement first; the [Herdr](herdr-backend.md) and [T3 Code](t3code-backend.md) guides own their respective checks.
+  Then run the guarded teardown command printed by spawn or a refused same-task retry; if teardown refuses, keep the lease, journal, and claim and follow the recovery guidance for the reported reason.
+  `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns those instructions.
   Remember that finished or exited tasks still retain their records.
 
 - A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
@@ -647,9 +649,11 @@ Backend guides and other documents refer here instead of restating the resolutio
 
 ### Teardown identity checks
 
-`fm-teardown.sh <id>` takes a task id directly and validates the complete metadata-only endpoint identity before any runtime dispatch or cleanup mutation.
+When `state/<id>.meta` exists, `fm-teardown.sh <id>` validates the complete metadata-only endpoint identity before any runtime dispatch or cleanup mutation.
 Missing, empty, duplicate, malformed, backend-inconsistent, or task-mismatched endpoint records are preserved and refused.
 When the worktree identity is missing, empty, or ambiguous, the refusal also explains how to identify the held copy and restore exactly one `worktree=` line without changing the record automatically.
+
+When the task record is absent but `state/<id>.treehouse-acquire/` remains, `fm-teardown.sh <id>` takes the guarded journal-only recovery path described in [its header](../bin/fm-teardown.sh), without runtime endpoint dispatch.
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.
 

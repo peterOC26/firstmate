@@ -178,11 +178,12 @@
 # this home or absent, no process has its working directory inside it, it has
 # no uncommitted change outside the generated-wiring allowance below, and HEAD
 # is reachable from a remote-tracking branch other than the no-mistakes mirror
-# or from local main or master. It then drops this task's own claim and the
-# journal. When pool state already shows that lease released, or the copy is
-# missing and meets the missing-copy retirement rule, only this task's own
-# claim and the journal go. --force relaxes none of this; anything else keeps
-# the journal, lease, and claim and prints the manual recovery steps.
+# or, only when no remote-tracking refs exist, from local main or master. It
+# then drops this task's own claim and the journal. When pool state already
+# shows that lease released, or the copy is missing and meets the missing-copy
+# retirement rule, only this task's own claim and the journal go. --force
+# relaxes none of this; anything else keeps the journal, lease, and claim and
+# prints the manual recovery steps.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
 # before cleanup. Its current working directory is only incidental process
