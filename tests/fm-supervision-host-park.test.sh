@@ -361,7 +361,7 @@ test_handling_owner_yields_only_to_daemon_owned_away() {
 test_owner_replaces_immediately_closed_cycles() {
   local home mode result
   for mode in handling ack; do
-    for result in success nonzero failed empty; do
+    for result in success reason-only nonzero failed empty; do
       home=$(make_home "fast-close-$mode-$result" attended)
       cp -R "$ROOT/bin" "$home/bin"
       mv "$home/bin/fm-watch-arm.sh" "$home/bin/real-arm.sh"
@@ -372,8 +372,8 @@ n=$(cat "$FM_HOME/arm-count" 2>/dev/null || echo 0)
 n=$((n + 1))
 echo "$n" > "$FM_HOME/arm-count"
 if [ "$n" -le 2 ]; then
-  printf 'watcher: started pid=%s\n' "$$"
   result=$(cat "$FM_HOME/arm-result")
+  [ "$result" = reason-only ] || printf 'watcher: started pid=%s\n' "$$"
   [ "$result" = empty ] || echo 'check: queued decision'
   [ "$result" != failed ] || echo 'watcher: FAILED - fixture failure'
   [ "$result" != nonzero ] || exit 1
@@ -396,7 +396,7 @@ SH
           printf "%s\n" "$?" > "$FM_HOME/owner.rc"
           while [ ! -e "$FM_HOME/session.stop" ]; do sleep 0.1; done
         ' _ "$mode" &
-      if [ "$result" = success ]; then
+      if [ "$result" = success ] || [ "$result" = reason-only ]; then
         wait_until 200 test -s "$home/state/.supervision-host-left" \
           || fail "$mode: immediate closes lost ownership: $(cat "$home/owner.out")"
         [ "$(cat "$home/arm-count")" -ge 3 ] || fail "$mode: closed cycles were not replaced"

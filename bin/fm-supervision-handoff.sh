@@ -203,6 +203,13 @@ retry_delivery() {
   fi
 }
 
+arm_closed_cleanly() {
+  ! fm_pid_alive "$ARM" \
+    && wait "$ARM" 2>/dev/null \
+    && grep -Eq '^(signal:|stale:|check:|heartbeat($|:))' "$OUT" \
+    && ! grep -q '^watcher: FAILED' "$OUT"
+}
+
 NEXT_RETRY=$((SECONDS + RETRY))
 while owner_active; do
   OUT=$(mktemp "$STATE/.supervision-handoff-arm.XXXXXX") || exit 1
@@ -217,10 +224,7 @@ while owner_active; do
   while ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME" \
     || ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$OUT"; do
     if ! fm_pid_alive "$ARM"; then
-      if wait "$ARM" 2>/dev/null \
-        && grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$OUT" \
-        && grep -Eq '^(signal:|stale:|check:|heartbeat($|:))' "$OUT" \
-        && ! grep -q '^watcher: FAILED' "$OUT"; then
+      if arm_closed_cleanly; then
         closed=1
         break
       fi
@@ -236,15 +240,20 @@ while owner_active; do
   done
   if [ "$closed" -eq 0 ]; then
     owner_active || exit 0
-    identity=$(fm_pid_identity "$ARM") || exit 1
-    tmp=$(mktemp "$LEFT.XXXXXX") || exit 1
-    if ! printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" || ! mv -f "$tmp" "$LEFT" \
-      || [ ! -f "$LEFT" ] || [ -L "$LEFT" ] \
-      || [ "$(cat "$LEFT")" != "$ARM"$'\t'"$identity" ]; then
-      rm -f "$tmp" "$LEFT/${tmp##*/}" 2>/dev/null || true
-      exit 1
+    tmp=
+    if identity=$(fm_pid_identity "$ARM") \
+      && tmp=$(mktemp "$LEFT.XXXXXX") \
+      && printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" && mv -f "$tmp" "$LEFT" \
+      && [ -f "$LEFT" ] && [ ! -L "$LEFT" ] \
+      && [ "$(cat "$LEFT")" = "$ARM"$'\t'"$identity" ]; then
+      ARM_RECORDED=1
+    else
+      [ -z "$tmp" ] || rm -f "$tmp" "$LEFT/${tmp##*/}" 2>/dev/null || true
+      arm_closed_cleanly || exit 1
+      closed=1
     fi
-    ARM_RECORDED=1
+  fi
+  if [ "$closed" -eq 0 ]; then
     if [ "$READY_PRINTED" -eq 0 ]; then
       grep -E -m1 '^watcher: (started|attached) pid=[0-9]+' "$OUT"
       READY_PRINTED=1
