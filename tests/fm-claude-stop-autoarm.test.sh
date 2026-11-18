@@ -912,6 +912,7 @@ test_replacement_retires_interrupted_session_episode() {
 
     # Its first real failure must still notify and retain bounded retries.
     write_arm_fixture "$dir" failed
+    touch -t 202001010000 "$dir/state/.claude-autoarm-epoch" "$dir/state/.last-watcher-beat"
     replacement=$(run_autoarm "$dir" 2>/dev/null); status=$?
     expect_code 2 "$status" "$signal replacement must report its real failure"
     assert_contains "$replacement" 'automatic supervision mechanism is broken' \

@@ -1611,6 +1611,7 @@ test_reanchor_keeps_autoarm_midturn_healthy() {
   printf 'epoch=7 owner_pid=1 outcome=rewake updated_at=1 session_pid=%s recovery_generation=g1\nidentity-1\n' \
     "$front_pid" > "$dir/state/.claude-autoarm-epoch"
   printf 'acked:handling:g1\n' > "$dir/state/.watcher-down"
+  printf 'g1\n' > "$dir/state/.watcher-down.handling"
   touch -t 201901010000 "$dir/state/.last-watcher-beat"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch" "$dir/state/epoch-mtime"
   autoarm_midturn_healthy "$dir/state" || fail "the rewake fixture is not healthy before the re-anchor, so this case proves nothing"

@@ -280,11 +280,11 @@ test_main_only_pass_through_leaves_the_successor_watcher_running() {
 
 
 # The session-lock holder's process identity cannot be read (its proc entry
-# is truncated), so no main-session key exists: the close reaches main exactly
-# as the arm printed it, before any mirror feed or engine turn.
+# is truncated), so no main-session key exists: the close reaches main without
+# mirror feed or an engine turn, and the unverified successor is reported.
 
 test_attended_close_with_unidentified_main_session_passes_to_main() {
-  local home
+  local home token generation
   home=$(make_home attended-unidentified attended)
   FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" \
     "$FAKE_CLAUDE" -c '
@@ -300,14 +300,19 @@ test_attended_close_with_unidentified_main_session_passes_to_main() {
   wait_until 150 watcher_live "$home" || fail "unidentified: the host never started a watcher cycle: $(cat "$home/host.out")"
   append_status "$home" 'step one'
   wait_until_deadline 60 host_exited "$home" || fail "unidentified: the close did not reach main: $(cat "$home/state/.supervision-host.log")"
-  expect_code 0 "$(cat "$home/host.rc")" "a close for an unidentified main session must exit 0"
+  expect_code 1 "$(cat "$home/host.rc")" "an unidentified main session must report its unverified successor"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must carry the watcher's reason line"
-  assert_no_re '^supervision-host' "$home/host.out" "the close must reach main exactly as the arm printed it"
+  assert_re '^supervision-host: .*successor could not be verified$' "$home/host.out" \
+    "the failed hand-back must name its unverified successor"
   [ "$(engine_calls "$home")" -eq 0 ] || fail "unidentified: the engine ran without a main-session key"
   assert_grep 'demo.status' "$home/state/.wake-queue" "the wake must stay queued for main"
+  token=$(cat "$home/state/.watcher-down")
+  generation=${token##*:}
+  [ "$(cat "$home/state/.watcher-down.continuity-failed")" = "$generation" ] \
+    || fail "unidentified: the failed successor did not record its recovery generation"
   assert_re '	pass-through	attended	the main session could not be identified	signal:' "$home/state/.supervision-host.log" \
     "the ledger must record why the close went to main"
-  pass "host: an attended close whose main session cannot be identified reaches main and runs no engine turn"
+  pass "host: an unidentified main session receives the close and its unverified successor failure"
 }
 
 
