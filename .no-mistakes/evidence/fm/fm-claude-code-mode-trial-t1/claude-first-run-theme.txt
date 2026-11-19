@@ -1,0 +1,18 @@
+Real Claude Code worker pane, captured in the private lab tmux session
+
+Welcome to Claude Code v2.1.323
+
+Let's get started.
+
+Choose the text style that looks best with your terminal
+To change this later, run /theme
+
+    Auto (match terminal)
+  ❯ ✔ Dark mode
+    Light mode
+    Dark mode (colorblind-friendly)
+    Light mode (colorblind-friendly)
+    Dark mode (ANSI colors only)
+    Light mode (ANSI colors only)
+
+The worker remained at this first-run theme picker. The Code Mode confirmation and task prompt were not reached.

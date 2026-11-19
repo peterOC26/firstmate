@@ -1,0 +1,10 @@
+Real product launch probe
+
+Claude Code: 2.1.323
+Firstmate command: bin/fm-spawn.sh trial-code-mode <disposable project> --mode local-only --yolo off --harness claude --claude-code-mode
+Spawn result: spawned trial-code-mode harness=claude kind=ship mode=local-only yolo=off
+Recorded task metadata: claude_code_mode=1
+Live task-pane process: claude
+Live process environment: CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1
+
+The process environment was read from the real Claude child in the private lab tmux pane while it was running. The UI did not reach the Code Mode confirmation or task prompt.
