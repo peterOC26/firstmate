@@ -117,12 +117,12 @@ That successor, like one a turn hands back at its start (see [Away](#away)), run
 The host republishes the recovery marker as downtime, even when an earlier engine turn left it reading handling, because the re-arm owner delivers a close to main only while that marker reads downtime.
 If that publish fails, Claude receives the close plus `supervision-host: the hand-back recovery generation could not be recorded`; other primaries receive a `watcher: FAILED` line instead of the close.
 Both paths exit nonzero.
-The [Claude continuation owner](watcher-continuity.md#claude-handling-successor) keeps replacing closed cycles until main begins handling the recovery generation; other primaries leave a one-shot successor, whose next close can leave supervision down if main's continuation is lost.
+See the [Claude continuity contract](watcher-continuity.md#claude-handling-successor); other primaries leave a one-shot successor, whose next close can leave supervision down if main's continuation is lost.
 The opt-in [acknowledged hand-back](#acknowledged-hand-back) keeps the Claude owner active until main acknowledges.
 The session's next park without `--restart` requests a take-over to restore a single host-owned arm; the [host header](../bin/fm-supervision-host.sh) owns successor persistence and cleanup, and the [arm header](../bin/fm-watch-arm.sh) owns take-over eligibility and fallback.
 OpenCode and omp still launch the host with `--restart`, which takes precedence over recorded take-over and lacks its acknowledgement-preserving handover; changing that first-cycle path remains a follow-up.
 For the host-off Claude Stop hook's continuation owner, see [Claude handling successor](watcher-continuity.md#claude-handling-successor).
-If the Claude continuation owner cannot start, the host records failed continuity and falls back to a one-shot successor; a verified fallback preserves the successful hand-back exit.
+If the supervision host's Claude continuation owner cannot start, the host records failed continuity and falls back to a one-shot successor; a verified fallback preserves the successful hand-back exit.
 If neither can be verified, the host adds a successor failure line and exits nonzero.
 With a verified successor, it also passes the close through unchanged, with no added line, when any of these holds (`fm_supervision_host_attended_ready` in `bin/fm-supervision-engine-lib.sh` owns the list):
 
@@ -249,8 +249,8 @@ The captain row is still durable, and the next drain presents it until it is ack
 
 ## Acknowledged hand-back
 
-Claude hand-backs use the [generation-bound continuation owner](watcher-continuity.md#claude-handling-successor) by default, including park boundaries and failure returns.
-The home-local [configuration flag](configuration.md#acknowledged-hand-back-configsupervision-handoff-ack) extends that ownership through acknowledgement rather than ending it when main begins handling.
+The [Claude continuity contract](watcher-continuity.md#claude-handling-successor) owns the default hand-back behavior.
+The home-local [configuration flag](configuration.md#acknowledged-hand-back-configsupervision-handoff-ack) extends ownership through acknowledgement.
 It covers park boundaries, attended pass-throughs, the away return on a captain inbox note, and other host exits that hand work to main, without changing branch eligibility or the park bound.
 Before emitting the close, the host queues a token-bound check and verifies a detached successor against the home's watcher identity and fresh beacon.
 `bin/fm-supervision-handoff.sh` keeps replacing each closed one-shot cycle while that check remains unacknowledged.
@@ -365,8 +365,7 @@ The host checks the boundary on every loop pass, so closes that are already wait
 It also starts no engine turn that could still be running at the boundary (the turn bound plus the engine grace).
 It judges this when the close arrives and again just before the turn starts.
 When it declines such a turn, that close reaches main ahead of the boundary line instead, and its wake stays durable in the queue.
-The [Claude continuation owner](watcher-continuity.md#claude-handling-successor) preserves supervision until main begins handling the boundary wake; other primaries' default paths depend on main receiving their continuation.
-The [acknowledged hand-back](#acknowledged-hand-back) keeps Claude's owner active through the drain acknowledgement.
+See the [Claude continuity contract](watcher-continuity.md#claude-handling-successor) for the default boundary hand-back and its acknowledged extension; other primaries' default paths depend on main receiving their continuation.
 
 ### Codex native park and checkpoint bound
 

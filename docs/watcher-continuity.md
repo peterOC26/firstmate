@@ -177,16 +177,12 @@ After an actionable foreground close, including an attached peer cycle that ende
 2. Waits for readiness; if owner startup fails, records failed continuity and tries a direct one-shot `bin/fm-watch-arm.sh` successor.
 3. Only then exits 2 with the wake.
 
-A child of the hook cannot outlive its exit-2 rewake.
-So that successor is the one deliberate detached launch in the continuity path:
-
-- It runs under nohup.
-- Its stdio is away from the hook's pipes.
-- It has its own process group.
+A child of the hook cannot outlive its exit-2 rewake unless it is detached.
+The continuation owner and direct fallback each run under nohup with stdio away from the hook's pipes and their own process groups; every watcher arm they launch also gets its own process group.
 
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
-The next Stop's foreground arm attaches to that live cycle.
+The next Stop's foreground arm attaches to a confirmed live cycle; after an unconfirmed start, it re-arms as before.
 The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits; once handling of a generation it followed has begun, a later episode never revives it.
 Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
 `FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval; [the environment-variable reference](configuration.md#environment-variables) owns its default.
@@ -195,7 +191,6 @@ If the fallback confirms a live watcher, the rewake banner adds `The continuatio
 That fallback covers one cycle without replacing later closes.
 If neither launch confirms a live watcher, the banner reports the unconfirmed successor; neither failure withholds the wake.
 Failed startup or replacement independently records the recovery generation in `state/.watcher-down.continuity-failed`, so committing a rewake does not claim successful continuity.
-The next Stop then re-arms as before.
 
 ### Durable queue and turn-end backstop
 
