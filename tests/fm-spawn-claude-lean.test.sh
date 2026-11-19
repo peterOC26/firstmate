@@ -60,6 +60,7 @@ install_claude_probe() { # <fakebin>
 printf 'FORCE=%s\n' "${FORCE_PROMPT_CACHING_5M-unset}"
 printf 'AUTO=%s\n' "${CLAUDE_CODE_DISABLE_AUTO_MEMORY-unset}"
 printf 'COMPACT=%s\n' "${COMPACT_ADVISER_DISABLE-unset}"
+printf 'CODE_MODE=%s\n' "${CLAUDE_CODE_EXPERIMENTAL_CODE_MODE-unset}"
 printf 'ARGS'
 for arg in "$@"; do
   printf ' %s' "$arg"
@@ -90,6 +91,7 @@ run_emitted_launch() { # <fakebin> <launch-log> <pane-log> <with-preamble>
     FORCE_PROMPT_CACHING_5M="$CONTRARY_FORCE" \
     CLAUDE_CODE_DISABLE_AUTO_MEMORY="$CONTRARY_AUTO" \
     COMPACT_ADVISER_DISABLE="$CONTRARY_COMPACT" \
+    CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=0 \
     /bin/sh -c "$preamble
 $launch"
 }
@@ -213,7 +215,7 @@ test_lean_ship_and_scout() {
 }
 
 test_secondmate_refuses() {
-  local rec id sm out status
+  local rec id sm out status flag
   id="lean-sm-a1"
   rec=$(make_case secondmate-on claude "$id")
   read_case "$rec"
@@ -224,13 +226,15 @@ test_secondmate_refuses() {
   printf 'charter for %s\n' "$id" > "$sm/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$sm/.gitignore"
   git -C "$sm" init -q -b main
-  out=$(run_case_spawn "$id" "$sm" --secondmate --claude-lean)
-  status=$?
-  expect_code 1 "$status" "secondmate lean spawn must refuse: $out"
-  assert_contains "$out" 'does not apply to secondmate' "the refusal must name supervision"
-  assert_absent "$HOME_DIR/state/$id.meta" "a refused secondmate must not write a task record"
-  [ ! -s "$LAUNCH_LOG" ] || fail "a refused secondmate must not launch an agent"
-  pass "secondmate supervision refuses lean launches"
+  for flag in --claude-lean --claude-code-mode; do
+    out=$(run_case_spawn "$id" "$sm" --secondmate "$flag")
+    status=$?
+    expect_code 1 "$status" "secondmate $flag spawn must refuse: $out"
+    assert_contains "$out" 'does not apply to secondmate' "the refusal must name supervision"
+    assert_absent "$HOME_DIR/state/$id.meta" "a refused secondmate must not write a task record"
+    [ ! -s "$LAUNCH_LOG" ] || fail "a refused secondmate must not launch an agent"
+  done
+  pass "secondmate supervision refuses lean and Code Mode launches"
 }
 
 test_ordinary_launch_is_unchanged() {
@@ -248,6 +252,10 @@ test_ordinary_launch_is_unchanged() {
       "ordinary allowlist=$setting: the launch command must not mention the five-minute cache"
     assert_no_grep 'CLAUDE_CODE_DISABLE_AUTO_MEMORY' "$LAUNCH_LOG" \
       "ordinary allowlist=$setting: the launch command must not disable auto memory"
+    assert_no_grep 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE' "$LAUNCH_LOG" \
+      "ordinary allowlist=$setting: the launch must not enable Code Mode"
+    assert_no_grep 'claude_code_mode=' "$HOME_DIR/state/$id.meta" \
+      "ordinary allowlist=$setting: the task record must not gain a Code Mode choice"
     assert_no_grep '--strict-mcp-config' "$LAUNCH_LOG" \
       "ordinary allowlist=$setting: the launch command must not pass --strict-mcp-config"
     assert_no_grep '--bare' "$LAUNCH_LOG" \
@@ -319,12 +327,121 @@ test_t3code_refuses_before_runtime_check() {
   pass "--claude-lean on backend=t3code refuses before the T3 runtime check"
 }
 
+test_code_mode_ship_and_scout() {
+  local kind setting id rec out status seen
+  local -a args
+  for kind in ship scout; do
+    for setting in absent enabled; do
+      id="code-$kind-$setting-a1"
+      rec=$(make_case "code-$kind-$setting" claude "$id")
+      read_case "$rec"
+      args=(--claude-code-mode)
+      if [ "$kind" = scout ]; then
+        args+=(--scout)
+      else
+        args+=(--mode no-mistakes --yolo off)
+      fi
+      if [ "$setting" = enabled ]; then
+        : > "$HOME_DIR/config/launch-env-allowlist"
+        args+=(--claude-lean)
+      fi
+      out=$(run_case_spawn "$id" "$PROJ_DIR" "${args[@]}")
+      status=$?
+      expect_code 0 "$status" "Code Mode $kind allowlist=$setting spawn failed: $out"
+      assert_equals 1 "$(export_count "$HOME_DIR/state/$id.meta" 'claude_code_mode=1')" \
+        "Code Mode choice must be recorded exactly once"
+      assert_no_grep 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE' "$PANE_LOG" \
+        "Code Mode must stay in this worker's launch, outside pane exports"
+      assert_hooks_installed "$WT_DIR/.claude/settings.local.json" 'Code Mode'
+      install_claude_probe "$FAKEBIN_DIR"
+      seen=$(run_emitted_launch "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG" 0) \
+        || fail "Code Mode launch failed to run"
+      assert_equals 1 "$(field_of "$seen" CODE_MODE)" \
+        "Code Mode must override the inherited value with allowlist=$setting"
+      if [ "$setting" = enabled ]; then
+        assert_lean_probe "$seen" 'Code Mode with lean'
+      else
+        assert_plain_probe "$seen" 'Code Mode without lean'
+      fi
+    done
+  done
+  pass "Code Mode reaches only the opted-in worker, including with lean and an environment allowlist"
+}
+
+test_code_mode_refusals() {
+  local rec id out status scenario expected
+  local -a args
+  for scenario in codex raw t3code value; do
+    id="code-refuse-$scenario-a1"
+    rec=$(make_case "code-refuse-$scenario" claude "$id")
+    read_case "$rec"
+    args=(--claude-code-mode)
+    case "$scenario" in
+      codex) args+=(--harness codex); expected='applies only to the claude harness' ;;
+      raw) args+=('echo raw'); expected='not a raw launch command' ;;
+      t3code) args+=(--backend t3code); expected='cannot run on backend=t3code' ;;
+      value) args=(--claude-code-mode=1); expected='takes no value' ;;
+    esac
+    out=$(run_case_spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off "${args[@]}")
+    status=$?
+    expect_code 1 "$status" "Code Mode $scenario must refuse: $out"
+    assert_contains "$out" "$expected" "Code Mode $scenario should name the refusal"
+    assert_absent "$HOME_DIR/state/$id.meta" "refused Code Mode launch must not write a task record"
+    [ ! -s "$LAUNCH_LOG" ] || fail "refused Code Mode launch must not launch an agent"
+  done
+  pass "Code Mode refuses non-Claude harnesses, raw commands, T3, and values"
+}
+
+test_code_mode_relaunch() {
+  local setting id rec out status seen round
+  local -a args
+  for setting in plain code; do
+    id="code-relaunch-$setting-a1"
+    rec=$(make_case "code-relaunch-$setting" claude "$id")
+    read_case "$rec"
+    args=(--mode no-mistakes --yolo off)
+    [ "$setting" = plain ] || args+=(--claude-code-mode)
+    out=$(run_case_spawn "$id" "$PROJ_DIR" "${args[@]}")
+    expect_code 0 "$?" "initial relaunch fixture failed: $out"
+    mv "$FAKEBIN_DIR/tmux" "$FAKEBIN_DIR/tmux-original"
+    cat > "$FAKEBIN_DIR/tmux" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *'#{pane_current_command}'*) printf 'bash\n'; exit 0 ;;
+esac
+exec "$(dirname "$0")/tmux-original" "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/tmux"
+    for round in 1 2; do
+      out=$(run_case_spawn "$id" --relaunch)
+      status=$?
+      expect_code 0 "$status" "Code Mode $setting relaunch $round failed: $out"
+      install_claude_probe "$FAKEBIN_DIR"
+      seen=$(run_emitted_launch "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG" 0) \
+        || fail "relaunched Code Mode command failed to run"
+      if [ "$setting" = code ]; then
+        assert_equals 1 "$(field_of "$seen" CODE_MODE)" "relaunch must restore Code Mode"
+        assert_equals 1 "$(export_count "$HOME_DIR/state/$id.meta" 'claude_code_mode=1')" \
+          "relaunch must persist Code Mode exactly once"
+      else
+        assert_equals 0 "$(field_of "$seen" CODE_MODE)" "ordinary relaunch must leave Code Mode off"
+        assert_no_grep 'claude_code_mode=' "$HOME_DIR/state/$id.meta" \
+          "ordinary relaunch must not record Code Mode"
+      fi
+    done
+  done
+  pass "relaunch restores the Code Mode opt-in and keeps legacy tasks unchanged"
+}
+
 test_lean_ship_and_scout
 test_secondmate_refuses
 test_ordinary_launch_is_unchanged
 test_non_claude_refuses
 test_raw_command_refuses
 test_t3code_refuses_before_runtime_check
+test_code_mode_ship_and_scout
+test_code_mode_refusals
+test_code_mode_relaunch
 
 # This credentialed guard consumes emitted launches with the installed Claude,
 # including a mod that registers tools without an MCP configuration file.

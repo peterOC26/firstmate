@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--backend <name>] [--herdr-resume-lock-wait]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--claude-code-mode] [--backend <name>] [--herdr-resume-lock-wait]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--hermes-profile <name>] [--account <entry>] [--claude-lean] [--claude-code-mode] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
@@ -72,7 +72,7 @@
 #   and accumulated progress notes, remains intact on disk, keeping the launch
 #   argument below Linux's per-argument limit without manual note archiving.
 #   tests/fm-control-relaunch.test.sh covers inline and oversized delivery.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--account <entry>] [--claude-lean]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--account <entry>] [--claude-lean] [--claude-code-mode]
 #   --relaunch launches a replacement agent for an EXISTING task into that
 #   task's own recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
@@ -83,8 +83,8 @@
 #   backend, kind, project or home, worktree, endpoint - comes from the task's
 #   validated state/<id>.meta, so --backend, --scout, --secondmate, a project
 #   positional, and batch pairs are all refused alongside it; only harness,
-#   model, effort, a declared Claude account, and the per-launch Claude lean
-#   option below may change. This makes a harness switch one ordinary relaunch.
+#   model, effort, a declared Claude account, the per-launch Claude lean option,
+#   and enabling Code Mode below may change. This makes a harness switch one ordinary relaunch.
 #   It refuses unless the
 #   recorded endpoint is positively agent-free on a backend with both a
 #   recovery-grade agent-state classifier and replacement-agent support
@@ -515,6 +515,15 @@
 #   A secondmate, non-claude harness, raw launch command, or backend=t3code refuses:
 #   T3 starts Claude itself and cannot pass --strict-mcp-config. Other
 #   harnesses are not launched without the lean behavior.
+# Claude Code Mode (--claude-code-mode):
+#   Opt-in for a Firstmate-built Claude ship or scout. Sets
+#   CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 in that worker's launch environment,
+#   beside the lean environment assignment. Records claude_code_mode=1 in task
+#   meta and restores it on relaunch because Code Mode sessions require it to
+#   resume. Absent, ordinary launches are unchanged. Refuses secondmates,
+#   non-Claude harnesses, raw launch commands, and backend=t3code, which starts
+#   Claude itself instead of consuming the launch environment. Does not answer
+#   Claude's first-run confirmation or change settings.
 # Codex approval mode (config/codex-approval-mode):
 #   One whitespace-trimmed token: absent or `bypass` selects
 #   --dangerously-bypass-approvals-and-sandbox; `approve-for-me` selects
@@ -1051,6 +1060,7 @@ ACCOUNT_ARG=
 ACCOUNT_SET=0
 # Opt-in Claude-only launch posture. 0 leaves every launch byte-identical.
 CLAUDE_LEAN=0
+CLAUDE_CODE_MODE=0
 RELAUNCH=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
 # Absent/unset keeps upstream refuse-on-contention. See header.
@@ -1195,6 +1205,11 @@ for a in "$@"; do
     echo "error: --claude-lean takes no value" >&2
     exit 1
     ;;
+  --claude-code-mode) CLAUDE_CODE_MODE=1 ;;
+  --claude-code-mode=*)
+    echo "error: --claude-code-mode takes no value" >&2
+    exit 1
+    ;;
   *) POS+=("$a") ;;
   esac
 done
@@ -1216,6 +1231,10 @@ done
 }
 if [ "$KIND" = secondmate ] && [ "$HERMES_PROFILE_SET" = 1 ]; then
   echo 'error: --hermes-profile is for crewmate/scout launches, never a secondmate' >&2
+  exit 1
+fi
+if [ "$KIND" = secondmate ] && [ "$CLAUDE_CODE_MODE" = 1 ]; then
+  echo "error: --claude-code-mode does not apply to secondmate supervision sessions" >&2
   exit 1
 fi
 [ "$EFFORT_SET" -eq 0 ] || [ -n "$EFFORT" ] || {
@@ -1878,6 +1897,7 @@ spawn_abort_cleanup() {
             echo "worktree=${WT:-}"
             echo "project=$PROJ_ABS"
             echo "harness=$HARNESS"
+            [ "$CLAUDE_CODE_MODE" = 0 ] || echo "claude_code_mode=1"
             echo "kind=$KIND"
             [ -z "${MODE:-}" ] || echo "mode=$MODE"
             [ -z "${YOLO:-}" ] || echo "yolo=$YOLO"
@@ -2191,6 +2211,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   [ "$ACCOUNT_SET" -eq 0 ] || shared_args+=(--account "$ACCOUNT_ARG")
   [ "$CLAUDE_LEAN" -eq 0 ] || shared_args+=(--claude-lean)
+  [ "$CLAUDE_CODE_MODE" -eq 0 ] || shared_args+=(--claude-code-mode)
   for pair in "${POS[@]}"; do
     case "$pair" in
     *=*) : ;;
@@ -2424,6 +2445,10 @@ if [ "$RELAUNCH" -eq 0 ]; then
     echo "error: --claude-lean cannot run on backend=t3code; T3 starts Claude itself and cannot pass --strict-mcp-config. Choose another backend." >&2
     exit 1
   fi
+  if [ "$CLAUDE_CODE_MODE" -eq 1 ] && [ "$BACKEND" = t3code ]; then
+    echo "error: --claude-code-mode cannot run on backend=t3code; T3 starts Claude itself and cannot pass the launch environment. Choose another backend." >&2
+    exit 1
+  fi
   fm_backend_runtime_check "$BACKEND" || exit 1
   if [ "$BACKEND" = rex ]; then
     fm_backend_rex_local_server_ensure || exit 1
@@ -2570,6 +2595,14 @@ if [ "$RELAUNCH" -eq 1 ]; then
       ;;
   esac
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
+  case "$(fm_meta_get "$RELAUNCH_META" claude_code_mode)" in
+    '' | 0) ;;
+    1) CLAUDE_CODE_MODE=1 ;;
+    *)
+      echo "error: task $ID has an invalid recorded claude_code_mode; expected 0 or 1" >&2
+      exit 1
+      ;;
+  esac
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
   # A secondmate whose endpoint is gone already has ONE owner for that
@@ -2926,7 +2959,7 @@ launch_template() {
     # __CLAUDELEANENV__ and __CLAUDELEANFLAGS__ stay empty unless --claude-lean
     # is on. Empty substitution is what keeps an ordinary launch byte-identical.
     # The header owns the set values. --bare is never one of them.
-    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 __CLAUDELEANENV__claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings __CLAUDESETTINGS____CLAUDELEANFLAGS__ '
+    printf '%s' 'CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 __CLAUDELEANENV____CLAUDECODEMODEENV__claude __CLAUDEPERMFLAG__ __CLAUDEADDDIRS__--settings __CLAUDESETTINGS____CLAUDELEANFLAGS__ '
     if [ "$kind" != secondmate ]; then
       printf '%s' "--append-system-prompt '$(spawn_claude_task_channel_statement)' "
     fi
@@ -3258,6 +3291,25 @@ case "$ARG3" in
   }
   ;;
 esac
+
+if [ "$CLAUDE_CODE_MODE" = 1 ]; then
+  if [ "$KIND" = secondmate ]; then
+    echo "error: --claude-code-mode does not apply to secondmate supervision sessions" >&2
+    exit 1
+  fi
+  if [ "$RAW_LAUNCH" = 1 ]; then
+    echo "error: --claude-code-mode applies to a Firstmate-built claude launch, not a raw launch command" >&2
+    exit 1
+  fi
+  if [ "$HARNESS" != claude ]; then
+    echo "error: --claude-code-mode applies only to the claude harness (this launch is $HARNESS)" >&2
+    exit 1
+  fi
+  if [ "$BACKEND" = t3code ]; then
+    echo "error: --claude-code-mode cannot run on backend=t3code; T3 starts Claude itself and cannot pass the launch environment. Choose another backend." >&2
+    exit 1
+  fi
+fi
 
 if [ "$CLAUDE_LEAN" = 1 ]; then
   if [ "$KIND" = secondmate ]; then
@@ -7283,7 +7335,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness hermes_profile hermes_home kind mode yolo branch tasktmp base_branch upstream_consent forge backup_remote backup_prefix model effort opencode_version account account_provider omp_profile busy_gen spawn_gen approval_mode traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id paseo_terminal_id paseo_workspace_id rex_server rex_session_id rex_window_id rex_block_id t3_thread_id t3_project_id tern_session_id tern_tab_id tern_block_id hc_session hc_terminal home projects control_relaunch_tx polytoken_session polytoken_port polytoken_credential", keys, " ")
+      split("window endpoint_task_id worktree project harness hermes_profile hermes_home claude_code_mode kind mode yolo branch tasktmp base_branch upstream_consent forge backup_remote backup_prefix model effort opencode_version account account_provider omp_profile busy_gen spawn_gen approval_mode traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id paseo_terminal_id paseo_workspace_id rex_server rex_session_id rex_window_id rex_block_id t3_thread_id t3_project_id tern_session_id tern_tab_id tern_block_id hc_session hc_terminal home projects control_relaunch_tx polytoken_session polytoken_port polytoken_credential", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -7296,6 +7348,7 @@ preserve_relaunch_meta() {
   spawn_meta_treehouse_lease_lines
   echo "project=$PROJ_ABS"
   echo "harness=$HARNESS"
+  [ "$CLAUDE_CODE_MODE" = 0 ] || echo "claude_code_mode=1"
   if [ "$RAW_LAUNCH" = 0 ]; then
     case "$HARNESS" in
       claude) echo "approval_mode=$CLAUDE_PERMISSION_MODE" ;;
@@ -7517,6 +7570,11 @@ if [ "$CLAUDE_LEAN" = 1 ]; then
 fi
 LAUNCH=${LAUNCH//__CLAUDELEANENV__/$CLAUDE_LEAN_ENV}
 LAUNCH=${LAUNCH//__CLAUDELEANFLAGS__/$CLAUDE_LEAN_FLAGS}
+CLAUDE_CODE_MODE_ENV=
+if [ "$CLAUDE_CODE_MODE" = 1 ]; then
+  CLAUDE_CODE_MODE_ENV='CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 '
+fi
+LAUNCH=${LAUNCH//__CLAUDECODEMODEENV__/$CLAUDE_CODE_MODE_ENV}
 case "$LAUNCH" in
 *__CLAUDESETTINGS__*)
   if [ "$KIND" = secondmate ]; then
