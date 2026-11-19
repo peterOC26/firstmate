@@ -447,9 +447,8 @@
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
 #   path the steering doorbell names). Raw commands must
 #   be POSIX sh compatible under this opt-in; the absent-file path is unchanged.
-#   With or without the file, every pane-backed launch first clears
-#   FM_WAKE_QUEUE, FM_WAKE_QUEUE_LOCK, FM_ROOT_OVERRIDE, and FM_STATE_OVERRIDE
-#   so worker tests resolve their own queue and state paths; FM_HOME is kept.
+#   See docs/configuration.md#worker-launch-environment-configlaunch-env-allowlist
+#   for the pane-backed launch path overrides cleared before execution.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
 #   See docs/configuration.md for provider/Git setup and supported limits.
