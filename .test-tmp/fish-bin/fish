@@ -1,0 +1,4 @@
+#!/bin/sh
+TMP_ROOT=$(dirname "$HOME")
+mkdir -p "$TMP_ROOT" "$HOME"
+exec /usr/bin/bwrap --ro-bind / / --dev /dev --bind /tmp /tmp --bind "$TMP_ROOT" "$TMP_ROOT" --ro-bind '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7R53R1N40Q27RYM47CR0JK7/.test-tmp/fish-root/usr/share' /usr/share --setenv TMPDIR "$TMP_ROOT" --setenv LD_LIBRARY_PATH '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7R53R1N40Q27RYM47CR0JK7/.test-tmp/fish-root/usr/lib/x86_64-linux-gnu' -- '/home/zabi/.no-mistakes/worktrees/7f0ec18181b6/01M7R53R1N40Q27RYM47CR0JK7/.test-tmp/fish-root/usr/bin/fish' "$@"

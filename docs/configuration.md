@@ -1733,7 +1733,9 @@ The flag is read only for ship and scout spawns, secondmate charters never take 
 
 The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
 T3 Code starts the provider from the server's environment and cannot apply this command boundary, so `backend=t3code` refuses when the file exists; [`t3code-backend.md`](t3code-backend.md#active-limits) owns that backend limit.
-With no file, ambient inheritance remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+With no file, ambient inheritance otherwise remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+Pane-backed launches always clear inherited `FM_WAKE_QUEUE`, `FM_WAKE_QUEUE_LOCK`, `FM_ROOT_OVERRIDE`, and `FM_STATE_OVERRIDE`.
+This scrub leaves `FM_HOME` untouched, though an enabled allowlist still controls whether it reaches the worker, so worker test suites can establish their own queue and state paths without inheriting supervisor overrides.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -1810,7 +1812,7 @@ Raw launch commands run under noninteractive POSIX `sh` with this option and mus
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
 This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
 
-Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh), and the Orca environment source in [`tests/fm-spawn-orca-worktree.test.sh`](../tests/fm-spawn-orca-worktree.test.sh).
+Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh), checks pane-backed home-path scrubbing in [`tests/fm-spawn-home-env-scrub.test.sh`](../tests/fm-spawn-home-env-scrub.test.sh), and checks the Orca environment source in [`tests/fm-spawn-orca-worktree.test.sh`](../tests/fm-spawn-orca-worktree.test.sh).
 
 ### Compact adviser setting
 
