@@ -170,25 +170,27 @@ When restoration does not succeed, the model is never left blind.
 
 ### Claude handling successor
 
-Claude's Stop hook also starts one handling successor before notification.
+With the supervision host off, Claude's Stop hook starts a detached continuation owner before notification.
 After an actionable foreground close, including an attached peer cycle that ended, the hook:
 
-1. Launches `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
-2. Waits for that arm's one status line.
+1. Launches `bin/fm-supervision-handoff.sh` in handling mode, which starts `bin/fm-watch-arm.sh` with the closed arm's pid as `FM_WATCH_PREDECESSOR_ARM_PID`.
+2. Waits for readiness; if owner startup fails, records failed continuity and tries a direct one-shot `bin/fm-watch-arm.sh` successor.
 3. Only then exits 2 with the wake.
 
-A child of the hook cannot outlive its exit-2 rewake.
-So that successor is the one deliberate detached launch in the continuity path:
-
-- It runs under nohup.
-- Its stdio is away from the hook's pipes.
-- It has its own process group.
+A child of the hook cannot outlive its exit-2 rewake unless it is detached.
+The continuation owner and direct fallback each run under nohup with stdio away from the hook's pipes and their own process groups; every watcher arm they launch also gets its own process group.
 
 This is the shape `bin/fm-startup-network.sh` uses, and [`verification/supervision.md`](verification/supervision.md#detached-session-open-workers-survive-the-hook) verified that it survives the hook.
 
-The next Stop's foreground arm attaches to that live cycle.
-A successor that confirms no live watcher adds one line to the rewake banner and never withholds the wake.
-The next Stop then re-arms as before.
+The next Stop's foreground arm attaches to a confirmed live cycle; after an unconfirmed start, it re-arms as before.
+The owner replaces closed cycles until main begins handling the current recovery generation, following generation changes while it waits; once handling of a generation it followed has begun, a later episode never revives it.
+Its invocation is `bin/fm-supervision-handoff.sh TOKEN PREDECESSOR_ARM_PID [ack|handling]`: handling mode binds TOKEN to the recovery generation, while the default ack mode binds it to the optional host check.
+`FM_SUPERVISION_HANDOFF_RETRY_SECONDS` sets the retry interval; [the environment-variable reference](configuration.md#environment-variables) owns its default.
+When the requested turn never starts, the owner retries through the existing [guarded hand-back transport](supervision-host.md#reaching-a-lost-claude-continuation) at that interval.
+If the fallback confirms a live watcher, the rewake banner adds `The continuation owner failed; a one-shot handling successor is watching.`
+That fallback covers one cycle without replacing later closes.
+If neither launch confirms a live watcher, the banner reports the unconfirmed successor; neither failure withholds the wake.
+Failed startup or replacement independently records the recovery generation in `state/.watcher-down.continuity-failed`, so committing a rewake does not claim successful continuity.
 
 ### Durable queue and turn-end backstop
 
@@ -218,7 +220,7 @@ When the host instead hands the accepted close back to main and leaves that succ
 - Grok retains its tracked background-task notification protocol.
 
 No adapter starts a replacement with a fire-and-forget shell `&` from a model command.
-The Claude hook's detached handling successor is launched by the hook itself, which waits for the successor's status line before it exits.
+For the Claude hook-owned detached launch, see [Claude handling successor](#claude-handling-successor).
 
 The turn-end guard remains the final backstop rather than the normal continuity mechanism.
 In its `--claude` mode it cooperates with the auto-arm.
@@ -226,6 +228,10 @@ In its `--claude` mode it cooperates with the auto-arm.
 ## Recovery episode acknowledgement
 
 A recovery episode is one generation of the `state/.watcher-down` marker.
+Main beginning a drain atomically records that generation in `state/.watcher-down.handling` under the marker lock.
+The receipt survives marker republication by in-turn appends and is valid only for its recorded generation.
+Branch drains and successor-delivery confirmations do not establish that main started its requested turn.
+The Claude continuation owner and mid-turn health check consume this same receipt; neither an exit-2 rewake nor terminal submission proves handling.
 It is retired only by the generation-bound acknowledgement the drain prints as `WAKE_ACK_REQUIRED`.
 The away return brief treats a still-open handling episode as a wake in progress, not watcher downtime; an open downtime episode remains a gap.
 
@@ -541,7 +547,8 @@ The same suite covers a handling successor delivering a queued captain inbox not
 - Benign live-watcher cycle ends.
 - One-notice failure episodes.
 - Exit-2 translation.
-- The handling successor an ended attached cycle starts with the closed arm as its predecessor and that outlives the rewake.
+- A host-off handling owner replaces a cycle closed by a second decision while the requested turn is withheld, then exits only after main records the matching handling receipt; the begun-handling control leaves its watcher running.
+- Owner startup and recovery-snapshot failures retain a one-shot successor when possible, record failed continuity, and still deliver the wake.
 - An unconfirmed successor reported in the banner without withholding the wake.
 - The [session-bound HUP/TERM/INT failure handoff](turnend-guard.md#failure-progression-and-block-budget) and replacement-session notice isolation.
 
@@ -573,7 +580,8 @@ OpenCode support targets persistent TUI sessions rather than headless `opencode 
 The other harnesses rely on these mechanisms:
 
 - Claude normally depends on the Stop `asyncRewake` rewake.
-  The host's opt-in [acknowledged hand-back](supervision-host.md#acknowledged-hand-back) adds guarded tmux retries when that continuation is lost.
+  Its default [handling continuation owner](#claude-handling-successor) replaces closed watcher cycles and retries through the guarded hand-back transport when that continuation is lost.
+  The host's opt-in [acknowledged hand-back](supervision-host.md#acknowledged-hand-back) keeps that owner active until acknowledgement instead of handling.
 - Cursor depends on its awaited stop-hook park.
 - Grok retains native background-completion notifications.
 - Codex retains bounded foreground checkpoints unless the home opts in to its [native Stop park](supervision-protocols/codex.md).

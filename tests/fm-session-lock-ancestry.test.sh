@@ -880,7 +880,28 @@ install_autoarm_scripts() {
   cat > "$dir/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 echo "$$" >> "$FM_HOME/state/arm-ran"
-printf 'pending:downtime:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+  . "$FM_HOME/bin/fm-wake-lib.sh"
+  fm_recovery_marker_read "$FM_HOME/state/.watcher-down"
+  generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+  if [ ! -e "$FM_HOME/state/.watch.lock" ]; then
+    mkdir -p "$FM_HOME/state/.watch.lock"
+    printf '%s\n' "$$" > "$FM_HOME/state/.watch.lock/pid"
+    printf '%s\n' "$FM_HOME" > "$FM_HOME/state/.watch.lock/fm-home"
+    printf '%s\n' "$FM_HOME/bin/fm-watch.sh" > "$FM_HOME/state/.watch.lock/watcher-path"
+    fm_pid_identity "$$" > "$FM_HOME/state/.watch.lock/pid-identity"
+  fi
+  trap '[ "$(cat "$FM_HOME/state/.watch.lock/pid" 2>/dev/null)" != "$$" ] || rm -rf "$FM_HOME/state/.watch.lock"' EXIT
+  touch "$FM_HOME/state/.last-watcher-beat"
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  while [ -d "$FM_HOME/state" ] && kill -0 "$FM_TEST_SUITE_PID" 2>/dev/null \
+    && ! fm_recovery_handling_observed "$FM_HOME/state/.watcher-down" "$generation" \
+    && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+    sleep 0.1
+  done
+  exit 0
+fi
+printf 'pending:downtime:fixture-%s\n' "$$" > "$FM_HOME/state/.watcher-down"
 touch "$FM_HOME/state/.last-watcher-beat"
 printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
 printf 'stale: fixture-win actionable\n'
@@ -1084,6 +1105,17 @@ while [ ! -e "$FM_HOME/state/stop-spare" ]; do
     printf '%s\n' '{"session_id":"fixture","stop_hook_active":true}' \
       | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$out/hook.out" 2>&1
     printf '%s\n' "$?" > "$out/hook.rc"
+    if [ "$(cat "$out/hook.rc")" = 2 ]; then
+      ( . "$FM_HOME/bin/fm-wake-lib.sh"
+        fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"
+      )
+      # Retire this phase's continuation before testing the next session's identity.
+      i=0
+      while [ "$i" -lt 400 ] && { [ -e "$FM_HOME/state/.watch.lock" ] || [ -e "$FM_HOME/state/.supervision-handoff-owner" ]; }; do
+        sleep 0.05
+        i=$((i + 1))
+      done
+    fi
     printf '%s\n' '{"session_id":"fixture","stop_hook_active":true}' \
       | "$FM_HOME/bin/fm-turnend-guard.sh" --claude > "$out/guard.out" 2>&1
     printf '%s\n' "$?" > "$out/guard.rc"
@@ -1611,6 +1643,7 @@ test_reanchor_keeps_autoarm_midturn_healthy() {
   printf 'epoch=7 owner_pid=1 outcome=rewake updated_at=1 session_pid=%s recovery_generation=g1\nidentity-1\n' \
     "$front_pid" > "$dir/state/.claude-autoarm-epoch"
   printf 'acked:handling:g1\n' > "$dir/state/.watcher-down"
+  printf 'g1\n' > "$dir/state/.watcher-down.handling"
   touch -t 201901010000 "$dir/state/.last-watcher-beat"
   touch -t 202001010000 "$dir/state/.claude-autoarm-epoch" "$dir/state/epoch-mtime"
   autoarm_midturn_healthy "$dir/state" || fail "the rewake fixture is not healthy before the re-anchor, so this case proves nothing"

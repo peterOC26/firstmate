@@ -275,14 +275,14 @@ test_park_boundary_ends_the_park_before_the_hook_timeout() {
   echo 60 > "$home/park-clock"
   wait_until 150 host_exited "$home" || fail "boundary: the host did not end its park"
   assert_re '^supervision-host: cycle boundary - ' "$home/host.out" "the park boundary must reach main as a host line"
-  watcher_live "$home" && fail "the park boundary left the watcher running"
+  wait_until 150 watcher_live "$home" || fail "the park boundary left no watcher"
   [ ! -e "$home/state/.supervision-handoff-pending" ] || fail "the absent opt-in changed the default boundary"
   token=$(cat "$home/state/.watcher-down")
   case "$token" in
     pending:downtime:*|announced:downtime:*) ;;
     *) fail "the park boundary must publish downtime for the owner's rewake, got: $token" ;;
   esac
-  pass "host: the park ends itself with a boundary wake and a stopped watcher"
+  pass "host: the park ends itself with a boundary wake and a verified successor"
 }
 
 
@@ -294,6 +294,172 @@ test_park_boundary_ends_the_park_before_the_hook_timeout() {
 # a turn of its own on any machine speed. The bound also stays well past every
 # wall-clock check in the case: a host that ignored the test clock would start
 # the second turn instead of silently passing at a wall-clock boundary.
+
+test_default_handback_replaces_closes_until_main_handles() {
+  local home first owner generation posture
+  for posture in attended away; do
+    home=$(make_home "boundary-continuity-$posture" "$posture")
+    [ "$posture" != away ] || : > "$home/state/.afk"
+    FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HANDOFF_RETRY_SECONDS=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+      FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+    wait_until 150 watcher_live "$home" || fail "continuity: no initial watcher"
+    echo 60 > "$home/park-clock"
+    wait_until 150 host_exited "$home" || fail "continuity: no boundary hand-back"
+    assert_absent "$home/state/.watcher-down.continuity-failed" "handling owner must not fall back for an away marker"
+    first=$(cut -f1 "$home/state/.supervision-host-left")
+    owner=$(cut -f1 "$home/state/.supervision-handoff-owner")
+    kill -0 "$owner" || fail "continuity: no detached owner"
+    append_status "$home" 'arrived after hand-back'
+    wait_until 200 sh -c '[ "$(cut -f1 "$1/state/.supervision-host-left")" != "$2" ]' _ "$home" "$first" \
+      || fail "continuity: a successor close stranded supervision: $(cat "$home/state/.supervision-handoff.log" "$home/host.out" 2>/dev/null)"
+    wait_until 150 watcher_live "$home" || fail "continuity: replacement watcher not live"
+    wait_until 100 test -s "$home/state/.supervision-handoff.log" || fail "continuity: missing bounded retry"
+    generation=$(sed 's/.*://' "$home/state/.watcher-down")
+    FM_HOME="$home" bash -c '. "$1"; FM_SUPERVISION_ACTOR=branch fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
+      || fail "continuity: branch handling failed"
+    kill -0 "$owner" || fail "continuity: branch handling retired main continuity"
+    FM_HOME="$home" bash -c '. "$1"; fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh" \
+      || fail "continuity: main handling failed"
+    wait_until 100 sh -c '[ ! -e "$1" ]' _ "$home/state/.supervision-handoff-owner" \
+      || fail "continuity: handling receipt did not retire the owner"
+    [ "$(cat "$home/state/.watcher-down.handling")" = "$generation" ] || fail "continuity: receipt names the wrong generation"
+    watcher_live "$home" || fail "continuity: receipt retirement stopped the verified watcher"
+    stop_home_processes "$home"
+  done
+  pass "host: attended and away hand-backs replace cycles until main handles"
+}
+
+test_handling_owner_yields_only_to_daemon_owned_away() {
+  local home actor owner first
+  for actor in daemon host; do
+    home=$(make_home "handling-away-$actor" away)
+    FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+      FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+    wait_until 150 watcher_live "$home" || fail "$actor: no initial watcher"
+    echo 60 > "$home/park-clock"
+    wait_until 150 host_exited "$home" || fail "$actor: no hand-back"
+    owner=$(cut -f1 "$home/state/.supervision-handoff-owner")
+    first=$(cut -f1 "$home/state/.supervision-host-left")
+    [ "$actor" != daemon ] || : > "$home/config/supervision-host-off"
+    : > "$home/state/.afk"
+    if [ "$actor" = daemon ]; then
+      wait_until 100 sh -c '[ ! -e "$1" ]' _ "$home/state/.supervision-handoff-owner" \
+        || fail "daemon-owned away did not retire the handling owner"
+    else
+      append_status "$home" 'decision while host owns away' needs-decision
+      wait_until 150 sh -c '[ "$(cut -f1 "$1/state/.supervision-host-left")" != "$2" ]' _ "$home" "$first" \
+        || fail "host-owned away did not replace its closed cycle"
+      kill -0 "$owner" || fail "host-owned away retired the handling owner"
+      wait_until 150 watcher_live "$home" || fail "host-owned away lost supervision"
+    fi
+    assert_absent "$home/state/.watcher-down.continuity-failed" "$actor: normal ownership transition recorded failure"
+    stop_home_processes "$home"
+  done
+  pass "handling owner yields to daemon-owned away and continues host-owned away"
+}
+
+test_owner_replaces_immediately_closed_cycles() {
+  local home mode result
+  for mode in handling ack; do
+    for result in success reason-only nonzero failed empty; do
+      home=$(make_home "fast-close-$mode-$result" attended)
+      cp -R "$ROOT/bin" "$home/bin"
+      mv "$home/bin/fm-watch-arm.sh" "$home/bin/real-arm.sh"
+      printf '%s\n' "$result" > "$home/arm-result"
+      cat > "$home/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+n=$(cat "$FM_HOME/arm-count" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$FM_HOME/arm-count"
+if [ "$n" -le 2 ]; then
+  result=$(cat "$FM_HOME/arm-result")
+  [ "$result" = reason-only ] || printf 'watcher: started pid=%s\n' "$$"
+  [ "$result" = empty ] || echo 'check: queued decision'
+  [ "$result" != failed ] || echo 'watcher: FAILED - fixture failure'
+  [ "$result" != nonzero ] || exit 1
+  exit 0
+fi
+exec "$(dirname "$0")/real-arm.sh"
+SH
+      chmod +x "$home/bin/fm-watch-arm.sh"
+      : > "$home/config/supervision-handoff-ack"
+      FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" \
+        "$FAKE_CLAUDE" -c '
+          printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+          printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
+          . "$FM_HOME/bin/fm-wake-lib.sh"
+          fm_recovery_marker_publish "$FM_HOME/state/.watcher-down" downtime >/dev/null
+          fm_recovery_marker_snapshot "$FM_HOME/state/.watcher-down"
+          token=${FM_RECOVERY_MARKER_TOKEN##*:}
+          printf "%s\n" "$token" > "$FM_HOME/state/.supervision-handoff-pending"
+          "$FM_HOME/bin/fm-supervision-handoff.sh" "$token" "$$" "$1" > "$FM_HOME/owner.out" 2>&1
+          printf "%s\n" "$?" > "$FM_HOME/owner.rc"
+          while [ ! -e "$FM_HOME/session.stop" ]; do sleep 0.1; done
+        ' _ "$mode" &
+      if [ "$result" = success ] || [ "$result" = reason-only ]; then
+        wait_until 200 test -s "$home/state/.supervision-host-left" \
+          || fail "$mode: immediate closes lost ownership: $(cat "$home/owner.out")"
+        [ "$(cat "$home/arm-count")" -ge 3 ] || fail "$mode: closed cycles were not replaced"
+        watcher_live "$home" || fail "$mode: no watcher after immediate closes"
+        assert_absent "$home/state/.watcher-down.continuity-failed" "$mode: clean close recorded failure"
+        FM_HOME="$home" bash -c '. "$1"; fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down"' _ "$ROOT/bin/fm-wake-lib.sh"
+        [ "$mode" != ack ] || rm "$home/state/.supervision-handoff-pending"
+        wait_until 100 test -s "$home/owner.rc" || fail "$mode: receipt did not retire owner"
+        expect_code 0 "$(cat "$home/owner.rc")" "$mode: receipt retirement failed"
+        watcher_live "$home" || fail "$mode: receipt stopped the live successor"
+      else
+        wait_until 100 test -s "$home/owner.rc" || fail "$mode/$result: invalid close did not stop owner"
+        expect_code 1 "$(cat "$home/owner.rc")" "$mode/$result: invalid close was accepted"
+        assert_present "$home/state/.watcher-down.continuity-failed" "$mode/$result: failure not recorded"
+        [ "$(cat "$home/arm-count")" = 1 ] || fail "$mode/$result: failed arm was replaced"
+      fi
+      stop_home_processes "$home"
+    done
+  done
+  pass "owner replaces immediate actionable closes and rejects failed or empty closes in both modes"
+}
+
+test_ack_owner_still_stands_down_for_away_marker() {
+  local home
+  home=$(make_home ack-away-marker attended)
+  : > "$home/config/supervision-handoff-ack"
+  FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+    FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+  wait_until 150 watcher_live "$home" || fail "ack marker: no initial watcher"
+  echo 60 > "$home/park-clock"
+  wait_until 150 host_exited "$home" || fail "ack marker: no hand-back"
+  assert_present "$home/state/.supervision-handoff-owner" "ack marker: no owner"
+  : > "$home/state/.afk"
+  wait_until 100 sh -c '[ ! -e "$1" ]' _ "$home/state/.supervision-handoff-owner" \
+    || fail "ack marker: owner ignored the away marker"
+  watcher_live "$home" || fail "ack marker: retiring owner stopped its watcher"
+  stop_home_processes "$home"
+  pass "host: acknowledgement owner still stands down for an away marker"
+}
+
+test_handback_replacement_failure_records_continuity() {
+  local home mode arm generation
+  for mode in handling ack; do
+    home=$(make_home "replacement-failure-$mode" attended)
+    [ "$mode" != ack ] || : > "$home/config/supervision-handoff-ack"
+    FM_TEST_HOST_SESSION_HOLD=1 FM_SUPERVISION_HOST_PARK_SECONDS=60 \
+      FM_TEST_SUPERVISION_HOST_CLOCK="$home/park-clock" start_host "$home"
+    wait_until 150 watcher_live "$home" || fail "$mode: no initial watcher"
+    echo 60 > "$home/park-clock"
+    wait_until 150 host_exited "$home" || fail "$mode: no boundary hand-back"
+    arm=$(cut -f1 "$home/state/.supervision-host-left")
+    rm "$home/state/.supervision-host-left"
+    mkdir "$home/state/.supervision-host-left"
+    kill -TERM "$arm"
+    wait_until 200 test -s "$home/state/.watcher-down.continuity-failed" \
+      || fail "$mode: failed replacement was not recorded as failed continuity"
+    generation=$(sed 's/.*://' "$home/state/.watcher-down")
+    [ "$(cat "$home/state/.watcher-down.continuity-failed")" = "$generation" ] \
+      || fail "$mode: failure named a different recovery generation"
+    stop_home_processes "$home"
+  done
+  pass "host: both hand-back modes record a failed replacement independently"
+}
 
 test_park_boundary_holds_under_back_to_back_closes() {
   # The turn bound is the one wall-clock bound left: it must cover the stub's
@@ -326,7 +492,7 @@ test_park_boundary_holds_under_back_to_back_closes() {
   [ "$(tail -n 1 "$home/host.out")" = "$(grep '^supervision-host: cycle boundary - ' "$home/host.out")" ] \
     || fail "a close read at the boundary must be printed ahead of the boundary line: $(cat "$home/host.out")"
   assert_grep 'demo.status' "$home/state/.wake-queue" "a close waiting at the boundary must stay queued for main"
-  watcher_live "$home" && fail "the park boundary left the watcher running"
+  wait_until 150 watcher_live "$home" || fail "the park boundary left no watcher"
   pass "host: waiting closes cannot carry the park past its boundary"
 }
 
@@ -376,7 +542,7 @@ SH
   while IFS= read -r pid; do
     kill -0 "$pid" 2>/dev/null && fail "the boundary left the successor arm $pid running"
   done < <(awk -F '\t' '$1 == "arm" { print $2 }' "$home/host-record-at-render")
-  watcher_live "$home" && fail "the boundary left the watcher running"
+  wait_until 150 watcher_live "$home" || fail "the boundary left no watcher"
   pass "host: a close whose margin runs out while the successor starts reaches main at the boundary without a turn"
 }
 
@@ -466,6 +632,10 @@ test_first_cycle_status_streams_and_owner_options_reach_it() {
   # Pass-through can leave a successor watcher running. Retire that cycle so
   # the orphan-arm fixture below owns the watcher we later ask --restart to replace.
   FM_HOME="$home" "$ROOT/bin/fm-watch-arm.sh" --stop >/dev/null || fail "stream: could not stop the prior cycle"
+  # Stopping the hand-back's continuation watcher opens a downtime episode;
+  # main handles it so the orphan arm's watcher has nothing to resurface.
+  main_drain_and_ack "$home"
+  [ "$(marker_kind "$home")" != downtime ] || fail "fixture: main did not take the stop's downtime episode"
 
   # A watcher a dead arm left behind, holding this home's watcher lock.
   FM_HOME="$home" PATH="$home/fakebin:$PATH" perl -e 'setpgrp(0, 0); exec @ARGV' "$ROOT/bin/fm-watch-arm.sh" \
@@ -568,13 +738,15 @@ test_unchanged_held_outcome_reaches_the_captain_once_until_a_new_event() {
 test_unverified_engine_hands_every_away_wake_to_main() {
   local home
   home=$(make_home no-engine away 'pi')
-  start_host "$home"
+  FM_TEST_HOST_SESSION_HOLD=1 start_host "$home"
   wait_until 150 watcher_live "$home" || fail "no engine: the host never started a watcher cycle"
   append_status "$home" 'anything'
   wait_until_deadline 60 host_exited "$home" || fail "no engine: the wake did not reach main"
   assert_re "^supervision-host: no supervision engine runs here: config/supervision-host names 'pi', which is not a verified supervision engine" \
     "$home/host.out" "an unverified engine must be named on the wake it hands to main"
   ! ls "$home"/engine-call.* >/dev/null 2>&1 || fail "no engine: an engine ran"
+  wait_until 150 watcher_live "$home" || fail "no engine: failure hand-back left no successor"
+  [ -s "$home/state/.supervision-handoff-owner" ] || fail "no engine: failure hand-back left no continuation owner"
   pass "host: a home naming an unverified engine hands every away wake to main with the reason"
 }
 
@@ -664,6 +836,11 @@ test_superseded_host_leaves_the_owner_untouched() {
 }
 
 fm_test_run \
+  test_handling_owner_yields_only_to_daemon_owned_away \
+  test_owner_replaces_immediately_closed_cycles \
+  test_default_handback_replaces_closes_until_main_handles \
+  test_ack_owner_still_stands_down_for_away_marker \
+  test_handback_replacement_failure_records_continuity \
   test_latch_trips_after_two_engine_errors_then_probes_and_recovers \
   test_latch_keeps_attended_closes_on_main_and_skips_unopted_homes \
   test_attended_latch_keeps_closes_on_main_and_records_recovery_off_main \

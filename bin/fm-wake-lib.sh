@@ -493,7 +493,8 @@ fm_afk_mode() {
 # because the watcher only runs between turns. A stale beacon is still healthy
 # while fm_autoarm_midturn_healthy proves a Claude auto-arm generation
 # explains the gap (a rewake bound to the current recovery generation and
-# live session lock), because turn-end re-arms.
+# live session lock whose handling turn began or is still inside grace),
+# because turn-end re-arms.
 # Without that proof a stale or absent beacon is a genuine lapse.
 # extension: a live identity-matched watcher is the ordinary healthy state, but a
 # genuinely unheld lock is also healthy while the beacon is fresh AND a live Pi
@@ -1004,7 +1005,7 @@ _fm_wake_append_recovery_restore_locked() {
 }
 
 _fm_recovery_marker_begin_handling() {
-  local marker=$1 expected_generation=${2:-} lock line generation
+  local marker=$1 expected_generation=${2:-} lock line generation tmp
   lock="${marker}.lock"
   fm_lock_acquire_wait "$lock" || return 1
   if ! fm_recovery_marker_read "$marker"; then
@@ -1046,7 +1047,33 @@ _fm_recovery_marker_begin_handling() {
       ;;
     *) fm_lock_release "$lock"; return 1 ;;
   esac
+  if [ -z "$expected_generation" ] && [ "${FM_SUPERVISION_ACTOR:-main}" = main ]; then
+    if [ -d "${marker}.handling" ] || ! tmp=$(mktemp "${marker}.handling.XXXXXX") \
+      || ! printf '%s\n' "$generation" > "$tmp" \
+      || ! _fm_atomic_replace "$tmp" "${marker}.handling"; then
+      [ -z "${tmp:-}" ] || rm -f "$tmp"
+      fm_lock_release "$lock"
+      return 1
+    fi
+  fi
   fm_lock_release "$lock"
+}
+
+fm_recovery_handling_observed() {
+  [ -n "${2:-}" ] && [ "$(cat "${1}.handling" 2>/dev/null)" = "$2" ]
+}
+
+fm_recovery_continuity_failed() {
+  local marker=$1 generation tmp
+  fm_recovery_marker_snapshot "$marker" || return 1
+  generation=${FM_RECOVERY_MARKER_TOKEN##*:}
+  [ -n "$generation" ] || return 1
+  [ ! -d "${marker}.continuity-failed" ] || return 1
+  tmp=$(mktemp "${marker}.continuity-failed.XXXXXX") || return 1
+  if ! printf '%s\n' "$generation" > "$tmp" || ! _fm_atomic_replace "$tmp" "${marker}.continuity-failed"; then
+    rm -f "$tmp"
+    return 1
+  fi
 }
 
 fm_recovery_marker_snapshot() {
@@ -2321,11 +2348,12 @@ fm_autoarm_claim_open() {  # <state-dir> [grace]
 # changed or dead session lock, a moved recovery generation, or an absent/later
 # beacon all fail it, so a genuine lapse stays loud. Cursor autoarm homes have no
 # Claude epoch ledger and fail this, keeping their existing fresh-beacon-only
-# pull-guard contract. The rewake and beacon may both be older than grace: a
-# legitimate handling turn can outrun grace, which is the false alarm this
-# exists to stop.
+# pull-guard contract. The rewake and beacon may both be older than grace once
+# a drain has moved the recovery marker to handling: a legitimate handling turn
+# can outrun grace, which is the false alarm this exists to stop. A rewake only
+# requests that turn, so one still on downtime past grace never started.
 fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
-  local state=$1 lock_pid recovery epoch_mtime beacon_mtime
+  local state=$1 grace=${2:-${FM_GUARD_GRACE:-300}} lock_pid recovery epoch_mtime beacon_mtime
   [ -e "$state/.claude-autoarm-failure-notified" ] && return 1
   [ -e "$state/.claude-autoarm-failure-alarmed" ] && return 1
   fm_autoarm_ledger_read "$state" || return 1
@@ -2339,7 +2367,10 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
   [ -n "$FM_AUTOARM_RECOVERY" ] && [ "$FM_AUTOARM_RECOVERY" = "$recovery" ] || return 1
   epoch_mtime=$(fm_path_mtime "$state/.claude-autoarm-epoch") || return 1
   beacon_mtime=$(fm_path_mtime "$state/.last-watcher-beat") || return 1
-  [ "$epoch_mtime" -ge "$beacon_mtime" ]
+  [ "$epoch_mtime" -ge "$beacon_mtime" ] || return 1
+  fm_recovery_handling_observed "$state/.watcher-down" "$recovery" && return 0
+  [ "$(cat "$state/.watcher-down.continuity-failed" 2>/dev/null)" != "$recovery" ] || return 1
+  [ "$(fm_path_age "$state/.claude-autoarm-epoch")" -lt "$grace" ]
 }
 
 # Match an interrupted episode to the current lock's process identity AND
