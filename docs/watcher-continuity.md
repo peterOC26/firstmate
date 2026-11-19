@@ -552,7 +552,8 @@ The same suite covers a handling successor delivering a queued captain inbox not
 - Benign live-watcher cycle ends.
 - One-notice failure episodes.
 - Exit-2 translation.
-- The handling successor an ended attached cycle starts with the closed arm as its predecessor and that outlives the rewake.
+- A host-off handling owner replaces a cycle closed by a second decision while the requested turn is withheld, then exits only after main records the matching handling receipt; the begun-handling control leaves its watcher running.
+- Owner startup and recovery-snapshot failures retain a one-shot successor when possible, record failed continuity, and still deliver the wake.
 - An unconfirmed successor reported in the banner without withholding the wake.
 - The [session-bound HUP/TERM/INT failure handoff](turnend-guard.md#failure-progression-and-block-budget) and replacement-session notice isolation.
 
