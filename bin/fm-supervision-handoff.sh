@@ -32,6 +32,7 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-operational-input.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+# shellcheck source=bin/fm-supervision-engine-lib.sh
 . "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
 fm_backend_source tmux || exit 1
 MODE=${3:-ack}
