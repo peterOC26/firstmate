@@ -393,7 +393,7 @@ test_code_mode_refusals() {
 }
 
 test_code_mode_relaunch() {
-  local setting id rec out status seen round
+  local setting id rec out status seen round target
   local -a args
   for setting in plain code; do
     id="code-relaunch-$setting-a1"
@@ -428,6 +428,23 @@ SH
         assert_no_grep 'claude_code_mode=' "$HOME_DIR/state/$id.meta" \
           "ordinary relaunch must not record Code Mode"
       fi
+    done
+    [ "$setting" = code ] || continue
+    for target in codex 'claude --raw-probe'; do
+      out=$(run_case_spawn "$id" --relaunch --harness "$target")
+      expect_code 0 "$?" "Code Mode harness switch to $target failed: $out"
+      assert_no_grep 'claude_code_mode=' "$HOME_DIR/state/$id.meta" \
+        "switching away from a built Claude launch must clear the recorded choice"
+      assert_no_grep 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE' "$LAUNCH_LOG" \
+        "switching harness must not inject Code Mode into the emitted launch"
+      out=$(run_case_spawn "$id" --relaunch --harness claude)
+      expect_code 0 "$?" "return to Claude failed: $out"
+      seen=$(run_emitted_launch "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG" 0) \
+        || fail "returned Claude launch failed to run"
+      assert_equals 0 "$(field_of "$seen" CODE_MODE)" \
+        "returning to Claude must not resurrect the discarded choice"
+      out=$(run_case_spawn "$id" --relaunch --claude-code-mode)
+      expect_code 0 "$?" "explicit Code Mode re-enable failed: $out"
     done
   done
   pass "relaunch restores the Code Mode opt-in and keeps legacy tasks unchanged"

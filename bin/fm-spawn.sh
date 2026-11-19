@@ -519,8 +519,8 @@
 #   Opt-in for a Firstmate-built Claude ship or scout. Sets
 #   CLAUDE_CODE_EXPERIMENTAL_CODE_MODE=1 in that worker's launch environment,
 #   beside the lean environment assignment. Records claude_code_mode=1 in task
-#   meta and restores it on relaunch because Code Mode sessions require it to
-#   resume. Absent, ordinary launches are unchanged. Refuses secondmates,
+#   meta and restores it on relaunch only for a Firstmate-built Claude launch.
+#   Switching harnesses drops the choice. Absent, ordinary launches are unchanged. Refuses secondmates,
 #   non-Claude harnesses, raw launch commands, and backend=t3code, which starts
 #   Claude itself instead of consuming the launch environment. Does not answer
 #   Claude's first-run confirmation or change settings.
@@ -2595,14 +2595,6 @@ if [ "$RELAUNCH" -eq 1 ]; then
       ;;
   esac
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
-  case "$(fm_meta_get "$RELAUNCH_META" claude_code_mode)" in
-    '' | 0) ;;
-    1) CLAUDE_CODE_MODE=1 ;;
-    *)
-      echo "error: task $ID has an invalid recorded claude_code_mode; expected 0 or 1" >&2
-      exit 1
-      ;;
-  esac
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
   # A secondmate whose endpoint is gone already has ONE owner for that
@@ -3291,6 +3283,17 @@ case "$ARG3" in
   }
   ;;
 esac
+
+if [ "$RELAUNCH" -eq 1 ] && [ "$RAW_LAUNCH" = 0 ] && [ "$HARNESS" = claude ]; then
+  case "$(fm_meta_get "$RELAUNCH_META" claude_code_mode)" in
+    '' | 0) ;;
+    1) CLAUDE_CODE_MODE=1 ;;
+    *)
+      echo "error: task $ID has an invalid recorded claude_code_mode; expected 0 or 1" >&2
+      exit 1
+      ;;
+  esac
+fi
 
 if [ "$CLAUDE_CODE_MODE" = 1 ]; then
   if [ "$KIND" = secondmate ]; then

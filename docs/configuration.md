@@ -1478,7 +1478,7 @@ It is independent of `config/claude-permission-mode`, which still selects only t
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact switches, what stays loaded, and the refusals.
 Regression coverage is [`tests/fm-spawn-claude-lean.test.sh`](../tests/fm-spawn-claude-lean.test.sh).
-`--claude-code-mode` separately opts one Claude worker into experimental Code Mode and preserves that choice on relaunch; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns its environment and refusals.
+`--claude-code-mode` separately opts one Claude worker into experimental Code Mode and preserves that choice on Claude relaunch; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns its environment and refusals.
 
 ## Codex permission mode (config/codex-permission-mode)
 
