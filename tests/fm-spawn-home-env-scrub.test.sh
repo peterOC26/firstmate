@@ -104,10 +104,10 @@ spawn_and_probe() {  # <kind> <allowlist absent|enabled>
       name=${pair%%=*}
       value="$SUPERVISOR/${pair#*=}"
       if [ "$setting" = enabled ]; then
-        value=unset
+        value="unset"
       elif [ "$kind" = secondmate ]; then
         case "$name" in
-          FM_DATA_OVERRIDE | FM_PROJECTS_OVERRIDE | FM_CONFIG_OVERRIDE) value=unset ;;
+          FM_DATA_OVERRIDE | FM_PROJECTS_OVERRIDE | FM_CONFIG_OVERRIDE) value="unset" ;;
         esac
       fi
       assert_contains "$seen" "$name=$value" "$kind, allowlist $setting, $pane_shell: unrelated override changed"
