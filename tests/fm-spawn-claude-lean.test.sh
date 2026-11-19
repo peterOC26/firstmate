@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# tests/fm-spawn-claude-lean.test.sh - opt-in --claude-lean on a Claude launch.
+# tests/fm-spawn-claude-lean.test.sh - Claude lean and Code Mode launch behavior.
 #
 # Assertions drive the real spawn against a fake pane, then execute the launch
 # the pane received with the claude binary replaced by a probe. They never read
-# bin/fm-spawn.sh's source. Absent the flag, the launch must not grow the lean
-# environment, the lean flag, or a claude_lean= record line.
+# bin/fm-spawn.sh's source. Without either opt-in, launches stay free of both
+# postures' environment and task metadata.
 set -u
 
 # shellcheck source=tests/fixtures.sh
