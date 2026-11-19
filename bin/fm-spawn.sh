@@ -230,7 +230,8 @@
 #   identity records project and holder, allocation.json captures get's raw
 #   JSON, then identity gains treehouse_lease_id. A legacy-copy hold refusal
 #   before get removes only this attempt's never-acquired journal. Once get
-#   may have run, it survives until explicit teardown or a safe Herdr/t3code
+#   may have run, it survives until explicit teardown (which also accepts the
+#   id of a spawn that aborted with only this journal) or a safe Herdr/t3code
 #   abort returns the copy with its recorded lease ID and holder. An abort
 #   return requires completed record rollback when needed and no remaining task
 #   metadata.

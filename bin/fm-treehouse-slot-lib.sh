@@ -530,6 +530,12 @@ spawn_return_treehouse_slot() {
 }
 
 # shellcheck disable=SC2153,SC2154
+spawn_treehouse_guarded_release_hint() {
+  echo "Guarded release (bin/fm-teardown.sh's header owns when it returns the lease); if it refuses, follow the manual recovery below:" >&2
+  printf '  FM_HOME=%q bash %q %q\n' "$FM_HOME" "$SCRIPT_DIR/fm-teardown.sh" "$ID" >&2
+}
+
+# shellcheck disable=SC2153,SC2154
 spawn_treehouse_recovery_steps() {
   local journal=$1
   {
@@ -615,6 +621,7 @@ spawn_treehouse_reservation_preflight() {
   else
     if [ -e "$STATE/$ID.treehouse-acquire" ] || [ -L "$STATE/$ID.treehouse-acquire" ]; then
       echo "REFUSED: task $ID has a retained Treehouse acquisition journal; reconcile $STATE/$ID.treehouse-acquire before retrying" >&2
+      spawn_treehouse_guarded_release_hint
       spawn_treehouse_recovery_steps "$STATE/$ID.treehouse-acquire"
       exit 1
     fi
@@ -645,6 +652,7 @@ spawn_abort_retain_treehouse_journal() {
   if [ "$status" -ne 0 ] && [ -n "$TREEHOUSE_ACQUIRE_JOURNAL" ] &&
     [ -d "$TREEHOUSE_ACQUIRE_JOURNAL" ]; then
     echo "warning: retaining Treehouse lease recovery journal $TREEHOUSE_ACQUIRE_JOURNAL; reconcile this acquisition before retrying task $ID" >&2
+    spawn_treehouse_guarded_release_hint
     spawn_treehouse_recovery_steps "$TREEHOUSE_ACQUIRE_JOURNAL"
   fi
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
