@@ -447,6 +447,8 @@
 #   FM_TASK_INBOX export every launch carries (the absolute state/<id>.inbox
 #   path the steering doorbell names). Raw commands must
 #   be POSIX sh compatible under this opt-in; the absent-file path is unchanged.
+#   See docs/configuration.md#worker-launch-environment-configlaunch-env-allowlist
+#   for the pane-backed launch path overrides cleared before execution.
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
 #   See docs/configuration.md for provider/Git setup and supported limits.
@@ -7796,6 +7798,11 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+# A pane can inherit the supervising home's queue and state-path overrides from
+# its backend server, and a worker's test run would then read and write that
+# live home. The worker needs none of them: its status, inbox, and hooks carry
+# explicit paths, and FM_HOME still resolves its own home.
+LAUNCH="export FM_WAKE_QUEUE= FM_WAKE_QUEUE_LOCK= FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE=; $LAUNCH"
 # Same shape as the kill switch above, and only for a lean Claude launch, so
 # an ordinary launch command stays byte-identical. The allowlist pin below
 # sets it again at the env -i boundary.
