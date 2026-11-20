@@ -1,0 +1,35 @@
+Live local scenario: real /usr/bin/gh and synthetic GitHub API over localhost-only HTTPS proxy
+Synthetic PR #239; approved head: c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 ; check ci=SUCCESS; branch rules: none
+
+Stale-head refusal exit: 1
+Stale-head response: error: refusing to merge https://github.com/example/repo/pull/239
+  - the live head is "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1", not the expected head c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2
+Merge mutations before refusal: 0
+
+Approved-head merge exit: 0
+CLI response: verified: https://github.com/example/repo/pull/239 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+verified: https://github.com/example/repo/pull/239 is open and mergeable, with every unwaived required check reported and every unwaived check green at head c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1
+Persisted supervision row: 1795158121	1	check	merged-task-x1-https://github.com/example/repo/pull/239	check: merge landed: task-x1 https://github.com/example/repo/pull/239
+Local API merge mutation:
+  POST /graphql -> 200 GraphQL merge mutation
+Task metadata recreated: False
+Merge poll armed: False
+API requests:
+  CONNECT api.github.com:443 -> localhost emulator
+  POST /graphql -> 200 GraphQL PR read
+  CONNECT api.github.com:443 -> localhost emulator
+  GET /repos/example/repo/branches/main -> 200 branch protection
+  CONNECT api.github.com:443 -> localhost emulator
+  GET /repos/example/repo/rules/branches/main?per_page=100 -> 200 no queue or required rules
+  CONNECT api.github.com:443 -> localhost emulator
+  GET /repos/example/repo/rules/branches/main?per_page=100 -> 200 no queue or required rules
+  CONNECT api.github.com:443 -> localhost emulator
+  CONNECT api.github.com:443 -> localhost emulator
+  POST /graphql -> 200 WorkflowRun introspection
+  POST /graphql -> 200 PR merge preflight introspection
+  CONNECT api.github.com:443 -> localhost emulator
+  POST /graphql -> 200 GraphQL PR read
+  CONNECT api.github.com:443 -> localhost emulator
+  POST /graphql -> 200 GraphQL merge mutation
+  CONNECT api.github.com:443 -> localhost emulator
+  POST /graphql -> 200 GraphQL PR read

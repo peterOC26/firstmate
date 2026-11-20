@@ -1,0 +1,10 @@
+ok - fm-pr-merge --closed-task merges a green PR whose task record is gone
+
+Observed CLI response:
+verified: https://github.com/example/repo/pull/239 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+Observed supervision row:
+1795157282	1	check	merged-task-x1-https://github.com/example/repo/pull/239	check: merge landed: task-x1 https://github.com/example/repo/pull/239
+Observed forge merge request:
+pr merge 239 --repo example/repo --match-head-commit c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1 --squash
+ok - fm-pr-merge --closed-task keeps the head pin, green, attended, queue, hold, and record guards
+Focused driver exit status: 0
