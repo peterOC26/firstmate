@@ -99,16 +99,15 @@
 # the BRANCH OUTCOMES section (bin/fm-wake-drain.sh) presents every
 # unprocessed captain outcome until main acknowledges it. Otherwise the host
 # parks on the successor.
-# Every other outcome exits with the close's own reason line plus one
-# "supervision-host:" line saying why main has this wake, after stopping the
-# successor cycle so main's next turn end starts from the same state as
-# without the host. Whenever the captain returned during an away engine turn
+# Whenever the captain returned during an away engine turn
 # that recorded visible outcomes, handled or not, the return brief was rendered
 # before they existed, so the host exits with the close, one "supervision-host:"
 # line naming them, and one line per visible outcome, for main to relay. The
-# default host injects nothing and has no delivery path of its own; the owner's
-# existing wake path delivers it, unless ACKNOWLEDGED HAND-BACK below adds
-# retries through its detached owner. The default fallback is
+# host returns it through the primary's existing wake path. Every Claude
+# hand-back starts a detached continuation owner: handling mode by default,
+# or ack mode under ACKNOWLEDGED HAND-BACK below. It replaces closed cycles
+# and retries delivery until main begins handling or acknowledges, respectively.
+# The fallback is
 # always to exit with the close's own reason line. That handoff is only a
 # prompt: each non-silent outcome recorded after the return is already a
 # durable queued wake
@@ -119,12 +118,14 @@
 # With that opt-in, every main hand-back first queues a token-bound check and
 # verifies a detached bin/fm-supervision-handoff.sh owner. That owner keeps
 # replacing closed arms until main acknowledges the check, and leaves its
-# verified arm for the next park to take over. Its header owns retry delivery
-# and limits. The home computed below is exported before any child starts.
+# verified arm for the next park to take over. docs/watcher-continuity.md and
+# docs/configuration.md cover retry delivery and limits.
+# The home computed below is exported before any child starts.
 # A shell assignment is not visible to the branch offer or to that owner,
 # the owner stops immediately when FM_HOME is absent, and the offer's own
 # fallback is the repository that contains its script rather than that home.
-# Without the flag all hand-back paths below are unchanged.
+# Without the flag Claude uses handling-mode ownership rather than waiting
+# for acknowledgement; other primaries retain their existing hand-back paths.
 #
 # THE LATCH. An opted-in host persists engine health across short-lived
 # parks; docs/supervision-host.md "The broken-session latch" owns the policy.
@@ -134,8 +135,9 @@
 # stop hook carries the same tracked 28800-second registration, and a host
 # that handles its own wakes is not shortened by them, so the host ends its
 # own park before that timeout: after FM_SUPERVISION_HOST_PARK_SECONDS (default
-# 27000, under the tracked 28800-second registration) it stops this home's
-# watcher and exits with one "supervision-host: cycle boundary" line, which the
+# 27000, under the tracked 28800-second registration) Claude hands watcher
+# coverage to its continuation owner; other primaries stop this home's watcher.
+# It exits with one "supervision-host: cycle boundary" line, which the
 # owner delivers as an ordinary wake; main drains, acknowledges, and ends its
 # turn, and that turn end starts the next park. The verified Codex asynchronous owner sets
 # FM_CODEX_MODEL_FREE_PARK=1: its boundary resets the quiet timer while keeping
@@ -569,7 +571,7 @@ boundary_exit() {
   park_elapsed
   log_line "boundary	after ${PARK_ELAPSED}s"
   away_unsurfaced_inbox_return
-  acknowledged_handback \
+  continuation_handback \
     'supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn' \
     "$AWAY_INBOX_RETURN_LINE"
   retire_arm "$ARM_PID" "$ARM_OUT"
@@ -733,7 +735,9 @@ retire_successor() {
 # Hand the close to main: stop the successor cycle, print the close, why, and
 # any further "supervision-host:" lines, and exit.
 exit_to_main() {  # <why> [further lines]
-  acknowledged_handback "supervision-host: $1" "${2:-}"
+  away_unsurfaced_inbox_return
+  log_line "to-main	$1"
+  continuation_handback "supervision-host: $1" "${2:-}" "$AWAY_INBOX_RETURN_LINE"
   local lines=${2:-} rc=0
   retire_successor
   if [ -n "$SUCCESSOR_GENERATION" ] \
@@ -742,52 +746,66 @@ exit_to_main() {  # <why> [further lines]
     lines=${lines:+$lines$'\n'}"supervision-host: watcher downtime could not be restored for the main hand-back"
     rc=1
   fi
-  log_line "to-main	$1"
-  away_unsurfaced_inbox_return
   emit "supervision-host: $1" "$lines" "$AWAY_INBOX_RETURN_LINE"
   exit "$rc"
 }
 
-# The opt-in path never changes the default hand-back paths. It must verify
-# protection before emitting the close, not assume a detached process started.
-acknowledged_handback() {  # [extra output lines]; returns only when disabled
-  [ "$PRIMARY" = claude ] && [ -e "$CONFIG/supervision-handoff-ack" ] || return 1
+continuation_handback() {
+  [ "$PRIMARY" = claude ] || return 1
   host_still_owner || stand_down "this session no longer owns supervision"
-  local predecessor=${SUCCESSOR_PID:-${ARM_PID:-${CLOSED_ARM_PID:-$HOST_PID}}} pid out deadline tmp
+  local predecessor=${SUCCESSOR_PID:-${ARM_PID:-${CLOSED_ARM_PID:-$HOST_PID}}} pid out deadline tmp token=$GEN mode=handling
   retire_arm "$ARM_PID" "$ARM_OUT"
   ARM_PID=''
   ARM_OUT=''
   retire_successor
-  tmp=$(mktemp "$STATE/.supervision-handoff-pending.XXXXXX") || exit 1
-  printf '%s\n' "$GEN" > "$tmp" && mv -f "$tmp" "$STATE/.supervision-handoff-pending" || exit 1
-  if ! fm_wake_append check "supervision-handoff:$GEN" \
-    "check: supervision-handoff - the host handed supervision to main; drain, handle, and acknowledge this hand-back" \
-    || ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null; then
-    emit "$@" 'supervision-host: the acknowledged hand-back could not be recorded'
+  if [ -e "$CONFIG/supervision-handoff-ack" ]; then
+    mode=ack
+    tmp=$(mktemp "$STATE/.supervision-handoff-pending.XXXXXX") || exit 1
+    printf '%s\n' "$GEN" > "$tmp" && mv -f "$tmp" "$STATE/.supervision-handoff-pending" || exit 1
+    if ! fm_wake_append check "supervision-handoff:$GEN" \
+      "check: supervision-handoff - the host handed supervision to main; drain, handle, and acknowledge this hand-back"; then
+      emit "$@" 'supervision-host: the acknowledged hand-back could not be recorded'
+      exit 1
+    fi
+  fi
+  if ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null \
+    || ! fm_recovery_marker_snapshot "$STATE/.watcher-down"; then
+    log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"
+    emit "$@" 'supervision-host: the hand-back recovery generation could not be recorded'
     exit 1
   fi
-  out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX") || exit 1
-  set -m
-  FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
-    nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$GEN" "$predecessor" > "$out" 2>&1 </dev/null &
-  pid=$!
-  set +m
-  record_process handoff "$pid"
-  deadline=$((SECONDS + READY_TIMEOUT))
-  while fm_pid_alive "$pid" && [ "$SECONDS" -lt "$deadline" ]; do
-    if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" \
-      && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
-      disown "$pid" 2>/dev/null || true
-      forget_process "$pid"
-      rm -f "$out"
-      log_line "handoff	$GEN"
-      emit "$@"
-      exit 0
-    fi
-    sleep 0.2
-  done
-  kill -TERM "$pid" 2>/dev/null || true
+  [ "$mode" = ack ] || token=${FM_RECOVERY_MARKER_TOKEN##*:}
+  if out=$(mktemp "$STATE/.supervision-handoff-start.XXXXXX"); then
+    set -m
+    FM_SUPERVISION_HOST_READY_TIMEOUT="$READY_TIMEOUT" \
+      nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$token" "$predecessor" "$mode" > "$out" 2>&1 </dev/null &
+    pid=$!
+    set +m
+    record_process handoff "$pid"
+    deadline=$((SECONDS + READY_TIMEOUT))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" \
+        && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
+        disown "$pid" 2>/dev/null || true
+        forget_process "$pid"
+        rm -f "$out"
+        log_line "handoff	$GEN"
+        emit "$@"
+        exit 0
+      fi
+      fm_pid_alive "$pid" || break
+      sleep 0.2
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    forget_process "$pid"
+  fi
+  fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   rm -f "$out"
+  if leave_successor_for_main; then
+    emit "$@"
+    exit 0
+  fi
   emit "$@" 'supervision-host: the acknowledged hand-back successor could not be verified'
   exit 1
 }
@@ -1304,6 +1322,7 @@ hand_back_away_inbox_note() {
   [ -n "$inbox_ids" ] || inbox_ids=$carried
   [ -n "$inbox_ids" ] || return 1
   log_line "pass-through	away	main-only (captain inbox note${inbox_ids} queued)	$reason_line"
+  continuation_handback "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   leave_successor_for_main || true
   emit "supervision-host: the captain sent a note and away mode should end (captain inbox note${inbox_ids} queued)"
   exit 0
@@ -1357,7 +1376,7 @@ while :; do
   if ! fm_afk_contract_away_present "$STATE"; then
     if ! attended_acceptor "$(printf '%s\n' "$REASON" | head -n 1)"; then
       log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-      acknowledged_handback
+      continuation_handback
       case "$ATTENDED_WHY" in
         main-only*)
           leave_successor_for_main
@@ -1410,7 +1429,7 @@ while :; do
   HANDLE_RC=$?
   if [ "$HANDLE_RC" -eq 2 ]; then
     log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-    acknowledged_handback
+    continuation_handback
     # The successor this turn already started and confirmed stays up. Retiring
     # it is what left no watcher after a close that became main-only.
     detach_successor

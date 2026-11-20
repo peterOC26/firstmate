@@ -106,8 +106,9 @@ verdict=routine
 [ "$mode" != go-away ] || verdict=captain
 case "$mode" in
   fail) exit 3 ;;
-  handle|captain|captain-close-before-return|held|captain-held|hold-lease|hold-marker|return|return-silent|return-fail|return-fail-silent|return-many|return-lookup-fail|return-first|noack|emptyresult|go-away)
-    case "$mode" in held|captain-held) read -r _ < "$FM_HOME/stub-release" ;; esac
+  handle|captain|captain-close-before-return|held|held-fail|captain-held|hold-lease|hold-marker|return|return-silent|return-fail|return-fail-silent|return-many|return-lookup-fail|return-first|noack|emptyresult|go-away)
+    case "$mode" in held|held-fail|captain-held) read -r _ < "$FM_HOME/stub-release" ;; esac
+    [ "$mode" != held-fail ] || exit 3
     [ "$mode" != return-first ] || "$FM_REPO/bin/fm-afk-contract.sh" archive >> "$FM_HOME/engine-return.log" 2>&1
     [ "$mode" != go-away ] || "$FM_REPO/bin/fm-afk-contract.sh" enter --words 'gone mid-turn' >> "$FM_HOME/engine-return.log" 2>&1
     "$FM_REPO/bin/fm-lease.sh" claim "$task" >> "$FM_HOME/engine-lease.log" 2>&1
@@ -283,6 +284,9 @@ start_host() {  # <home> [park options...]
       done
       "$0" park "$@" > "$FM_HOME/host.out" 2>&1
       printf "%s\n" "$?" > "$FM_HOME/host.rc"
+      if [ "${FM_TEST_HOST_SESSION_HOLD:-0}" = 1 ]; then
+        while [ ! -e "$FM_HOME/session.stop" ]; do sleep 0.1; done
+      fi
     ' "$HOST" "$@" 2>> "$home/claude.err" &
 }
 
@@ -904,10 +908,13 @@ start_session() {  # <home>
 }
 
 
+park_started() { [ -e "$1/host.out" ] && watcher_live "$1"; }
+# A hand-back's continuation owner leaves a watcher live between parks, so a
+# live watcher alone does not prove this park started.
 park_again() {  # <home>
-  rm -f "$1/host.rc"
+  rm -f "$1/host.rc" "$1/host.out"
   : > "$1/park.go"
-  wait_until 150 watcher_live "$1" \
+  wait_until 150 park_started "$1" \
     || fail "the next park never started a watcher cycle: $(cat "$1/host.out"; tail -n 5 "$1/state/.supervision-host.log" 2>/dev/null)"
 }
 

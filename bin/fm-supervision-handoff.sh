@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
-# fm-supervision-handoff.sh <token> <predecessor-arm-pid>
-# Private Claude host hand-back owner, enabled by config/supervision-handoff-ack.
-# The host queues check: supervision-handoff:<token> and starts this detached
-# child before returning its close. Only main's sequence-bound wake-drain ack
-# removes .supervision-handoff-pending. Until then this owner replaces each
-# closed one-shot arm and retries a record-backed watcher doorbell every 300s
-# (FM_SUPERVISION_HANDOFF_RETRY_SECONDS). A retry never consumes queued work.
+# fm-supervision-handoff.sh <token> <predecessor-pid> [ack|handling] owns and
+# replaces watchers until acknowledgement (ack) or a handling receipt (handling),
+# session loss, ownership transfer, or daemon-owned away; ack stops on any .afk.
 # .supervision-handoff-owner records this process's pid and identity. The next
 # host stops it before taking over the arm recorded in .supervision-host-left.
-# Ack and TERM both leave that verified arm for the next park, not a second arm.
+# Ack, a handling receipt, and TERM leave that verified arm for the next park, not a second arm.
 #
 # Automatic delivery uses one inherited endpoint, never a guessed pane. An
 # inherited TMUX_PANE is tried first. Otherwise an inherited Herdr pane
@@ -22,8 +18,6 @@
 # watching but need a normal turn or human message to resume main.
 # No terminal text proves acknowledgement. Busy, unknown, or pending input is
 # never overwritten. The existing backend submit primitive owns Enter retries.
-# Removing the opt-in, losing the pinned session, or entering daemon-backed
-# away mode stops retries and leaves the current arm for its next owner.
 set -u
 umask 077
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,7 +32,11 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-operational-input.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+# shellcheck source=bin/fm-supervision-engine-lib.sh
+. "$SCRIPT_DIR/fm-supervision-engine-lib.sh"
 fm_backend_source tmux || exit 1
+MODE=${3:-ack}
+case "$MODE" in ack|handling) ;; *) exit 2 ;; esac
 TOKEN=${1:-}
 PREDECESSOR=${2:-}
 case "$TOKEN" in ''|*[!A-Za-z0-9._-]*) exit 2 ;; esac
@@ -51,7 +49,7 @@ GRACE=${FM_GUARD_GRACE:-$(fm_poll_derived_grace)}
 RETRY=${FM_SUPERVISION_HANDOFF_RETRY_SECONDS:-300}
 case "$RETRY" in ''|0*|*[!0-9]*) RETRY=300 ;; esac
 fm_session_lock_owned_by_self "$STATE" || exit 1
-[ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ] || exit 1
+[ "$MODE" = handling ] || [ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ] || exit 1
 SESSION=$(cat "$STATE/.lock" 2>/dev/null) || exit 1
 SESSION_ID=$(fm_pid_identity "$SESSION") || exit 1
 [ -n "$SESSION_ID" ] || exit 1
@@ -65,6 +63,11 @@ printf '%s\t%s\n' "$$" "$IDENTITY" > "$tmp" && mv -f "$tmp" "$OWNER" || exit 1
 
 # shellcheck disable=SC2329 # EXIT trap.
 cleanup() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    fm_recovery_continuity_failed "$STATE/.watcher-down" || true
+    printf 'watcher: FAILED - continuation owner could not retain a verified successor\n'
+  fi
   if [ -n "$ARM" ]; then
     if [ "$ARM_RECORDED" -eq 1 ]; then
       disown "$ARM" 2>/dev/null || true
@@ -83,6 +86,25 @@ session_owned() {
   [ "$(cat "$STATE/.lock" 2>/dev/null)" = "$SESSION" ] \
     && fm_pid_alive "$SESSION" \
     && [ "$(fm_pid_identity "$SESSION" 2>/dev/null)" = "$SESSION_ID" ]
+}
+
+handoff_pending() {
+  if [ "$MODE" = handling ]; then
+    # Main's turn end re-arms once handling starts, so a later episode never revives this owner.
+    fm_recovery_handling_observed "$STATE/.watcher-down" "$TOKEN" && return 1
+    if fm_recovery_marker_read "$STATE/.watcher-down"; then
+      TOKEN=${FM_RECOVERY_MARKER_TOKEN##*:}
+    fi
+    ! fm_recovery_handling_observed "$STATE/.watcher-down" "$TOKEN"
+  else
+    [ -e "$CONFIG/supervision-handoff-ack" ] && [ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ]
+  fi
+}
+
+owner_active() {
+  session_owned && { [ ! -e "$STATE/.afk" ] \
+    || { [ "$MODE" = handling ] && fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; }; } \
+    && [ "$(cut -f1 "$OWNER" 2>/dev/null)" = "$$" ]
 }
 
 # Inherited Herdr only. A missing marker, a stopped server, a foreign shell,
@@ -135,14 +157,14 @@ retry_delivery_herdr() {
     printf deferred
     return 0
   }
-  session_owned || { printf deferred; return 0; }
-  [ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ] || { printf deferred; return 0; }
+  owner_active || { printf deferred; return 0; }
+  handoff_pending || { printf deferred; return 0; }
   [ "$(fm_backend_herdr_server_running_state "$session")" = running ] || {
     printf deferred
     return 0
   }
   if fm_operational_record_write "$STATE" watcher \
-    'check: supervision-handoff - the host hand-back is still unacknowledged. Run bin/fm-wake-drain.sh, handle its queued work, and run its exact WAKE_ACK_REQUIRED command. This is automatic supervision, not a captain return.' message; then
+    'check: supervision-handoff - supervision still needs a handling turn. Run bin/fm-wake-drain.sh, handle its queued work, and run its exact WAKE_ACK_REQUIRED command. This is automatic supervision, not a captain return.' message; then
     verdict=$(fm_backend_send_text_submit herdr "$target" "$message" 2 0.2 0.2 2>/dev/null) || verdict=unconfirmed
   fi
   printf '%s' "$verdict"
@@ -166,9 +188,9 @@ retry_delivery() {
       && fm_harness_pid_alive "$SESSION" \
       && [ "$(fm_pane_busy_state "$TMUX_PANE" claude 2>/dev/null)" = idle ] \
       && [ "$(fm_backend_composer_state tmux "$TMUX_PANE" 2>/dev/null)" = empty ] \
-      && session_owned && [ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ]; then
+      && owner_active && handoff_pending; then
       if fm_operational_record_write "$STATE" watcher \
-        'check: supervision-handoff - the host hand-back is still unacknowledged. Run bin/fm-wake-drain.sh, handle its queued work, and run its exact WAKE_ACK_REQUIRED command. This is automatic supervision, not a captain return.' message; then
+        'check: supervision-handoff - supervision still needs a handling turn. Run bin/fm-wake-drain.sh, handle its queued work, and run its exact WAKE_ACK_REQUIRED command. This is automatic supervision, not a captain return.' message; then
         verdict=$(fm_backend_send_text_submit tmux "$TMUX_PANE" "$message" 2 0.2 0.2 2>/dev/null) || verdict=unconfirmed
       fi
     fi
@@ -182,8 +204,15 @@ retry_delivery() {
   fi
 }
 
+arm_closed_cleanly() {
+  ! fm_pid_alive "$ARM" \
+    && wait "$ARM" 2>/dev/null \
+    && grep -Eq '^(signal:|stale:|check:|heartbeat($|:))' "$OUT" \
+    && ! grep -q '^watcher: FAILED' "$OUT"
+}
+
 NEXT_RETRY=$((SECONDS + RETRY))
-while session_owned && [ -e "$CONFIG/supervision-handoff-ack" ] && [ ! -e "$STATE/.afk" ]; do
+while owner_active; do
   OUT=$(mktemp "$STATE/.supervision-handoff-arm.XXXXXX") || exit 1
   # The arm must survive both this owner and the original hook's process group.
   set -m
@@ -192,37 +221,62 @@ while session_owned && [ -e "$CONFIG/supervision-handoff-ack" ] && [ ! -e "$STAT
   ARM_RECORDED=0
   set +m
   deadline=$((SECONDS + ${FM_SUPERVISION_HOST_READY_TIMEOUT:-25}))
+  closed=0
   while ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME" \
     || ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$OUT"; do
-    if ! fm_pid_alive "$ARM" || [ "$SECONDS" -ge "$deadline" ]; then
+    if ! fm_pid_alive "$ARM"; then
+      if arm_closed_cleanly; then
+        closed=1
+        break
+      fi
+      exit 1
+    fi
+    if grep -q '^watcher: FAILED' "$OUT" || [ "$SECONDS" -ge "$deadline" ]; then
+      grep '^watcher: FAILED' "$OUT" || true
       kill -TERM "$ARM" 2>/dev/null || true
       wait "$ARM" 2>/dev/null || true
       exit 1
     fi
     sleep 0.2
   done
-  identity=$(fm_pid_identity "$ARM") || exit 1
-  tmp=$(mktemp "$LEFT.XXXXXX") || exit 1
-  printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" && mv -f "$tmp" "$LEFT" || exit 1
-  [ -f "$LEFT" ] && [ ! -L "$LEFT" ] \
-    && [ "$(cat "$LEFT")" = "$ARM"$'\t'"$identity" ] || exit 1
-  ARM_RECORDED=1
-  if [ "$READY_PRINTED" -eq 0 ]; then
-    grep -E -m1 '^watcher: (started|attached) pid=[0-9]+' "$OUT"
-    READY_PRINTED=1
-  fi
-  while fm_pid_alive "$ARM"; do
-    [ "$(cat "$PENDING" 2>/dev/null)" = "$TOKEN" ] || exit 0
-    session_owned && [ -e "$CONFIG/supervision-handoff-ack" ] && [ ! -e "$STATE/.afk" ] || exit 0
-    if [ "$SECONDS" -ge "$NEXT_RETRY" ]; then
-      retry_delivery
-      NEXT_RETRY=$((SECONDS + RETRY))
+  if [ "$closed" -eq 0 ]; then
+    owner_active || exit 0
+    tmp=
+    if identity=$(fm_pid_identity "$ARM") \
+      && tmp=$(mktemp "$LEFT.XXXXXX") \
+      && printf '%s\t%s\n' "$ARM" "$identity" > "$tmp" && mv -f "$tmp" "$LEFT" \
+      && [ -f "$LEFT" ] && [ ! -L "$LEFT" ] \
+      && [ "$(cat "$LEFT")" = "$ARM"$'\t'"$identity" ]; then
+      ARM_RECORDED=1
+    else
+      [ -z "$tmp" ] || rm -f "$tmp" "$LEFT/${tmp##*/}" 2>/dev/null || true
+      arm_closed_cleanly || exit 1
+      closed=1
     fi
-    sleep 1
-  done
+  fi
+  if [ "$closed" -eq 0 ]; then
+    if [ "$READY_PRINTED" -eq 0 ]; then
+      grep -E -m1 '^watcher: (started|attached) pid=[0-9]+' "$OUT"
+      READY_PRINTED=1
+    fi
+    while fm_pid_alive "$ARM"; do
+      handoff_pending && owner_active || exit 0
+      if [ "$SECONDS" -ge "$NEXT_RETRY" ]; then
+        retry_delivery
+        NEXT_RETRY=$((SECONDS + RETRY))
+      fi
+      sleep 1
+    done
+  fi
   wait "$ARM" 2>/dev/null || true
   PREDECESSOR=$ARM
   ARM=
   rm -f "$OUT"
   OUT=
+  handoff_pending || exit 0
+  if [ "$SECONDS" -ge "$NEXT_RETRY" ]; then
+    retry_delivery
+    NEXT_RETRY=$((SECONDS + RETRY))
+  fi
+  sleep 1
 done

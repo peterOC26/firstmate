@@ -127,10 +127,13 @@ The verdict depends on the supervision model.
 
 Under the Claude Stop auto-arm model a beacon fresh within grace is healthy even with no live watcher process.
 A stale beacon is still healthy while `fm_autoarm_midturn_healthy` in `bin/fm-wake-lib.sh` proves a Claude rewake explains the mid-turn gap.
-That proof requires both of these:
+That proof requires all of these:
 
 - The rewake is bound to the current recovery generation and live session-lock owner.
-- No later watcher beacon or exhausted-failure marker supersedes it.
+- No later watcher beacon or failure marker, including a recorded continuity failure, supersedes it.
+- Main's drain has begun handling that recovery generation, or the rewake is still younger than grace.
+
+A rewake only requests the handling turn, so one without a generation-bound handling receipt past grace is a continuation that never started and alarms.
 
 The tolerance holds because that session's turn-end will re-arm.
 Without that proof a stale or absent beacon is a genuine lapse and alarms.
@@ -625,7 +628,7 @@ It proves that a live foreign owner still prevents arming while repeated non-own
 `tests/fm-guard-stale-banner.test.sh` covers the pull-guard predicate for each supervision model:
 
 - The persistent model's fresh-leftover-beacon negative control.
-- The auto-arm model's healthy fresh-beacon-without-a-watcher case, session-and-recovery-bound long-turn rewake tolerance, independently broken tolerance signals, open-claim negative control, stale-beacon alarm, and isolation from other models.
+- The auto-arm model's healthy fresh-beacon-without-a-watcher case, receipt-bound long-turn rewake tolerance including receipt survival across in-turn appends and the recent undrained-request case, independently broken tolerance signals, open-claim negative control, stale-beacon alarm, and isolation from other models.
 - The extension model's live-watcher path, ownership-qualified fresh hand-off, held-lock failures, independently broken ownership signals, stale-beacon alarm, queued-wake warning, and Pi and pi-signed harness routing.
 
 It also covers true-reason banner wording and reason-keyed episode dedup surviving a beacon mtime change.

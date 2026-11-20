@@ -170,6 +170,20 @@
 # bin/fm-wake-lib.sh. A leased copy that is provably absent follows that
 # contract's missing-copy retirement rule; otherwise teardown retains the
 # lease and records and prints manual recovery steps.
+# A task id with no record but a retained state/<id>.treehouse-acquire
+# journal is a spawn that aborted after acquiring its copy (bin/fm-spawn.sh's
+# header owns the journal). Under the project, control, and spawn locks,
+# teardown returns exactly that journal's lease only when its copy is a
+# recognized pool slot that no task record names, its claim is this task's in
+# this home or absent, no process has its working directory inside it, it has
+# no uncommitted change outside the generated-wiring allowance below, and HEAD
+# is reachable from a remote-tracking branch other than the no-mistakes mirror
+# or, only when no remote-tracking refs exist, from local main or master. It
+# then drops this task's own claim and the journal. When pool state already
+# shows that lease released, or the copy is missing and meets the missing-copy
+# retirement rule, only this task's own claim and the journal go. --force
+# relaxes none of this; anything else keeps the journal, lease, and claim and
+# prints the manual recovery steps.
 # The recorded endpoint's exact task identity and the record's spawn incarnation
 # are validated separately
 # before cleanup. Its current working directory is only incidental process
@@ -575,6 +589,178 @@ teardown_export_records() {  # <state> <task-id>
     }
 }
 
+# Untracked entries Firstmate generates in a task copy; every other change is work.
+TEARDOWN_GENERATED_UNTRACKED_RE='^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)'
+
+# Fix 2 (see script header): pids of every process whose CURRENT WORKING
+# DIRECTORY is exactly $1 or under it, from one bounded system-wide `lsof -a
+# -d cwd` scan (never the recursive +D file-tree walk, which lsof itself
+# documents as slow). Never $$ (this script's own pid). Empty output when
+# nothing matches; failure means the scan could not establish a safe result.
+pids_with_cwd_under() {  # <dir>
+  local dir=$1 out pid path line
+  [ -n "$dir" ] && [ -d "$dir" ] || return 0
+  dir=$(cd "$dir" && pwd -P) || return 1
+  out=$(lsof -a -d cwd -Fpn 2>/dev/null) || return 1
+  [ -n "$out" ] || return 0
+  pid=
+  while IFS= read -r line; do
+    case "$line" in
+      p*)
+        pid=${line#p}
+        case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+        ;;
+      fcwd) [ -n "$pid" ] || return 1 ;;
+      n*)
+        [ -n "$pid" ] || return 1
+        path=${line#n}
+        case "$path" in
+          "$dir"|"$dir"/*)
+            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\n' "$pid"
+            ;;
+        esac
+        ;;
+      '') ;;
+      *) return 1 ;;
+    esac
+  done <<EOF
+$out
+EOF
+}
+
+teardown_journal_refuse() {  # <journal> <reason>
+  echo "REFUSED: $2; keeping task $ID's acquisition journal, lease, and slot claim" >&2
+  spawn_treehouse_recovery_steps "$1"
+  return 1
+}
+
+# The script header owns when an aborted spawn's journal may release its lease.
+teardown_journal_release_locked() {  # <journal> <project>
+  local journal=$1 project=$2 wt lease_id holder home dirty pids unlanded branch remote_refs
+  local -a landed_refs=(--exclude='no-mistakes/*' --remotes)
+  [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] ||
+    teardown_journal_refuse "$journal" "task $ID gained a record; run teardown again" || return
+  [ -d "$journal" ] && [ ! -L "$journal" ] ||
+    teardown_journal_refuse "$journal" "unsafe acquisition journal $journal" || return
+  fm_treehouse_record_lease "$journal/identity" ||
+    teardown_journal_refuse "$journal" "acquisition journal $journal records no single lease identity" || return
+  lease_id=$FM_TREEHOUSE_RECORD_LEASE_ID
+  holder=$FM_TREEHOUSE_RECORD_LEASE_HOLDER
+  home=$(CDPATH='' cd -- "$FM_HOME" && pwd -P) ||
+    teardown_journal_refuse "$journal" "cannot resolve this home" || return
+  case "$holder" in
+    "$home/$ID/"*) ;;
+    *) teardown_journal_refuse "$journal" "lease holder $holder is not this home's task $ID" || return ;;
+  esac
+  [ -f "$journal/allocation.json" ] && [ ! -L "$journal/allocation.json" ] &&
+    wt=$(jq -er '.path | select(type == "string" and startswith("/") and (test("[\\r\\n\\t]") | not))' \
+      "$journal/allocation.json" 2>/dev/null) &&
+    jq -e --arg id "$lease_id" --arg holder "$holder" '.lease_id == $id and .lease_holder == $holder' \
+      "$journal/allocation.json" >/dev/null 2>&1 ||
+    teardown_journal_refuse "$journal" "allocation in $journal does not match its recorded lease" || return
+
+  if [ -d "$wt" ] && fm_treehouse_lease_matches "$wt" "$lease_id" "$holder"; then
+    fm_treehouse_pool_slot "$project" "$wt" ||
+      teardown_journal_refuse "$journal" "leased copy $wt is not a recognized pool slot for $project" || return
+    fm_treehouse_record_exclusive "$STATE" "$wt" ||
+      teardown_journal_refuse "$journal" "a task record names $wt" || return
+    fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine|absent) ;;
+      *) teardown_journal_refuse "$journal" "slot claim on $wt is not task $ID's in this home" || return ;;
+    esac
+    pids=$(pids_with_cwd_under "$wt") ||
+      teardown_journal_refuse "$journal" "cannot list processes working in $wt" || return
+    [ -z "$pids" ] ||
+      teardown_journal_refuse "$journal" "processes are working in $wt: $(printf '%s' "$pids" | tr '\n' ' ')" || return
+    dirty=$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null) ||
+      teardown_journal_refuse "$journal" "cannot inspect $wt for uncommitted changes" || return
+    dirty=$(printf '%s\n' "$dirty" | grep -vE "$TEARDOWN_GENERATED_UNTRACKED_RE" || true)
+    [ -z "$dirty" ] ||
+      teardown_journal_refuse "$journal" "$wt has uncommitted changes" || return
+    remote_refs=$(git -C "$wt" for-each-ref --format='%(refname)' refs/remotes/ 2>/dev/null) ||
+      teardown_journal_refuse "$journal" "cannot inspect $wt for remote-tracking refs" || return
+    if [ -z "$remote_refs" ]; then
+      for branch in main master; do
+        if git -C "$wt" show-ref --verify --quiet "refs/heads/$branch"; then
+          landed_refs+=("refs/heads/$branch")
+          break
+        fi
+      done
+    fi
+    unlanded=$(git -C "$wt" rev-list -n 1 HEAD --not "${landed_refs[@]}" -- 2>/dev/null) ||
+      teardown_journal_refuse "$journal" "cannot inspect $wt for unlanded commits" || return
+    [ -z "$unlanded" ] ||
+      teardown_journal_refuse "$journal" "$wt holds commits on no remote or eligible local default branch" || return
+    (cd "$project" && treehouse return --force "$wt" --if-lease-id "$lease_id" --if-lease-holder "$holder") ||
+      teardown_journal_refuse "$journal" "treehouse return of $wt failed" || return
+    if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then
+      fm_treehouse_slot_owner_release "$wt" "$ID"
+      fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
+      [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] ||
+        teardown_journal_refuse "$journal" "returned $wt but could not drop its slot claim" || return
+    fi
+    echo "teardown: $ID's aborted spawn returned its leased copy $wt"
+  elif [ -d "$wt" ] && fm_treehouse_lease_released "$wt" "$lease_id"; then
+    fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine)
+        fm_treehouse_slot_owner_release "$wt" "$ID"
+        fm_treehouse_slot_owner_state "$wt" "$ID" "$FM_HOME"
+        [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] ||
+          teardown_journal_refuse "$journal" "returned $wt but could not drop its slot claim" || return
+        ;;
+      absent|other) ;;
+      *) teardown_journal_refuse "$journal" "cannot read the slot claim on $wt" || return ;;
+    esac
+    echo "teardown: $ID's aborted spawn lease on $wt was already released"
+  elif fm_treehouse_missing_copy_lease_unheld "$wt" "$lease_id"; then
+    fm_treehouse_missing_copy_release_own_claim "$wt" "$ID" "$FM_HOME" ||
+      teardown_journal_refuse "$journal" "could not drop the slot claim beside missing copy $wt" || return
+    echo "teardown: $ID's aborted spawn copy $wt is gone and no pool entry names it or carries its lease"
+  else
+    teardown_journal_refuse "$journal" "cannot prove the lease on $wt is this journal's and safe to release" || return
+  fi
+  rm -rf -- "$journal" || {
+    echo "error: could not remove acquisition journal $journal" >&2
+    return 1
+  }
+}
+
+teardown_journal_release() {
+  local journal="$STATE/$ID.treehouse-acquire" project project_lock rc=0
+  local spawn_lock="$STATE/.spawn-$ID.lock" control_lock="$STATE/.control-$ID.lock"
+  fm_refuse_if_gate_agent
+  if ! project=$(awk '
+      /^project=/ { count++; value=substr($0,9) }
+      END { if (count == 1 && length(value)) print value; else exit 1 }
+    ' "$journal/identity" 2>/dev/null) ||
+    ! project_lock=$(fm_treehouse_project_lock_path "$project"); then
+    teardown_journal_refuse "$journal" "cannot resolve the project of acquisition journal $journal"
+    return 1
+  fi
+  fm_lock_try_acquire "$project_lock" || {
+    echo "REFUSED: another Treehouse slot allocation or return is in progress for $project; nothing was changed" >&2
+    return 1
+  }
+  if ! fm_lock_try_acquire "$control_lock"; then
+    fm_lock_release "$project_lock" || true
+    echo "error: another lifecycle action is already running for task $ID; nothing was changed" >&2
+    return 1
+  fi
+  if ! fm_lock_try_acquire "$spawn_lock"; then
+    fm_lock_release "$control_lock" || true
+    fm_lock_release "$project_lock" || true
+    echo "REFUSED: a spawn of task $ID is still running; nothing was changed" >&2
+    return 1
+  fi
+  teardown_journal_release_locked "$journal" "$project" || rc=$?
+  fm_lock_release "$spawn_lock" || true
+  fm_lock_release "$control_lock" || true
+  fm_lock_release "$project_lock" || true
+  return "$rc"
+}
+
 if [ "$#" -lt 1 ] || ! fm_task_id_path_safe "$1"; then
   echo "error: invalid teardown request" >&2
   exit 2
@@ -617,6 +803,13 @@ fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
 
 META="$STATE/$ID.meta"
+if [ ! -e "$META" ] && [ ! -L "$META" ] &&
+  { [ -e "$STATE/$ID.treehouse-acquire" ] || [ -L "$STATE/$ID.treehouse-acquire" ]; }; then
+  trap 'fm_lease_guard_release || true' EXIT
+  TEARDOWN_JOURNAL_RC=0
+  teardown_journal_release || TEARDOWN_JOURNAL_RC=$?
+  exit "$TEARDOWN_JOURNAL_RC"
+fi
 TREEHOUSE_PROJECT_LOCK=
 TREEHOUSE_PROJECT_LOCK_HELD=0
 TREEHOUSE_SLOT_LOCK_REQUIRED=0
@@ -2224,7 +2417,7 @@ read_worktree_dirt() {
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
-  dirty=$(printf '%s\n' "$dirty_raw" | grep -vE '^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)' || true)
+  dirty=$(printf '%s\n' "$dirty_raw" | grep -vE "$TEARDOWN_GENERATED_UNTRACKED_RE" || true)
 }
 
 validate_worktree_teardown_safety() {
@@ -2419,42 +2612,6 @@ conclude_task_no_mistakes_run() {  # <worktree>
   fi
   echo "REFUSED: no-mistakes run for $ID is still parked after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown." >&2
   return 1
-}
-
-# Fix 2 (see script header): pids of every process whose CURRENT WORKING
-# DIRECTORY is exactly $1 or under it, from one bounded system-wide `lsof -a
-# -d cwd` scan (never the recursive +D file-tree walk, which lsof itself
-# documents as slow). Never $$ (this script's own pid). Empty output when
-# nothing matches; failure means the scan could not establish a safe result.
-pids_with_cwd_under() {  # <dir>
-  local dir=$1 out pid path line
-  [ -n "$dir" ] && [ -d "$dir" ] || return 0
-  dir=$(cd "$dir" && pwd -P) || return 1
-  out=$(lsof -a -d cwd -Fpn 2>/dev/null) || return 1
-  [ -n "$out" ] || return 0
-  pid=
-  while IFS= read -r line; do
-    case "$line" in
-      p*)
-        pid=${line#p}
-        case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-        ;;
-      fcwd) [ -n "$pid" ] || return 1 ;;
-      n*)
-        [ -n "$pid" ] || return 1
-        path=${line#n}
-        case "$path" in
-          "$dir"|"$dir"/*)
-            [ -n "$pid" ] && [ "$pid" != "$$" ] && printf '%s\n' "$pid"
-            ;;
-        esac
-        ;;
-      '') ;;
-      *) return 1 ;;
-    esac
-  done <<EOF
-$out
-EOF
 }
 
 task_process_identity() {  # <pid>

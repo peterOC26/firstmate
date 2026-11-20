@@ -1905,6 +1905,40 @@ expected=$(printf '%s\n' \
 [ "$deduped" = "$expected" ] || fail "distinct result generations were coalesced or reordered: $deduped"
 pass "pending results preserve numeric order and distinct wake identity"
 
+# --- concurrent first runners share the capture directories they create -----
+# Two extension runners recovered together in a fresh home both find the
+# capture inbox and reservation directories absent; the one that loses the
+# creation race must accept the directory the other just made.
+PREP="$TMP_ROOT/prepare-race"; mkdir -p "$PREP"
+prep_failed=0
+for trial in 1 2 3 4 5; do
+  prep_state="$PREP/state-$trial"
+  mkdir -m 0700 "$prep_state"
+  prep_pids=()
+  for caller in 1 2 3 4 5 6; do
+    bash -c '
+      . "$1/bin/fm-pr-lib.sh"
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-procevent-lib.sh"
+      : > "$3.ready.$4"
+      while [ ! -e "$3" ]; do kill -0 "$5" 2>/dev/null || exit 1; done
+      fm_procevent_capture_inbox_prepare "$2" >/dev/null \
+        && fm_procevent_capture_reservation_prepare "$2" >/dev/null
+    ' _ "$ROOT" "$prep_state" "$PREP/go-$trial" "$caller" "$$" 2>/dev/null &
+    prep_pids+=("$!")
+  done
+  for _ in $(seq 1 300); do
+    [ "$(find "$PREP" -maxdepth 1 -name "go-$trial.ready.*" | wc -l | tr -d ' ')" -eq 6 ] && break
+    sleep 0.05
+  done
+  : > "$PREP/go-$trial"
+  for pid in "${prep_pids[@]}"; do
+    wait "$pid" || prep_failed=$((prep_failed + 1))
+  done
+done
+[ "$prep_failed" -eq 0 ] || fail "a runner that lost the capture directory creation race refused to capture: $prep_failed of 30 calls failed"
+pass "concurrent first runners in a fresh home all prepare the shared capture directories"
+
 # --- two homes cannot both own one canonical source -------------------------
 HA="$TMP_ROOT/ha"; HB="$TMP_ROOT/hb"; new_home "$HA"; new_home "$HB"
 TRIG2="$TMP_ROOT/trigger-two"

@@ -53,21 +53,6 @@
 #     records the failure durably without waking an idle primary. Nothing
 #     shortens a quiet park, because no-change heartbeats are absorbed without
 #     closing the arm.
-#   - Handling successor: Pi, omp, and OpenCode start the next arm before they
-#     deliver an actionable wake, so the fleet stays covered while the model
-#     handles it. After an actionable close, including an attached peer cycle
-#     that ended, this hook starts one successor bin/fm-watch-arm.sh with the
-#     closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID, the same handoff the
-#     Pi extension passes for its closed arm child, so the arm starts a
-#     handling-successor watcher and links the lifecycle ledger. A child of
-#     this hook cannot outlive the exit-2 rewake, so the successor is launched
-#     the one way a process survives a Claude hook: nohup, stdio detached, in
-#     its own process group (the shape bin/fm-startup-network.sh uses;
-#     docs/verification/supervision.md records the survival check). The hook
-#     waits for the successor's one status line, adds one banner line when no
-#     live watcher was confirmed, and never withholds the wake for it; the
-#     next Stop's foreground arm attaches to that live cycle. The supervision
-#     host owns its own successors, so its path is unchanged.
 #   - Supervision host: a home that runs it (by default on this Claude
 #     primary; docs/configuration.md "Supervision host" owns the gate and its
 #     opt-out) runs bin/fm-supervision-host.sh in the arm's place, bound
@@ -267,15 +252,6 @@ if ! fm_session_lock_owned_by_self "$STATE"; then
   RECOVER_SESSION_LOCK=1
 fi
 
-# True when this Claude home runs the supervision host and the posture record
-# is away, not quiet. The host is the away session there. A leftover state/.afk
-# must not leave it unarmed. Quiet mode and a daemon-owned away stay inert.
-away_host_is_actor() {
-  fm_supervision_host_enabled "$CONFIG" claude || return 1
-  [ -e "$STATE/.afk-contract" ] && [ ! -L "$STATE/.afk-contract" ] || return 1
-  [ "$(FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-afk-contract.sh" mode 2>/dev/null || true)" != quiet ]
-}
-
 # A /clear re-keys the session id inside the same process. Ancestry still owns
 # the lock, but this hook does not otherwise call fm-lock.sh, so the sidecar
 # keeps the previous id. Refresh it before arming. A failed refresh still arms,
@@ -292,7 +268,7 @@ refresh_stale_lock_session() {
 # --- AFK: the away daemon owns the watcher and triage; never rewake ----------
 # The supervision host is the away session on a home that runs it, so the
 # daemon flag does not apply there while the posture record is away.
-if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
+if [ -e "$STATE/.afk" ] && ! fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; then
   exit 0
 fi
 
@@ -571,39 +547,60 @@ run_arm() {  # <output file, or empty for none>
 }
 
 # --- handling successor --------------------------------------------------------
-# Start the next arm before the rewake delivers the wake, as the Pi, omp, and
-# OpenCode adapters do from their child-close handlers, so a watcher covers the
-# handling turn instead of the home waiting uncovered for the next Stop. The
-# successor receives the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID; it
-# must outlive this hook's exit, so it is detached three ways: nohup, stdio
-# away from the hook's pipes, and its own process group. Its one status line
-# is awaited within its own short successor budget plus slack - deliberately
-# not the arm's fresh-child backstop, which may run far longer. Sets
-# SUCCESSOR_FAILURE to the banner line for an unconfirmed successor.
+# Start a continuation owner before delivering the rewake. It starts the next
+# arm with the closed arm's pid as FM_WATCH_PREDECESSOR_ARM_PID and replaces
+# closed cycles until main begins handling the recovery generation. If owner
+# startup fails, record failed continuity and try one direct one-shot arm.
+# Both launches use nohup, detached stdio, and their own process group to
+# survive the hook's exit. Each awaits readiness within the successor budget
+# plus slack. SUCCESSOR_FAILURE carries the fallback or unconfirmed-start
+# banner line; neither failure withholds the wake.
 SUCCESSOR_FAILURE=
 start_handling_successor() {  # <closed-arm-pid>
-  local out pid deadline budget line monitor_was_on=0
+  local out pid deadline budget line recovery monitor_was_on=0
+  SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher; continuity failed.'
   budget=${FM_ARM_SUCCESSOR_CONFIRM_TIMEOUT:-30}
   case "$budget" in ''|*[!0-9]*) budget=30 ;; esac
   if ! out=$(mktemp "$STATE/.claude-autoarm-successor.XXXXXX"); then
     SUCCESSOR_FAILURE='The handling successor did not confirm a live watcher (its output file could not be created); this handling turn runs uncovered until the next turn end re-arms.'
     return 1
   fi
-  case $- in *m*) monitor_was_on=1 ;; esac
-  set -m 2>/dev/null || true
-  FM_WATCH_PREDECESSOR_ARM_PID=$1 FM_GUARD_GRACE="$GRACE" \
-    nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
-  pid=$!
-  [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
-  deadline=$(( $(date +%s) + budget + 2 ))
-  while :; do
-    if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
-      rm -f "$out" 2>/dev/null || true
-      return 0
+  fm_recovery_marker_snapshot "$STATE/.watcher-down" || true
+  recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
+  local mode
+  for mode in owner fallback; do
+    : > "$out"
+    case $- in *m*) monitor_was_on=1 ;; esac
+    set -m 2>/dev/null || true
+    if [ "$mode" = owner ]; then
+      FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+        FM_GUARD_GRACE="$GRACE" FM_SUPERVISION_HOST_READY_TIMEOUT="$budget" \
+        nohup "$SCRIPT_DIR/fm-supervision-handoff.sh" "$recovery" "$1" handling >"$out" 2>&1 </dev/null &
+    else
+      FM_GUARD_GRACE="$GRACE" FM_WATCH_PREDECESSOR_ARM_PID="$1" \
+        nohup "$SCRIPT_DIR/fm-watch-arm.sh" >"$out" 2>&1 </dev/null &
     fi
-    grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
-    [ "$(date +%s)" -ge "$deadline" ] && break
-    sleep 0.2
+    pid=$!
+    [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
+    deadline=$(( $(date +%s) + budget + 2 ))
+    while :; do
+      if grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$out" 2>/dev/null; then
+        if [ "$mode" = owner ]; then
+          SUCCESSOR_FAILURE=
+        else
+          SUCCESSOR_FAILURE='The continuation owner failed; a one-shot handling successor is watching.'
+        fi
+        rm -f "$out" 2>/dev/null || true
+        return 0
+      fi
+      grep -q '^watcher: FAILED' "$out" 2>/dev/null && break
+      fm_pid_alive "$pid" || break
+      [ "$(date +%s)" -ge "$deadline" ] && break
+      sleep 0.2
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   done
   line=$(grep '^watcher: FAILED' "$out" 2>/dev/null | head -n 1 || true)
   rm -f "$out" 2>/dev/null || true
@@ -647,7 +644,7 @@ while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   # AFK may have appeared mid-cycle: the daemon owns triage now, so suppress
   # every subsequent classification and handoff. A host that is itself the
   # away session still delivers its hand-back.
-  if [ -e "$STATE/.afk" ] && ! away_host_is_actor; then
+  if [ -e "$STATE/.afk" ] && ! fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; then
     autoarm_record afk
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0
@@ -730,9 +727,9 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 0
   fi
-  # The host owns its own successors and stops its cycle before handing back.
   if [ "$HOST_MODE" -eq 0 ]; then
-    start_handling_successor "$CLOSED_ARM_PID" || true
+    start_handling_successor "$CLOSED_ARM_PID" \
+      || fm_recovery_continuity_failed "$STATE/.watcher-down" || true
   fi
   {
     printf 'firstmate watcher wake - one supervision event needs a handling turn now.\n'

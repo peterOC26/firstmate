@@ -9,7 +9,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | --- | --- |
 | Firstmate's code, private files, or project location | [FM_HOME](#fm_home) and [operational home layout](#operational-home-layout-and-state) |
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
-| Worker permissions, accounts, or environment | [Codex approval review](#codex-automatic-approval-review), [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude lean launch](#claude-lean-launch), [Codex permission mode](#codex-permission-mode-configcodex-permission-mode), [persistent managed-policy failover](#persistent-managed-policy-failover), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [several Claude accounts](#several-claude-accounts-configclaude-accounts), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and its [Orca environment source](#orca-environment-source-configlaunch-env-tmux-session) |
+| Worker permissions, accounts, or environment | [Codex approval review](#codex-automatic-approval-review), [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launch options](#claude-launch-options), [Codex permission mode](#codex-permission-mode-configcodex-permission-mode), [persistent managed-policy failover](#persistent-managed-policy-failover), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [several Claude accounts](#several-claude-accounts-configclaude-accounts), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist), and its [Orca environment source](#orca-environment-source-configlaunch-env-tmux-session) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), [external memory tiers](#external-memory-tiers-memory-layering-section), [record export](#record-export-configrecord-export-root), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [standing away words](#standing-away-words-configafk-words), [Codex native Stop park](#codex-native-stop-park-configcodex-stop-park), [warm-cache compaction](#warm-cache-compaction-configwarm-compact), and [Calm preference](#calm-preference-configcalm) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -614,9 +614,11 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 - Every new task records `endpoint_task_id=` as the cleanup binding between the metadata filename and its opaque runtime endpoint.
 
 - Treehouse-backed ships and scouts additionally record `treehouse_lease_id=` and `treehouse_lease_holder=` for the durable acquisition; [the shared ownership contract](../bin/fm-wake-lib.sh) owns their lifetime, legacy-record preflight, and identity rules.
-  [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release and records-only reconciliation.
+  [Spawn's header](../bin/fm-spawn.sh) owns the persistent `state/<id>.treehouse-acquire/` recovery journal and retry behavior, while [teardown's header](../bin/fm-teardown.sh) owns conditional release, records-only reconciliation, and guarded recovery from a journal without a task record.
   These fields do not apply to Orca or replace the existing secondmate home-seed lease contract.
-  For an aborted acquisition, follow the manual recovery instructions printed by spawn or a refused same-task retry; `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns that procedure.
+  When an aborted acquisition leaves no task record, satisfy any backend-specific cleanup requirement first; the [Herdr](herdr-backend.md) and [T3 Code](t3code-backend.md) guides own their respective checks.
+  Then run the guarded teardown command printed by spawn or a refused same-task retry; if teardown refuses, keep the lease, journal, and claim and follow the recovery guidance for the reported reason.
+  `spawn_treehouse_recovery_steps` in [the spawn script](../bin/fm-spawn.sh) owns those instructions.
   Remember that finished or exited tasks still retain their records.
 
 - A herdr task additionally records `herdr_session=`, `herdr_workspace_id=`, `herdr_tab_id=`, and `herdr_pane_id=`.
@@ -647,9 +649,11 @@ Backend guides and other documents refer here instead of restating the resolutio
 
 ### Teardown identity checks
 
-`fm-teardown.sh <id>` takes a task id directly and validates the complete metadata-only endpoint identity before any runtime dispatch or cleanup mutation.
+When `state/<id>.meta` exists, `fm-teardown.sh <id>` validates the complete metadata-only endpoint identity before any runtime dispatch or cleanup mutation.
 Missing, empty, duplicate, malformed, backend-inconsistent, or task-mismatched endpoint records are preserved and refused.
 When the worktree identity is missing, empty, or ambiguous, the refusal also explains how to identify the held copy and restore exactly one `worktree=` line without changing the record automatically.
+
+When the task record is absent but `state/<id>.treehouse-acquire/` remains, `fm-teardown.sh <id>` takes the guarded journal-only recovery path described in [its header](../bin/fm-teardown.sh), without runtime endpoint dispatch.
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.
 
@@ -1466,7 +1470,7 @@ T3 Code owns its provider command and always uses `full-access`, so `backend=t3c
 
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the permission-mode observations and the distinct startup dialogs.
 
-## Claude lean launch
+## Claude launch options
 
 `--claude-lean` is an opt-in flag on `bin/fm-spawn.sh` for one Claude worker.
 Pass it when a short plan or code check should use the five-minute prompt cache and start without MCP servers or auto memory.
@@ -1478,6 +1482,7 @@ It is independent of `config/claude-permission-mode`, which still selects only t
 
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact switches, what stays loaded, and the refusals.
 Regression coverage is [`tests/fm-spawn-claude-lean.test.sh`](../tests/fm-spawn-claude-lean.test.sh).
+Claude Code's [experimental Code Mode documentation](https://code.claude.com/docs/en/code-mode) describes its requirements and behavior; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) documents Firstmate's `--claude-code-mode` launch option.
 
 ## Codex permission mode (config/codex-permission-mode)
 
@@ -1733,7 +1738,9 @@ The flag is read only for ship and scout spawns, secondmate charters never take 
 
 The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
 T3 Code starts the provider from the server's environment and cannot apply this command boundary, so `backend=t3code` refuses when the file exists; [`t3code-backend.md`](t3code-backend.md#active-limits) owns that backend limit.
-With no file, ambient inheritance remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+With no file, ambient inheritance otherwise remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+Pane-backed launches always clear inherited `FM_WAKE_QUEUE`, `FM_WAKE_QUEUE_LOCK`, `FM_ROOT_OVERRIDE`, and `FM_STATE_OVERRIDE`.
+This scrub leaves `FM_HOME` untouched, though an enabled allowlist still controls whether it reaches the worker, so worker test suites can establish their own queue and state paths without inheriting supervisor overrides.
 
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
@@ -1760,7 +1767,7 @@ SSH_AUTH_SOCK
 ### Variables retained and where values come from
 
 Firstmate retains basic home, executable search, terminal, locale, temporary-directory, and backend routing variables, plus its explicit launch assignments, its ship and scout task marker, the compact-adviser kill switch described below, and enabled task trace.
-For the lean-launch environment exception, see [Claude lean launch](#claude-lean-launch).
+For the lean-launch environment exception, see [Claude launch options](#claude-launch-options).
 The allowlist floor also retains Tern block markers `TERN_IDENTITY`, `TERN_PANE`, `TERN_PANE_SOCKET`, `TERN_WINDOW_KEY`, and `TERN_WINDOW_SOCKET` so a worker's own Tern/TSP integration survives `env -i`.
 It retains `HC_SESSION`, `HC_TERMINAL_ID`, `HC_TERMINAL_SOCKET`, and `HC_SCOPE` the same way, so a worker in an hc terminal still reports its status to herdr-core.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the exact retained names and parsing mechanics.
@@ -1810,7 +1817,7 @@ Raw launch commands run under noninteractive POSIX `sh` with this option and mus
 The filter runs at the worker command boundary, after the terminal daemon and pane shell have started; it does not scrub either of those processes.
 This is not a sandbox: it cannot revoke same-user access to credential files, prevent tools or later shells from loading credentials again, or isolate processes from the same user's other processes.
 
-Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh), and the Orca environment source in [`tests/fm-spawn-orca-worktree.test.sh`](../tests/fm-spawn-orca-worktree.test.sh).
+Regression coverage executes emitted launch commands with synthetic nonsecret values in [`tests/fm-spawn-dispatch-profile.test.sh`](../tests/fm-spawn-dispatch-profile.test.sh), checks pane-backed home-path scrubbing in [`tests/fm-spawn-home-env-scrub.test.sh`](../tests/fm-spawn-home-env-scrub.test.sh), and checks the Orca environment source in [`tests/fm-spawn-orca-worktree.test.sh`](../tests/fm-spawn-orca-worktree.test.sh).
 
 ### Compact adviser setting
 
@@ -3569,7 +3576,7 @@ FM_SUPERVISION_HOST_PARK_SECONDS=27000   # the host ends its park with a cycle-b
 FM_SUPERVISION_HOST_TURN_TIMEOUT=1200    # bound on one engine turn; a turn that hits it hands its wake to main
 FM_SUPERVISION_HOST_ROTATE_TURNS=20      # the engine conversation starts fresh after this many turns (and at every main session start)
 FM_SUPERVISION_ENGINE_GRACE=30           # seconds between TERM and KILL when an engine turn is stopped
-FM_SUPERVISION_HANDOFF_RETRY_SECONDS=300 # with config/supervision-handoff-ack, seconds between the detached owner's delivery retries of an unacknowledged hand-back
+FM_SUPERVISION_HANDOFF_RETRY_SECONDS=300 # seconds between Claude hand-back retries while awaiting main handling or acknowledgement
 # spoken interface and captain inbox; see "Spoken interface and captain inbox" above
 FM_VOICE_REGION=        # overrides config/voice-region for one relay run
 FM_VOICE_MODEL=         # overrides config/voice-model for one relay run

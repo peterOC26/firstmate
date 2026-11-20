@@ -745,7 +745,7 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
   append_status "$home" 'which export format?' needs-decision
   wait_until_deadline 60 hook_exited "$home" || fail "unrecorded successor: the decision close never reached the Stop hook: $(cat "$home/state/.supervision-host.log")"
   assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "fixture: the close was not a main-only pass-through"
-  assert_re '	pass-through	successor-unrecorded	signal:' "$home/state/.supervision-host.log" "unrecorded successor: the failed record was not logged"
+  [ -s "$home/state/.watcher-down.continuity-failed" ] || fail "unrecorded successor: failed continuity was not recorded"
   assert_rewoke_main "$home" "unrecorded successor (pass-through)"
   assert_re '^signal: .*demo.status' "$home/hook.err" "unrecorded successor: the close must carry the watcher's reason line"
   wait_until 100 no_home_arms "$home" || fail "unrecorded successor: an arm outlived the host:"$'\n'"$(home_arms "$home")"

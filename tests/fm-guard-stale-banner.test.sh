@@ -82,6 +82,7 @@ record_aged_rewake_epoch() {
   printf 'epoch=7 owner_pid=1 outcome=rewake updated_at=1 session_pid=%s recovery_generation=%s\n' \
     "$session_pid" "$recovery" > "$home/state/.claude-autoarm-epoch"
   printf 'acked:handling:%s\n' "$recovery" > "$home/state/.watcher-down"
+  printf '%s\n' "$recovery" > "$home/state/.watcher-down.handling"
   touch -t 201901010000 "$home/state/.last-watcher-beat"
   touch -t 202001010000 "$home/state/.claude-autoarm-epoch"
 }
@@ -486,12 +487,38 @@ test_autoarm_long_handling_turn_stays_silent() {
   pass "fm-guard stale banner: auto-arm long handling turn with a healthy rewake stays silent"
 }
 
+test_autoarm_handling_receipt_survives_append() {
+  local dir home out pid
+  dir=$(make_guard_case autoarm-handling-append)
+  home=$(case_home "$dir")
+  sleep 60 &
+  pid=$!
+  record_aged_rewake_epoch "$home" "$pid"
+  record_session_lock_pid "$home" "$pid"
+  rm -f "$home/state/.watcher-down.handling"
+  printf 'pending:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+  FM_HOME="$home" bash -c '
+    . "$1"
+    FM_SUPERVISION_ACTOR=branch fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down" || exit 1
+    [ ! -e "$FM_HOME/state/.watcher-down.handling" ] || exit 1
+    fm_recovery_marker_begin_handling "$FM_HOME/state/.watcher-down" || exit 1
+    fm_wake_append check midturn "check: appended during handling" || exit 1
+    fm_recovery_marker_read "$FM_HOME/state/.watcher-down" || exit 1
+    [ "$FM_RECOVERY_MARKER_TOKEN" = pending:downtime:guard-test-generation ]
+  ' _ "$ROOT/bin/fm-wake-lib.sh" || fail "handling then append did not preserve the recovery generation"
+  out=$(run_guard_case_autoarm "$dir")
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  assert_not_contains "$out" "WATCHER DOWN - SUPERVISION IS OFF" "observed handling must survive a later append past grace"
+  pass "fm-guard: generation-bound handling survives an in-turn append"
+}
+
 # Drive the long-turn signals apart on the same stale beacon. Losing any one
 # healthy-generation signal must restore the banner; the stale beacon alone
 # is not enough to stay quiet, and adding a failure marker is not either.
 test_autoarm_long_turn_requires_every_healthy_signal() {
   local dir home out pid replacement_pid='' case_name
-  for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon; do
+  for case_name in no-epoch failed-outcome failure-notified failure-alarmed dead-lock missing-lock changed-lock moved-recovery later-beacon never-drained never-drained-announced branch-only continuity-failed; do
     dir=$(make_guard_case "autoarm-long-turn-$case_name")
     home=$(case_home "$dir")
     sleep 60 &
@@ -531,6 +558,22 @@ test_autoarm_long_turn_requires_every_healthy_signal() {
       later-beacon)
         touch -t 202101010000 "$home/state/.last-watcher-beat"
         ;;
+      never-drained)
+        rm -f "$home/state/.watcher-down.handling"
+        printf 'pending:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+        ;;
+      never-drained-announced)
+        rm -f "$home/state/.watcher-down.handling"
+        printf 'announced:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+        ;;
+      branch-only)
+        rm -f "$home/state/.watcher-down.handling"
+        ;;
+      continuity-failed)
+        rm -f "$home/state/.watcher-down.handling"
+        printf 'guard-test-generation\n' > "$home/state/.watcher-down.continuity-failed"
+        touch "$home/state/.claude-autoarm-epoch"
+        ;;
     esac
     out=$(run_guard_case_autoarm "$dir")
     [ -z "$pid" ] || kill "$pid" 2>/dev/null || true
@@ -544,6 +587,26 @@ test_autoarm_long_turn_requires_every_healthy_signal() {
       "a genuine auto-arm lapse with $case_name must still name the stale beacon"
   done
   pass "fm-guard stale banner: every auto-arm long-turn healthy signal is load-bearing"
+}
+
+# A rewake younger than grace whose handling turn has not drained yet is still
+# starting, so its downtime marker alone must not alarm.
+test_autoarm_recent_undrained_rewake_stays_silent() {
+  local dir home out pid
+  dir=$(make_guard_case autoarm-recent-undrained)
+  home=$(case_home "$dir")
+  sleep 60 &
+  pid=$!
+  record_aged_rewake_epoch "$home" "$pid"
+  record_session_lock_pid "$home" "$pid"
+  printf 'pending:downtime:guard-test-generation\n' > "$home/state/.watcher-down"
+  touch "$home/state/.claude-autoarm-epoch"
+  out=$(run_guard_case_autoarm "$dir")
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  [ -z "$out" ] \
+    || fail "a rewake still inside grace must not alarm before its turn drains, got: $out"
+  pass "fm-guard stale banner: an undrained auto-arm rewake inside grace stays silent"
 }
 
 # An open arming claim is between-turn startup, not evidence that the current
@@ -1015,7 +1078,9 @@ test_autoarm_fresh_beacon_without_watcher_is_healthy
 test_autoarm_stale_beacon_alarms_with_correct_reason
 test_autoarm_stale_episode_is_stable
 test_autoarm_long_handling_turn_stays_silent
+test_autoarm_handling_receipt_survives_append
 test_autoarm_long_turn_requires_every_healthy_signal
+test_autoarm_recent_undrained_rewake_stays_silent
 test_autoarm_open_claim_does_not_explain_stale_beacon
 test_autoarm_long_turn_does_not_silence_other_models
 test_persistent_no_watcher_banner_names_missing_process
