@@ -602,7 +602,16 @@ A leftover `state/.afk` flag declines nothing.
 It does so only while `bin/fm-afk-contract.sh validate` succeeds on a complete, readable, live away record (`mode` is not quiet).
 An archived, incomplete, invalid, or quiet record restores the attended refusal byte for byte.
 
-The captain's away words are the whole mandate:
+While the away record exists, two actions use MAIN's standing authority without an away-word or task-note grant:
+
+- When an existing job reports its current stage done, the branch checks its brief and current task state.
+  If the stage has not already advanced, it relaunches into the next stage declared in the brief with `bin/fm-control.sh <task> relaunch --note <next declared stage>`.
+  The command's own refusals are the guard: the supervision lease guard, the safe checkpoint, and the required `--note` for a ship or scout.
+  Any undeclared stage or unresolved captain decision waits for the return.
+- The branch answers an ask-user finding with `bin/fm-send.sh --resolve-key` when the ask-user-authority policy lets firstmate decide it.
+  A finding the policy says to escalate is reported with verdict captain and left for the return.
+
+For actions authorized by the captain's away words:
 
 - The branch reads them at the tail.
 - It decides by its own judgment whether the event in front of it is the moment they name.
