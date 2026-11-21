@@ -26,7 +26,7 @@ Hold-for-return is the default and the only reach profile this release records: 
    Before any other work, run `bin/fm-afk-launch.sh enter --words-file <path> [--expected-return <UTC ISO 8601>] [--spend <n>]` (or `--words <text>`).
    It writes `state/.afk-contract` at once, with no separate confirmation step, then prints the entry announcement and the record's read-back.
    For an away record it then prints the read-only entry inventory; a quiet entry does not.
-   `bin/fm-afk-contract.sh` records the captain's away words verbatim as free text, and no script parses the words.
+   `bin/fm-afk-contract.sh` records the captain's away words verbatim as free text; by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
    Read `bin/fm-afk-contract.sh --help` for the flags rather than memorizing them.
    When `/afk` brings no new words, omit both word-input flags so the script can apply the [standing away words policy](../../../docs/configuration.md#standing-away-words-configafk-words).
    Re-invoking `/afk` while already away with no new words refreshes the posture and leaves the standing record untouched.

@@ -216,7 +216,7 @@ On every verified primary harness, tracked hook integration gives the primary se
 The guard covers the main primary and genuinely marked secondmate homes, exempts child crewmate/scout worktrees, is loop-safe per harness, and is documented in [turnend-guard.md](turnend-guard.md).
 
 Away mode is a posture of the one supervision session, recorded in `state/.afk-contract` by `bin/fm-afk-contract.sh` in the same turn as `/afk` with no wait for a further go, read back in plain sentences only after entry, and announced at entry as hold-for-return only because no phone channel exists.
-The record owner `bin/fm-afk-contract.sh` owns the away record schema, stores the captain's words verbatim, and does not parse them.
+The record owner `bin/fm-afk-contract.sh` owns the away record schema, stores the captain's words verbatim; by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
 The [Pi branch authority relocation](pi-supervision-branch.md#authority-relocation) documents the split between word-authorized actions, the two actions under MAIN's standing authority, task-note grants, and their per-action gates; `bin/fm-branch-prompt.sh` "Postures" owns the execution rules.
 Destructive, irreversible, and security-sensitive actions remain outside away authority.
 Daemon-backed quiet mode writes the same record marked quiet; `bin/fm-afk-contract.sh` owns the mode reading, and the supervision host treats a quiet record without a daemon as attended, delivering captain outcomes to the present captain.

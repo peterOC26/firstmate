@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/fm-afk-contract.test.sh - the away-posture record owner
-# (bin/fm-afk-contract.sh): the captain's away words recorded verbatim as the
-# whole mandate, the read-back rendering, the entry announcement (hold-for-
+# (bin/fm-afk-contract.sh): the captain's away words recorded verbatim as
+# free text, the read-back rendering, the entry announcement (hold-for-
 # return only), the one-step same-turn entry with no wait for a go, the
 # retired two-step entry refusing by name, the refresh and replace rules,
 # the archive at return, the version 2 record with version 1 still readable,
