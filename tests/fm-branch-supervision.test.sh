@@ -82,7 +82,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
 }
 
 test_branch_prompt_emits_pending_decision_review_contract() {
-  local surface prompt
+  local surface prompt away
   # Exercise the emitted contract on both public report surfaces. These
   # assertions verify instructions reach the model, not model adherence.
   for surface in pi host; do
@@ -128,10 +128,24 @@ test_branch_prompt_emits_pending_decision_review_contract() {
       "A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation. A new artifact, finding, or result, a changed waiting reason, pending decision, blocker, or next action, or recurrence after resolution does." \
       "$surface prompt does not distinguish duplicate wakes from material changes"
     assert_contains "$prompt" \
-      "When in doubt, render." \
-      "$surface prompt omits the fallback to rendering when uncertain"
+      "Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy." \
+      "$surface prompt permits task or heartbeat silence over a pending hold"
+    away=${prompt#*'Away (the record exists):'}
+    away=${away%%'# Discipline'*}
+    assert_contains "$away" 'without an away-word or task-note grant' \
+      "$surface away prompt requires extra authority for standing actions"
+    assert_contains "$away" \
+      "\`bin/fm-control.sh <task> relaunch\`: when an existing job reports its current stage done" \
+      "$surface away prompt omits relaunch after a completed stage"
+    assert_contains "$away" 'use the existing rule guard to relaunch it into the next stage declared in the brief' \
+      "$surface away prompt permits relaunch outside the declared stages or rule guard"
+    assert_contains "$away" \
+      "\`bin/fm-send.sh --resolve-key\`: answer an ask-user finding when the ask-user-authority policy" \
+      "$surface away prompt omits policy-authorized keyed answers"
+    assert_contains "$away" 'Report a finding the policy says to escalate with verdict captain and leave it for the return.' \
+      "$surface away prompt omits the hold for findings that require escalation"
   done
-  pass "both emitted prompts include pending-decision review and escalation comparison instructions"
+  pass "both emitted prompts include pending-decision review, escalation comparison, and away standing authority"
 }
 
 # A home adds its own rules through config/branch-prompt-include.md: absent or
