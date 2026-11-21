@@ -1,0 +1,23 @@
+Live synthetic evaluation of the generated supervision-host prompt through the production Claude Sonnet engine turn.
+Scenario: unchanged captain hold
+Input history: {"seq":1,"epoch":1795255150,"task":"sydney-restore","wake":"","verdict":"captain","summary":"Sydney restore remains paused awaiting the captain choice between snapshot A and snapshot B; no restore action.","silent":false,"statusEndpoint":98,"statusIdent":"strong:38:11967001:2026-11-21 10:59:10.586727040 +0100"};{"seq":2,"epoch":1795255156,"task":"sydney-restore","wake":"signal: sydney-restore still waits for the same captain choice; no new facts","verdict":"routine","summary":"Sydney restore still paused awaiting the captain's choice between snapshot A and B; nothing new, no action taken.","silent":true,"statusEndpoint":98,"statusIdent":"strong:38:11967001:2026-11-21 10:59:10.586727040 +0100"};
+Claude response: I handled the sydney-restore wake and recorded one silent routine outcome.
+
+The restore is still paused waiting for the captain to pick snapshot A or snapshot B. The newest earlier outcome for this task was already a captain report with the same decision, so I added nothing for the captain. I took no action on the task.
+
+I ran the acknowledgement command the drain printed. I claimed no leases, so there was nothing to release.
+Persisted result: {"seq":2,"epoch":1795255156,"task":"sydney-restore","wake":"signal: sydney-restore still waits for the same captain choice; no new facts","verdict":"routine","summary":"Sydney restore still paused awaiting the captain's choice between snapshot A and B; nothing new, no action taken.","silent":true,"statusEndpoint":98,"statusIdent":"strong:38:11967001:2026-11-21 10:59:10.586727040 +0100"}
+Host receipt: unchanged-turn	2	routine	sydney-restore
+Wake row acknowledgement: empty; branch grant: consumed
+Scenario: new green CI result after an intervening routine row
+Durable history (captain, then red-CI routine): {"seq":1,"epoch":1795255228,"task":"ci-recovery","wake":"","verdict":"captain","summary":"Pull request is ready and waiting on the captain decision.","silent":false,"statusEndpoint":131,"statusIdent":"strong:38:11967947:2026-11-21 11:00:28.497624721 +0100"};{"seq":2,"epoch":1795255228,"task":"ci-recovery","wake":"","verdict":"routine","summary":"CI went red after rebase and the worker is fixing it.","silent":false,"statusEndpoint":131,"statusIdent":"strong:38:11967947:2026-11-21 11:00:28.497624721 +0100"};
+Claude response: I recorded one captain-verdict outcome for `ci-recovery`. CI is green again after the rebase, and the pull request is still waiting on the captain's same approval. No PR URL was available in the records I read, so the summary doesn't include one.
+
+The newest earlier outcome was routine (CI red, worker fixing it), so the green result counts as new. I took no action on the task.
+
+The report command printed "recorded seq 3 [captain]". The acknowledgement command that followed printed nothing, so I can't confirm it consumed the wake.
+
+I claimed no lease because I changed nothing on the task.
+Persisted result: {"seq":3,"epoch":1795255236,"task":"ci-recovery","wake":"signal: CI is green again; ci-recovery is waiting for the captain","verdict":"captain","summary":"CI is green again after the rebase; the pull request is ready and still waiting on the captain's same approval.","silent":false,"statusEndpoint":131,"statusIdent":"strong:38:11967947:2026-11-21 11:00:28.497624721 +0100"}
+Host receipt: changed-turn	3	captain	ci-recovery
+Wake row acknowledgement: empty; branch grant: consumed
