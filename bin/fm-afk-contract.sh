@@ -31,8 +31,8 @@
 # The read-back is printed after the record exists; it is informational, never a
 # gate, and never asks for a go.
 #
-# THE RECORD IS THE WORDS. The captain's away words are the whole mandate: they
-# are recorded verbatim, read back as plain sentences by firstmate after entry,
+# THE RECORD IS THE WORDS. The captain's away words are recorded verbatim, read
+# back as plain sentences by firstmate after entry,
 # and acted on by the supervision session's own judgment at the
 # moment an event makes them relevant, through the guarded scripts and under the
 # standing authority it already has (bin/fm-branch-prompt.sh "Postures" owns the
@@ -592,7 +592,7 @@ fm_afk_contract_parse_inputs() {  # <args...>; sets WORDS, EXPECTED_RETURN, SPEN
         FM_AFK_CONTRACT_SCALARS_GIVEN=1
         shift 2 ;;
       --action|--object|--when|--stop|--grant|--grant=*)
-        fm_afk_contract_log "$1 was retired: the captain's away words are the whole mandate, so pass them with --words or --words-file and nothing else"
+        fm_afk_contract_log "$1 was retired: the captain's away words are recorded verbatim as free text, so pass them with --words or --words-file and nothing else"
         return 2 ;;
       *)
         fm_afk_contract_log "unknown option '$1'"

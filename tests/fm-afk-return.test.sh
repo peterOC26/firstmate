@@ -449,9 +449,9 @@ test_return_brief_composes_from_record_store_and_held_set() {
   [ "$health_line" -lt "$words_line" ] && [ "$words_line" -lt "$waiting_line" ] && [ "$waiting_line" -lt "$failed_line" ] \
     || fail "the brief sections are out of order (health $health_line, instructions $words_line, waiting $waiting_line, failed $failed_line)"
   assert_contains "$out" $'  your words at entry:\n    merge the windows fix when green, then cut a prerelease\n    if the install deadlocks abort the competing run\n' "the captain's verbatim words were not carried into the brief"
-  assert_contains "$out" $'  the away session acted on them:\n    - fix-windows: per your away instructions: merged the windows fix PR once checks went green\n    - prerelease: per your away instructions: filed and dispatched the prerelease cut; it needs your review\nWaiting on you:\n' "the session's account listed something other than exactly the two actions taken under the words"
-  assert_not_contains "$out" $'acted on them:\n    - other:' "an outcome that did not cite the words was listed as an action under them"
-  assert_not_contains "$out" $'acted on them:\n    - held-note:' "a summary opening with the marker's words but no colon was listed as an action under them"
+  assert_contains "$out" $'  the away session acted under your instructions or standing authority:\n    - fix-windows: per your away instructions: merged the windows fix PR once checks went green\n    - prerelease: per your away instructions: filed and dispatched the prerelease cut; it needs your review\nWaiting on you:\n' "the session's account listed something other than exactly the two actions taken under the words"
+  assert_not_contains "$out" $'acted under your instructions or standing authority:\n    - other:' "an outcome that did not cite the words was listed as an action under them"
+  assert_not_contains "$out" $'acted under your instructions or standing authority:\n    - held-note:' "a summary opening with the marker's words but no colon was listed as an action under them"
   assert_not_contains "$out" 'still building' "the return brief rendered a silent routine outcome"
   assert_not_contains "$out" 'not executed' "the brief still calls the words inert"
   assert_not_contains "$out" 'clause' "the brief still speaks of clauses"
@@ -503,6 +503,12 @@ test_return_brief_points_at_the_drain_on_a_host_home_only() {
     mkdir -p "$fakebin"
     ln -s /bin/bash "$fakebin/$harness"
     contract_in "$dir" enter --words 'watch the fleet' >/dev/null 2>&1 || fail "could not record the away posture"
+    outcome_in "$dir" append --task staged --verdict routine \
+      --summary 'on standing away authority: advanced to the declared review stage' >/dev/null || fail "could not seed stage advance"
+    outcome_in "$dir" append --task finding --verdict captain \
+      --summary 'on standing away authority: answered the policy-decided finding' >/dev/null || fail "could not seed policy answer"
+    outcome_in "$dir" append --task silent --verdict routine --silent true \
+      --summary 'on standing away authority: silent fixture' >/dev/null || fail "could not seed silent row"
     for n in 1 2 3 4 5 6; do
       outcome_in "$dir" append --task demo --verdict routine --summary "routine $n" >/dev/null || fail "could not seed routine $n"
     done
@@ -512,9 +518,12 @@ test_return_brief_points_at_the_drain_on_a_host_home_only() {
     # shellcheck disable=SC2016 # the single-quoted script expands in the harness shell
     out=$(FM_HOME="$dir/home" FM_STATE_OVERRIDE="$dir/home/state" FM_CONFIG_OVERRIDE="$dir/home/config" \
       "$fakebin/$harness" -c '"$0" begin 2>&1' "$dir/bin/fm-afk-return.sh") || fail "$harness: the return did not clear: $out"
-    assert_contains "$out" '7 outcome(s) handled by the away session (6 routine, 1 escalated above)' "$harness: the brief must count the window's outcomes"
+    assert_contains "$out" '10 outcome(s) handled by the away session (8 routine, 2 escalated above)' "$harness: the brief must count the window's outcomes"
+    assert_contains "$out" '    - staged: on standing away authority: advanced to the declared review stage' "the return omitted a stage advance older than the routine rollup"
+    assert_contains "$out" '    - finding: on standing away authority: answered the policy-decided finding' "the return omitted a standing policy answer"
+    assert_not_contains "$out" 'silent fixture' "the return rendered a silent standing-authority row"
     if [ "$harness" = claude ]; then
-      assert_contains "$out" "  1 captain outcome(s) escalated by the away session, presented in the drain's BRANCH OUTCOMES section" \
+      assert_contains "$out" "  2 captain outcome(s) escalated by the away session, presented in the drain's BRANCH OUTCOMES section" \
         "a host home's brief must point at the drain for its captain outcomes"
       assert_contains "$out" "the drain's BRANCH OUTCOMES section presents the visible outcomes" "a host home's brief must point at the visible outcomes in the drain"
       assert_not_contains "$out" 'PR ready for review' "a host home's brief must leave the captain outcome to the drain"
@@ -701,7 +710,7 @@ test_return_brief_keeps_refresh_history() {
   assert_contains "$out" '    first mandate: merge task first PR when green' "the superseded words were not rendered verbatim"
   assert_contains "$out" $'  your words at entry:\n    replacement mandate' "the final words were omitted"
   assert_contains "$out" 'first: completed before the mandate refresh' "the pre-refresh outcome was omitted"
-  assert_contains "$out" $'    replacement mandate\n    \n  the away session took no action under them.\nWaiting on you:' "the return brief dropped a trailing blank line from the final words or lost the empty account"
+  assert_contains "$out" $'    replacement mandate\n    \n  the away session took no action under your instructions or standing authority.\nWaiting on you:' "the return brief dropped a trailing blank line from the final words or lost the empty account"
   [ -f "$dir/home/state/afk-contracts/$first_epoch.afk-contract" ] || fail "return did not archive the final session record at the canonical path"
   pass "a refreshed posture keeps its original window, superseded mandate, and earlier outcomes"
 }

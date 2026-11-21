@@ -20,9 +20,9 @@
 # superseded in-session mandates, naming config/afk-words when that record's
 # source field says the mandate came from the standing file - followed by the
 # away session's account of
-# every visible action it took under them (each non-silent outcome-store row
+# every visible action it took under them or standing away authority (each non-silent outcome-store row
 # from the window whose summary opens with the "per your away instructions:"
-# marker the branch prompt in bin/fm-branch-prompt.sh requires), then what is
+# or "on standing away authority:" marker the branch prompt in bin/fm-branch-prompt.sh requires), then what is
 # waiting on the captain,
 # then what was tried and failed or could not be fixed (a supervision-host
 # latch or engine errors inside the window lead it), then landed work whose
@@ -586,6 +586,7 @@ strip_axi_help() {
 # taken under the captain's words to open its outcome summary with this marker
 # exactly; the brief's account includes visible rows from the window that carry it.
 AWAY_ACTION_MARKER='per your away instructions:'
+STANDING_ACTION_MARKER='on standing away authority:'
 
 MANDATE_COUNT=0
 HELD_READ_FAILED=0
@@ -613,14 +614,14 @@ render_words_record() {  # <record> [superseded-time]
   case "$words" in *$'\n') ;; *) printf '\n' ;; esac
 }
 
-render_words_account() {  # the away session's account of what it did under the words
+render_actions_account() {
   local rows
-  rows=$(printf '%s\n' "$STORE_ROWS" | awk -F '\t' -v marker="$AWAY_ACTION_MARKER" '
-    $6 != "true" && substr($5, 1, length(marker)) == marker { printf "    - %s: %s\n", $2, $5 }')
+  rows=$(printf '%s\n' "$STORE_ROWS" | awk -F '\t' -v marker="$AWAY_ACTION_MARKER" -v standing="$STANDING_ACTION_MARKER" '
+    $6 != "true" && (substr($5, 1, length(marker)) == marker || substr($5, 1, length(standing)) == standing) { printf "    - %s: %s\n", $2, $5 }')
   if [ -n "$rows" ]; then
-    printf '  the away session acted on them:\n%s\n' "$rows"
+    printf '  the away session acted under your instructions or standing authority:\n%s\n' "$rows"
   else
-    printf '  the away session took no action under them.\n'
+    printf '  the away session took no action under your instructions or standing authority.\n'
   fi
 }
 
@@ -692,7 +693,7 @@ render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-
     done
     render_words_record "$record"
     [ "$MANDATE_COUNT" -gt 0 ] || printf '  (no away instructions recorded)\n'
-    render_words_account
+    render_actions_account
   else
     printf '  (no away-posture record for this window; legacy away flag only)\n'
   fi
