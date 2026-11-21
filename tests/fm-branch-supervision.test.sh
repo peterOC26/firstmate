@@ -137,8 +137,9 @@ test_branch_prompt_emits_pending_decision_review_contract() {
     assert_contains "$away" \
       "\`bin/fm-control.sh <task> relaunch\`: when an existing job reports its current stage done" \
       "$surface away prompt omits relaunch after a completed stage"
-    assert_contains "$away" 'use the existing rule guard to relaunch it into the next stage declared in the brief' \
-      "$surface away prompt permits relaunch outside the declared stages or rule guard"
+    assert_contains "$away" \
+      "If the stage has not already advanced, relaunch it into the next stage declared in the brief with \`bin/fm-control.sh <task> relaunch --note <next declared stage>\`; the command's own refusals are the guard: the supervision lease guard, the safe checkpoint, and the required \`--note\` for a ship or scout. Leave any undeclared stage or unresolved captain decision for the return." \
+      "$surface away prompt omits the guarded relaunch command or its stage and decision limits"
     assert_contains "$away" \
       "\`bin/fm-send.sh --resolve-key\`: answer an ask-user finding when the ask-user-authority policy" \
       "$surface away prompt omits policy-authorized keyed answers"
