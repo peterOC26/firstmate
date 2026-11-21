@@ -1,0 +1,3 @@
+$ FM_HOME=<isolated fixture> bin/fm-afk-contract.sh enter --action merge
+fm-afk-contract: --action was retired: the captain's away words are recorded verbatim as free text, so pass them with --words or --words-file and nothing else
+exit=2
