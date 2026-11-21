@@ -591,8 +591,7 @@ A leftover `state/.afk` flag declines nothing.
   While the record exists, processing messages are filtered from request-local context, including earlier stored copies, without deleting session history or acknowledging outcomes.
   The first run boundary after the record is archived, ordinarily the captain's return message, presents the accumulated rows with a fresh triggered budget exactly as after any other gap.
   `bin/fm-afk-return.sh` lists them under "waiting on you".
-- Main's standing authority relocates to the branch, and nothing more.
-  [Authority relocation](#authority-relocation) below gives the details.
+- Main's standing authority relocates to the branch for the bounded actions in [Authority relocation](#authority-relocation).
 - The branch prompt's fixed "Postures" section states these rules once per firstmate version, so the prefix stays byte-stable.
   The per-wake tail is the only dynamic content.
 
@@ -639,7 +638,7 @@ The return brief renders the words verbatim beside that account.
 
 ### The authority invariant
 
-Being away changes how the captain is informed and what happens at a captain-owned decision point, never firstmate's authority set.
+While away, the branch may use only the authority listed in [Authority relocation](#authority-relocation); unresolved captain-owned decisions remain for the return.
 `tests/fm-branch-supervision.test.sh`, `tests/fm-pr-merge.test.sh`, and `tests/fm-send-resolve-key.test.sh` pin this invariant.
 It sets these limits:
 
