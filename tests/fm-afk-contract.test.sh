@@ -438,7 +438,7 @@ test_retired_clause_and_grant_inputs_are_usage_errors_by_name() {
     set -e
     [ "$rc" -eq 2 ] || fail "$flag should be a usage error (rc=$rc): $out"
     assert_contains "$out" "$flag was retired" "$flag refusal did not name the retirement"
-    assert_contains "$out" "away words are the whole mandate" "$flag refusal did not point at the words"
+    assert_contains "$out" "the captain's away words are recorded verbatim as free text, so pass them with --words or --words-file and nothing else" "$flag refusal did not point at the words"
     [ ! -f "$home/state/.afk-contract" ] || fail "$flag wrote a record despite the refusal"
   done
   set +e

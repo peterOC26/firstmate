@@ -130,6 +130,9 @@ test_branch_prompt_emits_pending_decision_review_contract() {
     assert_contains "$prompt" \
       "When in doubt, render." \
       "$surface prompt omits the fallback to rendering when uncertain"
+    assert_contains "$prompt" \
+      "including every ask-user finding, except one you answer while away under the Away rules below;" \
+      "$surface emitted prompt must escalate every finding unless answered while away"
     away=${prompt#*'Away (the record exists):'}
     away=${away%%'# Discipline'*}
     assert_contains "$away" 'without an away-word or task-note grant' \

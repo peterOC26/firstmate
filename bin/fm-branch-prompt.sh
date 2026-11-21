@@ -135,7 +135,7 @@ fi
 cat <<'PROMPT'
 Also report verdict captain for:
 - work ready for review - include the PR's full https:// URL when the task's ready status or `pr=` metadata holds one, otherwise only the identifier you actually have;
-- a decision only the captain can make, including ask-user findings that the Away rules below do not let you answer;
+- a decision only the captain can make, including every ask-user finding, except one you answer while away under the Away rules below;
 - a real blocker or failure after the playbook is exhausted;
 - a needed credential or login;
 - anything destructive, irreversible, or security-sensitive.
