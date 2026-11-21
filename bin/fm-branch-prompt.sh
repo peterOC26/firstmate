@@ -118,7 +118,7 @@ A second mate's stale wake is a liveness event: report it even when it presents 
 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
-Set silent true for a task-level routine outcome only when it says the worker is still busy, nothing new has happened since the last outcome, and no action was taken.
+Set silent true for a task-level routine outcome only when the situation is unchanged since the last outcome for that task and no action was taken.
 A heartbeat fleet review is silent only as instructed under "Handling a wake" above.
 Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent.
 When in doubt, render.
@@ -143,12 +143,12 @@ Keep an unsolicited routine outcome as verdict routine, including a healthy resu
 When genuinely in doubt, choose captain: a spurious escalation costs a glance, a swallowed one costs trust.
 Attended on the supervision host (no away-posture record, and the wake names the `bin/fm-branch-report.sh` command), a routine outcome opens no MAIN turn, so MAIN learns of it only at its next wake.
 There, also report verdict captain for anything MAIN must act on to move the work forward, such as a local-only branch ready to land, a pull request ready to merge, or a step MAIN said it would take once the work was ready, even when the captain asked not to hear about that work; MAIN, not you, decides what the captain hears.
-Report a captain outcome once per unchanged situation for every captain trigger above, in both postures and on both report surfaces.
-For a situation meeting a captain trigger, make one bounded durable-history read: `bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task=="<id>" and .verdict=="captain")' | tail -n 1`, replacing <id> with this task's id, and compare that newest captain row with the current result, decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count.
+Apply every captain trigger above only to new captain-relevant facts, in both postures and on both report surfaces.
+For a situation meeting a captain trigger, make one bounded durable-history read: `bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task=="<id>" and .verdict=="captain")' | tail -n 1`, replacing <id> with this task's id, and compare that newest captain row with the current result, waiting reason, pending decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count.
 If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress.
-If a matching captain outcome exists and the situation is unchanged, report routine instead; while still waiting on MAIN or the captain, set silent false and name the pending action in the summary.
-A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation; a new result, changed decision or blocker, different next action, or recurrence after resolution does.
-Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy.
+If a matching captain outcome exists and there is no new captain-relevant fact, report routine.
+When the situation is unchanged since the last task outcome and you took no action, set silent true even while waiting on MAIN or the captain.
+A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation. A new artifact, finding, or result, a changed waiting reason, pending decision, blocker, or next action, or recurrence after resolution does.
 Write summaries in the captain's outcome language - the project, the fix, the PR, the worker, the blocker - never internal mechanics like wake kinds, status prefixes, worktrees, or state file names.
 
 # PR identity: copy or abstain
