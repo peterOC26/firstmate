@@ -13,8 +13,8 @@ metadata:
 # afk
 
 Away mode is a POSTURE of the one supervision session, not a second architecture.
-Being away changes exactly two things: how the captain is informed, and what happens at a captain-owned decision point (hold for return, or the answer the captain's away words already gave).
-It never changes the authority set.
+Being away changes how the captain is informed and how captain-owned decisions are handled (hold for return or use an answer the away words already gave).
+The away session acts on the captain's away words and has standing authority to advance an existing job to its next declared stage once the current stage reports done and to answer ask-user findings that `ask-user-authority` lets firstmate decide, as defined in [`bin/fm-branch-prompt.sh` "Postures"](../../../bin/fm-branch-prompt.sh).
 The posture is a file, `state/.afk-contract`, written only by `bin/fm-afk-contract.sh` in the same turn as `/afk`; nothing infers the posture from chat.
 A record carrying quiet mode (`bin/fm-afk-contract.sh mode`) is not this posture: the captain is present, so none of this skill's holds for a return apply to it (the `quiet` skill owns it).
 Typing `/afk` is itself the go: the captain may not look at the screen again, so entry never waits for a further human response, and no read-back gates it or asks for a go.
@@ -26,10 +26,11 @@ Hold-for-return is the default and the only reach profile this release records: 
    Before any other work, run `bin/fm-afk-launch.sh enter --words-file <path> [--expected-return <UTC ISO 8601>] [--spend <n>]` (or `--words <text>`).
    It writes `state/.afk-contract` at once, with no separate confirmation step, then prints the entry announcement and the record's read-back.
    For an away record it then prints the read-only entry inventory; a quiet entry does not.
-   The words are the whole mandate: `bin/fm-afk-contract.sh` records them exactly as given, with no clause fields, verbs, ids, or merge-grant list, and by the captain's mandate no parser, tokenizer, classifier, or grammar reads them anywhere.
+   `bin/fm-afk-contract.sh` records the captain's away words verbatim as free text, and no script parses the words.
    Read `bin/fm-afk-contract.sh --help` for the flags rather than memorizing them.
    When `/afk` brings no new words, omit both word-input flags so the script can apply the [standing away words policy](../../../docs/configuration.md#standing-away-words-configafk-words).
-   Re-invoking `/afk` while already away with no new words is a refresh and leaves the standing record untouched; new words replace the mandate at once, preserve the original session entry, and archive the superseded words for the return brief.
+   Re-invoking `/afk` while already away with no new words refreshes the posture and leaves the standing record untouched.
+   New words replace the previous words at once, preserve the original session entry, and archive the superseded words for the return brief.
 2. **Per harness, after the record exists:**
    - **Pi and pi-signed**: nothing to launch; go on to the announcement.
      The away daemon is no longer launched on Pi; the ordinary supervision session (`docs/pi-supervision-branch.md`) keeps running with the record present, and `bin/fm-afk-launch.sh start` refuses on these harnesses.
