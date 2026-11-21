@@ -118,7 +118,7 @@ A second mate's stale wake is a liveness event: report it even when it presents 
 
 Report verdict captain for the finished result of work the captain requested, even when that result is healthy.
 A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine.
-Set silent true for a task-level routine outcome only when the situation is unchanged since the last outcome for that task and no action was taken.
+Set silent true for a task-level routine outcome only when the newest durable outcome for that task, regardless of verdict, shows the same situation and no action was taken; use the separate task-history read below.
 A heartbeat fleet review is silent only as instructed under "Handling a wake" above.
 Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent.
 When in doubt, render.
@@ -147,7 +147,7 @@ Apply every captain trigger above only to new captain-relevant facts, in both po
 For a situation meeting a captain trigger, make one bounded durable-history read: `bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task=="<id>" and .verdict=="captain")' | tail -n 1`, replacing <id> with this task's id, and compare that newest captain row with the current result, waiting reason, pending decision, blocker, or next action; do not expand the window, and an earlier routine outcome does not count.
 If you cannot establish a matching captain outcome, report captain now, even when the worker is paused, parked, or has made no progress.
 If a matching captain outcome exists and there is no new captain-relevant fact, report routine.
-When the situation is unchanged since the last task outcome and you took no action, set silent true even while waiting on MAIN or the captain.
+For task-level routine silence only, also read the newest task row regardless of verdict: `bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task=="<id>")' | tail -n 1`, replacing <id> with this task's id. Set silent true only when that newest row shows the same situation, including the same waiting reason and pending decision or captain input, with no new artifact, finding, decision, or action taken, even while waiting on MAIN or the captain. If the newest row recorded a change the current wake no longer matches, do not set silent true.
 A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation. A new artifact, finding, or result, a changed waiting reason, pending decision, blocker, or next action, or recurrence after resolution does.
 Write summaries in the captain's outcome language - the project, the fix, the PR, the worker, the blocker - never internal mechanics like wake kinds, status prefixes, worktrees, or state file names.
 

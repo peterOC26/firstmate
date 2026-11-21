@@ -59,7 +59,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
     *) fail "branch prompt lost the inlined recovery playbook" ;;
   esac
   case "$out_a" in
-    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when the situation is unchanged since the last outcome for that task and no action was taken."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*) ;;
+    *"Report verdict captain for the finished result of work the captain requested, even when that result is healthy."*"A start or still-working update on requested work that brings no new artifact, finding, or decision is verdict routine."*"Set silent true for a task-level routine outcome only when the newest durable outcome for that task, regardless of verdict, shows the same situation and no action was taken; use the separate task-history read below."*"Any routine outcome reporting an action, state change, or new result stays rendered; captain outcomes are never silent."*"Keep an unsolicited routine outcome as verdict routine"*) ;;
     *) fail "branch prompt lost the requested-result, progress-routine, or routine-silence rules" ;;
   esac
   case "$out_a" in
@@ -122,7 +122,7 @@ test_branch_prompt_emits_pending_decision_review_contract() {
       "If a matching captain outcome exists and there is no new captain-relevant fact, report routine." \
       "$surface prompt can escalate a hold that was already reported"
     assert_contains "$prompt" \
-      "When the situation is unchanged since the last task outcome and you took no action, set silent true even while waiting on MAIN or the captain." \
+      "For task-level routine silence only, also read the newest task row regardless of verdict: \`bin/fm-branch-outcome.sh list --recent 2000 | jq -c 'select(.task==\"<id>\")' | tail -n 1\`, replacing <id> with this task's id. Set silent true only when that newest row shows the same situation, including the same waiting reason and pending decision or captain input, with no new artifact, finding, decision, or action taken, even while waiting on MAIN or the captain. If the newest row recorded a change the current wake no longer matches, do not set silent true." \
       "$surface prompt does not silence a repeated hold"
     assert_contains "$prompt" \
       "A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation. A new artifact, finding, or result, a changed waiting reason, pending decision, blocker, or next action, or recurrence after resolution does." \
