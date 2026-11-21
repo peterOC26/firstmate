@@ -608,8 +608,7 @@ While the away record exists, two actions use MAIN's standing authority without 
   If the stage has not already advanced, it relaunches into the next stage declared in the brief with `bin/fm-control.sh <task> relaunch --note <next declared stage>`.
   The command's own refusals are the guard: the supervision lease guard, the safe checkpoint, and the required `--note` for a ship or scout.
   Any undeclared stage or unresolved captain decision waits for the return.
-- The branch answers an ask-user finding with `bin/fm-send.sh --resolve-key` when the ask-user-authority policy lets firstmate decide it.
-  A finding the policy says to escalate is reported with verdict captain and left for the return.
+- The branch can answer ask-user findings with `bin/fm-send.sh --resolve-key` under this standing authority; its policy gate is in the table below.
 
 For actions authorized by the captain's away words:
 

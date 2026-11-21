@@ -31,8 +31,8 @@
 # The read-back is printed after the record exists; it is informational, never a
 # gate, and never asks for a go.
 #
-# THE RECORD IS THE WORDS. The captain's away words are the whole mandate: they
-# are recorded verbatim, read back as plain sentences by firstmate after entry,
+# THE RECORD IS THE WORDS. The captain's away words are recorded verbatim, read
+# back as plain sentences by firstmate after entry,
 # and acted on by the supervision session's own judgment at the
 # moment an event makes them relevant, through the guarded scripts and under the
 # standing authority it already has (bin/fm-branch-prompt.sh "Postures" owns the
