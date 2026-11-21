@@ -128,8 +128,8 @@ test_branch_prompt_emits_pending_decision_review_contract() {
       "A new wake, elapsed time, repeated status text, or MAIN acknowledging the earlier outcome does not by itself change the situation. A new artifact, finding, or result, a changed waiting reason, pending decision, blocker, or next action, or recurrence after resolution does." \
       "$surface prompt does not distinguish duplicate wakes from material changes"
     assert_contains "$prompt" \
-      "Never set silent true for a task or fleet review still waiting on MAIN or the captain: waiting for a decision or action is not a worker still busy." \
-      "$surface prompt permits task or heartbeat silence over a pending hold"
+      "When in doubt, render." \
+      "$surface prompt omits the fallback to rendering when uncertain"
     away=${prompt#*'Away (the record exists):'}
     away=${away%%'# Discipline'*}
     assert_contains "$away" 'without an away-word or task-note grant' \
