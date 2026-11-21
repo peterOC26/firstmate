@@ -82,7 +82,7 @@ test_branch_prompt_is_byte_stable_and_above_cache_floor() {
 }
 
 test_branch_prompt_emits_pending_decision_review_contract() {
-  local surface prompt
+  local surface prompt away
   # Exercise the emitted contract on both public report surfaces. These
   # assertions verify instructions reach the model, not model adherence.
   for surface in pi host; do
@@ -130,8 +130,26 @@ test_branch_prompt_emits_pending_decision_review_contract() {
     assert_contains "$prompt" \
       "When in doubt, render." \
       "$surface prompt omits the fallback to rendering when uncertain"
+    assert_contains "$prompt" \
+      "including every ask-user finding, except one you answer while away under the Away rules below;" \
+      "$surface emitted prompt must escalate every finding unless answered while away"
+    away=${prompt#*'Away (the record exists):'}
+    away=${away%%'# Discipline'*}
+    assert_contains "$away" 'without an away-word or task-note grant' \
+      "$surface away prompt requires extra authority for standing actions"
+    assert_contains "$away" \
+      "\`bin/fm-control.sh <task> relaunch\`: when an existing job reports its current stage done" \
+      "$surface away prompt omits relaunch after a completed stage"
+    assert_contains "$away" \
+      "If the stage has not already advanced, relaunch it into the next stage declared in the brief with \`bin/fm-control.sh <task> relaunch --note <next declared stage>\`; the command's own refusals are the guard: the supervision lease guard, the safe checkpoint, and the required \`--note\` for a ship or scout. Leave any undeclared stage or unresolved captain decision for the return." \
+      "$surface away prompt omits the guarded relaunch command or its stage and decision limits"
+    assert_contains "$away" \
+      "\`bin/fm-send.sh --resolve-key\`: answer an ask-user finding when the ask-user-authority policy" \
+      "$surface away prompt omits policy-authorized keyed answers"
+    assert_contains "$away" 'Report a finding the policy says to escalate with verdict captain and leave it for the return.' \
+      "$surface away prompt omits the hold for findings that require escalation"
   done
-  pass "both emitted prompts include pending-decision review and escalation comparison instructions"
+  pass "both emitted prompts include pending-decision review, escalation comparison, and away standing authority"
 }
 
 # A home adds its own rules through config/branch-prompt-include.md: absent or
