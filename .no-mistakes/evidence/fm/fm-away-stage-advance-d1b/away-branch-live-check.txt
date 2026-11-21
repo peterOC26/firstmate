@@ -1,0 +1,42 @@
+Isolated FM_HOME: policy-clear decision answer and return brief
+All task and decision text below was synthetic in the disposable lab home.
+
+Attended attempt:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home {run-worktree}/.live-away-check.r4XaR5/home
+error: decision answer (fm-send --resolve-key) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+exit=6
+
+Away attempt:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home {run-worktree}/.live-away-check.r4XaR5/home
+note: decision answer (fm-send --resolve-key) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+exit=0
+
+Persisted inbox message:
+schema=fm-task-inbox.v1
+at=2026-11-21T17:30:13Z
+body-terminator=1
+--
+Fix: align with the accepted contract.
+
+Return brief excerpts:
+  (no away instructions recorded)
+  the away session acted under your instructions or standing authority:
+    - policy-safe: on standing away authority: answered the policy-clear scope correction
+Waiting on you:
+  - policy-risk [key=green-merge] needs your decision: Should the branch merge a green PR before captain return, despite the finding being ambiguous about whether merge was requested?
+  - policy-safe [key=scope-correction-model] needs your decision: The reviewer asks whether to fix the missing standing-authority rule, which is directly required by the accepted design, or leave it.
+Tried and failed, or could not be fixed:
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  7 outcome(s) handled by the away session (7 routine, 0 escalated above)
+  7 routine outcome(s) recorded; the latest visible:
+    - later: routine review 2
+    - later: routine review 3
+    - later: routine review 4
+    - later: routine review 5
+    - later: routine review 6
+Not started:
+
+Attempted direct engine evaluation:
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/bash -lc bin/fm-wake-drain.sh","aggregated_output":"wake drain: no branch-eligible row snapshot at {run-worktree}/.live-away-check.r4XaR5/home/state/.branch-eligible-rows; refusing to guess what this actor may consume\n","exit_code":1,"status":"failed"}}
