@@ -8,8 +8,9 @@
 #
 # Automatic delivery is restricted to the inherited pane on Claude, proven
 # through the transport the pane itself declares: TMUX_PANE for tmux, or
-# HERDR_ENV+HERDR_PANE_ID+HERDR_SESSION for herdr (a named session's pane,
-# including the fm-remote session remote homes run under). On tmux the pane's
+# HERDR_ENV+HERDR_PANE_ID for herdr, in HERDR_SESSION when the pane names one
+# (including the fm-remote session remote homes run under) and otherwise in
+# herdr's default session. On tmux the pane's
 # pid must be an ancestor of the pinned session-lock pid and that session must
 # still be in the terminal's foreground group; on herdr the pane's own
 # process-info must show the same ancestor-or-self and foreground-group facts
@@ -48,10 +49,11 @@ TRANSPORT=
 HERDR_TARGET=
 if [ -n "${TMUX_PANE:-}" ]; then
   TRANSPORT=tmux
-elif [ "${HERDR_ENV:-}" = 1 ] && [ -n "${HERDR_PANE_ID:-}" ] && [ -n "${HERDR_SESSION:-}" ]; then
+elif [ "${HERDR_ENV:-}" = 1 ] && [ -n "${HERDR_PANE_ID:-}" ]; then
   fm_backend_source herdr || exit 1
   TRANSPORT=herdr
-  HERDR_TARGET="$HERDR_SESSION:$HERDR_PANE_ID"
+  # A pane in herdr's default session carries no HERDR_SESSION.
+  HERDR_TARGET="${HERDR_SESSION:-default}:$HERDR_PANE_ID"
 fi
 TOKEN=${1:-}
 PREDECESSOR=${2:-}

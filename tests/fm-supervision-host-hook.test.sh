@@ -195,20 +195,9 @@ SH
 }
 
 
-# The herdr transport twin of the tmux case above: the detached owner inherits
-# HERDR_ENV/HERDR_PANE_ID/HERDR_SESSION from a Claude primary's pane and must
-# reach that exact pane through the real herdr adapter - only after proving the
-# pane's shell pid is an ancestor of the pinned session owner, the session is
-# the pane's foreground group, the native agent state is not submit-busy, the
-# rendered busy footer is idle, and the composer is empty. A typed draft, a
-# foreign pane, a different foreground conversation, a working agent, or an
-# unreachable server each defer without touching the queued check.
-test_handoff_retry_reaches_the_receiving_herdr_pane() {
-  local home doorbell record
-  home=$(make_primary_home handoff-herdr-doorbell)
-  : > "$home/config/supervision-handoff-ack"
-  printf '❯ human draft\n' > "$home/screen"
-  printf 'idle\n' > "$home/herdr-status"
+# Fake herdr for the hand-back doorbell cases; it logs each call's --session.
+write_doorbell_herdr_fake() {  # <home>
+  local home=$1
   cat > "$home/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -223,6 +212,7 @@ arg_value() { # <flag> <args...>
   done
   return 1
 }
+session=$(arg_value --session "$@") && printf '%s\n' "$session" >> "$FM_HOME/herdr-sessions"
 case "${1:-}" in
   status)
     if [ -e "$FM_HOME/server-down" ]; then printf '{"server":{"running":false}}\n'; else printf '{"server":{"running":true}}\n'; fi ;;
@@ -267,6 +257,23 @@ esac
 exit 0
 SH
   chmod +x "$home/fakebin/herdr"
+}
+
+# The herdr transport twin of the tmux case above: the detached owner inherits
+# HERDR_ENV/HERDR_PANE_ID/HERDR_SESSION from a Claude primary's pane and must
+# reach that exact pane through the real herdr adapter - only after proving the
+# pane's shell pid is an ancestor of the pinned session owner, the session is
+# the pane's foreground group, the native agent state is not submit-busy, the
+# rendered busy footer is idle, and the composer is empty. A typed draft, a
+# foreign pane, a different foreground conversation, a working agent, or an
+# unreachable server each defer without touching the queued check.
+test_handoff_retry_reaches_the_receiving_herdr_pane() {
+  local home doorbell record
+  home=$(make_primary_home handoff-herdr-doorbell)
+  : > "$home/config/supervision-handoff-ack"
+  printf '❯ human draft\n' > "$home/screen"
+  printf 'idle\n' > "$home/herdr-status"
+  write_doorbell_herdr_fake "$home"
   HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SESSION=fm-lab-doorbell \
     FM_SUPERVISION_HANDOFF_RETRY_SECONDS=3 start_hook_session "$home"
   turn_end "$home"
@@ -336,6 +343,32 @@ SH
   [ -f "$home/state/.supervision-handoff-pending" ] || fail "herdr doorbell: submission was mistaken for acknowledgement"
   stop_home_processes "$home"
   pass "host+hook: hand-back retry submits only to the idle owning herdr pane without replacing human input"
+}
+
+# A primary in herdr's default session inherits no HERDR_SESSION; its retry
+# must still reach the inherited pane through that default session.
+test_handoff_retry_reaches_a_default_session_herdr_pane() {
+  local home
+  home=$(make_primary_home handoff-herdr-default-session)
+  : > "$home/config/supervision-handoff-ack"
+  printf '❯ \n' > "$home/screen"
+  printf 'idle\n' > "$home/herdr-status"
+  write_doorbell_herdr_fake "$home"
+  HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SESSION='' \
+    FM_SUPERVISION_HANDOFF_RETRY_SECONDS=3 start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "default-session doorbell: no initial watcher"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until_deadline 60 hook_exited "$home" || fail "default-session doorbell: no hand-back"
+  wait_until 150 grep -q $'\tretry\t.*\tempty$' "$home/state/.supervision-handoff.log" \
+    || fail "default-session doorbell: no confirmed retry: $(cat "$home/state/.supervision-handoff.log" 2>/dev/null)"
+  assert_grep 'enter' "$home/submits" "the default-session retry must submit"
+  assert_grep 'default' "$home/herdr-sessions" "the retry must address herdr's default session"
+  if grep -qv '^default$' "$home/herdr-sessions"; then
+    fail "the default-session retry addressed another session: $(sort -u "$home/herdr-sessions")"
+  fi
+  stop_home_processes "$home"
+  pass "host+hook: hand-back retry reaches a herdr pane in the default session without HERDR_SESSION"
 }
 
 
@@ -855,6 +888,7 @@ fm_test_run \
   test_acknowledged_handoff_at_the_turn_keeps_the_pass_through_row \
   test_handoff_retry_respects_the_receiving_pane \
   test_handoff_retry_reaches_the_receiving_herdr_pane \
+  test_handoff_retry_reaches_a_default_session_herdr_pane \
   test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main \
   test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn \
   test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails \

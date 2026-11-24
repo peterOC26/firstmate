@@ -264,7 +264,7 @@ The helper's header owns process cleanup and transport guards; the [continuity c
 Both the default handling-mode owner and the acknowledgement-mode owner use this transport while their main-side completion receipt is absent.
 The first delivery remains the Stop hook's exit-2 feedback.
 A later retry does not depend on that hook or on another Stop firing.
-The detached owner writes a durable operational-input record and submits its watcher doorbell through the backend's existing submit primitive: the tmux pane the session inherited as `TMUX_PANE`, else the herdr pane the environment itself names through `HERDR_ENV`, `HERDR_SESSION`, and `HERDR_PANE_ID`.
+The detached owner writes a durable operational-input record and submits its watcher doorbell through the backend's existing submit primitive: the tmux pane the session inherited as `TMUX_PANE`, else the herdr pane the environment itself names through `HERDR_ENV` and `HERDR_PANE_ID`, in `HERDR_SESSION` when set and otherwise herdr's default session.
 On herdr that identity comes only from the injected environment, so a remote home's `fm-remote` session hands its scripts the same path and remote homes need no extra plumbing.
 It uses only the inherited pane, proves the pinned session owner lives in that pane's foreground process tree, and requires an idle agent with an empty composer.
 On herdr the pane's registered agent and any registered session binding must also identify `claude`, and idle must hold in both the native agent state and the rendered footer, because a live Claude turn can leave the native status reading idle.
