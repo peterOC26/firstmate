@@ -45,7 +45,7 @@ document:
 # The existing type-regression owner also runs in the required portable CI lane.
 # Keep commands.test absent; the firstmate-coding-guidelines skill owns this policy.
 commands:
-  lint: 'bin/fm-lint.sh && bash tests/fm-pi-primary-types.test.sh'
+  lint: 'FM_LINT_JOBS=1 bin/fm-lint.sh && bash tests/fm-pi-primary-types.test.sh'
 
 # CI repair prompt. The pipeline copies this into the same prompt that asks
 # for the summary field stored as the commit subject.
