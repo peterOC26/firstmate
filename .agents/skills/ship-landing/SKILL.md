@@ -15,7 +15,7 @@ With `config/pr-register-scan` present, the watcher can record ready task PRs du
 Of those readers only `bin/fm-pr-check.sh` fetches the copy's remotes before it decides, and a no-mistakes pipeline pushes from its own clone, so a no-mistakes ready signal can read blocked until that registration has run: register it before steering.
 A refusal that says it could not refresh a remote decided on the last-known refs, so retry it once that remote is reachable.
 Otherwise that blocked reading is the gate working, not a stuck worker, so steer the worker on the commit the refusal names rather than waiting.
-A `forge=external` task reports `done [at=<epoch>]: review <url> uploaded for review` instead: run `bin/fm-review-check.sh <id> <review url>` rather than `bin/fm-pr-check.sh`, which arms no merge watch, then always escalate the review URL to the captain whatever the yolo setting, because firstmate can neither observe nor perform its approval or merge.
+A `forge=external` task reports `done [at=<epoch>]: review <url> uploaded for review` instead: run `bin/fm-review-check.sh <id> <review url>`, which arms no merge watch, rather than `bin/fm-pr-check.sh`, then always escalate the review URL to the captain whatever the yolo setting, because firstmate can neither observe nor perform its approval or merge.
 A direct-PR worker pushes that commit to its PR branch, and a local-only worker commits it on its ship branch.
 A no-mistakes worker re-validates it with /no-mistakes so the pipeline stays the one publisher; it never pushes from its copy.
 In no-mistakes mode the earlier `done [at=<epoch>]: {summary}` is the pipeline handoff and is not gated.
