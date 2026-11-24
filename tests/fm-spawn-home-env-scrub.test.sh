@@ -50,7 +50,7 @@ assert_scrubbed() {  # <seen> <label> <want-home> <want-inbox>
   for name in $SCRUBBED; do
     assert_contains "$seen" "$name=unset" "$label: the worker must not inherit $name"
   done
-  assert_contains "$seen" "FM_HOME=$3" "$label: the worker must keep FM_HOME"
+  assert_contains "$seen" "FM_HOME=$3" "$label: the worker must use its active home"
   assert_contains "$seen" "FM_TASK_INBOX=$4" "$label: the worker must keep its steering inbox"
 }
 
@@ -69,7 +69,7 @@ spawn_and_probe() {  # <kind> <allowlist absent|enabled>
   : > "$dir/launch.log"
   : > "$dir/pane.log"
   if [ "$kind" = ship ]; then
-    want_home=$SUPERVISOR
+    want_home=$home
     out=$(FM_FAKE_LAUNCH_LOG="$dir/launch.log" FM_FAKE_PANE_LOG="$dir/pane.log" \
       fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" --mode no-mistakes --yolo off)
   else
@@ -86,9 +86,6 @@ spawn_and_probe() {  # <kind> <allowlist absent|enabled>
   fi
   status=$?
   expect_code 0 "$status" "$kind spawn with allowlist=$setting should succeed: $out"
-  # Under the allowlist the pane's FM_HOME is filtered out like everything else,
-  # so only the ambient launch can show that it survives.
-  [ "$setting" = absent ] || want_home='unset'
   install_probe "$fakebin"
   for pane_shell in /bin/sh fish; do
     if ! command -v "$pane_shell" >/dev/null 2>&1; then

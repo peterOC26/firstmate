@@ -2,80 +2,37 @@
 
 `bin/fm-test-run.sh` owns portable lane composition and execution.
 `bin/fm-test-isolation-proof.sh` owns the proven-isolated candidate set.
+`tests/fm-test-ci-timings.tsv` holds the committed per-script CI duration hints the packer reads.
 
 ## Verification inputs
 
-Balance hints come from serial runs of the real lanes on `ubuntu-latest`.
+Balance hints come from successful Ubuntu CI samples, not from local runs.
 The concurrent isolation proof in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) establishes concurrency safety, not serial CI duration.
 Local timings are not interchangeable with CI timings: platform and machine load can affect each script differently and change their relative weights.
 
-The parallel hint table and the refreshed serial entries now use the slower successful script durations from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961), retaining the earlier measurements and provisional exceptions noted below where they were not replaced.
-Both hint tables were originally refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
-Use the slowest successful `duration_ms` per script across their uploaded portable timing artifacts and completed `FM_TEST_END` log markers, with the exceptions below.
-All artifact records were cross-checked against the corresponding job's markers.
-This covered all 24 parallel and 201 serial members at that refresh; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
+The committed table records the slowest successful `duration_ms` per `tests/*.test.sh` across green main CI runs [43359484992](https://github.com/kunchenguid/firstmate/actions/runs/43359484992), [43331691300](https://github.com/kunchenguid/firstmate/actions/runs/43331691300), and [43209319634](https://github.com/kunchenguid/firstmate/actions/runs/43209319634), refreshed 2026-11-13.
+Failed or cancelled scripts are ignored, so a timeout does not become a packing weight.
 Observed maxima provide conservative packing weights, not an upper bound on future durations.
+A passing coverage guard does not establish a healthy job duration; refresh the table from uploaded timing artifacts when a member grows or the lane gains scripts.
 
-Two serial-5 jobs were cancelled at their 30-minute cap and uploaded no artifact.
-Their completed log markers supplement the complete runs, but a cancelled job's wall time is only a lower bound and its unfinished or never-started scripts have no completed sample.
-A failed script's duration is excluded even when its lane uploaded an artifact.
-In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
-Collect successful per-script measurements for every member before calculating a split.
+The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains a separate measurement and is skipped by the portable CI shards.
+Measure that script through the focused Git Bash runner rather than a portable skip.
 
-The supervision-host suite is four serial members so no one file occupies a whole CI shard; [supervision-host.md](supervision-host.md#verification) owns their coverage.
-The original local timing samples were 19978 ms for `tests/fm-supervision-host-drain.test.sh`, 175562 ms for `tests/fm-supervision-host-hook.test.sh` before its captain-inbox and computed-home hand-back cases, 189383 ms for `tests/fm-supervision-host.test.sh`, and 143185 ms for `tests/fm-supervision-host-park.test.sh`.
-The drain, hook, and park packing weights remain local `duration_ms` scaled by ~2.3 for CI, replacing the 1192918 ms single-file sample from run [39642852135](https://github.com/kunchenguid/firstmate/actions/runs/39642852135) that sat alone in a serial shard and still overran: run 39765114423 cancelled that script at the 30-minute job cap.
-The 573730 ms hint for `tests/fm-supervision-host.test.sh` is the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-Refresh the three remaining provisional hints from Ubuntu timing artifacts on the next green run.
-The native-Windows-only `tests/fm-pi-windows-shell-invocation.test.sh` retains its separate 5121 ms measurement from 2026-09-06T21:02Z instead of a portable capability skip.
-The `tests/fm-polytoken-harness.test.sh` hint is 27135 ms, the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-The 2026-10-07 `tests/fm-polytoken-signals-live-e2e.test.sh` hint remains the provisional 103 ms live-guard skip measured on the adapter-verification macOS host until an Ubuntu CI measurement replaces it.
-The `tests/fm-approval-failover.test.sh` serial hint is 10103 ms, the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-The 2026-10-23 Kimi folder-prompt live guard, `tests/fm-kimi-trust-prompt-live-e2e.test.sh`, carries a provisional 60 ms skip measured on the Linux host that recorded its captures, until the next CI refresh replaces it with an Ubuntu measurement.
-The 2026-11-03 `tests/fm-herdr-projected-cd-live-e2e.test.sh` serial hint is provisionally 28000 ms, above a successful 27692 ms local runner sample exercising Herdr 0.9.5 on macOS arm64, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-10-27 `tests/fm-claude-account-quota.test.sh` serial hint is a provisional local measurement of 2492 ms, the slowest of five local `bin/fm-test-run.sh` samples (1930-2492 ms) on a Linux host, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-11-04 `tests/fm-install-herdr.test.sh` serial hint is a provisional local measurement of 1000 ms, above the slowest of five `bin/fm-test-run.sh` samples (155-223 ms) on a Linux host, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-10-26 `tests/fm-test-tap-verify.test.sh` serial hint is a provisional local measurement of 1000 ms, above a 238 ms `bin/fm-test-run.sh` sample on this Linux host, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-10-27 `tests/fm-read-repetition.test.sh` hint remains the provisional Linux x86_64 local runner maximum of 602 ms (six successful samples, 528-602 ms).
-The `tests/fm-read-repetition-live.test.sh` hint is 1212 ms, the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961), replacing the provisional 1110 ms maximum from five successful local samples (949-1110 ms).
-The five local live samples exercised installed Pi 1.4.0 RPC without capability skips; they are not CI timing evidence or timings for unavailable harnesses.
-Both suites retain serial placement and full coverage; replace the remaining provisional `tests/fm-read-repetition.test.sh` hint with an Ubuntu timing-artifact maximum at the next CI refresh.
-The 2026-10-29 `tests/fm-live-lab-isolation.test.sh` serial hint is a provisional local measurement of 6459 ms, the slowest of six `bin/fm-test-run.sh` samples (4308-6459 ms) taken inside a private `unshare -Urm` /tmp on this Linux host, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-10-27 `tests/fm-codex-stop-park.test.sh` serial hint is a provisional local measurement of 35000 ms, above the slowest of the `bin/fm-test-run.sh` samples (20170-34700 ms) on a macOS arm64 host, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-10-28 `tests/fm-agy-primary.test.sh` serial hint remains provisionally 45000 ms until an Ubuntu timing-artifact maximum replaces it.
-The `tests/fm-agy-primary-live-e2e.test.sh` live-guard skip hint is 84 ms, the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-The 2026-11-07 `tests/fm-spawn-slot-ownership.test.sh` serial hint is a provisional local measurement of 284000 ms, the slowest local sample for that suite, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The 2026-11-13 `tests/fm-spawn-claude-lean.test.sh` serial hint is a provisional estimate of 80000 ms, about twice a local 39392 ms `bin/fm-test-run.sh` sample on Linux, until the next CI refresh replaces it with an Ubuntu timing-artifact maximum.
-The wedge-cap suite carries 448417 ms for `tests/fm-watch-wedge-cap.test.sh` and the 188 ms live-guard skip for `tests/fm-watch-wedge-cap-live.test.sh`, the slower successful durations from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-They are not a formality: without a hint the suite is packed on the 45000 ms default, which puts it beside a shard already holding about 17 minutes of measured work, so that shard would really have run for about 23 minutes - past the 20-minute target the guard reserves - while the coverage guard still passed.
-The wedge-cap parity suite packs 47201 ms, the slower successful duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961), replacing the 27763 ms sample from CI run [39597689178](https://github.com/kunchenguid/firstmate/actions/runs/39597689178) that had superseded the provisional 209000 ms local measurement.
-`test_portable_serial_packing_budget_boundary` now pins every other fixture script to 1 ms, so packing exactly at the 1200000 ms budget is accepted and one millisecond above it is refused even when real serial members have no hint.
-The coverage-guard test owns modeled real-hint headroom under that budget.
-The session-start hint retains its pre-optimization maximum until CI measures the shorter fixture-only home-summary bound; do not discount a local speedup from CI packing weights.
-The T3 Code backend suites carry the slowest successful Ubuntu samples from CI runs [39463576576](https://github.com/kunchenguid/firstmate/actions/runs/39463576576), [39814995718](https://github.com/kunchenguid/firstmate/actions/runs/39814995718), and [39883948163](https://github.com/kunchenguid/firstmate/actions/runs/39883948163) - 239245 ms for `tests/fm-backend-t3code.test.sh`, 57613 ms for `tests/fm-t3-mcp.test.sh`, and the 51 ms live-guard skip for `tests/fm-backend-t3code-live-e2e.test.sh`.
-The T3 Code hints for `tests/fm-watch-inbox-meta.test.sh` and `tests/fm-backend-t3code-pr-tools-live-e2e.test.sh` are now 419 ms and a 56 ms live-guard skip respectively, the slower successful durations from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-`tests/fm-backend-t3code.test.sh` and `tests/fm-t3-mcp.test.sh` run in the portable parallel lanes, so those two values sit in `portable_parallel_weight_hints`: every case id the backend suite spawns carries a per-run suffix and its cleanup removes only the `/tmp/fm-<id>` directories that run created, and both suites passed running concurrently with each other and beside another parallel suite (see [`fm-test-isolation-proof.md`](fm-test-isolation-proof.md)).
+A timed-out shard may upload no artifact, so a complete green run is what keeps the slowest scripts measured in the shard that needs them most.
 
 ## Parallel lanes
 
-The three parallel lanes use longest-processing-time assignment over those hints.
-[`tests/fm-pi-primary-types.test.sh`](../tests/fm-pi-primary-types.test.sh) owns its typecheck dependencies independently of the lane's installed Pi runtime.
-[`bin/fm-test-run.sh`](../bin/fm-test-run.sh) holds the duration values in `portable_parallel_weight_hints` and the ordered memberships beside `list_portable_parallel_1`, `list_portable_parallel_2`, and `list_portable_parallel_3`.
-Read the derived packing estimates with that runner's `--check-coverage`; its header and `--help` own the output fields and the selection-specific `--list-scheduled` weight rules.
+The two parallel lanes use longest-processing-time assignment over the committed hints.
+CI runs each lane with `--jobs 2`, so wall time tracks the longest member rather than the sequential sum.
+[`tests/fm-pi-primary-types.test.sh`](../tests/fm-pi-primary-types.test.sh) owns its typecheck dependencies independently of the lane's installed Pi runtime; both parallel jobs install the Pi package and fail on that gate skip so a packed move cannot silently skip it.
+Read the derived packing estimates with `bin/fm-test-run.sh --check-coverage`; its header and `--help` own the output fields and the selection-specific `--list-scheduled` weight rules.
 The largest individual hint sets a lower bound on the estimated duration of any split, regardless of how evenly the remaining work is assigned.
 The CI cap follows the three-tier timeout policy in [Timeouts](#timeouts) below.
 
 [`tests/fm-test-run.test.sh`](../tests/fm-test-run.test.sh), in `test_portable_parallel_lanes_stay_duration_balanced`, requires every parallel member to have a hint and the lane sums to differ by no more than five percent of the larger sum.
-Its scheduling regressions also check stored parallel lane order and preserve serial-weight scheduling for other selections.
+Its scheduling regressions also check stored parallel lane order and preserve committed-weight scheduling for other selections.
 These checks do not detect a script outgrowing an existing hint or establish measured job headroom.
-Refresh `portable_parallel_weight_hints` with the slowest completed `duration_ms` per script from several green CI runs' `fm-test-timing-portable-parallel-*` artifacts whenever the parallel set gains scripts or a member grows materially.
-
-The remote-secondmate lifecycle hint is 1005249 ms, its completed, passing `FM_TEST_END` sample from Ubuntu run [41289019354](https://github.com/kunchenguid/firstmate/actions/runs/41289019354).
-Rex lifecycle coverage outgrew the previous 345655 ms hint; serial shard 9 then reached the 30-minute job cap while running later tests.
-This is a completed-script measurement from a partial run, not a successful whole-shard timing or a guarantee of future headroom.
-The measured 284000 ms `tests/fm-spawn-slot-ownership.test.sh` weight packs every eleven-shard bin above the 1200000 ms budget.
-Sixteen serial shards keep every packed bin under that budget after the hint table took the slower successful script duration from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961).
-The normal-tier job timeout stays the hang tripwire.
+Refresh `tests/fm-test-ci-timings.tsv` whenever the parallel set gains scripts or a member grows materially.
 
 ## Portable serial remainder
 
@@ -85,52 +42,26 @@ Membership is derived rather than enumerated, so a newly added test lands here b
 
 ## Portable serial CI shards
 
-On green CI run [30725985757](https://github.com/kunchenguid/firstmate/actions/runs/30725985757), that remainder accumulated 19m04s of script time against a 20-minute job timeout.
-On [PR 1495](https://github.com/kunchenguid/firstmate/pull/1495), its main step ran about 19m51s before the job was cancelled at that boundary.
-`portable-serial-<k>of<n>` splits it across `n` separate CI runners.
+`portable-serial-<k>of<n>` splits the remainder across `n` separate CI runners.
 Each shard is still strictly serial in itself, and separate runners mean no two of these stateful scripts ever share a machine, so the split needs no concurrency isolation proof.
 
-`bin/fm-test-run.sh` owns `n` and refuses any lane whose `of<n>` disagrees with it.
+`bin/fm-test-run.sh` owns `n` (currently 19) and refuses any lane whose `of<n>` disagrees with it.
 `.github/workflows/ci.yml` derives the same `n` from `strategy.job-total` rather than a literal, so changing the shard count in either file without the other fails the lane loudly instead of leaving part of the required suite unrun.
 
-Assignment is longest-processing-time bin packing over per-script duration hints embedded in `bin/fm-test-run.sh`.
-[Verification inputs](#verification-inputs) owns the measurement provenance and exceptions.
+Assignment is longest-processing-time bin packing over the committed duration hints.
 A script with no hint gets the conservative `PORTABLE_SERIAL_DEFAULT_WEIGHT_MS` default.
 Hints only affect balance: the coverage guard keeps the partition complete and disjoint whatever they say, so a stale hint costs a slower shard rather than lost coverage.
-Balance is still worth keeping current, because enough unmeasured scripts let one shard carry more than twice another shard's real work and reach the job cap while another runner sits idle.
+The packing target is 15 minutes (`serial_budget_ms=900000`).
+`--check-coverage` refuses a modeled multi-script shard above that target; an indivisible suite may occupy a shard alone when its own hint is already above 15 minutes.
 `bin/fm-test-run.sh --check-coverage` reports the unmeasured share as `serial_unhinted=` and refuses past `PORTABLE_SERIAL_MAX_UNHINTED_PERCENT`.
-That catches missing hints, not stale existing hints: the host suite still had a 41512 ms hint after growing to over 1000 seconds in CI, so the old split placed it beside another 12 minutes of work while passing the guard.
-Refresh the hints whenever a serial member grows materially or the lane gains scripts, rather than waiting for missing-hint coverage to trip.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
-Its header and `--help` own the modeled-budget check and output fields; read the current estimates from `--check-coverage` instead of retaining copied lane sums here.
-[`tests/fm-test-run.test.sh`](../tests/fm-test-run.test.sh), in `test_portable_serial_packing_budget_boundary`, verifies acceptance exactly at the budget and refusal one millisecond above it through the executable runner.
-The watch-triage suite is three serial members so no one file occupies a whole CI shard: `tests/fm-watch-triage.test.sh` (classifier, signal/turn-end absorb, wedge ladder, gone endpoints, TERM, busy-pane age, timer repair, procevent, heartbeat/afk hand-off, exit picker; hint 1085417 ms), `tests/fm-watch-triage-pause.test.sh` (declared waits, captain-call holds, pause transitions, away/quiet holds, paused-until and background-job waits; hint 487363 ms), and `tests/fm-watch-triage-wedge-defer.test.sh` (wedge-threshold deferrals; 13 tests, hint 614407 ms).
-Those hints are the slower successful script durations from CI runs [42627283545](https://github.com/peterOC26/firstmate/actions/runs/42627283545) and [42599636961](https://github.com/peterOC26/firstmate/actions/runs/42599636961), replacing the per-file sums from run [40280579086](https://github.com/kunchenguid/firstmate/actions/runs/40280579086) after `tests/fm-watch-triage.test.sh` again passed 16 minutes on its own.
-The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
-Even so, maxima from two runs do not establish a P95 or guarantee future headroom.
-Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
+[`tests/fm-test-run.test.sh`](../tests/fm-test-run.test.sh), in `test_portable_serial_packing_budget_boundary`, verifies acceptance exactly at the budget, a singleton overflow, and refusal of a multi-script overflow through the executable runner.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
-
-Refresh the CI-derived hints by downloading the per-shard timing artifacts from several green CI runs and replacing the `portable_serial_weight_hints` table in `bin/fm-test-run.sh` with the slowest measured `duration_ms` per `path`:
-
-```sh
-for run in <run-id> <run-id> <run-id>; do
-  gh-axi run download "$run" -R kunchenguid/firstmate --dir "/tmp/fm-serial/$run"
-done
-jq -r '.scripts[] | select(.exit == 0) | [.path, .duration_ms] | @tsv' /tmp/fm-serial/*/fm-test-timing-portable-serial-*/*.json \
-  | awk -F'\t' '$2 > m[$1] { m[$1] = $2 } END { for (p in m) print p, m[p] }' \
-  | LC_ALL=C sort
-bin/fm-test-run.sh --check-coverage
-```
-
-A timed-out shard may upload no artifact, so include a complete green run or the slowest scripts go unmeasured in exactly the shard that needs them most.
-Completed shards from a partial run can supplement that complete baseline, but never treat missing tail scripts or the timeout duration as successful samples.
-Measure native-Windows-only scripts through the focused Git Bash runner and retain that `duration_ms` separately, because the portable CI shards skip them.
 
 ## Coverage guard
 
-`bin/fm-test-run.sh --check-coverage` verifies that the parallel lanes partition the proven-isolated set.
+`bin/fm-test-run.sh --check-coverage` verifies that both parallel lanes partition the proven-isolated set.
 It also verifies that the parallel lanes, portable serial lane, and real-Herdr family are disjoint and cover every `tests/*.test.sh` script.
 It separately verifies that the portable serial CI shards are non-empty, disjoint, and together equal the portable serial lane.
 Its hint-coverage and modeled-budget checks are described in [Portable serial CI shards](#portable-serial-ci-shards); neither replaces inspection of actual CI timing artifacts.
@@ -139,20 +70,29 @@ Its hint-coverage and modeled-budget checks are described in [Portable serial CI
 
 Portable shards, each portable serial shard, and the Herdr lane upload runner-generated timing JSON.
 `bin/fm-test-run.sh --aggregate-json` creates the combined summary artifact.
+The timing-aggregate job then runs `bin/fm-ci-budget-warn.sh`, which emits a GitHub warning annotation (never a failure) when any lane or lint partition's measured command time is at or above 20 minutes.
 `.github/workflows/ci.yml` owns the exact artifact names and aggregation wiring.
 
 ## Lint partitions and end-to-end latency
 
-`bin/fm-lint.sh` owns three canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
-CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
-Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, initial analysis flags, and fallback reporting.
-The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
-No fast mode, path skips, or paid runner provisioning is part of this layout.
+`bin/fm-lint.sh` owns four canonical CI partitions.
+Each partition attempts full source-aware ShellCheck analysis and runs workflow validation and backend-purity checks.
+Pull requests pass `--changed` so only the canonical-set files changed since the merge-base are analyzed, still with `--external-sources` and full dataflow.
+A change to lint definition files (`bin/fm-lint.sh`, `bin/fm-lint-workflows.sh`, the pinned installers, or `bin/fm-timeout-lib.sh`), including a delete or rename of any of those paths, upgrades that PR to the full canonical set.
+A change to a file that another canonical script sources, found from `# shellcheck source=` directives rather than a hand list, also upgrades to the full set so an unchanged consumer cannot hide a new ShellCheck finding from the PR and then fail the full gate on main.
+A delete or rename of that helper counts, including the old path of a rename.
+Main pushes keep the full canonical gate.
+CI caches the pinned ShellCheck and actionlint binaries and skips the download when the pin is already present.
+`FM_LINT_JOBS=1` stays in force because a second concurrent ShellCheck process does not fit the hosted runner's memory envelope.
 
-The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the three watch-triage members still sum to about 36.5 minutes of CI test time.
-The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses sixteen portable serial shards, three portable parallel shards, the Herdr lane, the herdr-core lane, and three lint partitions, plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
-Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
+CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
+Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, `--changed` source-aware analysis, definition-file upgrades, and fallback reporting.
+The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
+
+The packing target is a complete green run under fifteen minutes including start delay.
+One indivisible serial suite (`tests/fm-remote-secondmate-lifecycle-e2e.test.sh`) currently measures above that target on its own; it occupies a singleton shard rather than raising the job timeout. It is one sequential fixture lifecycle, not independently invocable cases, so splitting it would re-run provision/seed/launch per file and change how the lifecycle is asserted.
+Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
+The layout uses nineteen serial jobs, two parallel jobs with `--jobs 2`, four lint partitions, Herdr, herdr-core, plus short checks and macOS.
 The workflow retains per-PR supersession and keeps only the newest of close main pushes' runs, without changing the compliance workflow's event semantics.
 
 ## Local entry points
