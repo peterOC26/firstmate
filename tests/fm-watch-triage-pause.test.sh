@@ -2033,12 +2033,38 @@ test_superseded_wait_check_skips_away_mode() {
   pass "with the away-mode flag present an armed busy paused worker at a human gate behaves exactly as with the flag absent: no superseded wake and no crew-state read"
 }
 
+test_review_park_absorbs_delivered_dead_pause() {
+  local dir state parked
+  for parked in yes no; do
+    dir=$(make_case "delivered-dead-review-$parked"); state="$dir/state"
+    printf 'window=test:fm-held\nkind=ship\nbackend=tmux\n' > "$state/held.meta"
+    printf 'paused: parked on review: awaiting review activity\n' > "$state/held.status"
+    [ "$parked" != yes ] || : > "$state/held.review-park"
+    FM_STATE_OVERRIDE="$state" FM_HOME="$dir" bash -c '
+      . "$1"
+      fm_backend_agent_state() { printf "dead\n"; }
+      wake() { :; }
+      mark_surfaced "$STATE/held.status" "$(_fm_status_file_size "$STATE/held.status")" "$(_fm_open_decisions_file_ident "$STATE/held.status")" || exit 1
+      delivered_terminal_dead_id held >/dev/null || exit 1
+      handle_paused_stale test:fm-held held hash
+    ' _ "$WATCH" || fail "$parked: delivered paused lane could not be handled"
+    if [ "$parked" = yes ]; then
+      [ ! -s "$state/.wake-queue" ] || fail "review-parked lane emitted a dead-agent wake"
+      [ -e "$state/.paused-$(watch_window_key test:fm-held)" ] || fail "review-parked lane was not absorbed"
+    else
+      grep -F 'agent dead' "$state/.wake-queue" >/dev/null || fail "unparked dead lane lost its alert"
+    fi
+  done
+  pass "review parking absorbs delivered dead pauses while unparked lanes still alert"
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit 0
 fi
 
 fm_test_run \
+  test_review_park_absorbs_delivered_dead_pause \
   test_required_captain_hold_tests_fail_without_tasks_axi \
   test_nonterminal_stale_not_working_surfaced \
   test_nonterminal_stale_paused_absorbed_then_resurfaced \

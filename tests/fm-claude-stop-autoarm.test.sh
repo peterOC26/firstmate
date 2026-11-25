@@ -620,30 +620,43 @@ test_stopfailure_failure_continuations_are_paced() {
 # a vanished need leaves nothing to supervise, so either one appearing during
 # the wait ends the firing silently instead of waking the primary late.
 test_stopfailure_paced_rewake_honors_afk_and_need_after_wait() {
-  local dir case_name status fail_payload rcfile hook_pid
+  local dir case_name status fail_payload rcfile hook_pid ready
   fail_payload='{"session_id":"sess-autoarm","hook_event_name":"StopFailure","error":"connection_failed","transcript_path":"/tmp/sess.jsonl"}'
-  for case_name in afk need; do
+  for case_name in afk need host; do
     dir=$(make_primary_dir "$TMP_ROOT/stopfailure-wait-$case_name")
     : > "$dir/state/task.meta"
-    write_arm_fixture "$dir" actionable
+    ready="$dir/state/successor-ran"
+    if [ "$case_name" = host ]; then
+      rm -f "$dir/config/supervision-host-off"
+      : > "$dir/state/.afk-contract"
+      write_host_fixture "$dir" captain-note
+      ready="$dir/state/host-ran"
+    else
+      write_arm_fixture "$dir" actionable
+    fi
     : > "$dir/state/.claude-autoarm-stopfailure-rewake"
     rcfile="$dir/hook-rc"
     ( FM_CLAUDE_STOPFAILURE_REWAKE_COOLDOWN=5 run_autoarm "$dir" "$fail_payload" >/dev/null 2>&1; echo "$?" > "$rcfile" ) &
     hook_pid=$!
     for _ in $(seq 1 100); do
-      [ -e "$dir/state/successor-ran" ] && break
+      [ -e "$ready" ] && break
       sleep 0.05
     done
-    [ -e "$dir/state/successor-ran" ] || fail "$case_name: the paced StopFailure never reached its handling successor"
+    [ -e "$ready" ] || fail "$case_name: the paced StopFailure never reached its handling successor"
     sleep 0.5
     [ ! -e "$rcfile" ] || fail "$case_name: the StopFailure inside the cooldown finished before waiting it out"
-    if [ "$case_name" = afk ]; then
+    if [ "$case_name" != need ]; then
       : > "$dir/state/.afk"
     else
       rm -f "$dir/state/task.meta"
     fi
     wait "$hook_pid"
     status=$(cat "$rcfile")
+    if [ "$case_name" = host ]; then
+      expect_code 2 "$status" "the away host must deliver its hand-back after the cooldown"
+      [ "$(epoch_outcome "$dir")" = rewake ] || fail "the away host lost its hand-back during cooldown"
+      continue
+    fi
     expect_code 0 "$status" "$case_name appearing during the StopFailure cooldown wait must end the firing silently"
     if [ "$case_name" = afk ]; then
       [ "$(epoch_outcome "$dir")" = afk ] || fail "AFK during the wait must record outcome=afk, got: $(epoch_outcome "$dir")"
@@ -2638,6 +2651,11 @@ test_clear_rekey_stale_sidecar_starts_the_away_host() {
   unset CLAUDE_PID || true
   pass "auto-arm: a /clear re-key with a stale sidecar starts the away host and re-anchors the sidecar"
 }
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
 
 test_inert_in_child_worktree
 test_inert_without_session_lock

@@ -407,7 +407,7 @@ stopfailure_pace() {
   [ "$remaining" -gt 0 ] || return 0
   sleep "$remaining" &
   wait "$!" 2>/dev/null || true
-  if [ -e "$STATE/.afk" ]; then
+  if [ -e "$STATE/.afk" ] && ! fm_supervision_away_host_is_actor "$CONFIG" "$STATE"; then
     autoarm_record afk
   elif ! need_supervision; then
     autoarm_record clean

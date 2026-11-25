@@ -2587,6 +2587,12 @@ handle_paused_stale() {  # <window> <task> <hash> [idle|busy]
   now=$(date +%s)
   age=$(( now - mtime ))
   last=$(status_declared_wait_line "$statusf")
+  # A lane parked on review stopped its agent on purpose; bin/fm-park.sh's tick
+  # watches its PR and owns every wake for it.
+  if [ -f "$STATE/$task.review-park" ]; then
+    triage_log "absorbed stale (parked on review, watched by fm-park.sh tick): $win"
+    return 0
+  fi
   if [ "$activity" = idle ] \
     && [ "$(window_kind "$win")" != secondmate ] \
     && status_is_paused "$last" \
@@ -2598,12 +2604,6 @@ handle_paused_stale() {  # <window> <task> <hash> [idle|busy]
   fi
   min_age=$PAUSE_RESURFACE_SECS
   declaration="declared:$(fm_wake_signal_sig "$statusf" || true)"
-  # A lane parked on review stopped its agent on purpose; bin/fm-park.sh's tick
-  # watches its PR and owns every wake for it.
-  if [ -f "$STATE/$task.review-park" ]; then
-    triage_log "absorbed stale (parked on review, watched by fm-park.sh tick): $win"
-    return 0
-  fi
   pause_age=$(status_pause_age "$last" "$age" "$now")
   if status_is_paused "$last" && status_pause_is_overdue "$last" "$pause_age" "$now"; then
     detail="paused, wait overdue"
