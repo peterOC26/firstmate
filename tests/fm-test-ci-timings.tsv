@@ -7,11 +7,14 @@
 # Split-file weights for fm-watch-triage-busy, fm-captain-hold-teardown, and the
 # reduced watch-triage/captain-hold parents are proportional splits of those
 # parent measurements, pending a refresh from green CI.
+# Four fork measurements (afk-entry-brief, afk-main-outcome, spawn-claude-lean, spawn-slot-ownership) are provisional until replaced by a green fork CI run.
 path	duration_ms
 tests/fm-afk-contract.test.sh	13161
+tests/fm-afk-entry-brief.test.sh	27000
 tests/fm-afk-inject-e2e.test.sh	41468
 tests/fm-afk-inject-herdr-e2e.test.sh	60223
 tests/fm-afk-launch.test.sh	53562
+tests/fm-afk-main-outcome.test.sh	2000
 tests/fm-afk-pi-herdr-return-e2e.test.sh	251
 tests/fm-afk-return.test.sh	60966
 tests/fm-agy-harness.test.sh	58160
@@ -275,6 +278,7 @@ tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh	189
 tests/fm-sessionstart-nudge.test.sh	82311
 tests/fm-shared-captain-inheritance.test.sh	10514
 tests/fm-spawn-batch.test.sh	3836
+tests/fm-spawn-claude-lean.test.sh	80000
 tests/fm-spawn-compact-adviser-disable-remote.test.sh	80936
 tests/fm-spawn-compact-adviser-disable.test.sh	47269
 tests/fm-spawn-dispatch-profile.test.sh	534028
@@ -283,6 +287,7 @@ tests/fm-spawn-herdr-lease.test.sh	19025
 tests/fm-spawn-manual-pr-text.test.sh	8446
 tests/fm-spawn-orca-worktree.test.sh	59730
 tests/fm-spawn-pool-base-freshen.test.sh	170365
+tests/fm-spawn-slot-ownership.test.sh	284000
 tests/fm-spawn-worktree-settle.test.sh	12233
 tests/fm-startup-growth-check.test.sh	6029
 tests/fm-startup-memory-budget.test.sh	11138
