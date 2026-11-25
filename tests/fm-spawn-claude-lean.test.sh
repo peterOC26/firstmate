@@ -182,6 +182,9 @@ test_lean_ship_and_scout() {
       rec=$(make_case "lean-$kind-$setting" claude "$id")
       read_case "$rec"
       [ "$setting" = absent ] || : > "$HOME_DIR/config/launch-env-allowlist"
+      if [ "$setting" = enabled ]; then
+        printf '%s\n' Workflow > "$HOME_DIR/config/crew-exclude-tools"
+      fi
       if [ "$kind" = scout ]; then
         out=$(run_case_spawn "$id" "$PROJ_DIR" --scout --claude-lean)
       else
@@ -206,6 +209,10 @@ test_lean_ship_and_scout() {
       seen=$(run_emitted_launch "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG" 1) \
         || fail "$kind allowlist=$setting: the emitted launch failed to run"
       assert_lean_probe "$seen" "$kind allowlist=$setting"
+      if [ "$setting" = enabled ]; then
+        assert_contains "$seen" ' --disallowedTools mcp__*,Workflow ' \
+          "$kind: the emitted launch must deny both MCP tools and the configured tool"
+      fi
       seen=$(run_emitted_launch "$FAKEBIN_DIR" "$LAUNCH_LOG" "$PANE_LOG" 0) \
         || fail "$kind allowlist=$setting: the launch command alone failed to run"
       assert_lean_probe "$seen" "$kind allowlist=$setting, launch command alone"

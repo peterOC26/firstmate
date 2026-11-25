@@ -195,161 +195,180 @@ SH
 }
 
 
-# A herdr-hosted primary has no TMUX_PANE. The retry must use the inherited
-# Herdr pane and the same ownership, foreground, busy, and composer guards,
-# and it must not start a Herdr server that is not already running.
-test_handoff_retry_submits_through_the_inherited_herdr_pane() {
-  local home doorbell record real_ps
-  home=$(make_primary_home handoff-herdr-doorbell)
-  real_ps=$(command -v ps)
-  cat > "$home/fakebin/ps" <<SH
-#!/usr/bin/env bash
-if [ "\$1:\$2" = '-o:pgid=,tpgid=' ]; then
-  if [ -f "\$FM_HOME/background-session" ]; then printf '77 88\\n'; else printf '77 77\\n'; fi
-  exit 0
-fi
-exec "$real_ps" "\$@"
-SH
-  chmod +x "$home/fakebin/ps"
+# Fake herdr for the hand-back doorbell cases; it logs each call's --session.
+write_doorbell_herdr_fake() {  # <home>
+  local home=$1
   cat > "$home/fakebin/herdr" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FM_HOME/herdr-calls"
-case "$1" in
-  server)
-    printf '%s\n' "$*" >> "$FM_HOME/server-starts"
-    exit 1
-    ;;
+set -u
+lock_pid() { cat "$FM_HOME/state/.lock"; }
+agent_status() { cat "$FM_HOME/herdr-status" 2>/dev/null || printf 'idle\n'; }
+arg_value() { # <flag> <args...>
+  local flag=$1
+  shift
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$flag" ]; then printf '%s\n' "$2"; return 0; fi
+    shift
+  done
+  return 1
+}
+session=$(arg_value --session "$@") && printf '%s\n' "$session" >> "$FM_HOME/herdr-sessions"
+case "${1:-}" in
   status)
-    if [ -f "$FM_HOME/server-stopped" ]; then
-      printf '%s\n' '{"server":{"running":false}}'
-    else
-      printf '%s\n' '{"server":{"running":true}}'
-    fi
-    exit 0
-    ;;
+    if [ -e "$FM_HOME/server-down" ]; then printf '{"server":{"running":false}}\n'; else printf '{"server":{"running":true}}\n'; fi ;;
   agent)
-    if [ -f "$FM_HOME/native-working" ]; then
-      printf '%s\n' '{"result":{"agent":{"agent":"claude","agent_status":"working"}}}'
-    else
-      printf '%s\n' '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}'
-    fi
-    exit 0
-    ;;
+    [ "${2:-}" = get ] || exit 1
+    if [ -e "$FM_HOME/foreign-agent" ]; then label=pi; else label=claude; fi
+    if [ -e "$FM_HOME/foreign-binding" ]; then binding=pi; else binding=claude; fi
+    printf '{"result":{"agent":{"agent":"%s","agent_status":"%s","agent_session":{"agent":"%s"}}}}\n' "$label" "$(agent_status)" "$binding" ;;
   pane)
-    case "$2" in
-      process-info|read|send-text|send-keys) ;;
+    case "${2:-}" in
+      process-info)
+        pane=$(arg_value --pane "$@") || exit 1
+        if [ -e "$FM_HOME/foreign-pane" ]; then shell_pid=999999; else shell_pid=$(lock_pid); fi
+        if [ -e "$FM_HOME/background-session" ]; then
+          fg=999999
+        else
+          fg=$(ps -o pgid= -p "$(lock_pid)" 2>/dev/null | tr -d ' ')
+        fi
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"claude","argv0":"claude"}]}}}\n' \
+          "$pane" "$shell_pid" "$fg" "$(lock_pid)" ;;
+      read) cat "$FM_HOME/screen" ;;
+      send-text)
+        # pane send-text <pane> <text> --session <s>
+        shift 3
+        text=$1
+        printf 'send-text %s\n' "$text" >> "$FM_HOME/submits"
+        printf '❯ %s\n' "$text" > "$FM_HOME/screen" ;;
+      send-keys)
+        # pane send-keys <pane> <key> --session <s>
+        shift 3
+        key=$1
+        printf 'send-keys %s\n' "$key" >> "$FM_HOME/submits"
+        case "$key" in
+          enter)
+            printf 'working\n' > "$FM_HOME/herdr-status"
+            printf '❯ \n' > "$FM_HOME/screen" ;;
+        esac ;;
       *) exit 1 ;;
-    esac
-    ;;
+    esac ;;
   *) exit 1 ;;
 esac
-case "$2" in
-  process-info)
-    lock=$(cat "$FM_HOME/state/.lock")
-    shell_pid=$(ps -o ppid= -p "$lock" | tr -d ' ')
-    pane_id=$4
-    if [ -f "$FM_HOME/foreign-response" ]; then pane_id=w9:p9; fi
-    if [ -f "$FM_HOME/foreign-pane" ]; then shell_pid=999999; fi
-    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"bash","argv0":"bash","argv":["bash"],"cmdline":"bash"}]}}}\n' \
-      "$pane_id" "$shell_pid" "$shell_pid" "$lock"
-    ;;
-  read)
-    case "$*" in
-      *"--format ansi"*) exit 1 ;;
-    esac
-    if [ -s "$FM_HOME/typed" ]; then
-      printf '❯ %s\n' "$(cat "$FM_HOME/typed")"
-    elif [ -f "$FM_HOME/submitted" ] || [ -f "$FM_HOME/busy-footer" ]; then
-      if [ -f "$FM_HOME/busy-footer" ]; then
-        printf 'esc to interrupt\n❯ \n'
-      else
-        printf '❯ \n'
-      fi
-    else
-      cat "$FM_HOME/screen"
-    fi
-    ;;
-  send-text)
-    printf '%s\n' "$4" >> "$FM_HOME/submits"
-    printf '%s' "$4" > "$FM_HOME/typed"
-    ;;
-  send-keys)
-    printf '%s\n' "$4" >> "$FM_HOME/submits"
-    if [ "$4" = enter ]; then
-      rm -f "$FM_HOME/typed"
-      : > "$FM_HOME/submitted"
-    fi
-    ;;
-  *) exit 1 ;;
-esac
+exit 0
 SH
   chmod +x "$home/fakebin/herdr"
+}
+
+# The herdr transport twin of the tmux case above: the detached owner inherits
+# HERDR_ENV/HERDR_PANE_ID/HERDR_SESSION from a Claude primary's pane and must
+# reach that exact pane through the real herdr adapter - only after proving the
+# pane's shell pid is an ancestor of the pinned session owner, the session is
+# the pane's foreground group, the native agent state is not submit-busy, the
+# rendered busy footer is idle, and the composer is empty. A typed draft, a
+# foreign pane, a different foreground conversation, a working agent, or an
+# unreachable server each defer without touching the queued check.
+test_handoff_retry_reaches_the_receiving_herdr_pane() {
+  local home doorbell record
+  home=$(make_primary_home handoff-herdr-doorbell)
   : > "$home/config/supervision-handoff-ack"
-  : > "$home/server-stopped"
-  printf '❯ \n' > "$home/screen"
-  : > "$home/herdr-calls"
-  : > "$home/submits"
-  TMUX_PANE='' HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SESSION=fmhandoff \
-    FM_SUPERVISION_HANDOFF_RETRY_SECONDS=2 \
-    FM_BACKEND_HERDR_SUBMIT_POLLS=1 FM_BACKEND_HERDR_SUBMIT_MIN_SLEEP=0.05 \
-    start_hook_session "$home"
+  printf '❯ human draft\n' > "$home/screen"
+  printf 'idle\n' > "$home/herdr-status"
+  write_doorbell_herdr_fake "$home"
+  HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SESSION=fm-lab-doorbell \
+    FM_SUPERVISION_HANDOFF_RETRY_SECONDS=3 start_hook_session "$home"
   turn_end "$home"
   wait_until 150 watcher_live "$home" || fail "herdr doorbell: no initial watcher"
   append_status "$home" 'which export format?' needs-decision
   wait_until_deadline 60 hook_exited "$home" || fail "herdr doorbell: no hand-back"
-  wait_until 200 grep -q 'retry' "$home/state/.supervision-handoff.log" || fail "herdr doorbell: no retry while the server is stopped"
-  [ ! -s "$home/submits" ] || fail "herdr doorbell: a stopped server was typed into"
-  [ ! -s "$home/server-starts" ] || fail "herdr doorbell: a stopped server was started"
-  rm -f "$home/server-stopped"
-  : > "$home/foreign-response"
-  cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
-    || fail "herdr doorbell: no foreign-response retry"
-  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry trusted process-info for another pane"
-  rm -f "$home/foreign-response"
-  printf '❯ human draft\n' > "$home/screen"
-  cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
-    || fail "herdr doorbell: no pending-composer retry"
+  wait_until 150 grep -q 'retry' "$home/state/.supervision-handoff.log" || fail "herdr doorbell: no retry"
   [ ! -s "$home/submits" ] || fail "herdr doorbell: retry overwrote human input"
   printf '❯ \n' > "$home/screen"
   : > "$home/foreign-pane"
+  # Observe a complete new retry while the pane does not own this session.
   cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
     || fail "herdr doorbell: no foreign-pane retry"
   [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached another session's pane"
-  rm -f "$home/foreign-pane"
+  rm "$home/foreign-pane"
   : > "$home/background-session"
   cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
     || fail "herdr doorbell: no background-session retry"
   [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a different foreground conversation"
-  rm -f "$home/background-session"
-  : > "$home/busy-footer"
+  rm "$home/background-session"
+  : > "$home/foreign-agent"
   cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
-    || fail "herdr doorbell: no busy-footer retry"
-  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a busy composer"
-  rm -f "$home/busy-footer"
-  : > "$home/native-working"
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+    || fail "herdr doorbell: no foreign-agent retry"
+  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a foreign registered agent"
+  rm "$home/foreign-agent"
+  # All other delivery conditions pass: Claude, native/rendered idle, empty
+  # composer, and the pinned foreground owner. Only its binding is foreign.
+  : > "$home/foreign-binding"
   cp "$home/state/.supervision-handoff.log" "$home/retries-before"
-  wait_until 200 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
-    || fail "herdr doorbell: no native-working retry"
-  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a working agent"
-  rm -f "$home/native-working"
-  wait_until 200 grep -q $'\tretry\t.*\tempty$' "$home/state/.supervision-handoff.log" \
-    || fail "herdr doorbell: the submit helper did not confirm the idle owning pane's retry: $(cat "$home/state/.supervision-handoff.log")"
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+    || fail "herdr doorbell: no foreign-binding retry"
+  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a foreign session binding"
+  [ -f "$home/state/.supervision-handoff-pending" ] || fail "herdr doorbell: foreign binding consumed the pending check"
+  rm "$home/foreign-binding"
+  printf 'working\n' > "$home/herdr-status"
+  cp "$home/state/.supervision-handoff.log" "$home/retries-before"
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+    || fail "herdr doorbell: no working-agent retry"
+  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a busy agent"
+  printf 'idle\n' > "$home/herdr-status"
+  # Native status is idle and the composer is empty; only the rendered footer
+  # says Claude is generating. The intent requires this independent veto.
+  printf 'Thinking… (esc to interrupt)\n❯ \n' > "$home/screen"
+  cp "$home/state/.supervision-handoff.log" "$home/retries-before"
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+    || fail "herdr doorbell: no rendered-busy retry"
+  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached a rendered-busy agent with native idle status"
+  [ -f "$home/state/.supervision-handoff-pending" ] || fail "herdr doorbell: rendered busy consumed the pending check"
+  printf '❯ \n' > "$home/screen"
+  : > "$home/server-down"
+  cp "$home/state/.supervision-handoff.log" "$home/retries-before"
+  wait_until 150 bash -c '! cmp -s "$1/retries-before" "$1/state/.supervision-handoff.log"' _ "$home" \
+    || fail "herdr doorbell: no server-down retry"
+  [ ! -s "$home/submits" ] || fail "herdr doorbell: retry reached an unreadable pane"
+  rm "$home/server-down"
+  wait_until 150 grep -q $'\tretry\t.*\tempty$' "$home/state/.supervision-handoff.log" \
+    || fail "herdr doorbell: the submit helper did not confirm the idle owning pane's retry"
   [ -s "$home/submits" ] || fail "herdr doorbell: idle owning pane received no retry"
-  assert_grep 'enter' "$home/submits" "the herdr retry must submit, not merely type"
-  assert_grep 'fmhandoff' "$home/herdr-calls" "the retry must use the inherited herdr session"
-  doorbell=$(grep 'operational-inbox/' "$home/submits" | head -1)
+  assert_grep 'enter' "$home/submits" "the retry must submit, not merely type"
+  doorbell=$(grep 'send-text ' "$home/submits" | head -1)
   record=$(printf '%s\n' "$doorbell" | grep -o '/[^ ]*/operational-inbox/[^ ]*\.msg')
   [ -n "$record" ] && [ -f "$record" ] || fail "herdr doorbell: no durable operational record"
-  assert_grep 'watcher: check: supervision-handoff' "$record" "the herdr retry must be operational watcher input"
+  assert_grep 'watcher: check: supervision-handoff' "$record" "the retry must be operational watcher input"
   [ -f "$home/state/.supervision-handoff-pending" ] || fail "herdr doorbell: submission was mistaken for acknowledgement"
-  [ ! -s "$home/server-starts" ] || fail "herdr doorbell: delivery started a herdr server"
   stop_home_processes "$home"
-  pass "host+hook: hand-back retry submits through the inherited herdr pane without starting a server or replacing human input"
+  pass "host+hook: hand-back retry submits only to the idle owning herdr pane without replacing human input"
+}
+
+# A primary in herdr's default session inherits no HERDR_SESSION; its retry
+# must still reach the inherited pane through that default session.
+test_handoff_retry_reaches_a_default_session_herdr_pane() {
+  local home
+  home=$(make_primary_home handoff-herdr-default-session)
+  : > "$home/config/supervision-handoff-ack"
+  printf '❯ \n' > "$home/screen"
+  printf 'idle\n' > "$home/herdr-status"
+  write_doorbell_herdr_fake "$home"
+  HERDR_ENV=1 HERDR_PANE_ID=w1:p1 HERDR_SESSION='' \
+    FM_SUPERVISION_HANDOFF_RETRY_SECONDS=3 start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "default-session doorbell: no initial watcher"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until_deadline 60 hook_exited "$home" || fail "default-session doorbell: no hand-back"
+  wait_until 150 grep -q $'\tretry\t.*\tempty$' "$home/state/.supervision-handoff.log" \
+    || fail "default-session doorbell: no confirmed retry: $(cat "$home/state/.supervision-handoff.log" 2>/dev/null)"
+  assert_grep 'enter' "$home/submits" "the default-session retry must submit"
+  assert_grep 'default' "$home/herdr-sessions" "the retry must address herdr's default session"
+  if grep -qv '^default$' "$home/herdr-sessions"; then
+    fail "the default-session retry addressed another session: $(sort -u "$home/herdr-sessions")"
+  fi
+  stop_home_processes "$home"
+  pass "host+hook: hand-back retry reaches a herdr pane in the default session without HERDR_SESSION"
 }
 
 
@@ -868,7 +887,8 @@ fm_test_run \
   test_unverifiable_handoff_still_hands_back \
   test_acknowledged_handoff_at_the_turn_keeps_the_pass_through_row \
   test_handoff_retry_respects_the_receiving_pane \
-  test_handoff_retry_submits_through_the_inherited_herdr_pane \
+  test_handoff_retry_reaches_the_receiving_herdr_pane \
+  test_handoff_retry_reaches_a_default_session_herdr_pane \
   test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main \
   test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn \
   test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails \
