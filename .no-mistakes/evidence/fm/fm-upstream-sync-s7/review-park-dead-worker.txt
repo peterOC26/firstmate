@@ -1,0 +1,6 @@
+Real fm-watch.sh stale handler and tmux liveness probe ran in a private 120x40 server against an isolated FM_HOME.
+backend agent state: dead
+delivered status identity: 51@strong:38:18547951:2026-11-25 06:58:09.510763277 +0100
+handler outcome: review park absorbed stale
+triage: [2026-11-25T06:58:10+0100] absorbed stale (parked on review, watched by fm-park.sh tick): validation:worker
+wake queue bytes: 0

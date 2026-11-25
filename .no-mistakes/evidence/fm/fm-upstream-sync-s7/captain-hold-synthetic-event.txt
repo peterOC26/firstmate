@@ -1,0 +1,25 @@
+Live local run: bin/fm-captain-hold.sh and tasks-axi used an isolated markdown backlog. GitHub was not contacted.
+Synthetic persisted observer input: PR state=merged, checked_at=2026-11-25T06:06:50Z
+Policy registration: pr-policy: synthetic-pr-hold https://github.com/example/local/pull/17 merged close
+Mismatched PR URL attempt: return=0; hold remained open
+Matching PR event settlement: pr-settled: synthetic-pr-hold https://github.com/example/local/pull/17 merged close
+Final task record:
+task:
+  id: synthetic-pr-hold
+  title: "Decide synthetic PR outcome https://github.com/example/local/pull/17"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "fm-hold-v1:Q2FwdGFpbiBkZWNpc2lvbiByZXF1aXJlZA=="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: firstmate
+  priority: "-"
+  created: "-"
+  closed: 2026-11-25
+  deps: none
+  links: "pr:https://github.com/example/local/pull/17"
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 037d02a07ee8ae05d9b3455a2c0eda4f0b07719b026ac958c5d281b6e1954d41\nResolution mode: forge-closed\n\nReconciliation evidence:\nForge PR merged: https://github.com/example/local/pull/17\nObserved at: 2026-11-25T06:06:50Z\nSettlement policy: merged -> close"
+Policy removed after publication: true

@@ -1,0 +1,45 @@
+Installed CLI: grok 1.0.92 (b06756fd6256)
+Isolated tmux pane command: node
+Isolated pane capture:
+
+   detached worktree /h/z/.n/w/7f0ec18181b6/01M88FBMKHQC6ZDB20P1JKRWTH
+
+                                                     ⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄
+                                                     ⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀
+                                                     ⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀
+                                                     ⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀
+                                                     ⠀⠀⢹⣷⠀⠀⠀⠀⠀⢀⣴⡿⠀⠀
+                                                     ⠀⢀⠞⠁⠠⢶⣶⣶⣶⠿⠋⠀⠀⠀
+                                                     ⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+
+
+                                      Approve in your browser to finish signing in.
+
+                                                        [redacted device code]
+
+                                         Make sure your browser shows this code.
+
+                                                Click to copy sign-in URL
+
+
+
+                                                      Show full URL
+
+                                                  Waiting for approval…
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                                      ctrl+q  quit
+
+
+not attempted because isolated Grok session did not reach an interactive composer

@@ -1,0 +1,5 @@
+Real bin/fm-watch.sh ran as a private-tmux process against an isolated FM_HOME with a real shell pane and synthetic delivered review-park record.
+Watcher triage: [2026-11-25T07:03:30+0100] absorbed stale (parked on review, watched by fm-park.sh tick): validation:worker
+Wake queue: empty
+Active panes:
+bash:bash

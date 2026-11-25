@@ -1,0 +1,8 @@
+NEEDS_GH_AUTH
+RECORD_HYGIENE: status log without metadata older than 24 hours: orphan
+
+Persisted result:
+orphan archived: True
+recent orphan retained: True
+metadata-backed status retained: True
+archived content: working: orphan record for archive check
