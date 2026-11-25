@@ -23,8 +23,12 @@ if [ -z "${FM_TEST_DAEMON_SOURCED:-}" ]; then
 fi
 
 TMP_ROOT=$(fm_test_tmproot fm-daemon-tests)
-# shellcheck source=bin/fm-wake-lib.sh
-FM_STATE_OVERRIDE="$TMP_ROOT/state" . "$ROOT/bin/fm-wake-lib.sh"
+source_wake_lib() {
+  # The production wake library is linted as its own root.
+  # shellcheck source=/dev/null
+  . "$ROOT/bin/fm-wake-lib.sh"
+}
+FM_STATE_OVERRIDE="$TMP_ROOT/state" source_wake_lib
 FM_DAEMON_PRIMARY_HARNESS=claude
 export FM_DAEMON_PRIMARY_HARNESS
 
@@ -1594,7 +1598,7 @@ test_housekeeping_overdue_pause_opens_one_decision_in_away_mode() {
   fm_write_meta "$state/$task.meta" "window=$win" "worktree=$dir/wt" "kind=ship" "harness=pi"
   printf '%s\n' "$(( $(date +%s) - 5000 ))" > "$state/.subsuper-paused-$key"
   sleep 2
-  FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+  FM_STATE_OVERRIDE="$state" source_wake_lib
 
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$pane" \
     FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 \
@@ -1686,7 +1690,7 @@ test_housekeeping_overdue_queue_failure_leaves_decision_open() {
   FM_HOME="$dir" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-afk-contract.sh" enter --words 'fixture words' >/dev/null 2>&1 || fail "fixture: could not record away posture"
   echo $(( $(date +%s) - 5000 )) > "$state/.subsuper-paused-$task"
   sleep 2
-  FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+  FM_STATE_OVERRIDE="$state" source_wake_lib
   real_escalate_add=$(declare -f escalate_add)
   escalate_add() { return 1; }
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$pane" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 housekeeping "$state"
@@ -1713,7 +1717,7 @@ test_watcher_overdue_marker_does_not_hide_blocker_from_daemon() {
   printf 'blocked [key=paused-overdue-%s]: paused 90s, wait overdue - decide or release\n' "$task" >> "$statusf"
   fm_write_meta "$state/$task.meta" "window=$win" "worktree=$dir/wt" "kind=ship" "harness=pi"
   (
-    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ESCALATE_BATCH_SECS=999999 . "$ROOT/bin/fm-wake-lib.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ESCALATE_BATCH_SECS=999999 source_wake_lib
     if [ "$(uname)" = Darwin ]; then identity=$(/usr/bin/stat -f '%d %i' "$statusf"); else identity=$(stat -c '%d %i' "$statusf"); fi
     printf '%s:%s\n' "$identity" "$size" > "$state/.paused-overdue-$task"
     [ -z "$(overdue_delivered_key "$state" "$task")" ] || fail "an undelivered marker hid its blocker"
@@ -1735,7 +1739,7 @@ test_overdue_open_decision_without_marker_is_not_repeated() {
   printf '%s\n' "$(( $(date +%s) - 5000 ))" > "$state/.subsuper-paused-$task"
   sleep 2
   (
-    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 FM_ESCALATE_BATCH_SECS=999999 . "$ROOT/bin/fm-wake-lib.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 FM_ESCALATE_BATCH_SECS=999999 source_wake_lib
     housekeeping "$state"
     [ "$(grep -cF "blocked [key=paused-overdue-$task]" "$statusf")" -eq 1 ] || fail "an interrupted emission opened a second decision"
   ) || fail "open decision without a marker was repeated"
@@ -1758,19 +1762,21 @@ test_housekeeping_overdue_queue_failure_resume_discards() {
         FM_HOME="$dir" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-afk-contract.sh" enter --words fixture >/dev/null 2>&1 || fail "fixture: away posture"
         printf '%s\n' "$(( $(date +%s) - 5000 ))" > "$state/.subsuper-paused-$task"
         sleep 2
-        . "$ROOT/bin/fm-wake-lib.sh"
+        source_wake_lib
         # Prefix assignments on a sourced file last only while it is sourced, so each
         # daemon call carries the fixture environment itself.
         undated=1
         fixture() { PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$pane" \
           FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=$undated FM_ESCALATE_BATCH_SECS=999999 "$@"; }
         original_append=$(declare -f fm_wake_status_append_self_announced)
+        # shellcheck disable=SC2329 # Reached through fixture housekeeping.
         escalate_add() { return 1; }
         fixture housekeeping "$state"
         [ -e "$state/.paused-overdue-$task" ] || fail "failed queue lost the overdue marker"
         undated=86400
         printf '%s: worker changed wait\n' "$event" >> "$statusf"
         eval "$original_enqueue"
+        # shellcheck disable=SC2329 # Reached through fixture during reconciliation.
         fm_wake_status_append_self_announced() { return 2; }
         case "$route" in
           housekeeping) fixture housekeeping "$state" ;;
@@ -1817,7 +1823,7 @@ test_overdue_reconcile_ignores_unrelated_and_repeated_pause() {
       configured-resolve) printf 'working: resumed\n' >> "$statusf" ;;
     esac
     (
-      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" source_wake_lib
       if [ "$event" = custom ]; then
         FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_CLASSIFY_PAUSED_VERB=holding reconcile_overdue_pause "$state" "$task"
       elif [ "$event" = configured-resolve ]; then
@@ -1854,7 +1860,7 @@ test_housekeeping_overdue_initial_publication_reconciles_resume() {
       FM_HOME="$dir" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-afk-contract.sh" enter --words fixture >/dev/null 2>&1 || fail "fixture: away posture"
       printf '%s\n' "$(( $(date +%s) - 5000 ))" > "$state/.subsuper-paused-$task"
       sleep 2
-      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" source_wake_lib
       original_append=$(declare -f fm_wake_status_append_self_announced)
       eval "${original_append/fm_wake_status_append_self_announced ()/original_append_impl ()}"
       fm_wake_status_append_self_announced() {
@@ -1889,7 +1895,7 @@ test_housekeeping_quiet_overdue_pause_opens_decision() {
   FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'fixture words' >/dev/null 2>&1 \
     || fail "fixture: could not record the quiet posture"
   sleep 2
-  FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+  FM_STATE_OVERRIDE="$state" source_wake_lib
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$pane" \
     FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 \
     FM_ESCALATE_BATCH_SECS=999999 housekeeping "$state"
@@ -1914,7 +1920,7 @@ test_housekeeping_overdue_pause_preserves_prior_actionable_event() {
   echo $(( $(date +%s) - 5000 )) > "$state/.subsuper-paused-$task"
   echo $(( $(date +%s) - 5000 )) > "$state/.subsuper-last-scan"
   sleep 2
-  FM_STATE_OVERRIDE="$state" . "$ROOT/bin/fm-wake-lib.sh"
+  FM_STATE_OVERRIDE="$state" source_wake_lib
 
   PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$win" FM_FAKE_TMUX_CAPTURE="$pane" \
     FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_PAUSE_UNDATED_MAX_SECS=1 \
